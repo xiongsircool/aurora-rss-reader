@@ -2316,30 +2316,33 @@ async function handleImportOpml(event: Event) {
 
 .details__actions {
   display: flex;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 18px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(245, 246, 248, 0.9));
   border: 1px solid rgba(15, 17, 21, 0.08);
   box-shadow: 0 6px 18px rgba(15, 17, 21, 0.08);
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .details__actions button,
 .details__actions .lang-select {
-  height: 38px;
-  padding: 0 18px;
+  height: 28px;
+  padding: 0 12px;
   border-radius: 999px;
   border: 1px solid rgba(15, 17, 21, 0.12);
   background: rgba(255, 255, 255, 0.8);
   color: var(--text-primary);
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-weight: 500;
+  font-size: 0.75rem;
   letter-spacing: 0.01em;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  flex: 0 1 auto;
+  min-width: 68px;
+  white-space: nowrap;
 }
 
 .details__actions button:hover,
@@ -2367,10 +2370,13 @@ async function handleImportOpml(event: Event) {
 
 .details__actions .lang-select {
   appearance: none;
-  padding-right: 34px;
+  padding-right: 28px;
+  min-width: 78px;
+  text-align: left;
+  background-color: rgba(255, 255, 255, 0.8);
   background-image: linear-gradient(45deg, transparent 50%, rgba(15, 17, 21, 0.45) 50%), linear-gradient(135deg, rgba(15, 17, 21, 0.45) 50%, transparent 50%);
-  background-position: calc(100% - 18px) 15px, calc(100% - 12px) 15px;
-  background-size: 6px 6px, 6px 6px;
+  background-position: calc(100% - 13px) 11px, calc(100% - 9px) 11px;
+  background-size: 4px 4px, 4px 4px;
   background-repeat: no-repeat;
 }
 
@@ -2410,10 +2416,10 @@ async function handleImportOpml(event: Event) {
 .summary-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin: 0 0 24px;
-  padding: 18px 20px;
-  border-radius: 20px;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
   border: 1px solid rgba(15, 17, 21, 0.08);
   background: linear-gradient(135deg, rgba(255, 138, 61, 0.08), rgba(255, 138, 61, 0.02));
 }
@@ -2427,33 +2433,34 @@ async function handleImportOpml(event: Event) {
 }
 
 .summary-card__label {
-  font-size: 12px;
+  font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: rgba(15, 17, 21, 0.55);
-  margin-bottom: 6px;
+  margin-bottom: 2px;
   font-weight: 600;
 }
 
 .summary-card__text {
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--text-primary);
 }
 
 .summary-card__placeholder {
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .summary-card__action {
   border: none;
   border-radius: 999px;
-  padding: 10px 18px;
+  padding: 6px 14px;
   background: #ff8a3d;
   color: #fff;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.75rem;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   align-self: flex-start;
@@ -2633,6 +2640,11 @@ async function handleImportOpml(event: Event) {
 :global(.dark) .details__actions button:disabled {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.5);
+}
+
+:global(.dark) .details__actions .lang-select {
+  background-color: rgba(255, 255, 255, 0.15);
+  background-image: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.7) 50%), linear-gradient(135deg, rgba(255, 255, 255, 0.7) 50%, transparent 50%);
 }
 
 :global(.dark) .favorites-title {

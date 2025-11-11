@@ -17,36 +17,77 @@ from app.services.fetcher import _extract_time_from_description
 def _parse_datetime_enhanced_local(item):
     """本地版本的时间解析函数，避免循环导入"""
     from time import mktime
+    from email.utils import parsedate_to_datetime
 
-    # 1. 首先尝试标准的RSS时间字段
+    # 1. 首先尝试标准的RSS时间字段（已解析的时间结构）
     parsed = item.get("published_parsed") or item.get("updated_parsed")
     if parsed:
         try:
             timestamp = mktime(parsed)
-            return datetime.fromtimestamp(timestamp, tz=timezone.utc)
-        except Exception:
+            result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            logger.debug("从published_parsed/updated_parsed解析时间: %s", result)
+            return result
+        except Exception as e:
+            logger.debug("解析published_parsed/updated_parsed失败: %s", e)
             pass
 
-    # 2. 尝试其他时间字段
+    # 2. 尝试其他已解析的时间字段
     time_fields = ["created_parsed", "date_parsed", "pubdate_parsed", "issued_parsed"]
     for field in time_fields:
         if field in item:
             try:
                 timestamp = mktime(item[field])
-                return datetime.fromtimestamp(timestamp, tz=timezone.utc)
-            except Exception:
+                result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                logger.debug("从%s解析时间: %s", field, result)
+                return result
+            except Exception as e:
+                logger.debug("解析%s失败: %s", field, e)
                 continue
 
-    # 3. 尝试字符串时间字段
+    # 3. 尝试字符串时间字段（支持RSS的<pubDate>标签）
+    # RSS格式示例: "Tue, 04 Nov 2014 00:00:00 GMT"
     time_str_fields = ["published", "updated", "created", "date", "pubdate", "issued"]
     for field in time_str_fields:
         if field in item:
+            time_str = item[field]
+            if not time_str:
+                continue
+                
+            logger.debug("尝试解析时间字符串字段 %s: %s", field, time_str)
+            
+            # 3a. 首先尝试使用email.utils.parsedate_to_datetime解析RFC 822/2822格式
+            # 这是RSS <pubDate>标签的标准格式
             try:
-                time_struct = feedparser._parse_date(item[field])
-                if time_struct:
-                    timestamp = mktime(time_struct)
-                    return datetime.fromtimestamp(timestamp, tz=timezone.utc)
-            except Exception:
+                result = parsedate_to_datetime(time_str)
+                # 确保时区信息存在
+                if result.tzinfo is None:
+                    result = result.replace(tzinfo=timezone.utc)
+                logger.debug("使用parsedate_to_datetime从%s解析时间: %s", field, result)
+                return result
+            except Exception as e:
+                logger.debug("parsedate_to_datetime解析%s失败: %s", field, e)
+            
+            # 3b. 尝试使用feedparser内置的日期解析（如果可用）
+            try:
+                if hasattr(feedparser, '_parse_date'):
+                    time_struct = feedparser._parse_date(time_str)
+                    if time_struct:
+                        timestamp = mktime(time_struct)
+                        result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                        logger.debug("使用feedparser._parse_date从%s解析时间: %s", field, result)
+                        return result
+            except Exception as e:
+                logger.debug("feedparser._parse_date解析%s失败: %s", field, e)
+            
+            # 3c. 尝试ISO 8601格式
+            try:
+                result = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                if result.tzinfo is None:
+                    result = result.replace(tzinfo=timezone.utc)
+                logger.debug("使用fromisoformat从%s解析时间: %s", field, result)
+                return result
+            except Exception as e:
+                logger.debug("fromisoformat解析%s失败: %s", field, e)
                 continue
 
     # 4. 尝试从description中提取时间信息
@@ -54,8 +95,10 @@ def _parse_datetime_enhanced_local(item):
     if description:
         extracted_time = _extract_time_from_description(description)
         if extracted_time:
+            logger.debug("从描述中提取时间: %s", extracted_time)
             return extracted_time
 
+    logger.debug("无法解析时间，所有方法均失败")
     return None
 
 
