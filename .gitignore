@@ -1,0 +1,58 @@
+# macOS
+.DS_Store
+
+# Editor directories
+.idea/
+.vscode/
+
+# Python environments / caches
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*.pyo
+.mypy_cache/
+.pytest_cache/
+
+# Python env vars / secrets
+backend/.env
+backend/.env.local
+
+# Node / frontend artifacts
+node_modules/
+**/node_modules/
+package-lock.json
+yarn.lock
+.turbo/
+.parcel-cache/
+.cache/
+.eslintcache
+
+# Vite / Electron builds
+rss-desktop/dist/
+rss-desktop/dist-electron/
+rss-desktop/.vite/
+rss-desktop/out/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Coverage / testing
+coverage/
+coverage-final.json
+.nyc_output/
+
+# Build outputs / archives
+dist/
+build/
+*.tar
+*.tar.gz
+*.zip
+
+# Misc
+.spec-workflow/

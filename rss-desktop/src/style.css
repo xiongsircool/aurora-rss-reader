@@ -1,0 +1,68 @@
+:root {
+  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #0f1419;
+  background-color: #f5f7fb;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+
+  --bg-base: #f5f7fb;
+  --bg-surface: #ffffff;
+  --text-primary: #0f1419;
+  --text-secondary: #6c7384;
+  --border-color: rgba(15, 17, 21, 0.08);
+  --accent: #ff7a18;
+}
+
+:root.dark {
+  --bg-base: #0f1115;
+  --bg-surface: #181b22;
+  --text-primary: #f5f6fa;
+  --text-secondary: #9ba1b3;
+  --border-color: rgba(255, 255, 255, 0.15);
+  --accent: #ff8a3d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input,
+button {
+  font-family: inherit;
+}
+
+input[type='text'],
+input[type='url'],
+input[type='password'],
+input[type='number'],
+input[type='search'],
+select,
+textarea {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-secondary);
+}
