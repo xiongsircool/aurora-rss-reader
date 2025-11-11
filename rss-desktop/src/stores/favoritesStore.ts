@@ -8,10 +8,10 @@ export interface StarredEntry {
   feed_title: string
   title: string
   url: string
-  author?: string
-  summary?: string
-  content?: string
-  published_at?: string
+  author: string | null
+  summary: string | null
+  content: string | null
+  published_at: string | null
   read: boolean
   starred: boolean
 }

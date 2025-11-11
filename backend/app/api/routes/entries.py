@@ -24,6 +24,7 @@ def _entry_preview_summary(entry: Entry) -> str | None:
 async def list_entries(
     session: Session = Depends(get_session),
     feed_id: str | None = None,
+    group_name: str | None = Query(default=None, description="分组名称，用于获取该分组下所有订阅源的文章"),
     unread_only: bool = Query(default=False),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
@@ -41,6 +42,10 @@ async def list_entries(
     # 现有过滤条件
     if feed_id:
         stmt = stmt.where(Entry.feed_id == feed_id)
+    elif group_name:
+        # 按分组名称过滤：查询该分组下所有订阅源的文章
+        stmt = stmt.where(Feed.group_name == group_name)
+    
     if unread_only:
         stmt = stmt.where(Entry.read.is_(False))
 

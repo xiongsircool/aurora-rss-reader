@@ -553,7 +553,8 @@ async function applyFilters(options: { refreshFeeds?: boolean } = {}) {
     return
   }
 
-  if (!store.activeFeedId) {
+  // 如果既没有选择feed也没有选择分组，则返回
+  if (!store.activeFeedId && !store.activeGroupName) {
     if (promises.length) {
       await Promise.all(promises)
     }
@@ -563,7 +564,8 @@ async function applyFilters(options: { refreshFeeds?: boolean } = {}) {
   filterLoading.value = true
   promises.push(
     store.fetchEntries({
-      feedId: store.activeFeedId,
+      feedId: store.activeFeedId || undefined,
+      groupName: store.activeGroupName || undefined,
       unreadOnly: filterMode.value === 'unread',
       dateRange: filterDateRange,
       timeField: filterTimeField
@@ -580,11 +582,11 @@ async function applyFilters(options: { refreshFeeds?: boolean } = {}) {
 // 防抖的过滤器应用函数
 const debouncedApplyFilters = debounce(applyFilters, 300)
 
-// 监听activeFeedId变化
+// 监听activeFeedId或activeGroupName变化
 watch(
-  () => store.activeFeedId,
-  async (feedId) => {
-    if (feedId && !showFavoritesOnly.value) {
+  () => [store.activeFeedId, store.activeGroupName],
+  async () => {
+    if ((store.activeFeedId || store.activeGroupName) && !showFavoritesOnly.value) {
       await applyFilters()
     }
   }
@@ -741,6 +743,12 @@ function openExternal(url?: string | null) {
   if (url) {
     window.open(url, '_blank')
   }
+}
+
+async function handleGroupClick(groupName: string) {
+  // 点击分组标题时，选中该分组并加载其文章
+  store.selectGroup(groupName)
+  await store.fetchEntries({ groupName })
 }
 
 async function handleDeleteFeed(feedId: string) {
@@ -1015,36 +1023,40 @@ async function handleImportOpml(event: Event) {
         <template v-for="groupName in store.sortedGroupNames" :key="groupName">
           <div class="feed-group">
             <!-- 分组标题 -->
-            <button
-              class="group-header"
-              @click="store.toggleGroupCollapse(groupName)"
-            >
-              <span
-                class="group-toggle"
-                :class="{ collapsed: store.isGroupCollapsed(groupName) }"
-                aria-hidden="true"
+            <div class="group-header-wrapper">
+              <button
+                class="group-header"
+                :class="{ active: store.activeGroupName === groupName }"
+                @click="handleGroupClick(groupName)"
               >
-                <svg
-                  class="chevron-icon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+                <span
+                  class="group-toggle"
+                  :class="{ collapsed: store.isGroupCollapsed(groupName) }"
+                  aria-hidden="true"
+                  @click.stop="store.toggleGroupCollapse(groupName)"
                 >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </span>
-              <span class="group-name">{{ groupName }}</span>
-              <span class="group-stats">
-                {{ store.groupStats[groupName]?.feedCount || 0 }} 订阅
-                <span v-if="store.groupStats[groupName]?.unreadCount" class="unread-count">
-                  • {{ store.groupStats[groupName].unreadCount }} 未读
-                  <span v-if="isDateFilterActive" class="time-filter-hint">({{ timeFilterLabel }})</span>
+                  <svg
+                    class="chevron-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </span>
-              </span>
-            </button>
+                <span class="group-name">{{ groupName }}</span>
+                <span class="group-stats">
+                  {{ store.groupStats[groupName]?.feedCount || 0 }} 订阅
+                  <span v-if="store.groupStats[groupName]?.unreadCount" class="unread-count">
+                    • {{ store.groupStats[groupName].unreadCount }} 未读
+                    <span v-if="isDateFilterActive" class="time-filter-hint">({{ timeFilterLabel }})</span>
+                  </span>
+                </span>
+              </button>
+            </div>
 
             <!-- Feeds列表 -->
             <div
@@ -1067,7 +1079,7 @@ async function handleImportOpml(event: Event) {
                 >
                   <img
                     v-if="shouldShowFeedIcon(feed)"
-                    :src="feed.favicon_url"
+                    :src="feed.favicon_url || undefined"
                     :alt="`${feed.title || feed.url} 图标`"
                     loading="lazy"
                     decoding="async"
@@ -1154,6 +1166,9 @@ async function handleImportOpml(event: Event) {
                store.feeds.find((f) => f.id === selectedFavoriteFeed)?.title + ' 的收藏' || '收藏' :
                '全部收藏'
             }}
+          </h2>
+          <h2 v-else-if="store.activeGroupName">
+            {{ store.activeGroupName }} 分组
           </h2>
           <h2 v-else>
             {{ store.feeds.find((f) => f.id === store.activeFeedId)?.title || '最新条目' }}
@@ -1686,6 +1701,12 @@ async function handleImportOpml(event: Event) {
 
 .group-header:hover {
   background: rgba(255, 122, 24, 0.1);
+}
+
+.group-header.active {
+  background: rgba(255, 122, 24, 0.15);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(255, 122, 24, 0.3);
 }
 
 .group-toggle {

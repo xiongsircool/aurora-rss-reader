@@ -7,6 +7,7 @@ export const useFeedStore = defineStore('feed', () => {
   const feeds = ref<Feed[]>([])
   const entries = ref<Entry[]>([])
   const activeFeedId = ref<string | null>(null)
+  const activeGroupName = ref<string | null>(null)
   const selectedEntryId = ref<string | null>(null)
   const loadingFeeds = ref(false)
   const loadingEntries = ref(false)
@@ -113,6 +114,18 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   async function refreshActiveFeed() {
+    // 如果是分组模式，刷新该分组下的所有订阅源
+    if (activeGroupName.value) {
+      const groupFeeds = groupedFeeds.value[activeGroupName.value] || []
+      for (const feed of groupFeeds) {
+        await api.post(`/feeds/${feed.id}/refresh`)
+      }
+      await fetchEntries({ groupName: activeGroupName.value })
+      await fetchFeeds()
+      return
+    }
+    
+    // 单个订阅源模式
     if (!activeFeedId.value) return
     await api.post(`/feeds/${activeFeedId.value}/refresh`)
     await fetchEntries()
@@ -152,12 +165,17 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function fetchEntries(options?: {
     feedId?: string
+    groupName?: string
     unreadOnly?: boolean
     dateRange?: string
     timeField?: string
   }) {
     const targetFeed = options?.feedId ?? activeFeedId.value
-    if (!targetFeed) return
+    const targetGroup = options?.groupName ?? activeGroupName.value
+    
+    // 如果既没有feed也没有group，则返回
+    if (!targetFeed && !targetGroup) return
+    
     loadingEntries.value = true
     try {
       const mergedFilters = {
@@ -167,7 +185,14 @@ export const useFeedStore = defineStore('feed', () => {
       }
       lastEntryFilters.value = mergedFilters
 
-      const params: Record<string, string | number | boolean> = { feed_id: targetFeed, limit: 100 }
+      const params: Record<string, string | number | boolean> = { limit: 100 }
+
+      // 优先使用 feedId，其次使用 groupName
+      if (targetFeed) {
+        params.feed_id = targetFeed
+      } else if (targetGroup) {
+        params.group_name = targetGroup
+      }
 
       if (mergedFilters.unreadOnly) {
         params.unread_only = true
@@ -200,6 +225,13 @@ export const useFeedStore = defineStore('feed', () => {
   function selectFeed(id: string) {
     if (activeFeedId.value === id) return
     activeFeedId.value = id
+    activeGroupName.value = null  // 清除分组选择
+  }
+
+  function selectGroup(groupName: string) {
+    if (activeGroupName.value === groupName) return
+    activeGroupName.value = groupName
+    activeFeedId.value = null  // 清除单个订阅源选择
   }
 
   function selectEntry(entryId: string) {
@@ -345,6 +377,7 @@ export const useFeedStore = defineStore('feed', () => {
     entries,
     selectedEntry,
     activeFeedId,
+    activeGroupName,
     loadingFeeds,
     loadingEntries,
     addingFeed,
@@ -362,6 +395,7 @@ export const useFeedStore = defineStore('feed', () => {
     fetchEntries,
     addFeed,
     selectFeed,
+    selectGroup,
     selectEntry,
     refreshActiveFeed,
     deleteFeed,
