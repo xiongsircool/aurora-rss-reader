@@ -9,7 +9,7 @@ import Toast from '../components/Toast.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import LogoMark from '../components/LogoMark.vue'
-import type { Entry } from '../types'
+import type { Entry, Feed } from '../types'
 
 dayjs.extend(relativeTime)
 
@@ -80,6 +80,19 @@ const toastMessage = ref('')
 const toastType = ref<'success' | 'error' | 'info'>('info')
 const showSettings = ref(false)
 const MAX_AUTO_TITLE_TRANSLATIONS = Number.POSITIVE_INFINITY
+const NO_SUMMARY_TEXT = '暂无摘要'
+const FEED_ICON_COLORS = [
+  '#FF8A3D',
+  '#2EC4B6',
+  '#8E6CFF',
+  '#34C759',
+  '#FF6B6B',
+  '#4D9DE0',
+  '#FFB5A7',
+  '#6B705C'
+]
+
+const brokenFeedIcons = ref<Record<string, string>>({})
 
 // 布局状态管理
 const sidebarWidth = ref(280)
@@ -163,6 +176,13 @@ const currentSelectedEntry = computed(() => {
 
 const timelineLoading = computed(() => (showFavoritesOnly.value ? favoritesStore.loading : store.loadingEntries))
 
+const feedMap = computed<Record<string, Feed>>(() => {
+  return store.feeds.reduce<Record<string, Feed>>((acc, feed) => {
+    acc[feed.id] = feed
+    return acc
+  }, {})
+})
+
 // 收藏相关函数
 async function loadFavoritesData(options: { includeEntries?: boolean; feedId?: string | null } = {}) {
   const includeEntries = options.includeEntries ?? false
@@ -224,6 +244,53 @@ function handleEntrySelect(entryId: string) {
 
 function isEntryActive(entryId: string) {
   return currentSelectedEntry.value?.id === entryId
+}
+
+function handleFeedIconError(feedId: string, failedUrl?: string | null) {
+  brokenFeedIcons.value = {
+    ...brokenFeedIcons.value,
+    [feedId]: failedUrl || '__error__'
+  }
+}
+
+function shouldShowFeedIcon(feed?: Feed | null) {
+  if (!feed?.favicon_url) return false
+  const failedUrl = brokenFeedIcons.value[feed.id]
+  return failedUrl !== feed.favicon_url
+}
+
+function getFeedInitial(text?: string | null) {
+  const safe = text?.trim()
+  if (!safe) return '订'
+  return safe.charAt(0).toUpperCase()
+}
+
+function getFeedColor(feedId: string) {
+  if (!feedId) return FEED_ICON_COLORS[0]
+  let hash = 0
+  for (let i = 0; i < feedId.length; i += 1) {
+    hash = (hash * 31 + feedId.charCodeAt(i)) >>> 0
+  }
+  return FEED_ICON_COLORS[hash % FEED_ICON_COLORS.length]
+}
+
+function normalizeWhitespace(text: string) {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
+function stripHtml(value?: string | null) {
+  if (!value) return ''
+  const temp = document.createElement('div')
+  temp.innerHTML = value
+  const text = temp.textContent || temp.innerText || ''
+  return normalizeWhitespace(text)
+}
+
+function getEntryPreview(entry: Entry) {
+  const summary = entry.summary?.trim()
+  if (summary) return summary
+  const fallback = stripHtml(entry.content)
+  return fallback || NO_SUMMARY_TEXT
 }
 
 // Watch for AI store errors
@@ -796,12 +863,22 @@ async function handleImportOpml(event: Event) {
                   :class="['favorites-feed-item', { active: selectedFavoriteFeed === feed.id }]"
                   @click="selectFavoriteFeed(feed.id)"
                 >
-                  <span class="favorites-feed-icon" aria-hidden="true">
-                    <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <path d="M14 2v6h6" />
-                      <path d="M16 13H8M16 17H8M10 9H8" />
-                    </svg>
+                  <span
+                    class="favorites-feed-icon feed-icon"
+                    :style="{ backgroundColor: getFeedColor(feed.id) }"
+                    aria-hidden="true"
+                  >
+                    <img
+                      v-if="shouldShowFeedIcon(feedMap[feed.id])"
+                      :src="feedMap[feed.id]?.favicon_url || undefined"
+                      :alt="`${feed.title} 图标`"
+                      loading="lazy"
+                      decoding="async"
+                      @error="handleFeedIconError(feed.id, feedMap[feed.id]?.favicon_url)"
+                    />
+                    <span class="feed-icon__initial" v-else>
+                      {{ getFeedInitial(feed.title) }}
+                    </span>
                   </span>
                   <span class="favorites-feed-title">{{ feed.title }}</span>
                   <span class="favorites-feed-count">{{ feed.count }}</span>
@@ -871,6 +948,21 @@ async function handleImportOpml(event: Event) {
                 class="feed-item-main"
                 @click="store.selectFeed(feed.id)"
               >
+                <div
+                  class="feed-item__icon feed-icon"
+                  :style="{ backgroundColor: getFeedColor(feed.id) }"
+                  aria-hidden="true"
+                >
+                  <img
+                    v-if="shouldShowFeedIcon(feed)"
+                    :src="feed.favicon_url"
+                    :alt="`${feed.title || feed.url} 图标`"
+                    loading="lazy"
+                    decoding="async"
+                    @error="handleFeedIconError(feed.id, feed.favicon_url)"
+                  />
+                  <span v-else class="feed-icon__initial">{{ getFeedInitial(feed.title || feed.url) }}</span>
+                </div>
                 <div class="feed-item__info">
                   <span class="feed-item__title">{{ feed.title || feed.url }}</span>
                   <span class="feed-item__url" v-if="editingFeedId !== feed.id">
@@ -1020,7 +1112,7 @@ async function handleImportOpml(event: Event) {
                 <span>{{ formatDate(entry.published_at) }}</span>
               </div>
               <p class="entry-card__summary">
-                {{ entry.summary || entry.content || '暂无摘要' }}
+                {{ getEntryPreview(entry) }}
               </p>
             </button>
             <button
@@ -1051,29 +1143,28 @@ async function handleImportOpml(event: Event) {
     <section class="details" :style="{ width: detailsWidth + 'px' }">
       <div v-if="currentSelectedEntry" class="details__content">
         <div class="details__header">
-          <div>
-            <p class="muted">{{ currentSelectedEntry.feed_title }}</p>
-            <h2>{{ showTranslation && translatedContent.title ? translatedContent.title : currentSelectedEntry.title }}</h2>
-            <p class="muted">
-              {{ currentSelectedEntry.author || '未知作者' }} ·
-              {{ formatDate(currentSelectedEntry.published_at) }}
-            </p>
-          </div>
-          <div class="details__actions">
-            <button @click="openExternal(currentSelectedEntry.url)">打开原文</button>
-            <button @click="toggleStar">
-              {{ currentSelectedEntry.starred ? '取消收藏' : '收藏' }}
-            </button>
-            <button @click="handleTranslation" :disabled="translationLoading">
-              {{ translationLoading ? '翻译中...' : (showTranslation ? '显示原文' : '翻译') }}
-            </button>
-            <select v-model="translationLanguage" class="lang-select">
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-              <option value="ja">日本語</option>
-              <option value="ko">한국어</option>
-            </select>
-          </div>
+          <p class="muted">{{ currentSelectedEntry.feed_title }}</p>
+          <h2>{{ showTranslation && translatedContent.title ? translatedContent.title : currentSelectedEntry.title }}</h2>
+          <p class="muted">
+            {{ currentSelectedEntry.author || '未知作者' }} ·
+            {{ formatDate(currentSelectedEntry.published_at) }}
+          </p>
+        </div>
+
+        <div class="details__actions">
+          <button @click="openExternal(currentSelectedEntry.url)">打开原文</button>
+          <button @click="toggleStar">
+            {{ currentSelectedEntry.starred ? '取消收藏' : '收藏' }}
+          </button>
+          <button @click="handleTranslation" :disabled="translationLoading">
+            {{ translationLoading ? '翻译中...' : (showTranslation ? '显示原文' : '翻译') }}
+          </button>
+          <select v-model="translationLanguage" class="lang-select">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+          </select>
         </div>
 
         <div class="summary-card summary-card--inline">
@@ -1221,13 +1312,15 @@ async function handleImportOpml(event: Event) {
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 6px;
-  transition: background 0.2s;
+  transition: background 0.2s, color 0.2s;
+  color: var(--text-primary);
 }
 
 .theme-toggle:hover,
 .settings-btn:hover,
 .layout-reset-btn:hover {
   background: rgba(255, 122, 24, 0.1);
+  color: var(--accent);
 }
 
 .muted {
@@ -1455,6 +1548,49 @@ async function handleImportOpml(event: Event) {
 .feed-item-main:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.feed-icon {
+  --feed-icon-size: 32px;
+  --feed-icon-padding: 4px;
+  width: var(--feed-icon-size);
+  height: var(--feed-icon-size);
+  border-radius: 10px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feed-item-wrapper:hover .feed-icon {
+  transform: scale(1.03);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.feed-icon img {
+  width: calc(100% - var(--feed-icon-padding));
+  height: calc(100% - var(--feed-icon-padding));
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  display: block;
+  padding: calc(var(--feed-icon-padding) / 2);
+}
+
+.feed-icon__initial {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.feed-item__icon {
+  --feed-icon-size: 34px;
 }
 
 .feed-item__actions {
@@ -1712,6 +1848,12 @@ async function handleImportOpml(event: Event) {
   color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 4.2em; /* 1.4 line-height * 3 lines */
 }
 
 .details {
@@ -1724,50 +1866,106 @@ async function handleImportOpml(event: Event) {
 }
 
 .details__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.details__actions button {
-  border: none;
-  padding: 8px 14px;
+.details__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(245, 246, 248, 0.9));
+  border: 1px solid rgba(15, 17, 21, 0.08);
+  box-shadow: 0 6px 18px rgba(15, 17, 21, 0.08);
+  margin-bottom: 18px;
+}
+
+.details__actions button,
+.details__actions .lang-select {
+  height: 38px;
+  padding: 0 18px;
   border-radius: 999px;
-  margin-left: 8px;
-  background: rgba(15, 17, 21, 0.08);
+  border: 1px solid rgba(15, 17, 21, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
   cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.details__actions button:hover,
+.details__actions .lang-select:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(255, 122, 24, 0.25);
 }
 
 .details__actions button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.details__actions button:focus-visible,
+.details__actions .lang-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .details__actions .lang-select {
-  margin-left: 8px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(15, 17, 21, 0.15);
-  background: #ffffff;
-  cursor: pointer;
+  appearance: none;
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(15, 17, 21, 0.45) 50%), linear-gradient(135deg, rgba(15, 17, 21, 0.45) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 15px, calc(100% - 12px) 15px;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
 }
 
 .details__body {
   font-size: 15px;
   line-height: 1.6;
   color: var(--text-primary);
+  word-break: break-word;
 }
 
 .details__body :deep(p) {
   margin-bottom: 1em;
 }
 
+.details__body :deep(img) {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 12px auto;
+  border-radius: 10px;
+}
+
+.details__body :deep(table) {
+  width: 100%;
+  overflow-x: auto;
+  display: block;
+}
+
+.details__body :deep(pre),
+.details__body :deep(code) {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .summary-card {
   display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 18px;
+  flex-direction: column;
+  gap: 12px;
   margin: 0 0 24px;
   padding: 18px 20px;
   border-radius: 20px;
@@ -1813,7 +2011,7 @@ async function handleImportOpml(event: Event) {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  margin-left: auto;
+  align-self: flex-start;
 }
 
 .summary-card__action:disabled {
@@ -1864,6 +2062,30 @@ async function handleImportOpml(event: Event) {
     width: 100% !important;
     max-width: none;
   }
+
+  .details__actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .details__actions button,
+  .details__actions .lang-select {
+    flex: 1 1 calc(50% - 10px);
+    text-align: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .details__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .details__actions button,
+  .details__actions .lang-select {
+    flex: 1 1 auto;
+    width: 100%;
+  }
 }
 
 /* 翻译标题样式 */
@@ -1877,15 +2099,19 @@ async function handleImportOpml(event: Event) {
 }
 
 .translation-label {
-  display: inline-block;
-  background: var(--primary-color);
-  color: white;
-  padding: 0.1rem 0.3rem;
-  border-radius: 0.2rem;
-  font-size: 0.7rem;
-  font-weight: 500;
-  margin-right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  height: 1.35rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  font-weight: 600;
   text-transform: uppercase;
+  border: 1px solid rgba(255, 122, 24, 0.35);
+  background: rgba(255, 122, 24, 0.14);
+  color: #ff7a18;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45);
 }
 
 .loading-indicator {
@@ -1906,7 +2132,10 @@ async function handleImportOpml(event: Event) {
 }
 
 :global(.dark) .translation-label {
-  background: var(--primary-color-light, #4a5568);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffe4d3;
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.2);
 }
 
 :global(.dark) .resizer:hover {
@@ -1935,6 +2164,35 @@ async function handleImportOpml(event: Event) {
   border-top-color: rgba(255, 255, 255, 0.05);
 }
 
+:global(.dark) .details__actions {
+  background: rgba(19, 22, 29, 0.75);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+:global(.dark) .details__actions button,
+:global(.dark) .details__actions .lang-select {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+:global(.dark) .details__actions button:hover,
+:global(.dark) .details__actions .lang-select:hover {
+  background: var(--accent);
+  color: #151515;
+  border-color: var(--accent);
+  box-shadow: 0 0 20px rgba(255, 122, 24, 0.3);
+}
+
+:global(.dark) .details__actions button:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+:global(.dark) .favorites-title {
+  color: rgba(255, 255, 255, 0.95);
+}
 :global(.dark) .group-feeds .feed-item-wrapper:hover {
   background: rgba(255, 255, 255, 0.05);
 }
@@ -1948,6 +2206,19 @@ async function handleImportOpml(event: Event) {
   background: rgba(255, 122, 24, 0.15);
   color: var(--text-primary);
   border-color: rgba(255, 122, 24, 0.3);
+}
+
+:global(.dark) .theme-toggle,
+:global(.dark) .settings-btn,
+:global(.dark) .layout-reset-btn {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+:global(.dark) .theme-toggle:hover,
+:global(.dark) .settings-btn:hover,
+:global(.dark) .layout-reset-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffe5d0;
 }
 
 /* 收藏目录样式 */
@@ -1996,7 +2267,9 @@ async function handleImportOpml(event: Event) {
 
 .favorites-title {
   flex: 1;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary);
 }
 
 .favorites-count {
@@ -2072,13 +2345,17 @@ async function handleImportOpml(event: Event) {
   color: var(--accent);
 }
 
-.favorites-item-icon,
-.favorites-feed-icon {
+.favorites-item-icon {
   font-size: 0;
   line-height: 0;
   display: flex;
   align-items: center;
   opacity: 0.8;
+}
+
+.favorites-feed-icon {
+  --feed-icon-size: 26px;
+  opacity: 1;
 }
 
 .favorites-item-title,

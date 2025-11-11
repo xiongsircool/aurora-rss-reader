@@ -25,6 +25,11 @@ const localConfig = ref({
   translation_language: 'zh'
 })
 
+// RSSHub URL配置
+const rsshubUrl = ref('https://rsshub.app')
+const isTestingRSSHub = ref(false)
+const rsshubTestResult = ref<{ success: boolean; message: string } | null>(null)
+
 const isTesting = ref(false)
 const testResult = ref<{ success: boolean; message: string } | null>(null)
 
@@ -57,9 +62,11 @@ watch(() => props.show, async (show) => {
   if (show) {
     await Promise.all([
       aiStore.fetchConfig(),
-      settingsStore.fetchSettings()
+      settingsStore.fetchSettings(),
+      fetchRSSHubUrl()
     ])
     testResult.value = null
+    rsshubTestResult.value = null
   }
 })
 
@@ -85,7 +92,117 @@ async function testConnection() {
   }
 }
 
+async function fetchRSSHubUrl() {
+  try {
+    const response = await fetch('http://localhost:8787/api/settings/rsshub-url')
+    if (response.ok) {
+      const data = await response.json()
+      rsshubUrl.value = data.rsshub_url
+    }
+  } catch (error) {
+    console.error('获取RSSHub URL失败:', error)
+  }
+}
+
+async function testRSSHubConnection() {
+  if (!rsshubUrl.value) {
+    rsshubTestResult.value = { success: false, message: '请先输入RSSHub URL' }
+    return
+  }
+
+  isTestingRSSHub.value = true
+  rsshubTestResult.value = null
+
+  try {
+    // 先保存RSSHub URL
+    await saveRSSHubUrl()
+
+    // 通过后端API测试RSSHub连通性
+    const response = await fetch('http://localhost:8787/api/settings/test-rsshub-quick', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      rsshubTestResult.value = {
+        success: true,
+        message: `✅ RSSHub连接测试成功！<br>
+                 响应时间: ${result.response_time?.toFixed(2)}秒<br>
+                 RSS条目数: ${result.entries_count}<br>
+                 Feed标题: ${result.feed_title}<br>
+                 测试路由: ${result.test_url.split('/').pop()}`
+      }
+    } else {
+      rsshubTestResult.value = {
+        success: false,
+        message: `❌ RSSHub连接测试失败<br>
+                 错误信息: ${result.message}<br>
+                 测试地址: ${result.rsshub_url}<br>
+                 测试时间: ${new Date(result.tested_at).toLocaleString()}`
+      }
+    }
+  } catch (error) {
+    rsshubTestResult.value = {
+      success: false,
+      message: `❌ RSSHub测试失败<br>
+               错误: ${error instanceof Error ? error.message : '未知错误'}<br><br>
+               请确保：<br>
+               • 后端服务正在运行<br>
+               • RSSHub URL配置正确<br>
+               • 网络连接正常`
+    }
+  } finally {
+    isTestingRSSHub.value = false
+  }
+}
+
+async function saveRSSHubUrl() {
+  if (!rsshubUrl.value) {
+    rsshubTestResult.value = { success: false, message: 'RSSHub URL不能为空' }
+    return
+  }
+
+  try {
+    const response = await fetch('http://localhost:8787/api/settings/rsshub-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        rsshub_url: rsshubUrl.value
+      })
+    })
+
+    if (response.ok) {
+      rsshubTestResult.value = {
+        success: true,
+        message: 'RSSHub URL保存成功！'
+      }
+    } else {
+      const errorData = await response.json()
+      rsshubTestResult.value = {
+        success: false,
+        message: `保存失败: ${errorData.detail || '未知错误'}`
+      }
+    }
+  } catch (error) {
+    rsshubTestResult.value = {
+      success: false,
+      message: `保存失败: ${error instanceof Error ? error.message : '网络错误'}`
+    }
+  }
+}
+
 async function saveSettings() {
+  // 先保存RSSHub URL
+  if (rsshubUrl.value) {
+    await saveRSSHubUrl()
+  }
+
   const success = await aiStore.updateConfig(localConfig.value)
   if (success) {
     emit('close')
@@ -114,6 +231,46 @@ function handleBackdropClick(event: MouseEvent) {
         </div>
 
         <div class="modal-body">
+          <section class="settings-section">
+            <h3>RSSHub 配置</h3>
+            <div class="form-group">
+              <label>RSSHub URL</label>
+              <input
+                v-model="rsshubUrl"
+                type="text"
+                placeholder="输入您的RSSHub地址，如：http://58.198.178.157:1200"
+                class="form-input"
+              />
+              <p class="form-hint">
+                输入您自己的RSSHub实例地址，用于获取各种网站的RSS订阅
+              </p>
+              <p class="form-hint">
+                部署RSSHub: <a href="https://docs.rsshub.app/zh/guide/install/" target="_blank">RSSHub部署指南</a>
+              </p>
+            </div>
+
+            <div class="form-group">
+              <button
+                @click="testRSSHubConnection"
+                :disabled="isTestingRSSHub || !rsshubUrl"
+                class="test-btn"
+                :class="{
+                  loading: isTestingRSSHub,
+                  success: rsshubTestResult?.success,
+                  error: rsshubTestResult?.success === false
+                }"
+              >
+                {{ isTestingRSSHub ? '测试中...' : '测试RSSHub连通性' }}
+              </button>
+              <div v-if="rsshubTestResult" class="test-result" :class="{
+                success: rsshubTestResult.success,
+                error: !rsshubTestResult.success
+              }">
+                {{ rsshubTestResult.message }}
+              </div>
+            </div>
+          </section>
+
           <section class="settings-section">
             <h3>AI 配置</h3>
             <div class="form-group">

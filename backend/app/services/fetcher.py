@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from time import mktime
 from time import perf_counter
 from typing import Any
+from urllib.parse import urljoin, urlparse
 
 import feedparser
 import httpx
@@ -15,17 +16,64 @@ from sqlmodel import Session, select
 
 from app.db.models import Entry, Feed, FetchLog
 from app.db.session import SessionLocal
+from app.services.feed_config import (
+    DEFAULT_RSSHUB_MIRRORS, SPECIAL_USER_AGENTS, KNOWN_ALTERNATIVES,
+    TIMEOUT_CONFIG, RETRY_CONFIG, get_rsshub_mirrors
+)
+from app.utils.text import clean_html_text
 
 
 async def refresh_feed(feed_id: str) -> None:
     """Fetch a single feed and store new entries."""
 
-    async with httpx.AsyncClient(timeout=45) as client:
+    # 首先获取feed信息以确定特殊配置
+    with SessionLocal() as session:
+        feed = session.get(Feed, feed_id)
+        if not feed:
+            logger.warning("Feed %s not found", feed_id)
+            return
+        feed_url = feed.url
+
+    # 根据域名配置特殊的User-Agent
+    default_user_agent = "Mozilla/5.0 (compatible; RSS Reader/1.0; +https://github.com/rss-reader)"
+    user_agent = default_user_agent
+
+    for domain, special_ua in SPECIAL_USER_AGENTS.items():
+        if domain in feed_url:
+            user_agent = special_ua
+            logger.info("为域名 %s 使用特殊User-Agent", domain)
+            break
+
+    headers = {
+        "User-Agent": user_agent,
+        "Accept": "application/rss+xml, application/xml, text/xml",
+        "Accept-Language": "en-US,en;q=0.9,zh;q=0.8",
+        "Cache-Control": "no-cache",
+    }
+
+    timeout = httpx.Timeout(**TIMEOUT_CONFIG)
+
+    async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
         await _refresh_feed_with_client(feed_id, client)
 
 
 async def refresh_all_feeds() -> None:
-    async with httpx.AsyncClient(timeout=45) as client:
+    # 为批量刷新配置相同的优化参数
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; RSS Reader/1.0; +https://github.com/rss-reader)",
+        "Accept": "application/rss+xml, application/xml, text/xml",
+        "Accept-Language": "en-US,en;q=0.9,zh;q=0.8",
+        "Cache-Control": "no-cache",
+    }
+
+    timeout = httpx.Timeout(
+        connect=10.0,
+        read=30.0,
+        write=10.0,
+        pool=60.0
+    )
+
+    async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
         with SessionLocal() as session:
             feeds = session.exec(select(Feed)).all()
 
@@ -51,9 +99,47 @@ async def _refresh_feed_with_client(feed_id: str, client: httpx.AsyncClient) -> 
 
     start = perf_counter()
     try:
-        response = await client.get(feed.url, follow_redirects=True)
+        logger.info("开始获取RSS feed: %s", feed.url)
+
+        # 智能重试和备用URL处理
+        urls_to_try = await _get_urls_to_try(feed.url)
+        response = None
+        last_exception = None
+
+        for attempt, url_to_try in enumerate(urls_to_try):
+            try:
+                logger.info("尝试获取RSS (第%d次): %s", attempt + 1, url_to_try)
+                response = await client.get(url_to_try)
+                break
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as exc:
+                last_exception = exc
+                logger.warning("RSS feed %s (尝试 %d/%d) 失败: %s",
+                             url_to_try, attempt + 1, len(urls_to_try), exc)
+                if attempt == len(urls_to_try) - 1:  # 最后一次尝试
+                    raise
+
+        if not response:
+            raise last_exception or Exception("无法获取RSS响应")
+
+        # 记录HTTP状态信息
+        logger.info("RSS feed %s HTTP状态: %s", feed.url, response.status_code)
+
         response.raise_for_status()
+
+        # 检查内容类型
+        content_type = response.headers.get('content-type', '').lower()
+        if not any(ct in content_type for ct in ['xml', 'rss']):
+            logger.warning("RSS feed %s 返回的内容类型可能不是RSS: %s", feed.url, content_type)
+
         parsed = await asyncio.to_thread(feedparser.parse, response.content)
+
+        # 检查feedparser解析结果
+        if parsed.bozo:
+            logger.warning("RSS feed %s 解析时警告: %s", feed.url, parsed.bozo_exception)
+
+        if not parsed.entries and not parsed.feed:
+            logger.error("RSS feed %s 解析后没有找到任何内容", feed.url)
+
         new_items = await _persist_entries(feed_id, parsed)
 
         duration = int((perf_counter() - start) * 1000)
@@ -66,6 +152,10 @@ async def _refresh_feed_with_client(feed_id: str, client: httpx.AsyncClient) -> 
                 feed_db.last_checked_at = datetime.now(timezone.utc)
                 feed_db.last_error = None
                 feed_db.updated_at = datetime.now(timezone.utc)
+
+                icon_url = _select_feed_icon(parsed, feed_db.site_url or feed.url, feed.url)
+                if icon_url and icon_url != feed_db.favicon_url:
+                    feed_db.favicon_url = icon_url
                 session.add(feed_db)
 
             # 使用log_id查找日志记录
@@ -77,23 +167,43 @@ async def _refresh_feed_with_client(feed_id: str, client: httpx.AsyncClient) -> 
                 log_db.item_count = new_items
                 session.add(log_db)
             session.commit()
-    except Exception as exc:  # pylint: disable=broad-except
-        logger.exception("Failed to refresh feed %s", feed_id)
-        with SessionLocal() as session:
-            feed_db = session.get(Feed, feed_id)
-            if feed_db:
-                feed_db.last_error = str(exc)
-                feed_db.last_checked_at = datetime.now(timezone.utc)
-                session.add(feed_db)
+    except httpx.TimeoutException as exc:
+        error_msg = f"请求超时: {str(exc)}"
+        logger.error("RSS feed %s 请求超时: %s", feed.url, exc)
+        _log_error(feed_id, log_id, "timeout", error_msg)
 
-            # 使用log_id查找日志记录
-            log_db = session.get(FetchLog, log_id) if log_id else None
-            if log_db:
-                log_db.status = "failed"
-                log_db.message = str(exc)
-                log_db.finished_at = datetime.now(timezone.utc)
-                session.add(log_db)
-            session.commit()
+    except httpx.ConnectError as exc:
+        error_msg = f"连接错误: {str(exc)}"
+        logger.error("RSS feed %s 连接失败: %s", feed.url, exc)
+        _log_error(feed_id, log_id, "connect_error", error_msg)
+
+    except httpx.HTTPStatusError as exc:
+        error_msg = f"HTTP错误 {exc.response.status_code}: {str(exc)}"
+        logger.error("RSS feed %s HTTP错误 %s: %s", feed.url, exc.response.status_code, exc)
+        _log_error(feed_id, log_id, "http_error", error_msg)
+
+    except Exception as exc:  # pylint: disable=broad-except
+        error_msg = f"未知错误: {str(exc)}"
+        logger.exception("RSS feed %s 处理失败: %s", feed.url, exc)
+        _log_error(feed_id, log_id, "unknown_error", error_msg)
+
+
+def _log_error(feed_id: str, log_id: str | None, error_type: str, error_msg: str) -> None:
+    """统一的错误记录函数"""
+    with SessionLocal() as session:
+        feed_db = session.get(Feed, feed_id)
+        if feed_db:
+            feed_db.last_error = f"[{error_type}] {error_msg}"
+            feed_db.last_checked_at = datetime.now(timezone.utc)
+            session.add(feed_db)
+
+        log_db = session.get(FetchLog, log_id) if log_id else None
+        if log_db:
+            log_db.status = "failed"
+            log_db.message = f"[{error_type}] {error_msg}"
+            log_db.finished_at = datetime.now(timezone.utc)
+            session.add(log_db)
+        session.commit()
 
 
 async def _persist_entries(feed_id: str, parsed: Any) -> int:
@@ -113,9 +223,11 @@ async def _persist_entries(feed_id: str, parsed: Any) -> int:
             if exists:
                 continue
 
-            summary = item.get("summary") or item.get("subtitle")
+            raw_summary = item.get("summary") or item.get("subtitle")
             content = _extract_content(item)
-            readability_content = _render_readability(content or summary or "")
+            readability_source = content or raw_summary or ""
+            readability_content = _render_readability(readability_source)
+            summary_text = clean_html_text(raw_summary) or clean_html_text(content)
             categories = item.get("tags")
             categories_json = json.dumps([c["term"] for c in categories]) if categories else None
 
@@ -125,8 +237,8 @@ async def _persist_entries(feed_id: str, parsed: Any) -> int:
                 title=item.get("title"),
                 url=item.get("link"),
                 author=item.get("author"),
-                summary=summary,
-                content=content or summary,
+                summary=summary_text,
+                content=content or raw_summary,
                 readability_content=readability_content,
                 categories_json=categories_json,
                 published_at=_parse_datetime(item),
@@ -173,6 +285,124 @@ def _render_readability(html: str) -> str | None:
         return doc.summary()
     except Exception:  # pylint: disable=broad-except
         return None
+
+
+def _select_feed_icon(parsed_feed: Any, site_url: str | None, feed_url: str) -> str | None:
+    """Pick the best icon URL for a feed using metadata and sane fallbacks."""
+    feed_meta = getattr(parsed_feed, "feed", parsed_feed) or {}
+    base_url = site_url or feed_url
+    candidates: list[str] = []
+
+    def add_candidate(value: Any) -> None:
+        normalized = _normalize_icon_url(_extract_href(value), base_url)
+        if normalized and normalized not in candidates:
+            candidates.append(normalized)
+
+    # RSS/Atom common fields
+    add_candidate(feed_meta.get("image"))
+    add_candidate(feed_meta.get("icon"))
+    add_candidate(feed_meta.get("logo"))
+    add_candidate(feed_meta.get("itunes_image"))
+
+    # Link tags such as <link rel="icon"> or image types
+    links = feed_meta.get("links")
+    if isinstance(links, list):
+        for link in links:
+            href = link.get("href")
+            rel = link.get("rel")
+            rels = rel if isinstance(rel, list) else [rel]
+            if any(isinstance(r, str) and "icon" in r.lower() for r in rels if r):
+                add_candidate(href)
+                continue
+            link_type = link.get("type")
+            if isinstance(link_type, str) and link_type.startswith("image/"):
+                add_candidate(href)
+
+    # Common Apple touch icons should take precedence over default favicon
+    origin = _build_origin_url(base_url)
+    if origin:
+        for extra in ["/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/favicon.ico"]:
+            add_candidate(f"{origin}{extra}")
+
+    return candidates[0] if candidates else None
+
+
+def _extract_href(value: Any) -> str | None:
+    if not value:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return value.get("href") or value.get("url")
+    return None
+
+
+def _normalize_icon_url(candidate: str | None, base_url: str | None) -> str | None:
+    if not candidate:
+        return None
+    candidate = candidate.strip()
+    if candidate.startswith("data:"):
+        return None
+    if candidate.startswith("//"):
+        return f"https:{candidate}"
+    parsed = urlparse(candidate)
+    if parsed.scheme in {"http", "https"}:
+        return candidate
+    if base_url:
+        normalized_base = base_url
+        if not urlparse(base_url).scheme:
+            normalized_base = f"https://{base_url}"
+        return urljoin(normalized_base, candidate)
+    return None
+
+
+def _build_origin_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    parsed = urlparse(url if "://" in url else f"https://{url}")
+    if not parsed.netloc:
+        return None
+    scheme = parsed.scheme or "https"
+    return f"{scheme}://{parsed.netloc}"
+
+
+def schedule_refresh(feed_id: str) -> None:
+    asyncio.create_task(refresh_feed(feed_id))
+
+
+async def _get_urls_to_try(original_url: str) -> list[str]:
+    """获取要尝试的URL列表，使用用户配置的RSSHub URL"""
+    from app.services.user_settings_service import user_settings_service
+
+    urls = [original_url]
+
+    # 如果是RSSHub链接，使用用户配置的RSSHub URL
+    if any(rsshub in original_url for rsshub in ['rsshub.app', 'rsshub.rssforever.com', 'rsshub.ktachibana.party', 'rsshub.cskaoyan.com']):
+        try:
+            # 获取用户配置的RSSHub URL
+            user_rsshub_url = user_settings_service.get_rsshub_url()
+
+            # 替换为用户配置的RSSHub URL
+            for old_rsshub in ['rsshub.app', 'rsshub.rssforever.com', 'rsshub.ktachibana.party', 'rsshub.cskaoyan.com']:
+                if original_url.startswith(f"https://{old_rsshub}/"):
+                    converted_url = original_url.replace(f"https://{old_rsshub}/", f"{user_rsshub_url}/")
+                    urls.insert(0, converted_url)  # 将用户配置的URL放在最前面
+                    logger.info("使用用户配置的RSSHub URL: %s -> %s", original_url, converted_url)
+                    break
+                elif original_url.startswith(f"http://{old_rsshub}/"):
+                    converted_url = original_url.replace(f"http://{old_rsshub}/", f"{user_rsshub_url}/")
+                    urls.insert(0, converted_url)
+                    logger.info("使用用户配置的RSSHub URL: %s -> %s", original_url, converted_url)
+                    break
+
+        except Exception as e:
+            logger.warning("获取用户RSSHub配置失败，使用原始URL: %s", e)
+
+    # 检查是否有已知的替代方案
+    if original_url in KNOWN_ALTERNATIVES:
+        urls.extend(KNOWN_ALTERNATIVES[original_url])
+
+    return urls
 
 
 def schedule_refresh(feed_id: str) -> None:

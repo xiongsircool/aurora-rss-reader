@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSSHub 配置测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-section {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .url-display {
+            background: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RSSHub 配置测试</h1>
+
+        <div class="form-group">
+            <label for="rsshubUrl">RSSHub URL</label>
+            <input
+                type="text"
+                id="rsshubUrl"
+                placeholder="输入您的RSSHub地址，如：http://58.198.178.157:1200"
+                value="http://58.198.178.157:1200"
+            />
+            <p style="color: #666; font-size: 12px; margin-top: 8px;">
+                输入您自己的RSSHub实例地址，用于获取各种网站的RSS订阅
+            </p>
+        </div>
+
+        <div class="form-group">
+            <button onclick="saveRSSHubUrl()">保存RSSHub URL</button>
+            <button onclick="testRSSHub()">测试连接</button>
+            <button onclick="getCurrentSettings()">获取当前设置</button>
+        </div>
+
+        <div id="result"></div>
+
+        <div class="test-section">
+            <h3>测试URL转换</h3>
+            <p>输入要测试的RSSHub链接：</p>
+            <input
+                type="text"
+                id="testUrl"
+                placeholder="如：https://rsshub.app/nature/research/ng"
+                value="https://rsshub.app/nature/research/ng"
+                style="margin-bottom: 10px;"
+            />
+            <button onclick="testUrlConversion()">测试转换</button>
+            <div id="conversionResult"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8787/api';
+
+        async function saveRSSHubUrl() {
+            const url = document.getElementById('rsshubUrl').value;
+            if (!url) {
+                showResult('请输入RSSHub URL', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/settings/rsshub-url`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        rsshub_url: url
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showResult('RSSHub URL保存成功！', 'success');
+                } else {
+                    showResult(`保存失败: ${data.detail || '未知错误'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`保存失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testRSSHub() {
+            const url = document.getElementById('rsshubUrl').value;
+            if (!url) {
+                showResult('请输入RSSHub URL', 'error');
+                return;
+            }
+
+            try {
+                // 先保存RSSHub URL到后端
+                const saveResponse = await fetch('http://localhost:8787/api/settings/rsshub-url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        rsshub_url: url
+                    })
+                });
+
+                if (!saveResponse.ok) {
+                    const errorData = await saveResponse.json();
+                    showResult(`保存RSSHub URL失败: ${errorData.detail || '未知错误'}`, 'error');
+                    return;
+                }
+
+                // 通过后端测试RSSHub功能
+                // 这里我们测试一个转换后的URL，看看后端能否正确处理
+                const testOriginalUrl = "https://rsshub.app/nature/research/ng";
+                const convertResponse = await fetch('http://localhost:8787/api/feeds', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        url: testOriginalUrl,
+                        group_name: "test"
+                    })
+                });
+
+                if (convertResponse.ok) {
+                    const feedData = await convertResponse.json();
+
+                    // 等待一秒让后端处理RSS
+                    setTimeout(async () => {
+                        try {
+                            const entriesResponse = await fetch(`http://localhost:8787/api/entries?feed_id=${feedData.id}`);
+                            if (entriesResponse.ok) {
+                                const entries = await entriesResponse.json();
+                                if (entries.length > 0) {
+                                    showResult(`✅ RSSHub连接测试成功！<br>已成功获取 ${entries.length} 条RSS条目<br>第一条标题: ${entries[0].title?.substring(0, 50)}...`, 'success');
+                                } else {
+                                    showResult(`⚠️ RSSHub连接成功，但没有获取到RSS条目`, 'error');
+                                }
+                            } else {
+                                showResult(`⚠️ RSSHub配置成功，但获取RSS条目失败`, 'error');
+                            }
+                        } catch (error) {
+                            showResult(`⚠️ RSSHub配置成功，但测试RSS条目时出错: ${error.message}`, 'error');
+                        }
+                    }, 2000);
+
+                    showResult('🔄 RSSHub URL已保存，正在测试RSS获取...', 'success');
+
+                } else {
+                    const errorData = await convertResponse.json();
+                    showResult(`测试RSSHub时出错: ${errorData.detail || '未知错误'}`, 'error');
+                }
+
+            } catch (error) {
+                showResult(`❌ RSSHub测试失败: ${error.message}<br><br>请确保：<br>1. 后端服务运行在 http://localhost:8787<br>2. RSSHub实例可以访问<br>3. 网络连接正常`, 'error');
+            }
+        }
+
+        async function getCurrentSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/settings/rsshub-url`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('rsshubUrl').value = data.rsshub_url;
+                    showResult(`当前RSSHub URL: ${data.rsshub_url}`, 'success');
+                } else {
+                    showResult('获取设置失败', 'error');
+                }
+            } catch (error) {
+                showResult(`获取设置失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUrlConversion() {
+            const testUrl = document.getElementById('testUrl').value;
+            if (!testUrl) {
+                document.getElementById('conversionResult').innerHTML = '<div class="result error">请输入测试URL</div>';
+                return;
+            }
+
+            // 简单模拟URL转换逻辑
+            let convertedUrl = testUrl;
+            const userRsshubUrl = document.getElementById('rsshubUrl').value || 'https://rsshub.app';
+
+            if (testUrl.includes('rsshub.app') || testUrl.includes('rsshub.rssforever.com')) {
+                for (const oldRsshub of ['rsshub.app', 'rsshub.rssforever.com', 'rsshub.ktachibana.party', 'rsshub.cskaoyan.com']) {
+                    if (testUrl.startsWith(`https://${oldRsshub}/`)) {
+                        convertedUrl = testUrl.replace(`https://${oldRsshub}/`, `${userRsshubUrl}/`);
+                        break;
+                    } else if (testUrl.startsWith(`http://${oldRsshub}/`)) {
+                        convertedUrl = testUrl.replace(`http://${oldRsshub}/`, `${userRsshubUrl}/`);
+                        break;
+                    }
+                }
+            }
+
+            document.getElementById('conversionResult').innerHTML = `
+                <div style="margin-top: 10px;">
+                    <strong>原始URL:</strong>
+                    <div class="url-display">${testUrl}</div>
+                    <strong>转换后URL:</strong>
+                    <div class="url-display">${convertedUrl}</div>
+                    ${convertedUrl !== testUrl ? '<div class="result success">✅ URL已转换为您的RSSHub地址</div>' : '<div class="result">ℹ️ 该URL不需要转换</div>'}
+                </div>
+            `;
+        }
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+
+        // 页面加载时获取当前设置
+        window.addEventListener('load', getCurrentSettings);
+    </script>
+</body>
+</html>

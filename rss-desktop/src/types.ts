@@ -3,6 +3,7 @@ export interface Feed {
   url: string
   title: string | null
   group_name: string
+  favicon_url: string | null
   unread_count: number
   last_checked_at: string | null
   last_error: string | null

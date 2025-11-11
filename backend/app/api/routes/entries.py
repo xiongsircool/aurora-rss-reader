@@ -6,10 +6,16 @@ from sqlmodel import Session, select
 from app.db.deps import get_session
 from app.db.models import Entry, Feed
 from app.schemas.entry import EntryRead, EntryStateUpdate
+from app.utils.text import clean_html_text
 from sqlalchemy import func
 from typing import Optional
 
 router = APIRouter(prefix="/entries", tags=["entries"])
+
+
+def _entry_preview_summary(entry: Entry) -> str | None:
+    """Return a plain-text summary for list/favorite views."""
+    return clean_html_text(entry.summary) or clean_html_text(entry.content)
 
 
 @router.get("", response_model=list[EntryRead])
@@ -42,7 +48,7 @@ async def list_entries(
             title=entry.title,
             url=entry.url,
             author=entry.author,
-            summary=entry.summary,
+            summary=_entry_preview_summary(entry),
             content=entry.content,
             published_at=entry.published_at,
             read=entry.read,
@@ -78,7 +84,7 @@ async def update_entry_state(
         title=entry.title,
         url=entry.url,
         author=entry.author,
-        summary=entry.summary,
+        summary=_entry_preview_summary(entry),
         content=entry.content,
         published_at=entry.published_at,
         read=entry.read,
@@ -117,7 +123,7 @@ async def list_starred_entries(
             title=entry.title,
             url=entry.url,
             author=entry.author,
-            summary=entry.summary,
+            summary=_entry_preview_summary(entry),
             content=entry.content,
             published_at=entry.published_at,
             read=entry.read,

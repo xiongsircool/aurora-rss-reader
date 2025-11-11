@@ -3,42 +3,48 @@
 > 目标：以 Vue 3 + Vite 打造一个“本地运行、单应用”最小可用版本，先完成阅读体验与基础 AI 辅助，再考虑扩展。
 
 ## 1. 技术栈与脚手架
-- [x] 初始化 `Vue 3 + Vite + TypeScript` 前端（Pinia + Vue Router）。`rss-desktop/` 已通过 `create-electron-vite` 搭建。
-- [x] 使用 `Electron + Vite` 作为桌面容器，Electron 主进程负责窗口管理与与 Python 侧 IPC（可用 `child_process` 启动 Python 服务或通过 WebSocket/HTTP 通信）。
-- [x] 引入 Python 后端（FastAPI + Uvicorn），主要负责 SQLite 访问、Feed 抓取、AI 调用；`backend/` 已包含 `scripts/serve.py` 开发入口。
-- [ ] 配置环境变量：前端 `.env.local`（Electron 渠道变量）+ Python `.env`（GLM Key、SQLite 路径、RSSHub URL）；确保密钥仅保留在本地文件。
-- [ ] 内置脚本：`pnpm dev:ui`、`pnpm dev:electron`、`pnpm dev`（并行启动 Electron + Python），`pnpm build`（打包），`python -m scripts.migrate`（初始化数据库）。
-
-- [ ] 内置脚本：`pnpm fetch-feeds`（手动触发拉取）、`pnpm migrate`（初始化数据库或 IndexedDB store）。
+- [x] 初始化 `Vue 3 + Vite + TypeScript` 前端（Pinia + Vue Router）；`rss-desktop/` 由 `create-electron-vite` 搭建完成。
+- [x] 完成 Electron + Vite 容器，主进程负责窗口管理与 Python 服务通讯（HTTP/WebSocket）。
+- [x] 引入 FastAPI + SQLModel 后端，`backend/scripts/serve.py`、`start.sh` 已串联前后端。
+- [x] 配置基础环境文件：`rss-desktop/.env.example`、`backend/.env.example` 已提供；待补充前端 `.env.local` 模板。
+- [ ] 精简启动/构建脚本：补上 `pnpm dev:ui`、`pnpm dev:electron`、`pnpm dev`、`pnpm build`、`pnpm fetch-feeds` 等 npm script，并在 README 中说明。
+- [ ] 打通 `python -m scripts.migrate` 与 Electron 启动脚本，方便新环境“一键运行”。
 
 ## 2. 本地数据与存储
-- [ ] 设计 feeds / entries / translations / summaries schema，使用 Python + SQLModel/SQLAlchemy + Alembic 生成迁移；SQLite 文件默认存放在 `~/Library/Application Support/RSSMVP/data.sqlite`。
-- [ ] 在 FastAPI 中实现 DAO 层（批量插入、`guid + feed_id` 去重、分页查询），并提供 REST/WebSocket API 给 Electron 前端调用。
-- [ ] 实现最小备份/导入：Python 提供 OPML 导出/导入接口以及 JSON 备份任务；暴露“清理旧条目”命令。
+- [x] 设计 feeds / entries / summaries schema，SQLModel + SQLite 已落地，支持去重与分页查询。
+- [x] FastAPI DAO 层 + REST API 已实现，Electron 端通过 `api/client.ts` 调用。
+- [x] OPML 导入导出 & 收藏统计接口可用。
+- [ ] 备份/清理：补充 JSON/SQLite 备份任务与“清理旧条目”命令行入口。
 
 ## 3. Feed 采集与解析
-- [ ] 在 Python 中实现添加订阅 API：支持直接 RSS 链接 + 网页 URL 自动发现（requests + BeautifulSoup 提取 `<link>`；补充常见路径猜测）。
-- [ ] 使用 `feedparser` + `readability-lxml`（可选）解析 RSS/Atom/JSON Feed，统一输出结构返回给数据库层。
-- [ ] 设计后台计划任务（APScheduler 或手动 cron），支持“手动刷新”和定时拉取；完成写库与状态更新。
-- [ ] 将抓取日志写入 SQLite `fetch_logs` 表，并提供 API 供设置面板读取。
+- [x] 添加订阅 API、Feed 抓取、`feedparser` + `readability-lxml` 解析、APScheduler 定时刷新等基础能力已完成。
+- [x] 抓取日志 `fetch_logs` 已写入数据库，待在 UI 暴露。
+- [ ] **新增**：给 `httpx.AsyncClient` 增加自定义 `User-Agent`、`Accept`、`Referer`，解决 OUP / RSSHub 等返回 403 的问题。
+- [ ] **新增**：支持为单个订阅配置自定义 Header/代理（例如 RSSHub token、Cloudflare bypass）。
+- [ ] **新增**：将 `last_error`/日志内容暴露到设置面板，提示“哪些订阅解析失败/被拦截”。
 
 ## 4. 核心 UI 流程（Vue）
-- [ ] 在 Electron 渲染进程实现三栏布局（Sidebar / Timeline / Details+AI），遵循 `UI.md` 的尺寸与交互；通过 `@electron/remote` 或自定义 IPC 获取系统主题，支持浅/深色切换。
-- [ ] Sidebar：列出分组/订阅、添加订阅入口、快捷筛选（全部/未读/收藏）；操作通过 REST/WebSocket 调用 Python 服务。
-- [ ] Timeline：虚拟滚动或懒加载，支持未读状态点、时间戳、收藏按钮、批量“标为已读”。
-- [ ] Details Pane：展示全文、阅读进度、收藏/标记按钮；支持解析失败的 fallback。
-- [ ] Settings & Import Drawer：主题切换、RSSHub/代理配置、OPML 导入导出、抓取日志面板。
+- [x] 三栏布局、浅/深色主题、响应式布局已对齐 `UI.md`。
+- [x] Sidebar：分组、收藏目录、订阅管理、编辑/删除、OPML 操作均可用；订阅卡片 UI 已统一（描边 + 按钮分栏）。
+- [x] Timeline：支持搜索、未读/收藏过滤、收藏模式、标题翻译等；虚拟滚动仍在 backlog。
+- [x] Details Pane：正文、收藏/翻译/摘要入口、AI 摘要卡片均可用。
+- [x] Settings Modal：主题切换、AI Key 配置等基础信息可配置。
+- [ ] Timeline 虚拟滚动/分页加载，防止大量条目时卡顿。
+- [ ] Feed 抓取日志与错误提示接入设置面板。
 
-## 5. AI 辅助（可选但建议）
-- [ ] 在 Python 层实现 GLM-4-Flash 适配器（Base URL: `https://open.bigmodel.cn/api/paas/v4/`, Model: `glm-4-flash`, Key: `db8f92ecc62a46e8982d562075ac3511.DveQeGNFR07A2IkY` 仅写入 `.env`），统一提供摘要/翻译接口。
-- [ ] 前端展示 AI Summary 卡片：状态流转（待生成/生成中/成功/失败），支持手动触发与结果缓存到本地表。
-- [ ] 基于语言偏好提供“自动翻译”开关，生成后回填到详情视图。
+## 5. AI 辅助
+- [x] 后端 GLM-4-Flash 适配、摘要/翻译 API、缓存策略均已实现。
+- [x] 前端摘要卡片 + 自动翻译逻辑已落地，并支持展示翻译状态。
+- [ ] 增加 AI 接口重试与速率限制提示，防止 Key 超限时静默失败。
+- [ ] 允许在设置中切换不同模型/自建推理端点。
 
 ## 6. MVP 交付与体验验证
-- [ ] 记录关键快捷键（刷新、标为已读、打开设置），并在 UI 中可视化提示。
-- [ ] 编写最小 Smoke Test：拉取示例 RSS → 展示时间线 → 打开详情 → 生成摘要（调用 Python API）。
-- [ ] 打包方案：使用 Electron Builder 生成 macOS/Windows 安装包，包含 Python 可执行或依赖说明；同时提供 `dev` 启动脚本。
-- [ ] 整理使用手册：启动步骤、AI Key 配置、常见问题（解析失败、日志位置、缓存清理）。
+- [x] Smoke 流程（拉取 → 阅读 → 收藏/摘要）可跑通，`start.sh` 可一键启动。
+- [ ] 补充快捷键支持（刷新、标为已读、打开设置）并在 UI 中提示。
+- [ ] Electron Builder 打包脚本 & README “分发指南”。
+- [ ] 使用手册：启动步骤、AI Key 配置、常见错误（解析失败、日志位置、缓存清理）。
 
-## 7. 后续可选增强（留作 Backlog）
-- [ ] 多端同步/远程 API、插件体系、数据可视化等高级特性等 MVP 稳定后再规划。
+## 7. 后续可选增强（Backlog）
+- [ ] 多端同步/在线 API、插件体系、数据统计等高级特性。
+- [ ] 离线阅读包 / 全文缓存策略。
+- [ ] 更细粒度的 AI 能力（智能分组、相似文章折叠等）。

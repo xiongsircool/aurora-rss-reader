@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as api_router
+from app.services.rsshub_manager import rsshub_manager
 from app.core.config import settings
 from app.db.session import init_db
 from app.services.fetcher import refresh_all_feeds
@@ -26,6 +27,9 @@ def is_localhost_origin(origin: str) -> bool:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    # 初始化RSSHub配置
+    await rsshub_manager.initialize_default_mirrors()
+
     scheduler = AsyncIOScheduler()
     scheduler.start()
     scheduler.add_job(refresh_all_feeds, "interval", minutes=settings.fetch_interval_minutes)

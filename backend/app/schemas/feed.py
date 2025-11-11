@@ -16,6 +16,7 @@ class FeedRead(SQLModel):
     url: str
     title: Optional[str]
     group_name: str
+    favicon_url: Optional[str] = None
     unread_count: int
     last_checked_at: Optional[datetime]
     last_error: Optional[str]

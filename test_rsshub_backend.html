@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSSHub 后端测试功能</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
+        button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.2s;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .loading { background: #ff9500; }
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        .detail-table th, .detail-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .detail-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .detail-table tr.success { background: #f0f8f0; }
+        .detail-table tr.error { background: #fff5f5; }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007aff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 RSSHub 后端测试功能</h1>
+        <div class="result info">
+            <strong>功能说明：</strong><br>
+            • 通过后端API测试RSSHub连通性，避免前端CORS问题<br>
+            • 支持快速测试和完整测试两种模式<br>
+            • 提供详细的测试结果和性能指标
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>⚙️ 配置RSSHub URL</h2>
+        <input type="text" id="rsshubUrl" value="http://58.198.178.157:1200" placeholder="输入RSSHub地址">
+        <button onclick="configureRSSHub()">保存配置</button>
+        <button onclick="getCurrentSettings()">获取当前配置</button>
+        <div id="configureResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>🚀 快速测试</h2>
+        <button onclick="quickTest()">执行快速测试</button>
+        <div id="quickResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>🔍 完整测试</h2>
+        <button onclick="fullTest()">执行完整测试</button>
+        <div id="fullResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>📊 测试历史</h2>
+        <button onclick="showTestHistory()">显示测试历史</button>
+        <div id="historyResult"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8787/api/settings';
+        let testHistory = [];
+
+        async function configureRSSHub() {
+            const url = document.getElementById('rsshubUrl').value;
+            const resultDiv = document.getElementById('configureResult');
+
+            if (!url) {
+                resultDiv.innerHTML = '<div class="result error">请输入RSSHub URL</div>';
+                return;
+            }
+
+            try {
+                resultDiv.innerHTML = '<div class="result info">正在保存配置...</div>';
+
+                const response = await fetch(`${API_BASE}/rsshub-url`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rsshub_url: url })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="result success">✅ 配置保存成功: ${result.rsshub_url}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="result error">❌ 配置保存失败: ${result.detail}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ 保存失败: ${error.message}</div>`;
+            }
+        }
+
+        async function getCurrentSettings() {
+            const resultDiv = document.getElementById('configureResult');
+
+            try {
+                const response = await fetch(`${API_BASE}/rsshub-url`);
+                const result = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('rsshubUrl').value = result.rsshub_url;
+                    resultDiv.innerHTML = `<div class="result success">✅ 当前RSSHub URL: ${result.rsshub_url}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="result error">❌ 获取配置失败</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ 获取配置失败: ${error.message}</div>`;
+            }
+        }
+
+        async function quickTest() {
+            const resultDiv = document.getElementById('quickResult');
+            resultDiv.innerHTML = '<div class="result info">正在执行快速测试...</div>';
+
+            try {
+                const startTime = Date.now();
+                const response = await fetch(`${API_BASE}/test-rsshub-quick`, {
+                    method: 'POST'
+                });
+                const duration = (Date.now() - startTime) / 1000;
+
+                const result = await response.json();
+
+                if (result.success) {
+                    testHistory.push({
+                        type: '快速测试',
+                        time: new Date().toLocaleString(),
+                        success: true,
+                        duration: duration,
+                        result: result
+                    });
+
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>✅ 快速测试成功</h3>
+                            <div class="stats">
+                                <div class="stat-card">
+                                    <div class="stat-value">${result.response_time?.toFixed(2) || 'N/A'}</div>
+                                    <div class="stat-label">响应时间(秒)</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${result.entries_count || 0}</div>
+                                    <div class="stat-label">RSS条目数</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${(result.content_size / 1024).toFixed(1)}</div>
+                                    <div class="stat-label">内容大小(KB)</div>
+                                </div>
+                            </div>
+                            <p><strong>Feed标题:</strong> ${result.feed_title || 'N/A'}</p>
+                            <p><strong>测试路由:</strong> ${result.test_url}</p>
+                            <p><strong>测试时间:</strong> ${new Date(result.tested_at).toLocaleString()}</p>
+                        </div>
+                    `;
+                } else {
+                    testHistory.push({
+                        type: '快速测试',
+                        time: new Date().toLocaleString(),
+                        success: false,
+                        duration: duration,
+                        result: result
+                    });
+
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ 快速测试失败</h3>
+                            <p><strong>错误信息:</strong> ${result.message}</p>
+                            <p><strong>测试地址:</strong> ${result.rsshub_url || 'N/A'}</p>
+                            <p><strong>测试时间:</strong> ${new Date(result.tested_at).toLocaleString()}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ 测试执行失败</h3>
+                        <p><strong>错误:</strong> ${error.message}</p>
+                        <p>请确保后端服务正在运行在 http://localhost:8787</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function fullTest() {
+            const resultDiv = document.getElementById('fullResult');
+            resultDiv.innerHTML = '<div class="result info">正在执行完整测试，请稍候...</div>';
+
+            try {
+                const startTime = Date.now();
+                const response = await fetch(`${API_BASE}/test-rsshub-full`, {
+                    method: 'POST'
+                });
+                const duration = (Date.now() - startTime) / 1000;
+
+                const result = await response.json();
+
+                if (result.success || result.details) {
+                    testHistory.push({
+                        type: '完整测试',
+                        time: new Date().toLocaleString(),
+                        success: result.success,
+                        duration: duration,
+                        result: result
+                    });
+
+                    const summary = result.summary;
+
+                    let detailsHtml = '';
+                    if (result.details && result.details.length > 0) {
+                        detailsHtml = `
+                            <h4>详细测试结果:</h4>
+                            <table class="detail-table">
+                                <thead>
+                                    <tr>
+                                        <th>路由</th>
+                                        <th>状态</th>
+                                        <th>响应时间</th>
+                                        <th>Feed标题</th>
+                                        <th>条目数</th>
+                                        <th>错误信息</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${result.details.map(detail => `
+                                        <tr class="${detail.success ? 'success' : 'error'}">
+                                            <td>${detail.route.name}</td>
+                                            <td>${detail.success ? '✅ 成功' : '❌ 失败'}</td>
+                                            <td>${detail.response_time?.toFixed(2) || 'N/A'}s</td>
+                                            <td>${detail.feed_title || 'N/A'}</td>
+                                            <td>${detail.entries_count || 0}</td>
+                                            <td>${detail.error || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+
+                    resultDiv.innerHTML = `
+                        <div class="result ${result.success ? 'success' : 'warning'}">
+                            <h3>${result.success ? '✅ 完整测试成功' : '⚠️ 完整测试完成（发现问题）'}</h3>
+
+                            <div class="stats">
+                                <div class="stat-card">
+                                    <div class="stat-value">${summary.successful_tests}/${summary.total_tests}</div>
+                                    <div class="stat-label">成功率</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${summary.success_rate}</div>
+                                    <div class="stat-label">成功百分比</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${summary.average_response_time}</div>
+                                    <div class="stat-label">平均响应时间</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${summary.test_duration}</div>
+                                    <div class="stat-label">测试耗时</div>
+                                </div>
+                            </div>
+
+                            <p><strong>RSSHub地址:</strong> ${summary.rsshub_url}</p>
+                            <p><strong>测试时间:</strong> ${new Date(summary.tested_at).toLocaleString()}</p>
+
+                            ${detailsHtml}
+
+                            ${result.errors && result.errors.length > 0 ? `
+                                <h4>错误详情:</h4>
+                                <ul>
+                                    ${result.errors.map(error => `<li>${error}</li>`).join('')}
+                                </ul>
+                            ` : ''}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ 完整测试失败</h3>
+                            <p><strong>错误信息:</strong> ${result.message}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ 测试执行失败</h3>
+                        <p><strong>错误:</strong> ${error.message}</p>
+                        <p>请确保后端服务正在运行在 http://localhost:8787</p>
+                    </div>
+                `;
+            }
+        }
+
+        function showTestHistory() {
+            const resultDiv = document.getElementById('historyResult');
+
+            if (testHistory.length === 0) {
+                resultDiv.innerHTML = '<div class="result info">暂无测试历史</div>';
+                return;
+            }
+
+            let historyHtml = '<h3>测试历史记录</h3>';
+            historyHtml += '<table class="detail-table">';
+            historyHtml += `
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>类型</th>
+                        <th>结果</th>
+                        <th>耗时</th>
+                        <th>详情</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            testHistory.forEach((test, index) => {
+                historyHtml += `
+                    <tr class="${test.success ? 'success' : 'error'}">
+                        <td>${test.time}</td>
+                        <td>${test.type}</td>
+                        <td>${test.success ? '✅ 成功' : '❌ 失败'}</td>
+                        <td>${test.duration.toFixed(2)}s</td>
+                        <td>
+                            ${test.result.message ? test.result.message.substring(0, 50) + '...' : 'N/A'}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            historyHtml += '</tbody></table>';
+            resultDiv.innerHTML = historyHtml;
+        }
+
+        // 页面加载时获取当前配置
+        window.addEventListener('load', getCurrentSettings);
+    </script>
+</body>
+</html>
