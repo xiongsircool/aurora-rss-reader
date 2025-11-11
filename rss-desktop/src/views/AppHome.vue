@@ -5,6 +5,7 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import { useFeedStore } from '../stores/feedStore'
 import { useAIStore } from '../stores/aiStore'
 import { useFavoritesStore } from '../stores/favoritesStore'
+import { useSettingsStore } from '../stores/settingsStore'
 import Toast from '../components/Toast.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import SettingsModal from '../components/SettingsModal.vue'
@@ -16,6 +17,8 @@ dayjs.extend(relativeTime)
 const store = useFeedStore()
 const aiStore = useAIStore()
 const favoritesStore = useFavoritesStore()
+const settingsStore = useSettingsStore()
+const aiFeatures = computed(() => aiStore.config.features)
 
 // Computed filtered entries
 const filteredEntries = computed(() => {
@@ -66,7 +69,7 @@ const translatedContent = ref<{
 }>({ title: null, content: null })
 const titleTranslationLoadingMap = ref<Record<string, boolean>>({})
 const titleTranslationLanguageLabel = computed(() =>
-  (aiStore.config.translation_language || '').toUpperCase(),
+  (aiFeatures.value?.translation_language || '').toUpperCase(),
 )
 const editingFeedId = ref<string | null>(null)
 const editingGroupName = ref('')
@@ -74,6 +77,12 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const importLoading = ref(false)
 const searchQuery = ref('')
 const filterMode = ref<'all' | 'unread' | 'starred'>('all')
+const dateRangeFilter = ref('30d')
+const filterLoading = ref(false)
+const isDateFilterActive = computed(
+  () => settingsStore.settings.enable_date_filter && dateRangeFilter.value !== 'all'
+)
+const timeFilterLabel = computed(() => (isDateFilterActive.value ? getTimeRangeText(dateRangeFilter.value) : ''))
 const darkMode = ref(false)
 const showToast = ref(false)
 const toastMessage = ref('')
@@ -127,7 +136,7 @@ watch(() => aiStore.error, (error) => {
 })
 
 function getTitleTranslationCacheKey(entryId: string) {
-  const language = aiStore.config.translation_language || 'zh'
+  const language = aiFeatures.value?.translation_language || 'zh'
   return `${entryId}_${language}_title`
 }
 
@@ -142,7 +151,7 @@ function isTitleTranslationLoading(entryId: string) {
 }
 
 async function ensureTitleTranslation(entry: Entry) {
-  if (!aiStore.config.auto_title_translation || !entry?.id || !entry.title) {
+  if (!aiFeatures.value?.auto_title_translation || !entry?.id || !entry.title) {
     return
   }
   const cacheKey = getTitleTranslationCacheKey(entry.id)
@@ -151,7 +160,7 @@ async function ensureTitleTranslation(entry: Entry) {
   }
   titleTranslationLoadingMap.value[cacheKey] = true
   try {
-    await store.requestTitleTranslation(entry.id, aiStore.config.translation_language)
+    await store.requestTitleTranslation(entry.id, aiFeatures.value?.translation_language || 'zh')
   } catch (error) {
     console.error('标题翻译失败:', error)
   } finally {
@@ -313,16 +322,6 @@ watch(() => favoritesStore.error, (error) => {
   }
 })
 
-// Load theme from localStorage
-onMounted(() => {
-  const savedTheme = localStorage.getItem('theme')
-  darkMode.value = savedTheme === 'dark'
-  updateTheme()
-
-  // 加载收藏数据
-  loadFavoritesData()
-})
-
 function toggleTheme() {
   darkMode.value = !darkMode.value
   updateTheme()
@@ -420,12 +419,30 @@ onMounted(async () => {
   // 加载AI配置
   await aiStore.fetchConfig()
 
+  // 加载用户设置
+  await settingsStore.fetchSettings()
+
+  // 初始化时间过滤器为设置中的默认值
+  dateRangeFilter.value = settingsStore.settings.default_date_range
+
+  // 加载收藏数据
+  loadFavoritesData()
+
   // 添加全局事件监听器
   window.addEventListener('mousemove', handleMouseMove)
   window.addEventListener('mouseup', handleMouseUp)
 
-  await store.fetchFeeds()
-  await store.fetchEntries()
+  const initialDateRange = settingsStore.settings.enable_date_filter ? dateRangeFilter.value : undefined
+  const initialTimeField = settingsStore.settings.time_field
+
+  await store.fetchFeeds({
+    dateRange: initialDateRange,
+    timeField: initialTimeField
+  })
+  await store.fetchEntries({
+    dateRange: initialDateRange,
+    timeField: initialTimeField
+  })
 })
 
 // 组件卸载时清理事件监听器
@@ -447,7 +464,7 @@ watch(
     summaryText.value = cached?.summary ?? ''
 
     // 自动生成摘要逻辑
-    if (aiStore.config.auto_summary && !cached?.summary) {
+    if (aiFeatures.value?.auto_summary && !cached?.summary) {
       // 如果启用了自动摘要且没有缓存摘要，则自动生成
       try {
         summaryLoading.value = true
@@ -485,8 +502,8 @@ watch(
 watch(
   () => ({
     entries: filteredEntries.value,
-    language: aiStore.config.translation_language,
-    auto: aiStore.config.auto_title_translation,
+    language: aiFeatures.value?.translation_language,
+    auto: aiFeatures.value?.auto_title_translation,
   }),
   ({ entries, auto }) => {
     if (!auto) {
@@ -501,9 +518,103 @@ watch(
   { immediate: true },
 )
 
+// 防抖函数
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null
+  return (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
+  }
+}
+
+// 应用过滤器的实际函数
+async function applyFilters(options: { refreshFeeds?: boolean } = {}) {
+  const filterDateRange = settingsStore.settings.enable_date_filter ? dateRangeFilter.value : undefined
+  const filterTimeField = settingsStore.settings.time_field
+
+  const promises: Promise<unknown>[] = []
+
+  if (options.refreshFeeds) {
+    promises.push(
+      store.fetchFeeds({
+        dateRange: filterDateRange,
+        timeField: filterTimeField
+      })
+    )
+  }
+
+  if (showFavoritesOnly.value) {
+    if (promises.length) {
+      await Promise.all(promises)
+    }
+    return
+  }
+
+  if (!store.activeFeedId) {
+    if (promises.length) {
+      await Promise.all(promises)
+    }
+    return
+  }
+
+  filterLoading.value = true
+  promises.push(
+    store.fetchEntries({
+      feedId: store.activeFeedId,
+      unreadOnly: filterMode.value === 'unread',
+      dateRange: filterDateRange,
+      timeField: filterTimeField
+    })
+  )
+
+  try {
+    await Promise.all(promises)
+  } finally {
+    filterLoading.value = false
+  }
+}
+
+// 防抖的过滤器应用函数
+const debouncedApplyFilters = debounce(applyFilters, 300)
+
+// 监听activeFeedId变化
+watch(
+  () => store.activeFeedId,
+  async (feedId) => {
+    if (feedId && !showFavoritesOnly.value) {
+      await applyFilters()
+    }
+  }
+)
+
+// 监听过滤模式和时间范围变化（使用防抖）
+watch(filterMode, () => {
+  debouncedApplyFilters()
+})
+
+watch(dateRangeFilter, () => {
+  debouncedApplyFilters({ refreshFeeds: true })
+})
+
 function formatDate(date?: string | null) {
   if (!date) return '未知时间'
   return dayjs(date).fromNow()
+}
+
+function getTimeRangeText(dateRange: string): string {
+  const rangeMap: Record<string, string> = {
+    '1d': '最近1天',
+    '7d': '最近1周',
+    '30d': '最近1个月',
+    '90d': '最近3个月',
+    '180d': '最近6个月',
+    '365d': '最近1年',
+    'all': '全部时间'
+  }
+  return rangeMap[dateRange] || dateRange
 }
 
 async function handleAddFeed() {
@@ -714,8 +825,8 @@ async function handleImportOpml(event: Event) {
         <div class="brand">
           <LogoMark class="brand__icon" :size="32" />
           <div>
-            <h1>RSS READER</h1>
-            <p class="muted">本地阅读 · AI 摘要</p>
+            <h1>Aurora Feeds</h1>
+            <p class="muted">本地私享 · AI 智能阅读台</p>
           </div>
         </div>
         <div class="header-actions">
@@ -930,6 +1041,7 @@ async function handleImportOpml(event: Event) {
                 {{ store.groupStats[groupName]?.feedCount || 0 }} 订阅
                 <span v-if="store.groupStats[groupName]?.unreadCount" class="unread-count">
                   • {{ store.groupStats[groupName].unreadCount }} 未读
+                  <span v-if="isDateFilterActive" class="time-filter-hint">({{ timeFilterLabel }})</span>
                 </span>
               </span>
             </button>
@@ -977,7 +1089,13 @@ async function handleImportOpml(event: Event) {
                     />
                   </div>
                 </div>
-                <span class="feed-item__badge" v-if="feed.unread_count">{{ feed.unread_count }}</span>
+                <span
+                  class="feed-item__badge"
+                  v-if="feed.unread_count"
+                  :title="isDateFilterActive ? `仅统计${timeFilterLabel}内的未读文章` : '全部未读文章'"
+                >
+                  {{ feed.unread_count }}
+                </span>
               </button>
               <div class="feed-item__actions" @click.stop>
                 <button
@@ -1047,11 +1165,74 @@ async function handleImportOpml(event: Event) {
           </p>
         </div>
         <div class="timeline__actions">
-          <button @click="showFavoritesOnly ? loadFavoritesData({ includeEntries: true }) : store.refreshActiveFeed()">
-            {{ showFavoritesOnly ? '刷新收藏' : '刷新订阅' }}
+          <button
+            class="timeline-action-btn"
+            @click="showFavoritesOnly ? loadFavoritesData({ includeEntries: true }) : store.refreshActiveFeed()"
+          >
+            <span class="timeline-action-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path
+                  d="M4 4v6h6"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M20 20v-6h-6"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M20 10a8 8 0 0 0-13.66-4.66L4 8"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M4 14a8 8 0 0 0 13.66 4.66L20 16"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+              </svg>
+            </span>
+            <span>{{ showFavoritesOnly ? '刷新收藏' : '刷新订阅' }}</span>
           </button>
-          <button v-if="showFavoritesOnly" @click="backToAllFeeds" class="back-btn">
-            返回订阅
+          <button
+            v-if="showFavoritesOnly"
+            @click="backToAllFeeds"
+            class="timeline-action-btn timeline-action-btn--ghost"
+          >
+            <span class="timeline-action-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path
+                  d="M8 5l-5 7 5 7"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M21 12H4"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+              </svg>
+            </span>
+            <span>返回订阅</span>
           </button>
         </div>
       </header>
@@ -1083,6 +1264,66 @@ async function handleImportOpml(event: Event) {
             收藏
           </button>
         </div>
+
+        <!-- 时间过滤器 -->
+        <div class="date-filter" v-if="settingsStore.settings.enable_date_filter">
+          <label>时间范围</label>
+          <select
+            v-model="dateRangeFilter"
+            class="date-select"
+            :disabled="filterLoading"
+          >
+            <option value="1d">最近1天</option>
+            <option value="7d">最近1周</option>
+            <option value="30d">最近1个月</option>
+            <option value="90d">最近3个月</option>
+            <option value="180d">最近6个月</option>
+            <option value="365d">最近1年</option>
+            <option value="all">全部时间</option>
+          </select>
+          <div class="filter-stats" :class="{ 'filter-stats--loading': filterLoading }">
+            <div class="filter-stats__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path
+                  d="M12 4v6l4 2"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M4.5 6.5A9 9 0 1 1 6 19.5"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+                <circle cx="12" cy="12" r="9.2" stroke="currentColor" stroke-opacity="0.15" stroke-width="0.6" fill="none" />
+              </svg>
+            </div>
+            <div class="filter-stats__content">
+              <p class="filter-stats__title">
+                <template v-if="filterLoading">数据更新中…</template>
+                <template v-else>显示 {{ filteredEntries.length }} 篇文章</template>
+              </p>
+              <p class="filter-stats__meta" v-if="filterLoading">
+                正在根据筛选条件获取数据
+              </p>
+              <p class="filter-stats__meta" v-else>
+                <template v-if="isDateFilterActive">
+                  <span>{{ timeFilterLabel }}</span>
+                  <span class="filter-stats__separator">·</span>
+                  <span>左侧未读统计同步该时间范围</span>
+                </template>
+                <template v-else>
+                  <span>全部时间范围</span>
+                </template>
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <section class="timeline__list">
@@ -1097,7 +1338,7 @@ async function handleImportOpml(event: Event) {
             <button class="entry-card__main" @click="handleEntrySelect(entry.id)">
               <div class="entry-card__title">{{ entry.title || '未命名文章' }}</div>
               <div
-                v-if="aiStore.config.auto_title_translation && (getTranslatedTitle(entry.id) || isTitleTranslationLoading(entry.id))"
+                v-if="aiFeatures.auto_title_translation && (getTranslatedTitle(entry.id) || isTitleTranslationLoading(entry.id))"
                 class="entry-card__translated-title"
               >
                 <span class="translation-label">[{{ titleTranslationLanguageLabel }}]</span>
@@ -1488,6 +1729,12 @@ async function handleImportOpml(event: Event) {
   font-weight: 600;
 }
 
+.time-filter-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
 .group-feeds {
   background: rgba(255, 255, 255, 0.2);
   border-top: 1px solid rgba(15, 17, 21, 0.05);
@@ -1701,6 +1948,78 @@ async function handleImportOpml(event: Event) {
   border-bottom: 1px solid var(--border-color);
 }
 
+.timeline__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.timeline-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px 10px 12px;
+  background: linear-gradient(120deg, #ff7a18, #ffbe30);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(255, 122, 24, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.timeline-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(255, 122, 24, 0.45);
+}
+
+.timeline-action-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 16px rgba(255, 122, 24, 0.3);
+}
+
+.timeline-action-btn__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timeline-action-btn__icon svg {
+  width: 16px;
+  height: 16px;
+  color: #fff;
+}
+
+.timeline-action-btn--ghost {
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--text-primary);
+  box-shadow: 0 4px 14px rgba(15, 17, 21, 0.1);
+  border: 1px solid rgba(15, 17, 21, 0.08);
+  padding-right: 16px;
+}
+
+.timeline-action-btn--ghost .timeline-action-btn__icon {
+  background: rgba(15, 17, 21, 0.08);
+}
+
+.timeline-action-btn--ghost:hover {
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 17, 21, 0.15);
+}
+
+.timeline-action-btn--ghost:active {
+  box-shadow: 0 4px 12px rgba(15, 17, 21, 0.12);
+}
+
 .timeline__controls {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border-color);
@@ -1729,6 +2048,7 @@ async function handleImportOpml(event: Event) {
 .filter-buttons {
   display: flex;
   gap: 8px;
+  margin-bottom: 8px;
 }
 
 .filter-btn {
@@ -1754,6 +2074,131 @@ async function handleImportOpml(event: Event) {
   color: #ffffff;
   border-color: transparent;
   box-shadow: 0 8px 18px rgba(255, 122, 24, 0.25);
+}
+
+.date-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.date-filter label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.date-select {
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 120px;
+}
+
+.date-select:hover {
+  border-color: var(--accent);
+}
+
+.date-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255, 122, 24, 0.18);
+}
+
+.date-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--bg-secondary);
+}
+
+.filter-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(255, 122, 24, 0.08), rgba(0, 122, 255, 0.08));
+  box-shadow: 0 4px 20px rgba(15, 17, 21, 0.08);
+  margin-left: auto;
+  min-width: 220px;
+}
+
+.filter-stats__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff7a18, #ffbe30);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(255, 122, 24, 0.35);
+}
+
+.filter-stats__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.filter-stats__content {
+  flex: 1;
+}
+
+.filter-stats__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.filter-stats__meta {
+  margin: 2px 0 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-stats__separator {
+  color: rgba(15, 17, 21, 0.3);
+}
+
+.filter-stats--loading .filter-stats__icon {
+  animation: filterStatsSpin 1.2s linear infinite;
+}
+
+@keyframes filterStatsSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-indicator {
+  color: var(--text-secondary) !important;
+  font-weight: normal !important;
+  animation: pulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .timeline__list {
@@ -2380,22 +2825,6 @@ async function handleImportOpml(event: Event) {
   margin-left: 16px;
 }
 
-.back-btn {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.back-btn:hover {
-  background: rgba(255, 122, 24, 0.1);
-  border-color: var(--accent);
-}
-
 /* 深色模式收藏样式 */
 :global(.dark) .favorites-section {
   border-color: rgba(255, 255, 255, 0.08);
@@ -2436,14 +2865,18 @@ async function handleImportOpml(event: Event) {
   border-color: rgba(255, 122, 24, 0.5);
 }
 
-:global(.dark) .back-btn {
-  background: var(--bg-surface);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
+:global(.dark) .timeline-action-btn {
+  box-shadow: 0 8px 20px rgba(255, 122, 24, 0.25);
 }
 
-:global(.dark) .back-btn:hover {
-  background: rgba(255, 122, 24, 0.2);
-  border-color: rgba(255, 122, 24, 0.4);
+:global(.dark) .timeline-action-btn--ghost {
+  background: rgba(15, 17, 21, 0.8);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+:global(.dark) .timeline-action-btn--ghost .timeline-action-btn__icon {
+  background: rgba(255, 255, 255, 0.08);
 }
 </style>

@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     sqlite_path: Path = DEFAULT_SQLITE_PATH
     rsshub_base: str = "https://rsshub.app"
-    fetch_interval_minutes: int = 15
+    fetch_interval_minutes: int = 720
     frontend_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

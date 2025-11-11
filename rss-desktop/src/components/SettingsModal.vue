@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useAIStore } from '../stores/aiStore'
+import { useAIStore, type AIServiceKey } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 
 const props = defineProps<{
@@ -14,24 +14,60 @@ const emit = defineEmits<{
 const aiStore = useAIStore()
 const settingsStore = useSettingsStore()
 
-// 本地表单数据
-const localConfig = ref({
+type TestResult = { success: boolean; message: string }
+type ServiceKey = AIServiceKey
+
+const createLocalServiceConfig = () => ({
   api_key: '',
   base_url: 'https://open.bigmodel.cn/api/paas/v4/',
-  model_name: 'glm-4-flash',
-  auto_summary: false,
-  auto_translation: false,
-  auto_title_translation: false,
-  translation_language: 'zh'
+  model_name: 'glm-4-flash'
+})
+
+const localConfig = ref({
+  summary: createLocalServiceConfig(),
+  translation: createLocalServiceConfig(),
+  features: {
+    auto_summary: false,
+    auto_translation: false,
+    auto_title_translation: false,
+    translation_language: 'zh'
+  }
 })
 
 // RSSHub URL配置
 const rsshubUrl = ref('https://rsshub.app')
 const isTestingRSSHub = ref(false)
 const rsshubTestResult = ref<{ success: boolean; message: string } | null>(null)
+const serviceTesting = ref<Record<ServiceKey, boolean>>({
+  summary: false,
+  translation: false
+})
+const serviceTestResult = ref<Record<ServiceKey, TestResult | null>>({
+  summary: null,
+  translation: null
+})
 
-const isTesting = ref(false)
-const testResult = ref<{ success: boolean; message: string } | null>(null)
+// 显示设置 - 与settingsStore同步
+const enableDateFilter = computed({
+  get: () => settingsStore.settings.enable_date_filter,
+  set: (value) => {
+    settingsStore.updateSettings({ enable_date_filter: value })
+  }
+})
+
+const defaultDateRange = computed({
+  get: () => settingsStore.settings.default_date_range,
+  set: (value) => {
+    settingsStore.updateSettings({ default_date_range: value })
+  }
+})
+
+const timeField = computed({
+  get: () => settingsStore.settings.time_field,
+  set: (value) => {
+    settingsStore.updateSettings({ time_field: value })
+  }
+})
 
 // 订阅刷新设置 - 与settingsStore同步
 const autoRefresh = computed({
@@ -52,9 +88,34 @@ const fetchInterval = computed({
 })
 
 
+function syncFromStore() {
+  const summary = aiStore.config.summary || {}
+  const translation = aiStore.config.translation || {}
+  const features = aiStore.config.features || {}
+  localConfig.value.summary = {
+    ...localConfig.value.summary,
+    api_key: summary.api_key ?? localConfig.value.summary.api_key,
+    base_url: summary.base_url ?? localConfig.value.summary.base_url,
+    model_name: summary.model_name ?? localConfig.value.summary.model_name
+  }
+  localConfig.value.translation = {
+    ...localConfig.value.translation,
+    api_key: translation.api_key ?? localConfig.value.translation.api_key,
+    base_url: translation.base_url ?? localConfig.value.translation.base_url,
+    model_name: translation.model_name ?? localConfig.value.translation.model_name
+  }
+  localConfig.value.features = {
+    ...localConfig.value.features,
+    auto_summary: features.auto_summary ?? localConfig.value.features.auto_summary,
+    auto_translation: features.auto_translation ?? localConfig.value.features.auto_translation,
+    auto_title_translation: features.auto_title_translation ?? localConfig.value.features.auto_title_translation,
+    translation_language: features.translation_language ?? localConfig.value.features.translation_language
+  }
+}
+
 // 监听store配置变化
-watch(() => aiStore.config, (newConfig) => {
-  localConfig.value = { ...localConfig.value, ...newConfig }
+watch(() => aiStore.config, () => {
+  syncFromStore()
 }, { deep: true })
 
 // 监听模态框显示状态
@@ -65,36 +126,44 @@ watch(() => props.show, async (show) => {
       settingsStore.fetchSettings(),
       fetchRSSHubUrl()
     ])
-    testResult.value = null
+    syncFromStore()
+    serviceTestResult.value.summary = null
+    serviceTestResult.value.translation = null
     rsshubTestResult.value = null
   }
 })
 
-async function testConnection() {
-  if (!localConfig.value.api_key || !localConfig.value.base_url || !localConfig.value.model_name) {
-    testResult.value = { success: false, message: '请先完善API配置' }
+async function testConnection(service: ServiceKey) {
+  const serviceConfig = localConfig.value[service]
+  if (!serviceConfig.api_key || !serviceConfig.base_url || !serviceConfig.model_name) {
+    serviceTestResult.value[service] = { success: false, message: '请先完善API配置' }
     return
   }
 
-  isTesting.value = true
-  testResult.value = null
+  serviceTesting.value[service] = true
+  serviceTestResult.value[service] = null
 
   try {
-    const success = await aiStore.testConnection()
-    testResult.value = {
+    const success = await aiStore.testConnection(service, serviceConfig)
+    serviceTestResult.value[service] = {
       success,
       message: success ? '连接测试成功！' : aiStore.error || '连接测试失败'
     }
   } catch (error) {
-    testResult.value = { success: false, message: '连接测试失败' }
+    serviceTestResult.value[service] = { success: false, message: '连接测试失败' }
   } finally {
-    isTesting.value = false
+    serviceTesting.value[service] = false
   }
+}
+
+function copySummaryToTranslation() {
+  localConfig.value.translation = { ...localConfig.value.summary }
+  serviceTestResult.value.translation = null
 }
 
 async function fetchRSSHubUrl() {
   try {
-    const response = await fetch('http://localhost:8787/api/settings/rsshub-url')
+    const response = await fetch('/api/settings/rsshub-url')
     if (response.ok) {
       const data = await response.json()
       rsshubUrl.value = data.rsshub_url
@@ -118,7 +187,7 @@ async function testRSSHubConnection() {
     await saveRSSHubUrl()
 
     // 通过后端API测试RSSHub连通性
-    const response = await fetch('http://localhost:8787/api/settings/test-rsshub-quick', {
+    const response = await fetch('/api/settings/test-rsshub-quick', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -167,7 +236,7 @@ async function saveRSSHubUrl() {
   }
 
   try {
-    const response = await fetch('http://localhost:8787/api/settings/rsshub-url', {
+    const response = await fetch('/api/settings/rsshub-url', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -198,14 +267,28 @@ async function saveRSSHubUrl() {
 }
 
 async function saveSettings() {
-  // 先保存RSSHub URL
-  if (rsshubUrl.value) {
-    await saveRSSHubUrl()
-  }
+  try {
+    // 先保存RSSHub URL
+    if (rsshubUrl.value) {
+      await saveRSSHubUrl()
+    }
 
-  const success = await aiStore.updateConfig(localConfig.value)
-  if (success) {
+    // 保存AI配置
+    const aiSuccess = await aiStore.updateConfig({
+      summary: { ...localConfig.value.summary },
+      translation: { ...localConfig.value.translation },
+      features: { ...localConfig.value.features }
+    })
+    if (!aiSuccess) {
+      console.error('AI配置保存失败')
+    }
+
+    // 设置已经通过computed属性自动保存了，不需要额外操作
+    // 因为enableDateFilter、defaultDateRange、timeField、fetchInterval都使用了computed的setter
+
     emit('close')
+  } catch (error) {
+    console.error('保存设置失败:', error)
   }
 }
 
@@ -273,54 +356,135 @@ function handleBackdropClick(event: MouseEvent) {
 
           <section class="settings-section">
             <h3>AI 配置</h3>
-            <div class="form-group">
-              <label>API Key</label>
-              <input
-                v-model="localConfig.api_key"
-                type="text"
-                placeholder="输入 GLM API Key"
-                class="form-input"
-              />
-              <p class="form-hint">
-                获取 API Key:
-                <a href="https://open.bigmodel.cn" target="_blank">https://open.bigmodel.cn</a>
-              </p>
-            </div>
+            <div class="ai-config-grid">
+              <div class="ai-config-card">
+                <div class="ai-config-card__header">
+                  <div>
+                    <p class="ai-config-card__title">摘要生成</p>
+                    <p class="ai-config-card__subtitle">用于 AI 摘要与自动摘要</p>
+                  </div>
+                  <button
+                    @click="testConnection('summary')"
+                    :disabled="serviceTesting.summary || !localConfig.summary.api_key || !localConfig.summary.base_url || !localConfig.summary.model_name"
+                    class="test-btn"
+                    :class="{
+                      loading: serviceTesting.summary,
+                      success: serviceTestResult.summary?.success,
+                      error: serviceTestResult.summary?.success === false
+                    }"
+                  >
+                    {{ serviceTesting.summary ? '测试中...' : '测试连接' }}
+                  </button>
+                </div>
 
-            <div class="form-group">
-              <label>API 地址</label>
-              <input
-                v-model="localConfig.base_url"
-                type="text"
-                placeholder="API Base URL"
-                class="form-input"
-              />
-            </div>
+                <div class="form-group">
+                  <label>API Key</label>
+                  <input
+                    v-model="localConfig.summary.api_key"
+                    type="text"
+                    placeholder="输入 GLM API Key"
+                    class="form-input"
+                  />
+                  <p class="form-hint">
+                    获取 API Key:
+                    <a href="https://open.bigmodel.cn" target="_blank">https://open.bigmodel.cn</a>
+                  </p>
+                </div>
 
-            <div class="form-group">
-              <label>模型名称</label>
-              <input
-                v-model="localConfig.model_name"
-                type="text"
-                placeholder="例如: glm-4-flash"
-                class="form-input"
-              />
-              <p class="form-hint">
-                支持模型: glm-4-flash, glm-4, glm-4-air, glm-3-turbo, gpt-3.5-turbo, claude-3-haiku 等
-              </p>
-            </div>
+                <div class="form-group">
+                  <label>API 地址</label>
+                  <input
+                    v-model="localConfig.summary.base_url"
+                    type="text"
+                    placeholder="API Base URL"
+                    class="form-input"
+                  />
+                </div>
 
-            <div class="form-group">
-              <button
-                @click="testConnection"
-                :disabled="isTesting || !localConfig.api_key || !localConfig.base_url || !localConfig.model_name"
-                class="test-btn"
-                :class="{ loading: isTesting, success: testResult?.success, error: testResult?.success === false }"
-              >
-                {{ isTesting ? '测试中...' : '测试连接' }}
-              </button>
-              <div v-if="testResult" class="test-result" :class="{ success: testResult.success, error: !testResult.success }">
-                {{ testResult.message }}
+                <div class="form-group">
+                  <label>模型名称</label>
+                  <input
+                    v-model="localConfig.summary.model_name"
+                    type="text"
+                    placeholder="例如: glm-4-flash"
+                    class="form-input"
+                  />
+                  <p class="form-hint">
+                    支持模型: glm-4-flash, glm-4, glm-4-air, glm-3-turbo, gpt-3.5-turbo, claude-3-haiku 等
+                  </p>
+                </div>
+
+                <div
+                  v-if="serviceTestResult.summary"
+                  class="test-result"
+                  :class="{ success: serviceTestResult.summary.success, error: !serviceTestResult.summary.success }"
+                >
+                  {{ serviceTestResult.summary.message }}
+                </div>
+              </div>
+
+              <div class="ai-config-card">
+                <div class="ai-config-card__header">
+                  <div>
+                    <p class="ai-config-card__title">内容翻译</p>
+                    <p class="ai-config-card__subtitle">用于全文翻译与标题翻译</p>
+                  </div>
+                  <div class="ai-config-card__actions">
+                    <button class="ghost-btn" type="button" @click="copySummaryToTranslation">
+                      沿用摘要配置
+                    </button>
+                    <button
+                      @click="testConnection('translation')"
+                      :disabled="serviceTesting.translation || !localConfig.translation.api_key || !localConfig.translation.base_url || !localConfig.translation.model_name"
+                      class="test-btn"
+                      :class="{
+                        loading: serviceTesting.translation,
+                        success: serviceTestResult.translation?.success,
+                        error: serviceTestResult.translation?.success === false
+                      }"
+                    >
+                      {{ serviceTesting.translation ? '测试中...' : '测试连接' }}
+                    </button>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>API Key</label>
+                  <input
+                    v-model="localConfig.translation.api_key"
+                    type="text"
+                    placeholder="输入翻译使用的 API Key"
+                    class="form-input"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>API 地址</label>
+                  <input
+                    v-model="localConfig.translation.base_url"
+                    type="text"
+                    placeholder="API Base URL"
+                    class="form-input"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>模型名称</label>
+                  <input
+                    v-model="localConfig.translation.model_name"
+                    type="text"
+                    placeholder="例如: glm-4、glm-4-air"
+                    class="form-input"
+                  />
+                </div>
+
+                <div
+                  v-if="serviceTestResult.translation"
+                  class="test-result"
+                  :class="{ success: serviceTestResult.translation.success, error: !serviceTestResult.translation.success }"
+                >
+                  {{ serviceTestResult.translation.message }}
+                </div>
               </div>
             </div>
           </section>
@@ -330,7 +494,7 @@ function handleBackdropClick(event: MouseEvent) {
             <div class="form-group">
               <label class="checkbox-label">
                 <input
-                  v-model="localConfig.auto_summary"
+                  v-model="localConfig.features.auto_summary"
                   type="checkbox"
                   class="form-checkbox"
                 />
@@ -342,7 +506,7 @@ function handleBackdropClick(event: MouseEvent) {
             <div class="form-group">
               <label class="checkbox-label">
                 <input
-                  v-model="localConfig.auto_translation"
+                  v-model="localConfig.features.auto_translation"
                   type="checkbox"
                   class="form-checkbox"
                 />
@@ -354,7 +518,7 @@ function handleBackdropClick(event: MouseEvent) {
             <div class="form-group">
               <label class="checkbox-label">
                 <input
-                  v-model="localConfig.auto_title_translation"
+                  v-model="localConfig.features.auto_title_translation"
                   type="checkbox"
                   class="form-checkbox"
                 />
@@ -365,10 +529,10 @@ function handleBackdropClick(event: MouseEvent) {
 
             <div
               class="form-group"
-              v-if="localConfig.auto_translation || localConfig.auto_title_translation"
+              v-if="localConfig.features.auto_translation || localConfig.features.auto_title_translation"
             >
               <label>翻译目标语言</label>
-              <select v-model="localConfig.translation_language" class="form-select">
+              <select v-model="localConfig.features.translation_language" class="form-select">
                 <option value="zh">中文</option>
                 <option value="en">English</option>
                 <option value="ja">日本語</option>
@@ -403,7 +567,63 @@ function handleBackdropClick(event: MouseEvent) {
                 class="form-input"
               />
               <p class="form-hint">
-                设置RSS订阅的自动刷新间隔（5-1440分钟）
+                设置RSS订阅的自动刷新间隔（5-1440分钟），推荐720分钟（12小时）
+              </p>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h3>显示设置</h3>
+            <div class="form-group">
+              <label>
+                <input
+                  v-model="enableDateFilter"
+                  type="checkbox"
+                  class="form-checkbox"
+                />
+                启用时间过滤
+              </label>
+              <p class="form-hint">只显示指定时间范围内的文章，提升浏览体验</p>
+            </div>
+
+            <div class="form-group" v-if="enableDateFilter">
+              <label>默认时间范围</label>
+              <select v-model="defaultDateRange" class="form-select">
+                <option value="1d">最近1天</option>
+                <option value="7d">最近1周</option>
+                <option value="30d">最近1个月</option>
+                <option value="90d">最近3个月</option>
+                <option value="180d">最近6个月</option>
+                <option value="365d">最近1年</option>
+                <option value="all">全部时间</option>
+              </select>
+              <p class="form-hint">设置默认显示的文章时间范围</p>
+            </div>
+
+            <div class="form-group" v-if="enableDateFilter">
+              <label>时间基准</label>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input
+                    v-model="timeField"
+                    type="radio"
+                    value="inserted_at"
+                    class="form-radio"
+                  />
+                  入库时间（推荐）
+                </label>
+                <label class="radio-label">
+                  <input
+                    v-model="timeField"
+                    type="radio"
+                    value="published_at"
+                    class="form-radio"
+                  />
+                  文章发布时间
+                </label>
+              </div>
+              <p class="form-hint">
+                入库时间更可靠，文章发布时间可能有空值
               </p>
             </div>
           </section>
@@ -505,6 +725,66 @@ function handleBackdropClick(event: MouseEvent) {
   font-weight: 600;
 }
 
+.ai-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.ai-config-card {
+  border: 1px solid var(--border-color, rgba(15, 17, 21, 0.12));
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--bg-surface, #ffffff);
+}
+
+.ai-config-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ai-config-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ai-config-card__subtitle {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ai-config-card__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ghost-btn {
+  border: 1px dashed var(--border-color, rgba(15, 17, 21, 0.2));
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ghost-btn:hover {
+  border-color: var(--accent, #007aff);
+  color: var(--accent, #007aff);
+  background: rgba(0, 122, 255, 0.08);
+}
+
 .form-group {
   margin-bottom: 16px;
 }
@@ -541,6 +821,23 @@ function handleBackdropClick(event: MouseEvent) {
 
 .form-checkbox {
   margin-right: 8px;
+}
+
+.form-radio {
+  margin-right: 8px;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  font-weight: normal;
+  margin-bottom: 0;
 }
 
 .form-hint {

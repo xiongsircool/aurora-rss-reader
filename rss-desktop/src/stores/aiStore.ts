@@ -2,27 +2,62 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '../api/client'
 
-export interface AIConfig {
+export type AIServiceKey = 'summary' | 'translation'
+
+export interface AIServiceConfig {
   api_key: string
   base_url: string
   model_name: string
+  has_api_key?: boolean
+}
+
+export interface AIFeatureConfig {
   auto_summary: boolean
   auto_translation: boolean
   auto_title_translation: boolean
   translation_language: string
-  has_api_key?: boolean
 }
 
-export const useAIStore = defineStore('ai', () => {
-  const config = ref<AIConfig>({
-    api_key: '',
-    base_url: '',
-    model_name: '',
+export interface AIConfig {
+  summary: AIServiceConfig
+  translation: AIServiceConfig
+  features: AIFeatureConfig
+}
+
+export type PartialAIConfig = {
+  summary?: Partial<AIServiceConfig>
+  translation?: Partial<AIServiceConfig>
+  features?: Partial<AIFeatureConfig>
+}
+
+const createDefaultServiceConfig = (): AIServiceConfig => ({
+  api_key: '',
+  base_url: '',
+  model_name: '',
+  has_api_key: false
+})
+
+const createDefaultConfig = (): AIConfig => ({
+  summary: createDefaultServiceConfig(),
+  translation: createDefaultServiceConfig(),
+  features: {
     auto_summary: false,
     auto_translation: false,
     auto_title_translation: false,
     translation_language: 'zh'
-  })
+  }
+})
+
+function mergeConfig(target: AIConfig, updates: PartialAIConfig): AIConfig {
+  return {
+    summary: updates.summary ? { ...target.summary, ...updates.summary } : target.summary,
+    translation: updates.translation ? { ...target.translation, ...updates.translation } : target.translation,
+    features: updates.features ? { ...target.features, ...updates.features } : target.features
+  }
+}
+
+export const useAIStore = defineStore('ai', () => {
+  const config = ref<AIConfig>(createDefaultConfig())
 
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -32,7 +67,7 @@ export const useAIStore = defineStore('ai', () => {
     error.value = null
     try {
       const { data } = await api.get<AIConfig>('/ai/config')
-      config.value = { ...config.value, ...data }
+      config.value = mergeConfig(config.value, data)
     } catch (err) {
       console.error('Failed to fetch AI config:', err)
       error.value = '获取AI配置失败'
@@ -41,14 +76,13 @@ export const useAIStore = defineStore('ai', () => {
     }
   }
 
-  async function updateConfig(updates: Partial<AIConfig>) {
+  async function updateConfig(updates: PartialAIConfig) {
     loading.value = true
     error.value = null
     try {
       const { data } = await api.patch<{ success: boolean; message: string }>('/ai/config', updates)
       if (data.success) {
-        // 更新本地配置
-        config.value = { ...config.value, ...updates }
+        config.value = mergeConfig(config.value, updates)
         return true
       } else {
         error.value = data.message || '更新AI配置失败'
@@ -63,8 +97,13 @@ export const useAIStore = defineStore('ai', () => {
     }
   }
 
-  async function testConnection() {
-    if (!config.value.api_key || !config.value.base_url || !config.value.model_name) {
+  async function testConnection(service: AIServiceKey, overrides?: Partial<AIServiceConfig>) {
+    const source = {
+      ...config.value[service],
+      ...overrides
+    }
+
+    if (!source.api_key || !source.base_url || !source.model_name) {
       error.value = '请先完善API配置'
       return false
     }
@@ -73,9 +112,10 @@ export const useAIStore = defineStore('ai', () => {
     error.value = null
     try {
       const { data } = await api.post<{ success: boolean; message: string }>('/ai/test', {
-        api_key: config.value.api_key,
-        base_url: config.value.base_url,
-        model_name: config.value.model_name
+        service,
+        api_key: source.api_key,
+        base_url: source.base_url,
+        model_name: source.model_name
       })
       if (data.success) {
         return true
@@ -97,15 +137,7 @@ export const useAIStore = defineStore('ai', () => {
   }
 
   function resetConfig() {
-    config.value = {
-      api_key: '',
-      base_url: '',
-      model_name: '',
-      auto_summary: false,
-      auto_translation: false,
-      auto_title_translation: false,
-      translation_language: 'zh'
-    }
+    config.value = createDefaultConfig()
   }
 
   return {

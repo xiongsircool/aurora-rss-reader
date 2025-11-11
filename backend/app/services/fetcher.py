@@ -270,11 +270,102 @@ def _extract_content(item: Any) -> str | None:
 
 
 def _parse_datetime(item: Any) -> datetime | None:
+    """增强的时间解析函数，支持多种时间格式和位置"""
+
+    # 1. 首先尝试标准的RSS时间字段
     parsed = item.get("published_parsed") or item.get("updated_parsed")
-    if not parsed:
+    if parsed:
+        try:
+            timestamp = mktime(parsed)
+            return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        except Exception:
+            pass
+
+    # 2. 尝试其他时间字段
+    time_fields = ["created_parsed", "date_parsed", "pubdate_parsed", "issued_parsed"]
+    for field in time_fields:
+        if field in item:
+            try:
+                timestamp = mktime(item[field])
+                return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            except Exception:
+                continue
+
+    # 3. 尝试字符串时间字段
+    time_str_fields = ["published", "updated", "created", "date", "pubdate", "issued"]
+    for field in time_str_fields:
+        if field in item:
+            try:
+                time_struct = feedparser._parse_date(item[field])
+                if time_struct:
+                    timestamp = mktime(time_struct)
+                    return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            except Exception:
+                continue
+
+    # 4. 尝试从description中提取时间信息
+    description = item.get("summary") or item.get("description")
+    if description:
+        extracted_time = _extract_time_from_description(description)
+        if extracted_time:
+            return extracted_time
+
+    return None
+
+
+def _extract_time_from_description(description: str) -> datetime | None:
+    """从HTML描述中提取时间信息"""
+    import re
+    from datetime import datetime, timezone
+
+    if not description:
         return None
-    timestamp = mktime(parsed)
-    return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+
+    # 匹配ScienceDirect等格式的时间信息
+    patterns = [
+        # "Publication date: December 2025"
+        r'Publication date:\s*([A-Za-z]+\s+\d{4})',
+        # "Publication date: Available online 10 October 2025"
+        r'Publication date:\s*Available online\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
+        # "Publication date: June 2026"
+        r'Published:\s*([A-Za-z]+\s+\d{4})',
+        # 其他可能的时间格式
+        r'Date:\s*([A-Za-z]+\s+\d{4})',
+        r'Published:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, description, re.IGNORECASE)
+        if match:
+            time_str = match.group(1)
+            try:
+                # 解析不同格式的时间字符串
+                if re.match(r'^[A-Za-z]+\s+\d{4}$', time_str):
+                    # "December 2025" 格式
+                    parsed = datetime.strptime(time_str, "%B %Y")
+                elif re.match(r'^\d{1,2}\s+[A-Za-z]+\s+\d{4}$', time_str):
+                    # "10 October 2025" 格式
+                    parsed = datetime.strptime(time_str, "%d %B %Y")
+                else:
+                    continue
+
+                # 设置时间为当天的中午12点UTC
+                return parsed.replace(hour=12, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+
+            except ValueError:
+                # 尝试英文月份的其他格式
+                try:
+                    # 尝试解析缩写月份名
+                    if re.match(r'^[A-Za-z]{3}\s+\d{4}$', time_str):
+                        parsed = datetime.strptime(time_str, "%b %Y")
+                        return parsed.replace(hour=12, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+                    elif re.match(r'^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$', time_str):
+                        parsed = datetime.strptime(time_str, "%d %b %Y")
+                        return parsed.replace(hour=12, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+
+    return None
 
 
 def _render_readability(html: str) -> str | None:

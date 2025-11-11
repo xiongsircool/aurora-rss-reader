@@ -19,6 +19,10 @@ class UserSettingsResponse(BaseModel):
     auto_refresh: bool
     show_description: bool
     items_per_page: int
+    # 时间过滤相关设置
+    enable_date_filter: bool
+    default_date_range: str
+    time_field: str
 
 
 class UserSettingsUpdate(BaseModel):
@@ -28,6 +32,10 @@ class UserSettingsUpdate(BaseModel):
     auto_refresh: Optional[bool] = None
     show_description: Optional[bool] = None
     items_per_page: Optional[int] = None
+    # 时间过滤相关设置
+    enable_date_filter: Optional[bool] = None
+    default_date_range: Optional[str] = None
+    time_field: Optional[str] = None
 
 
 class RSSHubURLUpdate(BaseModel):
@@ -44,7 +52,10 @@ async def get_settings():
         fetch_interval_minutes=settings.fetch_interval_minutes,
         auto_refresh=settings.auto_refresh,
         show_description=settings.show_description,
-        items_per_page=settings.items_per_page
+        items_per_page=settings.items_per_page,
+        enable_date_filter=settings.enable_date_filter,
+        default_date_range=settings.default_date_range,
+        time_field=settings.time_field
     )
 
 
@@ -61,7 +72,10 @@ async def update_settings(update_data: UserSettingsUpdate):
             fetch_interval_minutes=settings.fetch_interval_minutes,
             auto_refresh=settings.auto_refresh,
             show_description=settings.show_description,
-            items_per_page=settings.items_per_page
+            items_per_page=settings.items_per_page,
+            enable_date_filter=settings.enable_date_filter,
+            default_date_range=settings.default_date_range,
+            time_field=settings.time_field
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"更新设置失败: {str(e)}")
@@ -78,7 +92,10 @@ async def update_rsshub_url(update_data: RSSHubURLUpdate):
             fetch_interval_minutes=settings.fetch_interval_minutes,
             auto_refresh=settings.auto_refresh,
             show_description=settings.show_description,
-            items_per_page=settings.items_per_page
+            items_per_page=settings.items_per_page,
+            enable_date_filter=settings.enable_date_filter,
+            default_date_range=settings.default_date_range,
+            time_field=settings.time_field
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"更新RSSHub URL失败: {str(e)}")

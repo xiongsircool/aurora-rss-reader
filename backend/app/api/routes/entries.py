@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
@@ -25,6 +27,8 @@ async def list_entries(
     unread_only: bool = Query(default=False),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
+    date_range: str | None = Query(default=None, description="时间范围: '1d', '7d', '30d', '90d', '180d', '365d'"),
+    time_field: str = Query(default="inserted_at", description="时间字段: 'published_at' 或 'inserted_at'"),
 ) -> list[EntryRead]:
     stmt = (
         select(Entry, Feed.title)
@@ -33,10 +37,46 @@ async def list_entries(
         .offset(offset)
         .limit(limit)
     )
+
+    # 现有过滤条件
     if feed_id:
         stmt = stmt.where(Entry.feed_id == feed_id)
     if unread_only:
         stmt = stmt.where(Entry.read.is_(False))
+
+    # 新增时间范围过滤
+    if date_range and date_range != "all":
+        # 解析时间范围
+        if date_range.endswith('h'):
+            hours = int(date_range.replace('h', ''))
+            cutoff_date = datetime.utcnow() - timedelta(hours=hours)
+        elif date_range.endswith('d'):
+            days = int(date_range.replace('d', ''))
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+        elif date_range.endswith('m'):
+            months = int(date_range.replace('m', ''))
+            cutoff_date = datetime.utcnow() - timedelta(days=months * 30)
+        elif date_range.endswith('y'):
+            years = int(date_range.replace('y', ''))
+            cutoff_date = datetime.utcnow() - timedelta(days=years * 365)
+        else:
+            # 默认按天处理
+            try:
+                days = int(date_range)
+                cutoff_date = datetime.utcnow() - timedelta(days=days)
+            except ValueError:
+                cutoff_date = datetime.utcnow() - timedelta(days=30)  # 默认30天
+
+        # 根据选择的字段进行时间过滤
+        if time_field == "published_at":
+            # 使用 published_at，如果为空则回退到 inserted_at
+            stmt = stmt.where(
+                (Entry.published_at >= cutoff_date) |
+                (Entry.published_at.is_(None) & (Entry.inserted_at >= cutoff_date))
+            )
+        else:
+            # 使用 inserted_at
+            stmt = stmt.where(Entry.inserted_at >= cutoff_date)
 
     rows = session.exec(stmt).all()
 

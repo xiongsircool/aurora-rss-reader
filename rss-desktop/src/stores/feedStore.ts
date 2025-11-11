@@ -16,6 +16,8 @@ export const useFeedStore = defineStore('feed', () => {
   const titleTranslationCache = ref<Record<string, { title: string; language: string }>>({})
   const errorMessage = ref<string | null>(null)
   const collapsedGroups = ref<Set<string>>(new Set())
+  const lastFeedFilters = ref<{ dateRange?: string; timeField?: string } | null>(null)
+  const lastEntryFilters = ref<{ unreadOnly?: boolean; dateRange?: string; timeField?: string } | null>(null)
 
   const selectedEntry = computed(() =>
     entries.value.find((entry) => entry.id === selectedEntryId.value) ?? null
@@ -64,10 +66,24 @@ export const useFeedStore = defineStore('feed', () => {
     })
   })
 
-  async function fetchFeeds() {
+  async function fetchFeeds(options?: { dateRange?: string; timeField?: string }) {
     loadingFeeds.value = true
     try {
-      const { data } = await api.get<Feed[]>('/feeds')
+      const mergedFilters = {
+        dateRange: options?.dateRange ?? lastFeedFilters.value?.dateRange,
+        timeField: options?.timeField ?? lastFeedFilters.value?.timeField,
+      }
+      lastFeedFilters.value = mergedFilters
+
+      const params: Record<string, string> = {}
+      if (mergedFilters.dateRange && mergedFilters.dateRange !== 'all') {
+        params.date_range = mergedFilters.dateRange
+      }
+      if (mergedFilters.timeField) {
+        params.time_field = mergedFilters.timeField
+      }
+
+      const { data } = await api.get<Feed[]>('/feeds', { params })
       feeds.value = data
       if (!activeFeedId.value && data.length > 0) {
         activeFeedId.value = data[0].id
@@ -100,6 +116,7 @@ export const useFeedStore = defineStore('feed', () => {
     if (!activeFeedId.value) return
     await api.post(`/feeds/${activeFeedId.value}/refresh`)
     await fetchEntries()
+    await fetchFeeds()
   }
 
   async function deleteFeed(feedId: string) {
@@ -133,14 +150,38 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  async function fetchEntries(feedId?: string) {
-    const targetFeed = feedId ?? activeFeedId.value
+  async function fetchEntries(options?: {
+    feedId?: string
+    unreadOnly?: boolean
+    dateRange?: string
+    timeField?: string
+  }) {
+    const targetFeed = options?.feedId ?? activeFeedId.value
     if (!targetFeed) return
     loadingEntries.value = true
     try {
-      const { data } = await api.get<Entry[]>('/entries', {
-        params: { feed_id: targetFeed, limit: 100 },
-      })
+      const mergedFilters = {
+        unreadOnly: options?.unreadOnly ?? lastEntryFilters.value?.unreadOnly ?? false,
+        dateRange: options?.dateRange ?? lastEntryFilters.value?.dateRange,
+        timeField: options?.timeField ?? lastEntryFilters.value?.timeField,
+      }
+      lastEntryFilters.value = mergedFilters
+
+      const params: Record<string, string | number | boolean> = { feed_id: targetFeed, limit: 100 }
+
+      if (mergedFilters.unreadOnly) {
+        params.unread_only = true
+      }
+
+      if (mergedFilters.dateRange && mergedFilters.dateRange !== 'all') {
+        params.date_range = mergedFilters.dateRange
+      }
+
+      if (mergedFilters.timeField) {
+        params.time_field = mergedFilters.timeField
+      }
+
+      const { data } = await api.get<Entry[]>('/entries', { params })
       entries.value = data
       if (data.length > 0) {
         const defaultEntry = data.find((entry) => entry.id === selectedEntryId.value) ?? data[0]
@@ -159,17 +200,29 @@ export const useFeedStore = defineStore('feed', () => {
   function selectFeed(id: string) {
     if (activeFeedId.value === id) return
     activeFeedId.value = id
-    fetchEntries(id)
   }
 
   function selectEntry(entryId: string) {
     selectedEntryId.value = entryId
   }
 
+  function adjustFeedUnreadCount(feedId: string, delta: number) {
+    const feed = feeds.value.find((f) => f.id === feedId)
+    if (feed) {
+      const next = Math.max(0, (feed.unread_count || 0) + delta)
+      feed.unread_count = next
+    }
+  }
+
   async function toggleEntryState(entry: Entry, state: Partial<Pick<Entry, 'read' | 'starred'>>) {
+    const previousRead = entry.read
     await api.patch<Entry>(`/entries/${entry.id}`, state)
     entry.read = state.read ?? entry.read
     entry.starred = state.starred ?? entry.starred
+
+    if (state.read !== undefined && previousRead !== entry.read) {
+      adjustFeedUnreadCount(entry.feed_id, entry.read ? -1 : 1)
+    }
   }
 
   async function requestSummary(entryId: string, language = 'zh') {

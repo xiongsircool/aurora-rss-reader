@@ -4,11 +4,18 @@ import api from '../api/client'
 
 export interface AppSettings {
   fetch_interval_minutes: number
+  // 时间过滤相关设置
+  enable_date_filter: boolean
+  default_date_range: string
+  time_field: string
 }
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<AppSettings>({
-    fetch_interval_minutes: 15
+    fetch_interval_minutes: 15,
+    enable_date_filter: true,
+    default_date_range: '30d',
+    time_field: 'inserted_at'
   })
 
   const loading = ref(false)
@@ -40,8 +47,8 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       const { data } = await api.patch('/settings', newSettings)
 
-      // 更新本地状态
-      settings.value = { ...settings.value, ...newSettings }
+      // 使用后端返回的数据更新本地状态，确保数据一致性
+      settings.value = { ...settings.value, ...data }
 
       return data
     } catch (err) {

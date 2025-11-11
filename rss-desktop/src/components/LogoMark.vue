@@ -11,58 +11,27 @@ const props = withDefaults(defineProps<{ size?: number }>(), {
     viewBox="0 0 64 64"
     fill="none"
     role="img"
-    aria-label="RSS READER 图标"
+    aria-label="Aurora Feeds 图标"
   >
     <defs>
-      <linearGradient id="rss-mark-gradient" x1="12" y1="10" x2="56" y2="54" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#ff7a18" />
-        <stop offset="55%" stop-color="#ffb347" />
-        <stop offset="100%" stop-color="#ffd262" />
+      <linearGradient id="rss-mark-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#1A2A6C" />
+        <stop offset="55%" stop-color="#4BB4F8" />
+        <stop offset="100%" stop-color="#8EF6E4" />
       </linearGradient>
     </defs>
-    <rect
-      x="8"
-      y="10"
-      width="48"
-      height="44"
-      rx="10"
-      fill="url(#rss-mark-gradient)"
-      opacity="0.12"
-    />
-    <path
-      d="M20 18h12c3 0 4 2 4 4v24c0 2-1 4-4 4H20c-3 0-4-2-4-4V22c0-2 1-4 4-4z"
-      fill="#fff"
-      opacity="0.2"
-    />
-    <path
-      d="M32 18h12c3 0 6 3 6 6v22c0 3-3 6-6 6H32"
-      stroke="url(#rss-mark-gradient)"
-      stroke-width="3"
-      stroke-linecap="round"
-    />
-    <line
-      x1="32"
-      y1="18"
-      x2="32"
-      y2="52"
-      stroke="url(#rss-mark-gradient)"
-      stroke-width="2"
-      stroke-linecap="round"
-      opacity="0.6"
-    />
-    <path
-      d="M26 36c4 0 8 4 8 8"
-      stroke="url(#rss-mark-gradient)"
-      stroke-width="3"
-      stroke-linecap="round"
-    />
-    <path
-      d="M26 28c8 0 16 7 16 16"
-      stroke="url(#rss-mark-gradient)"
-      stroke-width="3"
-      stroke-linecap="round"
-      opacity="0.8"
-    />
-    <circle cx="22" cy="44" r="3.5" fill="url(#rss-mark-gradient)" />
+    <rect x="4" y="4" width="56" height="56" rx="14" fill="#050A15" />
+    <g stroke="url(#rss-mark-gradient)" fill="none" stroke-linecap="round">
+      <path
+        d="M10 40 C16 28, 22 16, 32 22 C42 28, 48 16, 54 8"
+        stroke-width="5"
+      />
+      <path
+        d="M14 50 C20 40, 28 34, 36 38 C44 42, 50 32, 54 26"
+        stroke-width="3.5"
+        opacity="0.85"
+      />
+    </g>
+    <circle cx="22" cy="18" r="3.5" fill="#8EF6E4" opacity="0.9" />
   </svg>
 </template>

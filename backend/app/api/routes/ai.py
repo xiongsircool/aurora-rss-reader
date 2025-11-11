@@ -7,15 +7,42 @@ from pydantic import BaseModel
 from app.db.deps import get_session
 from app.db.models import Entry, Summary, Translation
 from app.schemas.ai import SummaryRequest, SummaryResponse, TranslationRequest, TranslationResponse
-from app.services.ai import glm_client
+from app.services.ai import GLMClient, ai_client_manager, ServiceKey
 from app.core.config import settings
 
-# 全局AI设置缓存（在生产环境中应该使用数据库或配置文件）
-_ai_settings_cache = {
-    "auto_summary": False,
-    "auto_translation": False,
-    "auto_title_translation": False,
-    "translation_language": "zh"
+
+def _default_service_config() -> dict[str, str]:
+    return {
+        "api_key": settings.glm_api_key or "",
+        "base_url": settings.glm_base_url,
+        "model_name": settings.glm_model,
+    }
+
+
+def _ensure_cache_initialized() -> None:
+    if "summary" not in _ai_settings_cache:
+        base = _default_service_config()
+        _ai_settings_cache["summary"] = base.copy()
+    if "translation" not in _ai_settings_cache:
+        _ai_settings_cache["translation"] = _ai_settings_cache["summary"].copy()
+    if "features" not in _ai_settings_cache:
+        _ai_settings_cache["features"] = {
+            "auto_summary": False,
+            "auto_translation": False,
+            "auto_title_translation": False,
+            "translation_language": "zh",
+        }
+
+
+_ai_settings_cache: dict[str, dict[str, str | bool]] = {
+    "summary": _default_service_config(),
+    "translation": _default_service_config(),
+    "features": {
+        "auto_summary": False,
+        "auto_translation": False,
+        "auto_title_translation": False,
+        "translation_language": "zh",
+    },
 }
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -41,7 +68,8 @@ async def generate_summary(
     if not content:
         raise HTTPException(status_code=400, detail="Entry has no content to summarize")
 
-    summary_text = await glm_client.summarize(content, language=payload.language)
+    client = ai_client_manager.get_client("summary")
+    summary_text = await client.summarize(content, language=payload.language)
 
     summary = Summary(entry_id=entry.id, language=payload.language, summary=summary_text)
     session.add(summary)
@@ -63,8 +91,10 @@ async def translate_entry_title(
     if not entry.title:
         return {"entry_id": entry.id, "title": "", "language": payload["language"]}
 
+    client = ai_client_manager.get_client("translation")
+
     try:
-        translated_title = await glm_client.translate(entry.title, target_language=payload["language"])
+        translated_title = await client.translate(entry.title, target_language=payload["language"])
         return {
             "entry_id": entry.id,
             "title": translated_title,
@@ -101,14 +131,17 @@ async def translate_entry(
     translated_content = None
 
     if entry.title:
-        translated_title = await glm_client.translate(entry.title, target_language=payload.language)
+        client = ai_client_manager.get_client("translation")
+        translated_title = await client.translate(entry.title, target_language=payload.language)
 
     if entry.summary:
-        translated_summary = await glm_client.translate(entry.summary, target_language=payload.language)
+        client = ai_client_manager.get_client("translation")
+        translated_summary = await client.translate(entry.summary, target_language=payload.language)
 
     content_to_translate = entry.readability_content or entry.content
     if content_to_translate:
-        translated_content = await glm_client.translate(content_to_translate, target_language=payload.language)
+        client = ai_client_manager.get_client("translation")
+        translated_content = await client.translate(content_to_translate, target_language=payload.language)
 
     translation = Translation(
         entry_id=entry.id,
@@ -130,11 +163,14 @@ async def translate_entry(
     )
 
 
-# AI配置管理
-class AIConfig(BaseModel):
-    api_key: str
-    base_url: str
-    model_name: str
+class AIServiceConfig(BaseModel):
+    api_key: str = ""
+    base_url: str = ""
+    model_name: str = ""
+    has_api_key: bool = False
+
+
+class AIFeatureConfig(BaseModel):
     auto_summary: bool = False
     auto_translation: bool = False
     auto_title_translation: bool = False
@@ -142,65 +178,94 @@ class AIConfig(BaseModel):
 
 
 class AIConfigResponse(BaseModel):
-    api_key: str
-    base_url: str
-    model_name: str
-    auto_summary: bool = False
-    auto_translation: bool = False
-    auto_title_translation: bool = False
-    translation_language: str = "zh"
-    has_api_key: bool = False
+    summary: AIServiceConfig
+    translation: AIServiceConfig
+    features: AIFeatureConfig
+
+
+class AIServiceConfigUpdate(BaseModel):
+    api_key: str | None = None
+    base_url: str | None = None
+    model_name: str | None = None
+
+
+class AIFeatureConfigUpdate(BaseModel):
+    auto_summary: bool | None = None
+    auto_translation: bool | None = None
+    auto_title_translation: bool | None = None
+    translation_language: str | None = None
+
+
+class AIConfigUpdate(BaseModel):
+    summary: AIServiceConfigUpdate | None = None
+    translation: AIServiceConfigUpdate | None = None
+    features: AIFeatureConfigUpdate | None = None
 
 
 class TestConnectionRequest(BaseModel):
-    api_key: str
-    base_url: str
-    model_name: str
+    api_key: str | None = None
+    base_url: str | None = None
+    model_name: str | None = None
+    service: ServiceKey = "summary"
+
+
+def _build_service_config(service: ServiceKey) -> AIServiceConfig:
+    _ensure_cache_initialized()
+    cached = _ai_settings_cache[service]
+    return AIServiceConfig(
+        api_key=str(cached.get("api_key", "") or ""),
+        base_url=str(cached.get("base_url", "") or ""),
+        model_name=str(cached.get("model_name", "") or ""),
+        has_api_key=bool(cached.get("api_key")),
+    )
 
 
 @router.get("/config", response_model=AIConfigResponse)
 async def get_ai_config() -> AIConfigResponse:
     """获取AI配置信息"""
+    _ensure_cache_initialized()
     return AIConfigResponse(
-        api_key=settings.glm_api_key,
-        base_url=settings.glm_base_url,
-        model_name=settings.glm_model,
-        auto_summary=_ai_settings_cache["auto_summary"],
-        auto_translation=_ai_settings_cache["auto_translation"],
-        auto_title_translation=_ai_settings_cache["auto_title_translation"],
-        translation_language=_ai_settings_cache["translation_language"],
-        has_api_key=bool(settings.glm_api_key)
+        summary=_build_service_config("summary"),
+        translation=_build_service_config("translation"),
+        features=AIFeatureConfig(**_ai_settings_cache["features"]),
     )
 
 
+def _apply_service_update(service: ServiceKey, update: AIServiceConfigUpdate) -> None:
+    _ensure_cache_initialized()
+    cached = _ai_settings_cache[service]
+    client_kwargs: dict[str, str] = {}
+    if update.api_key is not None:
+        cached["api_key"] = update.api_key
+        client_kwargs["api_key"] = update.api_key
+    if update.base_url is not None:
+        cached["base_url"] = update.base_url
+        client_kwargs["base_url"] = update.base_url
+    if update.model_name is not None:
+        cached["model_name"] = update.model_name
+        client_kwargs["model_name"] = update.model_name
+    if client_kwargs:
+        ai_client_manager.update_client(service, **client_kwargs)
+
+
 @router.patch("/config")
-async def update_ai_config(payload: dict) -> dict:
-    """更新AI配置（通过环境变量）"""
-    # 这里应该更新环境变量或配置文件
-    # 由于settings是从环境变量加载的，我们需要重新加载或使用其他机制
-
-    # 简单实现：存储到临时配置中
-    # 在实际应用中，你可能需要使用配置文件或数据库来存储这些设置
+async def update_ai_config(payload: AIConfigUpdate) -> dict:
+    """更新AI配置"""
     try:
-        global _ai_settings_cache
-
-        # 更新AI功能设置
-        if "auto_summary" in payload:
-            _ai_settings_cache["auto_summary"] = bool(payload["auto_summary"])
-        if "auto_translation" in payload:
-            _ai_settings_cache["auto_translation"] = bool(payload["auto_translation"])
-        if "auto_title_translation" in payload:
-            _ai_settings_cache["auto_title_translation"] = bool(payload["auto_title_translation"])
-        if "translation_language" in payload:
-            _ai_settings_cache["translation_language"] = str(payload["translation_language"])
-
-        # 更新glm_client的配置
-        if "api_key" in payload and payload["api_key"]:
-            glm_client.api_key = payload["api_key"]
-        if "base_url" in payload and payload["base_url"]:
-            glm_client.base_url = payload["base_url"]
-        if "model_name" in payload and payload["model_name"]:
-            glm_client.model = payload["model_name"]
+        if payload.summary:
+            _apply_service_update("summary", payload.summary)
+        if payload.translation:
+            _apply_service_update("translation", payload.translation)
+        if payload.features:
+            features = _ai_settings_cache["features"]
+            if payload.features.auto_summary is not None:
+                features["auto_summary"] = payload.features.auto_summary
+            if payload.features.auto_translation is not None:
+                features["auto_translation"] = payload.features.auto_translation
+            if payload.features.auto_title_translation is not None:
+                features["auto_title_translation"] = payload.features.auto_title_translation
+            if payload.features.translation_language is not None:
+                features["translation_language"] = payload.features.translation_language
 
         return {"success": True, "message": "配置更新成功"}
     except Exception as e:
@@ -211,22 +276,16 @@ async def update_ai_config(payload: dict) -> dict:
 async def test_ai_connection(payload: TestConnectionRequest) -> dict:
     """测试AI连接"""
     try:
-        # 临时设置配置进行测试
-        original_api_key = glm_client.api_key
-        original_base_url = glm_client.base_url
-        original_model = glm_client.model
+        _ensure_cache_initialized()
+        service = payload.service or "summary"
+        fallback = _ai_settings_cache[service]
+        temp_client = GLMClient(
+            base_url=payload.base_url or str(fallback.get("base_url", "") or ""),
+            model=payload.model_name or str(fallback.get("model_name", "") or ""),
+            api_key=payload.api_key or str(fallback.get("api_key", "") or ""),
+        )
 
-        glm_client.api_key = payload.api_key
-        glm_client.base_url = payload.base_url
-        glm_client.model = payload.model_name
-
-        # 测试连接 - 尝试生成一个简单的摘要
-        test_result = await glm_client.summarize("测试连接", language="zh")
-
-        # 恢复原始配置
-        glm_client.api_key = original_api_key
-        glm_client.base_url = original_base_url
-        glm_client.model = original_model
+        test_result = await temp_client.summarize("测试连接", language="zh")
 
         return {"success": True, "message": "连接测试成功", "test_result": test_result[:50] + "..."}
 
