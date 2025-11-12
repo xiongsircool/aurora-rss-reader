@@ -63,25 +63,9 @@ echo ""
 echo "按 Ctrl+C 停止服务"
 echo ""
 
-# 启动后端
-echo "🛠️  启动后端服务..."
-(
-    cd backend
-    source .venv/bin/activate
-    python -m scripts.serve
-) &
-BACKEND_PID=$!
+# 由 Electron 进程在开发模式自动启动后端
+echo "🛠️  由 Electron 自动启动后端 (开发模式)"
 
-cleanup() {
-    if ps -p $BACKEND_PID > /dev/null 2>&1; then
-        echo ""
-        echo "🛑 停止后端 (PID: $BACKEND_PID)"
-        kill $BACKEND_PID
-    fi
-}
-
-trap cleanup EXIT
-
-# 启动前端
+# 启动前端（仅前端，后端已在上面启动）
 cd rss-desktop
-pnpm dev
+pnpm dev:frontend

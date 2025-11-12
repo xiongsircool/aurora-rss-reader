@@ -64,7 +64,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 960,
+    minWidth: 400,
     minHeight: 600,
     icon: path.join(process.env.VITE_PUBLIC, 'aurora-icon.svg'),
     webPreferences: {

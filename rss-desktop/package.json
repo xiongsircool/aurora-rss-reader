@@ -1,8 +1,10 @@
 {
   "name": "rss-desktop",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "Aurora RSS Reader - AI-powered RSS reading application",
+  "author": "Aurora RSS Team",
   "scripts": {
     "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\" --names \"UI,API\" --prefix-colors \"cyan,green\"",
     "dev:frontend": "vite --host",
@@ -25,7 +27,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",
     "concurrently": "^8.2.2",
-    "electron": "^30.0.1",
+    "electron": "39.1.2",
     "electron-builder": "^24.13.3",
     "typescript": "^5.2.2",
     "vite": "^5.1.6",

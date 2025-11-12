@@ -1203,4 +1203,124 @@ function handleLanguageChange(newLanguage: string) {
 .modal-leave-to .modal-content {
   transform: scale(0.9);
 }
+
+/* =====================
+   Dark mode overrides
+   ===================== */
+:global(.dark) .modal-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+:global(.dark) .modal-content {
+  background: linear-gradient(180deg, #181b22 0%, #0f1115 100%);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+:global(.dark) .modal-header {
+  border-color: var(--border-color);
+}
+
+:global(.dark) .close-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:global(.dark) .modal-body {
+  background: rgba(24, 27, 34, 0.7);
+}
+
+:global(.dark) .settings-section {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+:global(.dark) .ghost-btn {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+:global(.dark) .ghost-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+:global(.dark) .form-input,
+:global(.dark) .form-select {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  box-shadow: none;
+}
+:global(.dark) .form-input::placeholder {
+  color: var(--text-secondary);
+}
+
+:global(.dark) .radio-label,
+:global(.dark) .checkbox-label {
+  color: var(--text-primary);
+}
+
+:global(.dark) .test-result {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+}
+
+:global(.dark) .about-content {
+  border-color: var(--border-color);
+}
+
+:global(.dark) .app-version {
+  background: rgba(0, 122, 255, 0.15);
+  color: #71b3ff;
+  border-color: rgba(0, 122, 255, 0.35);
+}
+
+:global(.dark) .feature-badge {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+}
+
+:global(.dark) .about-link {
+  background: var(--bg-surface);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+:global(.dark) .about-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--accent);
+}
+
+:global(.dark) .about-footer {
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+:global(.dark) .modal-footer {
+  border-color: var(--border-color);
+}
+
+:global(.dark) .btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+:global(.dark) .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Modal body scrollbar styling */
+.modal-body::-webkit-scrollbar { width: 8px; height: 8px; }
+.modal-body::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.18); border-radius: 8px; }
+.modal-body:hover::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.28); }
+:global(.dark) .modal-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
+:global(.dark) .modal-body:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
+.modal-body { scrollbar-width: thin; scrollbar-color: rgba(15, 17, 21, 0.28) transparent; }
+:global(.dark) .modal-body { scrollbar-color: rgba(255, 255, 255, 0.36) transparent; }
 </style>

@@ -21,7 +21,7 @@ const aiStore = useAIStore()
 const favoritesStore = useFavoritesStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
-const { setLanguage, loadLanguage } = useLanguage()
+const { loadLanguage } = useLanguage()
 const aiFeatures = computed(() => aiStore.config.features)
 
 // 初始化语言设置
@@ -114,7 +114,6 @@ const brokenFeedIcons = ref<Record<string, string>>({})
 const DEFAULT_VIEWPORT_WIDTH = typeof window !== 'undefined' ? window.innerWidth : 1440
 const DEFAULT_SIDEBAR_RATIO = 0.26
 const DEFAULT_DETAILS_RATIO = 0.38
-const RESIZER_GUTTER = 6 // 两条分隔线总宽度
 const MIN_TIMELINE_WIDTH = 240
 const MIN_SIDEBAR_WIDTH = 180
 const MIN_DETAILS_WIDTH = 260
@@ -935,7 +934,11 @@ async function handleImportOpml(event: Event) {
     :show="showSettings" 
     @close="showSettings = false" 
   />
-  <div class="app-shell" :style="layoutStyle">
+  <div
+    class="app-shell"
+    :style="layoutStyle"
+    :class="{ 'is-dragging-left': isDraggingLeft, 'is-dragging-right': isDraggingRight }"
+  >
     <!-- 侧边栏 -->
     <aside class="sidebar">
       <header class="sidebar__header">
@@ -1532,7 +1535,7 @@ async function handleImportOpml(event: Event) {
           </select>
         </div>
 
-        <div class="summary-card summary-card--inline">
+        <div class="summary-card summary-card--inline" :class="{ 'summary-card--loading': summaryLoading }">
           <div class="summary-card__content">
             <p class="summary-card__label">{{ t('ai.summaryLabel') }}</p>
             <p v-if="summaryText" class="summary-card__text">{{ summaryText }}</p>
@@ -1569,8 +1572,9 @@ async function handleImportOpml(event: Event) {
   color: var(--text-primary);
   position: relative;
   max-width: 100vw;
-  overflow-x: hidden;
-  overflow-y: auto;
+  /* 顶层容器不滚动，交给内部列滚动，避免多重滚动条 */
+  overflow: hidden;
+  height: 100vh;
   align-items: stretch;
   --sidebar-width: 280px;
   --details-width: 420px;
@@ -2470,13 +2474,20 @@ async function handleImportOpml(event: Event) {
   flex-direction: column;
   max-height: 100vh;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   width: var(--details-width);
   /* 最大宽度由JavaScript动态控制，最大可达50%屏幕宽度 */
 }
 
 .details__header {
   margin-bottom: 12px;
+}
+
+.details__content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .details__actions {
@@ -2486,9 +2497,9 @@ async function handleImportOpml(event: Event) {
   gap: 6px;
   padding: 8px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(245, 246, 248, 0.9));
-  border: 1px solid rgba(15, 17, 21, 0.08);
-  box-shadow: 0 6px 18px rgba(15, 17, 21, 0.08);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
   margin-bottom: 14px;
 }
 
@@ -2497,8 +2508,8 @@ async function handleImportOpml(event: Event) {
   height: clamp(28px, 3.2vw, 34px);
   padding: 0 clamp(10px, 1.3vw, 14px);
   border-radius: 999px;
-  border: 1px solid rgba(15, 17, 21, 0.12);
-  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
   color: var(--text-primary);
   font-weight: 500;
   font-size: clamp(0.72rem, 1vw, 0.8rem);
@@ -2508,6 +2519,7 @@ async function handleImportOpml(event: Event) {
   flex: 0 1 auto;
   min-width: 68px;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .details__actions button:hover,
@@ -2519,11 +2531,11 @@ async function handleImportOpml(event: Event) {
 }
 
 .details__actions button:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
   color: var(--text-secondary);
-  background: rgba(0, 0, 0, 0.04);
-  border-color: transparent;
+  background: var(--bg-surface);
+  border-color: var(--border-color);
   box-shadow: none;
 }
 
@@ -2538,8 +2550,8 @@ async function handleImportOpml(event: Event) {
   padding-right: 28px;
   min-width: 78px;
   text-align: left;
-  background-color: rgba(255, 255, 255, 0.8);
-  background-image: linear-gradient(45deg, transparent 50%, rgba(15, 17, 21, 0.45) 50%), linear-gradient(135deg, rgba(15, 17, 21, 0.45) 50%, transparent 50%);
+  background-color: var(--bg-surface);
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-primary) 50%), linear-gradient(135deg, var(--text-primary) 50%, transparent 50%);
   background-position: calc(100% - 13px) 11px, calc(100% - 9px) 11px;
   background-size: 4px 4px, 4px 4px;
   background-repeat: no-repeat;
@@ -2550,9 +2562,9 @@ async function handleImportOpml(event: Event) {
   line-height: 1.6;
   color: var(--text-primary);
   word-break: break-word;
-  flex: 1 1 auto;
-  overflow-y: auto;
-  min-height: 0;
+  flex: initial;
+  overflow: visible;
+  min-height: auto;
 }
 
 .details__body :deep(p) {
@@ -2588,8 +2600,8 @@ async function handleImportOpml(event: Event) {
   margin: 0 0 18px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(15, 17, 21, 0.08);
-  background: linear-gradient(135deg, rgba(255, 138, 61, 0.08), rgba(255, 138, 61, 0.02));
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
 }
 
 .summary-card--inline {
@@ -2604,7 +2616,7 @@ async function handleImportOpml(event: Event) {
   font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(15, 17, 21, 0.55);
+  color: var(--text-secondary);
   margin-bottom: 2px;
   font-weight: 600;
 }
@@ -2794,42 +2806,8 @@ async function handleImportOpml(event: Event) {
   border-top-color: rgba(255, 255, 255, 0.05);
 }
 
-:global(.dark) .details__actions {
-  background: rgba(19, 22, 29, 0.75);
-  border-color: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-}
-
-:global(.dark) .details__actions button,
-:global(.dark) .details__actions .lang-select {
-  background: rgba(64, 71, 87, 0.8);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  font-weight: 600;
-}
-
-:global(.dark) .details__actions button:hover,
-:global(.dark) .details__actions .lang-select:hover {
-  background: var(--accent);
-  color: #151515;
-  border-color: var(--accent);
-  box-shadow: 0 0 20px rgba(255, 122, 24, 0.3);
-}
-
-:global(.dark) .details__actions button:disabled {
-  background: rgba(24, 27, 34, 0.6);
-  color: rgba(255, 255, 255, 0.5);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: none;
-}
-
-:global(.dark) .details__actions .lang-select {
-  background-color: rgba(64, 71, 87, 0.8) !important;
-  background-image: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.9) 50%), linear-gradient(135deg, rgba(255, 255, 255, 0.9) 50%, transparent 50%) !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-}
+/* 暗色模式下无需单独覆盖 details__actions/summary-card，
+   它们直接使用全局主题变量（src/style.css 的 :root / :root.dark）。 */
 
 :global(.dark) .favorites-title {
   color: rgba(255, 255, 255, 0.95);
@@ -3075,4 +3053,54 @@ async function handleImportOpml(event: Event) {
 :global(.dark) .timeline-action-btn--ghost .timeline-action-btn__icon {
   background: rgba(255, 255, 255, 0.08);
 }
+/* ========== Layout and Scrolling Enhancements (added) ========== */
+/* Smooth (non-janky) width transitions for panels; disabled while dragging */
+.sidebar { transition: width 160ms ease; }
+.details { transition: width 160ms ease; }
+.is-dragging-left .sidebar,
+.is-dragging-right .details { transition: none !important; }
+
+/* Unified internal scrollbar styling */
+.sidebar::-webkit-scrollbar,
+.timeline__list::-webkit-scrollbar,
+.details::-webkit-scrollbar,
+.details__body::-webkit-scrollbar { width: 8px; height: 8px; }
+.sidebar::-webkit-scrollbar-thumb,
+.timeline__list::-webkit-scrollbar-thumb,
+.details::-webkit-scrollbar-thumb,
+.details__body::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.18); border-radius: 8px; }
+.sidebar:hover::-webkit-scrollbar-thumb,
+.timeline__list:hover::-webkit-scrollbar-thumb,
+.details:hover::-webkit-scrollbar-thumb,
+.details__body:hover::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.28); }
+:global(.dark) .sidebar::-webkit-scrollbar-thumb,
+:global(.dark) .timeline__list::-webkit-scrollbar-thumb,
+:global(.dark) .details::-webkit-scrollbar-thumb,
+:global(.dark) .details__body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
+:global(.dark) .sidebar:hover::-webkit-scrollbar-thumb,
+:global(.dark) .timeline__list:hover::-webkit-scrollbar-thumb,
+:global(.dark) .details:hover::-webkit-scrollbar-thumb,
+:global(.dark) .details__body:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
+.sidebar, .timeline__list, .details { scrollbar-width: thin; scrollbar-color: rgba(15, 17, 21, 0.28) transparent; }
+:global(.dark) .sidebar, :global(.dark) .timeline__list, :global(.dark) .details { scrollbar-color: rgba(255, 255, 255, 0.36) transparent; }
+
+/* Resizer visual polish (grip + highlight) */
+.resizer { transition: background-color 0.2s, box-shadow 0.2s; }
+.resizer:hover { background: rgba(255, 122, 24, 0.35); box-shadow: inset 0 0 0 1px rgba(255, 122, 24, 0.25); }
+.resizer.active { background: rgba(255, 122, 24, 0.55); box-shadow: inset 0 0 0 1px rgba(255, 122, 24, 0.35); }
+.resizer::before { width: 22px; height: 44px; transition: background-color 0.2s, opacity 0.2s; }
+.resizer:hover::before { background: rgba(255, 122, 24, 0.12); }
+.resizer.active::before { background: rgba(255, 122, 24, 0.22); }
+.resizer::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 2px; height: 22px; border-radius: 1px; background: currentColor; opacity: 0.15; box-shadow: 0 -8px 0 currentColor, 0 8px 0 currentColor; }
+.resizer:hover::after, .resizer.active::after { opacity: 0.35; }
+
+/* ========== AI Summary Card Beautify ========== */
+.summary-card { padding: 14px 14px 14px 16px; border-radius: 14px; background: linear-gradient(180deg, rgba(255, 122, 24, 0.06), rgba(255, 122, 24, 0.02)), var(--bg-surface); position: relative; }
+.summary-card::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: linear-gradient(180deg, var(--accent), rgba(255, 122, 24, 0.4)); opacity: 0.9; }
+.summary-card__label { font-size: 11px; }
+.summary-card__label::before { content: '✨'; margin-right: 6px; }
+.summary-card--loading .summary-card__text, .summary-card--loading .summary-card__placeholder { position: relative; }
+.summary-card--loading .summary-card__text::after, .summary-card--loading .summary-card__placeholder::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 40%, rgba(255, 255, 255, 0.35) 60%, transparent 100%); animation: summaryShimmer 1.2s ease-in-out infinite; pointer-events: none; }
+@keyframes summaryShimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
 </style>
