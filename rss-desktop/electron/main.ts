@@ -66,7 +66,7 @@ function createWindow() {
     height: 800,
     minWidth: 400,
     minHeight: 600,
-    icon: path.join(process.env.VITE_PUBLIC, 'aurora-icon.svg'),
+    icon: path.join(process.env.VITE_PUBLIC, 'icons', 'app-release.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
     },

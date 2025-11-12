@@ -19,7 +19,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8787 --reload
 
 ```bash
 # 设置您的RSSHub地址
-python manage_rsshub.py add "我的RSSHub" "http://58.198.178.157:1200" --priority 1 --default
+python manage_rsshub.py add "我的RSSHub" "http://localhost:1200" --priority 1 --default
 
 # 查看当前配置
 python manage_rsshub.py list
@@ -31,7 +31,7 @@ python manage_rsshub.py list
 # 更新RSSHub URL
 curl -X POST "http://localhost:8787/api/settings/rsshub-url" \
   -H "Content-Type: application/json" \
-  -d '{"rsshub_url": "http://58.198.178.157:1200"}'
+  -d '{"rsshub_url": "http://localhost:1200"}'
 
 # 获取当前RSSHub URL
 curl "http://localhost:8787/api/settings/rsshub-url"
@@ -104,10 +104,10 @@ services:
 
 ```
 原始链接：https://rsshub.app/nature/research/ng
-转换后： http://58.198.178.157:1200/nature/research/ng
+转换后： http://localhost:1200/nature/research/ng
 
 原始链接：https://rsshub.app/bilibili/user/dynamic/2267573
-转换后： http://58.198.178.157:1200/bilibili/user/dynamic/2267573
+转换后： http://localhost:1200/bilibili/user/dynamic/2267573
 ```
 
 ## 🔍 测试验证
@@ -119,7 +119,7 @@ services:
 python test_rsshub_config.py
 
 # 或直接测试您的RSSHub
-curl "http://58.198.178.157:1200/api/it之家/news"
+curl "http://localhost:1200/api/it之家/news"
 ```
 
 ### 2. 测试URL转换

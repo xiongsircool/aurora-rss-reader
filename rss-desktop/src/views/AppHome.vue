@@ -1271,8 +1271,9 @@ async function handleImportOpml(event: Event) {
 
     <!-- 时间线 -->
     <main class="timeline">
+      
       <header class="timeline__header">
-        <div>
+        <div class="timeline__title-block">
           <h2 v-if="showFavoritesOnly">
             {{ selectedFavoriteFeed ?
                store.feeds.find((f) => f.id === selectedFavoriteFeed)?.title + ' 的收藏' || '收藏' :
@@ -1363,95 +1364,62 @@ async function handleImportOpml(event: Event) {
           </button>
         </div>
       </header>
+      
 
       <div class="timeline__controls">
-        <input
-          v-model="searchQuery"
-          type="search"
-          :placeholder="t('articles.searchPlaceholder')"
-          class="search-input"
-        />
-        <div class="filter-buttons">
-          <button
-            :class="['filter-btn', { active: filterMode === 'all' }]"
-            @click="filterMode = 'all'"
-          >
-            {{ t('navigation.all') }}
-          </button>
-          <button
-            :class="['filter-btn', { active: filterMode === 'unread' }]"
-            @click="filterMode = 'unread'"
-          >
-            {{ t('navigation.unread') }}
-          </button>
-          <button
-            :class="['filter-btn', { active: filterMode === 'starred' }]"
-            @click="filterMode = 'starred'"
-          >
-            {{ t('navigation.favorites') }}
-          </button>
-        </div>
-
-        <!-- 时间过滤器 -->
-        <div class="date-filter" v-if="settingsStore.settings.enable_date_filter">
-          <label>{{ t('common.timeRange') }}</label>
-          <select
-            v-model="dateRangeFilter"
-            class="date-select"
-            :disabled="filterLoading"
-          >
-            <option value="1d">{{ t('time.last1Day') }}</option>
-            <option value="7d">{{ t('time.last1Week') }}</option>
-            <option value="30d">{{ t('time.last1Month') }}</option>
-            <option value="90d">{{ t('time.last3Months') }}</option>
-            <option value="180d">{{ t('time.last6Months') }}</option>
-            <option value="365d">{{ t('time.last1Year') }}</option>
-            <option value="all">{{ t('time.allTime') }}</option>
-          </select>
-          <div class="filter-stats" :class="{ 'filter-stats--loading': filterLoading }">
-            <div class="filter-stats__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path
-                  d="M12 4v6l4 2"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  fill="none"
-                />
-                <path
-                  d="M4.5 6.5A9 9 0 1 1 6 19.5"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  fill="none"
-                />
-                <circle cx="12" cy="12" r="9.2" stroke="currentColor" stroke-opacity="0.15" stroke-width="0.6" fill="none" />
-              </svg>
-            </div>
-            <div class="filter-stats__content">
-              <p class="filter-stats__title">
-                <template v-if="filterLoading">{{ t('filters.dataUpdating') }}</template>
-                <template v-else>{{ t('filters.displayingCount', { count: filteredEntries.length }) }}</template>
-              </p>
-              <p class="filter-stats__meta" v-if="filterLoading">
-                {{ t('filters.filteringData') }}
-              </p>
-              <p class="filter-stats__meta" v-else>
-                <template v-if="isDateFilterActive">
-                  <span>{{ timeFilterLabel }}</span>
-                  <span class="filter-stats__separator">·</span>
-                  <span>{{ t('filters.dateFilterNote') }}</span>
-                </template>
-                <template v-else>
-                  <span>{{ t('filters.allTimeRange') }}</span>
-                </template>
-              </p>
-            </div>
+        
+        <div class="timeline__controls-row timeline__controls-main">
+          <input
+            v-model="searchQuery"
+            type="search"
+            :placeholder="t('articles.searchPlaceholder')"
+            class="search-input"
+          />
+          <div class="filter-buttons">
+            <button
+              :class="['filter-btn', { active: filterMode === 'all' }]"
+              @click="filterMode = 'all'"
+            >
+              {{ t('navigation.all') }}
+            </button>
+            <button
+              :class="['filter-btn', { active: filterMode === 'unread' }]"
+              @click="filterMode = 'unread'"
+            >
+              {{ t('navigation.unread') }}
+            </button>
+            <button
+              :class="['filter-btn', { active: filterMode === 'starred' }]"
+              @click="filterMode = 'starred'"
+            >
+              {{ t('navigation.favorites') }}
+            </button>
           </div>
         </div>
+        
+        <div class="timeline__controls-row timeline__controls-meta">
+          
+          <div class="date-filter" v-if="settingsStore.settings.enable_date_filter">
+            <label>{{ t('common.timeRange') }}</label>
+            <select
+              v-model="dateRangeFilter"
+              class="date-select"
+              :disabled="filterLoading"
+            >
+              <option value="1d">{{ t('time.last1Day') }}</option>
+              <option value="7d">{{ t('time.last1Week') }}</option>
+              <option value="30d">{{ t('time.last1Month') }}</option>
+              <option value="90d">{{ t('time.last3Months') }}</option>
+              <option value="180d">{{ t('time.last6Months') }}</option>
+              <option value="365d">{{ t('time.last1Year') }}</option>
+              <option value="all">{{ t('time.allTime') }}</option>
+            </select>
+          </div>
+          
+          
+        </div>
       </div>
+      
 
       <section class="timeline__list">
         <LoadingSpinner v-if="timelineLoading" message="加载中..." />
@@ -2103,15 +2071,23 @@ async function handleImportOpml(event: Event) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: clamp(16px, 2vw, 24px);
+  padding: clamp(12px, 1.5vw, 18px) clamp(16px, 2vw, 22px);
   border-bottom: 1px solid var(--border-color);
   gap: 16px;
   flex-wrap: wrap;
 }
 
+.timeline__title-block {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .timeline__actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
@@ -2120,28 +2096,28 @@ async function handleImportOpml(event: Event) {
 .timeline-action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   border: none;
   border-radius: 999px;
-  padding: clamp(8px, 1.1vw, 10px) clamp(14px, 1.8vw, 18px) clamp(8px, 1.1vw, 10px) clamp(10px, 1.3vw, 12px);
+  padding: 6px 10px;
   background: linear-gradient(120deg, #ff7a18, #ffbe30);
   color: #fff;
-  font-size: clamp(12px, 0.95vw, 13px);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.2px;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(255, 122, 24, 0.35);
+  box-shadow: 0 6px 16px rgba(255, 122, 24, 0.3);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .timeline-action-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(255, 122, 24, 0.45);
+  box-shadow: 0 8px 20px rgba(255, 122, 24, 0.4);
 }
 
 .timeline-action-btn:active {
   transform: translateY(0);
-  box-shadow: 0 6px 16px rgba(255, 122, 24, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 122, 24, 0.28);
 }
 
 .timeline-action-btn__icon {
@@ -2182,16 +2158,31 @@ async function handleImportOpml(event: Event) {
 }
 
 .timeline__controls {
-  padding: clamp(12px, 1.8vw, 20px) clamp(16px, 2vw, 24px);
+  padding: 10px 16px 12px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   flex: 0 0 auto;
 }
 
-.search-input {
+.timeline__controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   width: 100%;
+}
+
+.timeline__controls-main {
+  justify-content: space-between;
+}
+
+.timeline__controls-meta {
+  justify-content: space-between;
+}
+
+.search-input {
   padding: 10px 14px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -2199,6 +2190,8 @@ async function handleImportOpml(event: Event) {
   background: var(--bg-surface);
   color: var(--text-primary);
   transition: border-color 0.2s, box-shadow 0.2s;
+  flex: 2 1 240px;
+  min-width: 200px;
 }
 
 .search-input:focus {
@@ -2210,7 +2203,9 @@ async function handleImportOpml(event: Event) {
 .filter-buttons {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
+  flex: 1 1 220px;
+  justify-content: flex-end;
+  margin-bottom: 0;
 }
 
 .filter-btn {
@@ -2241,15 +2236,20 @@ async function handleImportOpml(event: Event) {
 .date-filter {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(255, 122, 24, 0.06), rgba(0, 122, 255, 0.06));
+  box-shadow: 0 4px 12px rgba(15, 17, 21, 0.08);
+  min-width: 160px;
 }
 
 .date-filter label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .date-select {
@@ -2280,73 +2280,7 @@ async function handleImportOpml(event: Event) {
   background: var(--bg-secondary);
 }
 
-.filter-stats {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(135deg, rgba(255, 122, 24, 0.08), rgba(0, 122, 255, 0.08));
-  box-shadow: 0 4px 20px rgba(15, 17, 21, 0.08);
-  margin-left: auto;
-  min-width: 220px;
-}
-
-.filter-stats__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #ff7a18, #ffbe30);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6px 18px rgba(255, 122, 24, 0.35);
-}
-
-.filter-stats__icon svg {
-  width: 22px;
-  height: 22px;
-}
-
-.filter-stats__content {
-  flex: 1;
-}
-
-.filter-stats__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.filter-stats__meta {
-  margin: 2px 0 0 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.filter-stats__separator {
-  color: rgba(15, 17, 21, 0.3);
-}
-
-.filter-stats--loading .filter-stats__icon {
-  animation: filterStatsSpin 1.2s linear infinite;
-}
-
-@keyframes filterStatsSpin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* removed filter-stats UI */
 
 .loading-indicator {
   color: var(--text-secondary) !important;

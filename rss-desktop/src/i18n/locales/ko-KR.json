@@ -214,7 +214,7 @@
     "saveSuccess": "설정이 성공적으로 저장되었습니다",
     "saveError": "설정 저장에 실패했습니다",
     "rssHubConfig": "RSSHub 설정",
-    "rssHubPlaceholder": "RSSHub 주소를 입력하세요. 예: http://58.198.178.157:1200",
+    "rssHubPlaceholder": "RSSHub 주소를 입력하세요. 예: http://localhost:1200",
     "rssHubDescription": "다양한 웹사이트의 RSS 구독을 가져오기 위한 개인 RSSHub 인스턴스 주소를 입력하세요",
     "rssHubDeployGuide": "RSSHub 배포: RSSHub 배포 가이드",
     "testRssHub": "RSSHub 연결 테스트",

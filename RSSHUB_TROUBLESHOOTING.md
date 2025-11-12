@@ -2,7 +2,7 @@
 
 ## 🔍 诊断结果
 
-好消息！您的RSSHub实例 `http://58.198.178.157:1200` **完全正常工作**！
+好消息！您的RSSHub实例 `http://localhost:1200` **完全正常工作**！
 
 ### ✅ 正常工作的功能：
 - 基础Web服务 ✅
@@ -11,7 +11,7 @@
 - RSS内容格式 ✅
 
 ### ⚠️ 发现的问题：
-1. **CORS配置**：当前只允许 `58.198.178.157:1200` 访问
+1. **CORS配置**：当前只允许 `localhost:1200` 访问
 2. **网络访问**：可能是内网地址，需要确认网络连通性
 
 ## 🛠️ 解决方案
@@ -44,7 +44,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8787 --reload
 ```bash
 curl -X POST "http://localhost:8787/api/settings/rsshub-url" \
   -H "Content-Type: application/json" \
-  -d '{"rsshub_url": "http://58.198.178.157:1200"}'
+  -d '{"rsshub_url": "http://localhost:1200"}'
 ```
 
 3. **前端通过后端访问**：
@@ -66,21 +66,21 @@ export HTTPS_PROXY=http://your-proxy:port
 
 ### 1. 使用诊断工具
 ```bash
-python diagnose_rsshub.py "http://58.198.178.157:1200"
+python diagnose_rsshub.py "http://localhost:1200"
 ```
 
 ### 2. 使用测试页面
 1. 打开 `test_rsshub_frontend.html`
-2. 输入RSSHub URL：`http://58.198.178.157:1200`
+2. 输入RSSHub URL：`http://localhost:1200`
 3. 点击"测试连接"
 
 ### 3. 直接测试RSS路由
 ```bash
 # 测试Nature Genetics
-curl "http://58.198.178.157:1200/nature/research/ng"
+curl "http://localhost:1200/nature/research/ng"
 
 # 测试Bilibili动态
-curl "http://58.198.178.157:1200/bilibili/user/dynamic/2267573"
+curl "http://localhost:1200/bilibili/user/dynamic/2267573"
 ```
 
 ## 🔧 常见问题解决
@@ -109,7 +109,7 @@ curl "http://58.198.178.157:1200/bilibili/user/dynamic/2267573"
 
 1. **配置RSSHub URL**：
    ```bash
-   python manage_rsshub.py add "我的RSSHub" "http://58.198.178.157:1200" --priority 1 --default
+   python manage_rsshub.py add "我的RSSHub" "http://localhost:1200" --priority 1 --default
    ```
 
 2. **启动后端服务**：

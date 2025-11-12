@@ -210,7 +210,7 @@
     "saveSuccess": "设置保存成功",
     "saveError": "设置保存失败",
     "rssHubConfig": "RSSHub 配置",
-    "rssHubPlaceholder": "输入您的RSSHub地址，如：http://58.198.178.157:1200",
+    "rssHubPlaceholder": "输入您的RSSHub地址，如：http://localhost:1200",
     "rssHubDescription": "输入您自己的RSSHub实例地址，用于获取各种网站的RSS订阅",
     "rssHubDeployGuide": "部署RSSHub: RSSHub部署指南",
     "testRssHub": "测试RSSHub连通性",

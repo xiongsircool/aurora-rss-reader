@@ -118,7 +118,8 @@ notes/
 designs/
 *.draft.md
 *.wip.md
+images/appimages/
+.claude/
 
 # Misc
 .spec-workflow/
-

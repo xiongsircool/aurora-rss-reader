@@ -11,10 +11,12 @@
     "dev:backend": "cd ../backend && python3 -m scripts.serve",
     "dev:electron": "vite --mode electron",
     "build": "vue-tsc && vite build",
+    "pack": "pnpm build && electron-builder",
     "build:web": "vue-tsc && vite build",
     "preview": "vite preview",
     "migrate": "cd ../backend && python3 -m scripts.migrate",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "clean": "rm -rf dist dist-electron release .vite out"
   },
   "dependencies": {
     "axios": "^1.13.2",

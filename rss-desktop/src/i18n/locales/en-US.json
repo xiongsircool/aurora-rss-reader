@@ -210,7 +210,7 @@
     "saveSuccess": "Settings saved successfully",
     "saveError": "Failed to save settings",
     "rssHubConfig": "RSSHub Configuration",
-    "rssHubPlaceholder": "Enter your RSSHub address, e.g.: http://58.198.178.157:1200",
+    "rssHubPlaceholder": "Enter your RSSHub address, e.g.: http://localhost:1200",
     "rssHubDescription": "Enter your own RSSHub instance address for getting RSS subscriptions from various websites",
     "rssHubDeployGuide": "Deploy RSSHub: RSSHub Deployment Guide",
     "testRssHub": "Test RSSHub Connectivity",

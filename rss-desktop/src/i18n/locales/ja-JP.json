@@ -210,7 +210,7 @@
     "saveSuccess": "設定が正常に保存されました",
     "saveError": "設定の保存に失敗しました",
     "rssHubConfig": "RSSHub 設定",
-    "rssHubPlaceholder": "RSSHubアドレスを入力してください。例：http://58.198.178.157:1200",
+    "rssHubPlaceholder": "RSSHubアドレスを入力してください。例：http://localhost:1200",
     "rssHubDescription": "独自のRSSHubインスタンスアドレスを入力して、様々なウェブサイトのRSS購読を取得します",
     "rssHubDeployGuide": "RSSHubデプロイ: RSSHubデプロイガイド",
     "testRssHub": "RSSHub接続テスト",

@@ -378,7 +378,7 @@ function handleLanguageChange(newLanguage: string) {
                 {{ t('settings.rssHubDescription') }}
               </p>
               <p class="form-hint">
-                {{ t('settings.rssHubDeployGuide') }}: <a href="https://docs.rsshub.app/zh/guide/install/" target="_blank">RSSHub部署指南</a>
+                {{ t('settings.rssHubDeployGuide') }}: <a href="https://docs.rsshub.app/zh/deploy/" target="_blank">RSSHub部署指南</a>
               </p>
             </div>
 
@@ -431,7 +431,7 @@ function handleLanguageChange(newLanguage: string) {
                   <label>{{ t('settings.apiKey') }}</label>
                   <input
                     v-model="localConfig.summary.api_key"
-                    type="text"
+                    type="password"
                     :placeholder="t('settings.apiKeyPlaceholder')"
                     class="form-input"
                   />
@@ -502,7 +502,7 @@ function handleLanguageChange(newLanguage: string) {
                   <label>{{ t('settings.apiKey') }}</label>
                   <input
                     v-model="localConfig.translation.api_key"
-                    type="text"
+                    type="password"
                     :placeholder="t('settings.translationApiKeyPlaceholder')"
                     class="form-input"
                   />
