@@ -356,6 +356,11 @@
     "last3Months": "過去3ヶ月",
     "last6Months": "過去6ヶ月",
     "last1Year": "過去1年",
-    "allTime": "全期間"
+    "allTime": "全期間",
+    "dataUpdating": "データ更新中…",
+    "displayingCount": "{count}件の記事を表示",
+    "filteringData": "フィルター条件に基づいてデータを取得",
+    "dateFilterNote": "左側の未読数がこの時間範囲と同期されます",
+    "allTimeRange": "全期間"
   }
 }

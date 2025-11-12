@@ -356,6 +356,11 @@
     "last3Months": "最近3个月",
     "last6Months": "最近6个月",
     "last1Year": "最近1年",
-    "allTime": "全部时间"
+    "allTime": "全部时间",
+    "dataUpdating": "数据更新中…",
+    "displayingCount": "显示 {count} 篇文章",
+    "filteringData": "正在根据筛选条件获取数据",
+    "dateFilterNote": "左侧未读统计同步该时间范围",
+    "allTimeRange": "全部时间范围"
   }
 }

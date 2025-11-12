@@ -339,7 +339,12 @@
     "last3Months": "최근 3개월",
     "last6Months": "최근 6개월",
     "last1Year": "최근 1년",
-    "allTime": "전체 기간"
+    "allTime": "전체 기간",
+    "dataUpdating": "데이터 업데이트 중…",
+    "displayingCount": "{count}개의 기사 표시",
+    "filteringData": "필터 조건에 따라 데이터 가져오기",
+    "dateFilterNote": "왼쪽 읽지 않은 수가 이 시간 범위와 동기화됩니다",
+    "allTimeRange": "전체 시간 범위"
   },
   "languages": {
     "zh": "中文",

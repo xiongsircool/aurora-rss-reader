@@ -356,6 +356,11 @@
     "last3Months": "Last 3 months",
     "last6Months": "Last 6 months",
     "last1Year": "Last 1 year",
-    "allTime": "All Time"
+    "allTime": "All Time",
+    "dataUpdating": "Updating data…",
+    "displayingCount": "Showing {count} articles",
+    "filteringData": "Getting data based on filter criteria",
+    "dateFilterNote": "Left unread count syncs with this time range",
+    "allTimeRange": "All time range"
   }
 }
