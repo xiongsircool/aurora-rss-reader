@@ -6,10 +6,10 @@ import koKR from './locales/ko-KR.json'
 
 // 支持的语言列表
 export const availableLocales = [
-  { code: 'zh-CN', name: '简体中文', flag: '🇨🇳' },
-  { code: 'en-US', name: 'English', flag: '🇺🇸' },
-  { code: 'ja-JP', name: '日本語', flag: '🇯🇵' },
-  { code: 'ko-KR', name: '한국어', flag: '🇰🇷' }
+  { code: 'zh', name: '简体中文', flag: '🇨🇳' },
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'ja', name: '日本語', flag: '🇯🇵' },
+  { code: 'ko', name: '한국어', flag: '🇰🇷' }
 ] as const
 
 export type LocaleCode = typeof availableLocales[number]['code']
@@ -20,25 +20,25 @@ export function getBrowserLocale(): LocaleCode {
   const browserLang = navigator.language || (navigator as any).userLanguage
 
   // 尝试精确匹配
-  if (browserLang.startsWith('zh')) return 'zh-CN'
-  if (browserLang.startsWith('en')) return 'en-US'
-  if (browserLang.startsWith('ja')) return 'ja-JP'
-  if (browserLang.startsWith('ko')) return 'ko-KR'
+  if (browserLang.startsWith('zh')) return 'zh'
+  if (browserLang.startsWith('en')) return 'en'
+  if (browserLang.startsWith('ja')) return 'ja'
+  if (browserLang.startsWith('ko')) return 'ko'
 
   // 默认返回中文
-  return 'zh-CN'
+  return 'zh'
 }
 
 // 创建i18n实例
 const i18n = createI18n({
   legacy: false, // 使用Composition API模式
-  locale: 'zh-CN', // 默认语言
-  fallbackLocale: 'zh-CN', // 回退语言
+  locale: 'zh', // 默认语言
+  fallbackLocale: 'zh', // 回退语言
   messages: {
-    'zh-CN': zhCN,
-    'en-US': enUS,
-    'ja-JP': jaJP,
-    'ko-KR': koKR
+    'zh': zhCN,
+    'en': enUS,
+    'ja': jaJP,
+    'ko': koKR
   },
   globalInjection: true // 全局注入$t函数
 })

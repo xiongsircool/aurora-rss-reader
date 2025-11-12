@@ -20,8 +20,12 @@ export function useLanguage() {
   // 从本地存储加载语言设置
   const loadLanguage = () => {
     const savedLanguage = localStorage.getItem('rss-reader-language') as LocaleCode
+
     if (savedLanguage && availableLocales.some(lang => lang.code === savedLanguage)) {
       locale.value = savedLanguage
+    } else {
+      // 如果没有有效的保存设置，使用默认语言
+      locale.value = 'zh'
     }
   }
 

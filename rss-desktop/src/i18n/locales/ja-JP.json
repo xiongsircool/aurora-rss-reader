@@ -17,7 +17,16 @@
     "theme": "テーマ",
     "light": "ライト",
     "dark": "ダーク",
-    "auto": "自動"
+    "auto": "自動",
+    "selectAll": "すべて",
+    "subscription": "購読",
+    "articles": "記事",
+    "favorites": "お気に入り",
+    "timeRange": "時間範囲"
+  },
+  "opml": {
+    "export": "OPMLをエクスポート",
+    "import": "OPMLをインポート"
   },
   "navigation": {
     "all": "すべて",
@@ -26,7 +35,12 @@
     "today": "今日",
     "yesterday": "昨日",
     "thisWeek": "今週",
-    "groups": "グループ"
+    "groups": "グループ",
+    "allFavorites": "すべてのお気に入り",
+    "latestEntries": "最新のエントリー",
+    "backToSubscription": "購読に戻る",
+    "refreshFavorites": "お気に入りを更新",
+    "refreshSubscription": "購読を更新"
   },
   "feeds": {
     "title": "RSSフィード",
@@ -71,7 +85,16 @@
     "summary": "要約",
     "fullContent": "全文",
     "showMore": "もっと見る",
-    "showLess": "閉じる"
+    "showLess": "閉じる",
+    "searchPlaceholder": "記事を検索...",
+    "selectArticle": "記事を選択して詳細を表示",
+    "translating": "翻訳中...",
+    "cancelFavorite": "お気に入りから削除",
+    "addFavorite": "お気に入りに追加",
+    "showOriginal": "原文を表示",
+    "translationLabel": "[{language}]",
+    "translatingTitle": "翻訳中...",
+    "timeSeparator": "・"
   },
   "ai": {
     "title": "AI機能",
@@ -110,7 +133,18 @@
     "author": "作者",
     "github": "GitHub",
     "saveSuccess": "設定が正常に保存されました",
-    "saveError": "設定の保存に失敗しました"
+    "saveError": "設定の保存に失敗しました",
+    "appNameDescription": "{name} という名前はオーロラから着想を得ており、あなたのフィードに柔らかな光を届けたいという思いを込めています。",
+    "features": {
+      "rss": "RSS購読",
+      "ai": "AI要約",
+      "translation": "スマート翻訳",
+      "favorites": "お気に入り管理"
+    },
+    "projectHomepage": "GitHubプロジェクトホーム",
+    "feedbackIssue": "フィードバック",
+    "save": "保存",
+    "cancel": "キャンセル"
   },
   "groups": {
     "title": "グループ",
@@ -144,5 +178,33 @@
     "parse": "データ解析に失敗しました",
     "validation": "データ検証に失敗しました",
     "unknown": "不明なエラー"
+  },
+  "filters": {
+    "last1Day": "過去1日",
+    "last1Week": "過去1週間",
+    "last1Month": "過去1ヶ月",
+    "last3Months": "過去3ヶ月",
+    "last6Months": "過去6ヶ月",
+    "last1Year": "過去1年",
+    "allTime": "全期間",
+    "dataUpdating": "データ更新中…",
+    "displayingCount": "{count}件の記事を表示",
+    "filteringData": "フィルター条件に基づいてデータを取得",
+    "dateFilterNote": "左側の未読数がこの時間範囲と同期されます",
+    "allTimeRange": "全期間"
+  },
+  "languages": {
+    "zh": "中文",
+    "en": "English",
+    "ja": "日本語",
+    "ko": "한국어"
+  },
+  "layout": {
+    "themeToggleTitle": "ライトモードに切り替え",
+    "themeToggleTitleDark": "ダークモードに切り替え",
+    "settingsTitle": "設定",
+    "resetLayoutTitle": "レイアウトをリセット",
+    "leftResizeTitle": "ドラッグしてサイドバーの幅を調整",
+    "rightResizeTitle": "ドラッグして詳細パネルの幅を調整"
   }
 }

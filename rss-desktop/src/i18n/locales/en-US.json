@@ -135,6 +135,9 @@
     "selectArticle": "Select an article to view details",
     "searchPlaceholder": "Search articles...",
     "translating": "Translating...",
+    "translatingTitle": "Translating...",
+    "translationLabel": "[{language}]",
+    "timeSeparator": "·",
     "dataUpdating": "Updating data…",
     "displayingCount": "Showing {count} articles",
     "filteringData": "Getting data based on filter criteria",
@@ -251,6 +254,7 @@
     "publishTime": "Article Publish Time",
     "timeBaseDescription": "Entry time is more reliable, article publish time may have null values",
     "aboutDescription": "A modern local RSS reader with AI summarization, smart translation, and elegant reading experience.",
+    "appNameDescription": "{name} takes its name from the aurora, aiming to bring a calm, luminous reading experience to your feeds.",
     "features": {
       "rss": "RSS Subscriptions",
       "ai": "AI Summarization",
@@ -352,17 +356,6 @@
     "last3Months": "Last 3 months",
     "last6Months": "Last 6 months",
     "last1Year": "Last 1 year",
-    "allTime": "All Time",
-    "dataUpdating": "Updating data…",
-    "displayingCount": "Showing {count} articles",
-    "filteringData": "Getting data based on filter criteria",
-    "dateFilterActive": "{timeRange}",
-    "dateFilterNote": "Left unread count syncs with this time range",
-    "allTimeRange": "All time range"
-  },
-  "articles": {
-    "translationLabel": "[{language}]",
-    "translatingTitle": "Translating...",
-    "timeSeparator": "·"
+    "allTime": "All Time"
   }
 }

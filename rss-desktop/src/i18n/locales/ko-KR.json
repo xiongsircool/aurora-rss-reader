@@ -17,7 +17,16 @@
     "theme": "테마",
     "light": "라이트",
     "dark": "다크",
-    "auto": "자동"
+    "auto": "자동",
+    "selectAll": "전체",
+    "subscription": "구독",
+    "articles": "기사",
+    "favorites": "즐겨찾기",
+    "timeRange": "시간 범위"
+  },
+  "opml": {
+    "export": "OPML 내보내기",
+    "import": "OPML 가져오기"
   },
   "navigation": {
     "all": "전체",
@@ -26,7 +35,12 @@
     "today": "오늘",
     "yesterday": "어제",
     "thisWeek": "이번 주",
-    "groups": "그룹"
+    "groups": "그룹",
+    "allFavorites": "모든 즐겨찾기",
+    "latestEntries": "최신 항목",
+    "backToSubscription": "구독으로 돌아가기",
+    "refreshFavorites": "즐겨찾기 새로고침",
+    "refreshSubscription": "구독 새로고침"
   },
   "feeds": {
     "title": "RSS 피드",
@@ -71,7 +85,16 @@
     "summary": "요약",
     "fullContent": "전체 내용",
     "showMore": "더 보기",
-    "showLess": "접기"
+    "showLess": "접기",
+    "searchPlaceholder": "기사 검색...",
+    "selectArticle": "기사를 선택하여 상세 정보 보기",
+    "translating": "번역 중...",
+    "cancelFavorite": "즐겨찾기에서 제거",
+    "addFavorite": "즐겨찾기에 추가",
+    "showOriginal": "원본 표시",
+    "translationLabel": "[{language}]",
+    "translatingTitle": "번역 중...",
+    "timeSeparator": "・"
   },
   "ai": {
     "title": "AI 기능",
@@ -110,7 +133,18 @@
     "author": "제작자",
     "github": "GitHub",
     "saveSuccess": "설정이 성공적으로 저장되었습니다",
-    "saveError": "설정 저장에 실패했습니다"
+    "saveError": "설정 저장에 실패했습니다",
+    "appNameDescription": "{name}라는 이름은 오로라에서 영감을 받아 여러분의 피드에 은은한 빛과 영감을 전하고자 하는 마음을 담았습니다.",
+    "features": {
+      "rss": "RSS 구독",
+      "ai": "AI 요약",
+      "translation": "스마트 번역",
+      "favorites": "즐겨찾기 관리"
+    },
+    "projectHomepage": "GitHub 프로젝트 홈페이지",
+    "feedbackIssue": "피드백크",
+    "save": "저장",
+    "cancel": "취소"
   },
   "groups": {
     "title": "그룹",
@@ -144,5 +178,33 @@
     "parse": "데이터 파싱에 실패했습니다",
     "validation": "데이터 검증에 실패했습니다",
     "unknown": "알 수 없는 오류"
+  },
+  "filters": {
+    "last1Day": "최근 1일",
+    "last1Week": "최근 1주",
+    "last1Month": "최근 1개월",
+    "last3Months": "최근 3개월",
+    "last6Months": "최근 6개월",
+    "last1Year": "최근 1년",
+    "allTime": "전체 기간",
+    "dataUpdating": "데이터 업데이트 중…",
+    "displayingCount": "{count}개의 기사 표시",
+    "filteringData": "필터 조건에 따라 데이터 가져오기",
+    "dateFilterNote": "왼쪽 읽지 않은 수가 이 시간 범위와 동기화됩니다",
+    "allTimeRange": "전체 시간 범위"
+  },
+  "languages": {
+    "zh": "中文",
+    "en": "English",
+    "ja": "日本語",
+    "ko": "한국어"
+  },
+  "layout": {
+    "themeToggleTitle": "라이트 모드로 전환",
+    "themeToggleTitleDark": "다크 모드로 전환",
+    "settingsTitle": "설정",
+    "resetLayoutTitle": "레이아웃 재설정",
+    "leftResizeTitle": "드래그하여 사이드바 너비 조정",
+    "rightResizeTitle": "드래그하여 세부 정보 패널 너비 조정"
   }
 }

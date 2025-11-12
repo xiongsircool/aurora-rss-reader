@@ -135,6 +135,9 @@
     "selectArticle": "选择一篇文章查看详情",
     "searchPlaceholder": "搜索文章...",
     "translating": "翻译中...",
+    "translatingTitle": "翻译中...",
+    "translationLabel": "[{language}]",
+    "timeSeparator": "·",
     "dataUpdating": "数据更新中…",
     "displayingCount": "显示 {count} 篇文章",
     "filteringData": "正在根据筛选条件获取数据",
@@ -251,6 +254,7 @@
     "publishTime": "文章发布时间",
     "timeBaseDescription": "入库时间更可靠，文章发布时间可能有空值",
     "aboutDescription": "一个现代化的本地RSS阅读器，支持AI摘要、智能翻译和优雅的阅读体验。",
+    "appNameDescription": "{name} 的名字灵感来自极光，希望为你的信息流带来灵感与光亮。",
     "features": {
       "rss": "RSS订阅",
       "ai": "AI摘要",
@@ -352,17 +356,6 @@
     "last3Months": "最近3个月",
     "last6Months": "最近6个月",
     "last1Year": "最近1年",
-    "allTime": "全部时间",
-    "dataUpdating": "数据更新中…",
-    "displayingCount": "显示 {count} 篇文章",
-    "filteringData": "正在根据筛选条件获取数据",
-    "dateFilterActive": "{timeRange}",
-    "dateFilterNote": "左侧未读统计同步该时间范围",
-    "allTimeRange": "全部时间范围"
-  },
-  "articles": {
-    "translationLabel": "[{language}]",
-    "translatingTitle": "翻译中...",
-    "timeSeparator": "·"
+    "allTime": "全部时间"
   }
 }

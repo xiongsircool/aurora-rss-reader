@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLanguage } from '../composables/useLanguage'
+import type { LocaleCode } from '../i18n'
 import { useAIStore, type AIServiceKey } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 
@@ -49,6 +50,12 @@ const serviceTesting = ref<Record<ServiceKey, boolean>>({
 const serviceTestResult = ref<Record<ServiceKey, TestResult | null>>({
   summary: null,
   translation: null
+})
+
+// 语言选择器的本地绑定 - 使用computed确保响应式
+const selectedLanguage = computed({
+  get: () => currentLanguage.value?.code || 'zh',
+  set: (value: string) => handleLanguageChange(value)
 })
 
 // 显示设置 - 与settingsStore同步
@@ -307,36 +314,23 @@ function handleBackdropClick(event: MouseEvent) {
 }
 
 // 优化语言切换体验
-async function handleLanguageChange(newLanguage: string) {
-  if (newLanguage === currentLanguage.value.code) {
+function handleLanguageChange(newLanguage: string) {
+  // 验证语言代码有效性
+  if (!newLanguage || !availableLocales.some(locale => locale.code === newLanguage)) {
+    console.warn(`无效的语言代码: ${newLanguage}`)
     return
   }
 
-  try {
-    // 获取新语言的对象信息
-    const newLocale = availableLocales.value.find(locale => locale.code === newLanguage)
-
-    // 立即切换语言
-    await setLanguage(newLanguage)
-
-    // 显示成功提示
-    console.log(t('toast.languageChanged', {
-      language: newLocale?.name || newLanguage
-    }))
-
-    // 设置保存到本地存储
-    localStorage.setItem('preferred-language', newLanguage)
-
-  } catch (error) {
-    console.error('Language switch failed:', error)
-    console.error(t('toast.languageChangeFailed'))
-
-    // 恢复到原来的语言
-    const select = document.querySelector('.form-select') as HTMLSelectElement
-    if (select) {
-      select.value = currentLanguage.value.code
-    }
+  // 检查是否已经是当前语言
+  if (currentLanguage.value?.code === newLanguage) {
+    return
   }
+
+  // 切换语言 (setLanguage会自动保存到localStorage)
+  setLanguage(newLanguage as LocaleCode)
+
+  // 显示成功提示
+  console.log(`语言已切换到: ${newLanguage}`)
 }
 
 </script>
@@ -355,10 +349,8 @@ async function handleLanguageChange(newLanguage: string) {
           <section class="settings-section">
             <h3>{{ t('settings.language') }}</h3>
             <div class="form-group">
-              <label>{{ t('settings.language') }}</label>
               <select
-                v-model="currentLanguage.code"
-                @change="handleLanguageChange(currentLanguage.code)"
+                v-model="selectedLanguage"
                 class="form-select"
               >
                 <option
@@ -693,6 +685,9 @@ async function handleLanguageChange(newLanguage: string) {
                 <h4 class="app-title">{{ t('settings.appName', { name: 'Aurora Feeds' }) }}</h4>
                 <span class="app-version">{{ t('settings.appVersion', { version: '0.1.0' }) }}</span>
               </div>
+              <p class="app-name-note">
+                {{ t('settings.appNameDescription', { name: 'Aurora Feeds' }) }}
+              </p>
               <p class="app-description">
                 {{ t('settings.aboutDescription') }}
               </p>
@@ -748,16 +743,22 @@ async function handleLanguageChange(newLanguage: string) {
 }
 
 .modal-content {
-  background: var(--bg-surface, #ffffff);
+  --settings-accent: #4c74ff;
+  --settings-accent-strong: #2f54ff;
+  --settings-muted: #5a6276;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f7fc 100%);
   color: var(--text-primary, #0f1419);
-  border-radius: 16px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 80vh;
+  border-radius: 18px;
+  width: 92%;
+  max-width: 640px;
+  max-height: 82vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(15, 20, 25, 0.08);
+  box-shadow:
+    0 20px 60px rgba(15, 20, 25, 0.25),
+    0 2px 8px rgba(15, 20, 25, 0.08);
 }
 
 .modal-header {
@@ -793,10 +794,16 @@ async function handleLanguageChange(newLanguage: string) {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .settings-section {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: #f8faff;
+  border: 1px solid rgba(76, 116, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 .settings-section:last-child {
@@ -854,20 +861,20 @@ async function handleLanguageChange(newLanguage: string) {
 }
 
 .ghost-btn {
-  border: 1px dashed var(--border-color, rgba(15, 17, 21, 0.2));
-  background: transparent;
-  color: var(--text-secondary);
-  padding: 6px 10px;
-  border-radius: 6px;
+  border: 1px dashed rgba(76, 116, 255, 0.4);
+  background: rgba(76, 116, 255, 0.08);
+  color: var(--settings-accent, #4c74ff);
+  padding: 7px 12px;
+  border-radius: 8px;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .ghost-btn:hover {
-  border-color: var(--accent, #007aff);
-  color: var(--accent, #007aff);
-  background: rgba(0, 122, 255, 0.08);
+  background: rgba(76, 116, 255, 0.15);
+  border-color: var(--settings-accent-strong, #2f54ff);
+  color: var(--settings-accent-strong, #2f54ff);
 }
 
 .form-group {
@@ -885,23 +892,25 @@ async function handleLanguageChange(newLanguage: string) {
 .form-input,
 .form-select {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color, rgba(15, 17, 21, 0.12));
-  border-radius: 8px;
+  padding: 11px 14px;
+  border: 1px solid rgba(92, 106, 138, 0.22);
+  border-radius: 10px;
   font-size: 14px;
-  background: var(--bg-surface, #ffffff);
+  background: #fefefe;
   color: var(--text-primary, #0f1419);
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: inset 0 1px 2px rgba(15, 20, 25, 0.04);
 }
 
 .form-input::placeholder {
-  color: var(--text-secondary, #6c7384);
+  color: rgba(90, 98, 118, 0.62);
 }
 
 .form-input:focus,
 .form-select:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--settings-accent, #4c74ff);
+  box-shadow: 0 0 0 3px rgba(76, 116, 255, 0.15);
 }
 
 .form-checkbox {
@@ -942,57 +951,63 @@ async function handleLanguageChange(newLanguage: string) {
 
 
 .test-btn {
-  padding: 10px 20px;
   border: none;
-  border-radius: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  background: linear-gradient(120deg, #007aff, #5856d6);
-  color: white;
+  transition: transform 0.2s, opacity 0.2s;
+  background: linear-gradient(130deg, var(--settings-accent, #4c74ff), var(--settings-accent-strong, #2f54ff));
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(76, 116, 255, 0.25);
 }
 
 .test-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+  opacity: 0.95;
 }
 
 .test-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .test-btn.loading {
-  background: linear-gradient(120deg, #ff9500, #ff7a18);
+  opacity: 0.7;
+  transform: none;
 }
 
 .test-btn.success {
-  background: linear-gradient(120deg, #34c759, #30d158);
+  background: #34c759;
+  box-shadow: none;
 }
 
 .test-btn.error {
-  background: linear-gradient(120deg, #ff3b30, #ff6b6b);
+  background: #ff4d4f;
+  box-shadow: none;
 }
 
 .test-result {
   margin-top: 8px;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 12px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 500;
+  border: 1px solid transparent;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(15, 20, 25, 0.08);
 }
 
 .test-result.success {
-  background: rgba(52, 199, 89, 0.1);
-  color: #34c759;
-  border: 1px solid rgba(52, 199, 89, 0.2);
+  color: #0f7a39;
+  border-color: rgba(52, 199, 89, 0.35);
 }
 
 .test-result.error {
-  background: rgba(255, 59, 48, 0.1);
-  color: #ff3b30;
-  border: 1px solid rgba(255, 59, 48, 0.2);
+  color: #c43838;
+  border-color: rgba(255, 77, 79, 0.35);
 }
 
 .checkbox-label {
@@ -1053,6 +1068,12 @@ async function handleLanguageChange(newLanguage: string) {
   margin: 0 0 16px 0;
 }
 
+.app-name-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--settings-muted);
+}
+
 .about-features {
   display: flex;
   flex-wrap: wrap;
@@ -1091,19 +1112,20 @@ async function handleLanguageChange(newLanguage: string) {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(92, 106, 138, 0.16);
+  border-radius: 10px;
   color: var(--text-primary);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 .about-link:hover {
-  border-color: var(--accent);
-  background: rgba(255, 122, 24, 0.05);
+  border-color: var(--settings-accent, #4c74ff);
+  background: rgba(76, 116, 255, 0.08);
   transform: translateX(4px);
 }
 
@@ -1141,23 +1163,25 @@ async function handleLanguageChange(newLanguage: string) {
 }
 
 .btn-secondary {
-  background: var(--bg-surface, #ffffff);
-  color: var(--text-primary, #0f1419);
-  border: 1px solid var(--border-color, rgba(15, 17, 21, 0.12));
+  background: #f2f4fb;
+  color: var(--settings-muted, #5a6276);
+  border: 1px solid rgba(92, 106, 138, 0.2);
 }
 
 .btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: #e4e8f4;
 }
 
 .btn-primary {
-  background: linear-gradient(120deg, #ff7a18, #ffbe30);
+  background: linear-gradient(130deg, var(--settings-accent, #4c74ff), var(--settings-accent-strong, #2f54ff));
   color: white;
+  box-shadow: 0 12px 24px rgba(76, 116, 255, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 122, 24, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 18px 30px rgba(76, 116, 255, 0.3);
 }
 
 .modal-enter-active,
