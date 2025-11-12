@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
 
@@ -8,6 +11,7 @@ from app.db.deps import get_session
 from app.db.models import Entry, Summary, Translation
 from app.schemas.ai import SummaryRequest, SummaryResponse, TranslationRequest, TranslationResponse
 from app.services.ai import GLMClient, ai_client_manager, ServiceKey
+from app.services.translation_engine import IncrementalTranslator, SmartSegmenter
 from app.core.config import settings
 
 
@@ -108,10 +112,15 @@ async def translate_entry_title(
 async def translate_entry(
     payload: TranslationRequest, session: Session = Depends(get_session)
 ) -> TranslationResponse:
+    """
+    翻译文章（使用增量段落翻译）
+    支持长文章，按段落进行翻译以突破长度限制
+    """
     entry = session.get(Entry, payload.entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
+    # 检查缓存
     existing = session.exec(
         select(Translation).where(
             Translation.entry_id == payload.entry_id, Translation.language == payload.language
@@ -126,23 +135,44 @@ async def translate_entry(
             content=existing.content,
         )
 
+    # 初始化翻译器
+    client = ai_client_manager.get_client("translation")
+    translator = IncrementalTranslator(client)
+    
     translated_title = None
     translated_summary = None
     translated_content = None
 
+    # 翻译标题（简短，直接翻译）
     if entry.title:
-        client = ai_client_manager.get_client("translation")
         translated_title = await client.translate(entry.title, target_language=payload.language)
 
+    # 翻译摘要（简短，直接翻译）
     if entry.summary:
-        client = ai_client_manager.get_client("translation")
         translated_summary = await client.translate(entry.summary, target_language=payload.language)
 
+    # 翻译正文内容（使用段落级翻译）
     content_to_translate = entry.readability_content or entry.content
     if content_to_translate:
-        client = ai_client_manager.get_client("translation")
-        translated_content = await client.translate(content_to_translate, target_language=payload.language)
+        # 检查内容长度，决定是否使用段落翻译
+        content_length = len(content_to_translate)
+        
+        if content_length > 2000:  # 长文章使用段落翻译
+            print(f"使用段落翻译模式，内容长度: {content_length}")
+            translated_content = await translator.translate_long_text(
+                content_to_translate,
+                target_language=payload.language,
+                max_segment_length=1000,  # 每段最大1000字符
+                max_concurrent=3,  # 最多3个并发请求
+            )
+        else:  # 短文章直接翻译
+            print(f"使用直接翻译模式，内容长度: {content_length}")
+            translated_content = await client.translate(
+                content_to_translate, 
+                target_language=payload.language
+            )
 
+    # 保存到数据库
     translation = Translation(
         entry_id=entry.id,
         language=payload.language,
@@ -160,6 +190,153 @@ async def translate_entry(
         title=translation.title,
         summary=translation.summary,
         content=translation.content,
+    )
+
+
+@router.post("/translate-stream")
+async def translate_entry_stream(
+    payload: TranslationRequest, session: Session = Depends(get_session)
+):
+    """
+    流式翻译API - 支持实时进度更新
+    使用Server-Sent Events (SSE)返回翻译进度
+    """
+    entry = session.get(Entry, payload.entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    # 检查缓存
+    existing = session.exec(
+        select(Translation).where(
+            Translation.entry_id == payload.entry_id, Translation.language == payload.language
+        )
+    ).first()
+    
+    async def generate_events():
+        """生成SSE事件流"""
+        try:
+            # 如果有缓存，直接返回
+            if existing:
+                yield f"data: {json.dumps({'type': 'progress', 'percent': 100, 'message': '从缓存加载'})}\n\n"
+                yield f"data: {json.dumps({'type': 'complete', 'result': {'title': existing.title, 'summary': existing.summary, 'content': existing.content}})}\n\n"
+                return
+
+            # 初始化翻译器
+            client = ai_client_manager.get_client("translation")
+            translator = IncrementalTranslator(client)
+            
+            translated_title = None
+            translated_summary = None
+            translated_content = None
+
+            # 进度回调函数
+            async def progress_callback(current: int, total: int, message: str):
+                """发送进度更新"""
+                percent = int((current / total) * 100) if total > 0 else 0
+                event_data = {
+                    'type': 'progress',
+                    'percent': percent,
+                    'current': current,
+                    'total': total,
+                    'message': message
+                }
+                # 注意：在生成器中不能直接yield，需要通过队列传递
+                return event_data
+
+            # 翻译标题
+            yield f"data: {json.dumps({'type': 'progress', 'percent': 5, 'message': '正在翻译标题...'})}\n\n"
+            if entry.title:
+                translated_title = await client.translate(entry.title, target_language=payload.language)
+
+            # 翻译摘要
+            yield f"data: {json.dumps({'type': 'progress', 'percent': 10, 'message': '正在翻译摘要...'})}\n\n"
+            if entry.summary:
+                translated_summary = await client.translate(entry.summary, target_language=payload.language)
+
+            # 翻译正文
+            content_to_translate = entry.readability_content or entry.content
+            if content_to_translate:
+                content_length = len(content_to_translate)
+                
+                if content_length > 2000:
+                    # 长文章：使用段落翻译，发送详细进度
+                    yield f"data: {json.dumps({'type': 'progress', 'percent': 15, 'message': f'正在分析文章（{content_length}字符）...'})}\n\n"
+                    
+                    # 分割段落
+                    segments = SmartSegmenter.split_by_paragraphs(
+                        content_to_translate,
+                        max_length=1000
+                    )
+                    
+                    yield f"data: {json.dumps({'type': 'progress', 'percent': 20, 'message': f'开始翻译 {len(segments)} 个段落...'})}\n\n"
+                    
+                    # 翻译每个段落时发送进度
+                    total_segments = len(segments)
+                    completed_segments = 0
+                    
+                    def sync_progress_callback(current: int, total: int, message: str):
+                        """同步进度回调"""
+                        percent = 20 + int((current / total) * 70)  # 20% - 90%
+                        return {'type': 'progress', 'percent': percent, 'message': message}
+                    
+                    # 由于不能在回调中yield，我们手动处理段落翻译
+                    translated_segments = []
+                    for i, segment in enumerate(segments):
+                        progress_percent = 20 + int(((i + 1) / total_segments) * 70)
+                        yield f"data: {json.dumps({'type': 'progress', 'percent': progress_percent, 'message': f'翻译段落 {i+1}/{total_segments}'})}\n\n"
+                        
+                        # 翻译段落
+                        if segment['is_code']:
+                            translated_segments.append({**segment, 'translated': segment['content']})
+                        else:
+                            try:
+                                translated_text = await client.translate(
+                                    segment['content'],
+                                    target_language=payload.language
+                                )
+                                translated_segments.append({**segment, 'translated': translated_text})
+                            except Exception as e:
+                                # 翻译失败，使用原文
+                                translated_segments.append({**segment, 'translated': segment['content']})
+                    
+                    # 合并段落
+                    yield f"data: {json.dumps({'type': 'progress', 'percent': 95, 'message': '正在合并翻译结果...'})}\n\n"
+                    translated_content = translator.merge_segments(translated_segments)
+                else:
+                    # 短文章：直接翻译
+                    yield f"data: {json.dumps({'type': 'progress', 'percent': 50, 'message': '正在翻译内容...'})}\n\n"
+                    translated_content = await client.translate(
+                        content_to_translate,
+                        target_language=payload.language
+                    )
+
+            # 保存到数据库
+            yield f"data: {json.dumps({'type': 'progress', 'percent': 98, 'message': '正在保存翻译...'})}\n\n"
+            translation = Translation(
+                entry_id=entry.id,
+                language=payload.language,
+                title=translated_title,
+                summary=translated_summary,
+                content=translated_content,
+            )
+            session.add(translation)
+            session.commit()
+            session.refresh(translation)
+
+            # 发送完成事件
+            yield f"data: {json.dumps({'type': 'complete', 'result': {'title': translation.title, 'summary': translation.summary, 'content': translation.content}})}\n\n"
+            
+        except Exception as e:
+            # 发送错误事件
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate_events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
     )
 
 
