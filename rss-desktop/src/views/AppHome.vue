@@ -2802,10 +2802,11 @@ async function handleImportOpml(event: Event) {
 
 :global(.dark) .details__actions button,
 :global(.dark) .details__actions .lang-select {
-  background: rgba(36, 40, 50, 0.95);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: #f5f6fa;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: rgba(64, 71, 87, 0.8);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-weight: 600;
 }
 
 :global(.dark) .details__actions button:hover,
@@ -2824,9 +2825,10 @@ async function handleImportOpml(event: Event) {
 }
 
 :global(.dark) .details__actions .lang-select {
-  background-color: rgba(36, 40, 50, 0.95) !important;
-  background-image: linear-gradient(45deg, transparent 50%, rgba(245, 246, 250, 0.8) 50%), linear-gradient(135deg, rgba(245, 246, 250, 0.8) 50%, transparent 50%) !important;
-  color: #f5f6fa !important;
+  background-color: rgba(64, 71, 87, 0.8) !important;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.9) 50%), linear-gradient(135deg, rgba(255, 255, 255, 0.9) 50%, transparent 50%) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
 }
 
 :global(.dark) .favorites-title {
