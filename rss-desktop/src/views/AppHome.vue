@@ -2802,9 +2802,10 @@ async function handleImportOpml(event: Event) {
 
 :global(.dark) .details__actions button,
 :global(.dark) .details__actions .lang-select {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.95);
+  background: rgba(24, 27, 34, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #f5f6fa;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
 }
 
 :global(.dark) .details__actions button:hover,
@@ -2816,13 +2817,16 @@ async function handleImportOpml(event: Event) {
 }
 
 :global(.dark) .details__actions button:disabled {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(24, 27, 34, 0.6);
   color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
 }
 
 :global(.dark) .details__actions .lang-select {
-  background-color: rgba(255, 255, 255, 0.15);
-  background-image: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.7) 50%), linear-gradient(135deg, rgba(255, 255, 255, 0.7) 50%, transparent 50%);
+  background-color: rgba(24, 27, 34, 0.9) !important;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(245, 246, 250, 0.7) 50%), linear-gradient(135deg, rgba(245, 246, 250, 0.7) 50%, transparent 50%) !important;
+  color: #f5f6fa !important;
 }
 
 :global(.dark) .favorites-title {

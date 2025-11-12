@@ -62,6 +62,12 @@ textarea {
   color: var(--text-primary);
 }
 
+/* 暗色模式下的select元素样式 */
+:root.dark select {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}
+
 input::placeholder,
 textarea::placeholder {
   color: var(--text-secondary);
