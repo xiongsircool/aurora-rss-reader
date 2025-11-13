@@ -213,4 +213,19 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 
 ---
 
+## 🎯 Future Roadmap
+
+### Short-term Plans (v0.2)
+- **Mobile Support** - Develop iOS and Android mobile applications
+- **AI Daily Briefing** - Smart daily news summaries and personalized recommendations
+- **Podcast Support** - Support for audio podcast subscription and playback
+- **Reading Analytics** - Personal reading habits analysis and data visualization
+
+### Mid-term Plans (v0.3)
+- **Data Synchronization** - Cross-device data sync and cloud backup
+- **Plugin System** - Support for third-party plugin extensions
+- **Multi-account Support** - Support for multiple user account switching
+
+---
+
 Give it a ⭐ if you find it useful!
