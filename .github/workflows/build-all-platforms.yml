@@ -164,16 +164,48 @@ jobs:
 
   # 创建 Release
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
-    
+
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
-          
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          VERSION=$(echo ${{ github.ref_name }} | sed 's/v//')
+          cat > release_notes.md << 'EOF'
+          ## 🌟 Aurora RSS Reader v${VERSION}
+
+          ### ✨ 新功能
+          - AI 驱动的 RSS 阅读器，支持智能翻译和摘要
+          - 跨平台桌面应用（Windows、macOS、Linux）
+
+          ### 🚀 改进
+          - 优化的用户界面和体验
+          - 稳定的性能表现
+
+          ### 📦 下载说明
+          - **Windows**: 下载 `.exe` 安装包或便携版
+          - **macOS**: 下载 `.dmg` 安装包
+          - **Linux**: 下载 `.AppImage` 或 `.deb` 包
+
+          ### 🔧 系统要求
+          - Windows 10+ / macOS 10.15+ / Linux (Ubuntu 18.04+)
+          - 需要网络连接以使用 AI 功能
+
+          ---
+
+          📱 [项目主页](https://github.com/xiongsircool/aurora-rss-reader)
+          EOF
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -182,8 +214,9 @@ jobs:
             artifacts/**/*.exe
             artifacts/**/*.AppImage
             artifacts/**/*.deb
+          body_path: release_notes.md
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
