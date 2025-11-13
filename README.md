@@ -17,9 +17,13 @@
   </a>
 </p>
 
+<p align="center">
+  <a href="README.md">🇨🇳 中文</a> • <a href="README_EN.md">🇺🇸 English</a>
+</p>
+
 <div align="center">
-  <img alt="Aurora RSS Reader Icon" src="images/光图标不带背景色版本.png" width="120" height="120" />
-  <img alt="Aurora RSS Reader Logo" src="images/带版本号和软件名图标.png" width="300" height="120" />
+  <img alt="Aurora RSS Reader Icon" src="images/光图标不带背景色版本.png" width="120" />
+  <img alt="Aurora RSS Reader Logo" src="images/带版本号和软件名图标.png" width="400" />
 </div>
 
 ## 简介
