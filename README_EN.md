@@ -39,11 +39,11 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 - **Favorites Feature** - Bookmark important articles for later reading
 - **Time Filtering** - Filter articles by publication date
 
-### 🤖 AI Enhancement
-- **Auto Summarization** - Generate article summaries using LLM
-- **Smart Translation** - Support full-text and title translation
-- **Multi-language Support** - Chinese, English, Japanese, Korean interface
-- **Custom API** - Support OpenAI-compatible large language models
+### 🌟 Smart Features
+- **Article Summaries** - Automatically generate key points for quick understanding
+- **Multi-language Translation** - Support full-text and title translation for barrier-free reading
+- **Multi-language Interface** - Chinese, English, Japanese, Korean interface support
+- **Flexible Configuration** - Support multiple translation and summarization services
 
 ### ⚙️ System Features
 - **Local Storage** - SQLite database, offline available
@@ -66,15 +66,15 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
   </figure>
 </div>
 
-### 🤖 AI Features
+### 🌍 Multi-language Experience
 <div align="center">
   <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/自动翻译和自动摘要示意图.png" alt="AI Features" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Auto translation and summarization</figcaption>
+    <img src="images/appimages/多语言支持中文.png" alt="Chinese Interface" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>Chinese Interface</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/自定义AI模型的配置信息.png" alt="AI Configuration" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>AI model configuration</figcaption>
+    <img src="images/appimages/多语言支持英文.png" alt="English Interface" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>English Interface</figcaption>
   </figure>
 </div>
 

@@ -39,11 +39,11 @@ Aurora RSS Reader 是一个跨平台桌面 RSS 阅读器，集成了 AI 翻译�
 - **收藏功能** - 收藏重要文章便于后续阅读
 - **时间过滤** - 按发布时间筛选文章
 
-### 🤖 AI 增强
-- **自动摘要** - 使用 LLM 生成文章摘要
-- **智能翻译** - 支持全文和标题翻译
-- **多语言支持** - 中文、英文、日语、韩语界面
-- **自定义 API** - 支持 OpenAI 兼容的大语言模型
+### 🌟 智能功能
+- **文章摘要** - 自动生成文章要点，快速了解内容
+- **多语言翻译** - 支持全文和标题翻译，阅读无障碍
+- **多语言界面** - 中文、英文、日语、韩语界面支持
+- **灵活配置** - 支持多种翻译和摘要服务
 
 ### ⚙️ 系统功能
 - **本地存储** - SQLite 数据库，离线可用
@@ -66,15 +66,15 @@ Aurora RSS Reader 是一个跨平台桌面 RSS 阅读器，集成了 AI 翻译�
   </figure>
 </div>
 
-### 🤖 AI 功能
+### 🌍 多语言体验
 <div align="center">
   <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/自动翻译和自动摘要示意图.png" alt="AI 功能" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>自动翻译和摘要</figcaption>
+    <img src="images/appimages/多语言支持中文.png" alt="中文界面" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>中文界面</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/自定义AI模型的配置信息.png" alt="AI 配置" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>AI 模型配置</figcaption>
+    <img src="images/appimages/多语言支持英文.png" alt="English Interface" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>英文界面</figcaption>
   </figure>
 </div>
 
