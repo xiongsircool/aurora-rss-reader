@@ -2,9 +2,28 @@
 用户设置服务
 """
 from typing import Optional
-from sqlmodel import Session, select
-from app.db.session import SessionLocal
+from sqlalchemy import text
+from app.db.session import SessionLocal, engine
 from app.models.user_settings import UserSettings
+
+_schema_checked = False
+
+
+def ensure_user_settings_schema():
+    """Ensure new columns exist for user settings table."""
+    global _schema_checked
+    if _schema_checked:
+        return
+
+    with engine.connect() as connection:
+        columns = {row[1] for row in connection.execute(text("PRAGMA table_info('user_settings')"))}
+        if "show_entry_summary" not in columns:
+            connection.execute(
+                text("ALTER TABLE user_settings ADD COLUMN show_entry_summary BOOLEAN NOT NULL DEFAULT 1")
+            )
+            connection.commit()
+
+    _schema_checked = True
 
 
 class UserSettingsService:
@@ -13,6 +32,7 @@ class UserSettingsService:
     @staticmethod
     def get_settings() -> UserSettings:
         """获取用户设置，如果不存在则创建默认设置"""
+        ensure_user_settings_schema()
         with SessionLocal() as session:
             settings = session.get(UserSettings, 1)
             if not settings:
@@ -25,6 +45,7 @@ class UserSettingsService:
     @staticmethod
     def update_settings(**kwargs) -> UserSettings:
         """更新用户设置"""
+        ensure_user_settings_schema()
         with SessionLocal() as session:
             settings = session.get(UserSettings, 1)
             if not settings:

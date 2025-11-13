@@ -19,6 +19,7 @@ class UserSettingsResponse(BaseModel):
     auto_refresh: bool
     show_description: bool
     items_per_page: int
+    show_entry_summary: bool
     # 时间过滤相关设置
     enable_date_filter: bool
     default_date_range: str
@@ -32,6 +33,7 @@ class UserSettingsUpdate(BaseModel):
     auto_refresh: Optional[bool] = None
     show_description: Optional[bool] = None
     items_per_page: Optional[int] = None
+    show_entry_summary: Optional[bool] = None
     # 时间过滤相关设置
     enable_date_filter: Optional[bool] = None
     default_date_range: Optional[str] = None
@@ -53,6 +55,7 @@ async def get_settings():
         auto_refresh=settings.auto_refresh,
         show_description=settings.show_description,
         items_per_page=settings.items_per_page,
+        show_entry_summary=settings.show_entry_summary,
         enable_date_filter=settings.enable_date_filter,
         default_date_range=settings.default_date_range,
         time_field=settings.time_field
@@ -73,6 +76,7 @@ async def update_settings(update_data: UserSettingsUpdate):
             auto_refresh=settings.auto_refresh,
             show_description=settings.show_description,
             items_per_page=settings.items_per_page,
+            show_entry_summary=settings.show_entry_summary,
             enable_date_filter=settings.enable_date_filter,
             default_date_range=settings.default_date_range,
             time_field=settings.time_field
@@ -93,6 +97,7 @@ async def update_rsshub_url(update_data: RSSHubURLUpdate):
             auto_refresh=settings.auto_refresh,
             show_description=settings.show_description,
             items_per_page=settings.items_per_page,
+            show_entry_summary=settings.show_entry_summary,
             enable_date_filter=settings.enable_date_filter,
             default_date_range=settings.default_date_range,
             time_field=settings.time_field

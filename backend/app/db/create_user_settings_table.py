@@ -16,6 +16,7 @@ def create_user_settings_table():
                 auto_refresh BOOLEAN NOT NULL DEFAULT TRUE,
                 show_description BOOLEAN NOT NULL DEFAULT TRUE,
                 items_per_page INTEGER NOT NULL DEFAULT 50,
+                show_entry_summary BOOLEAN NOT NULL DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 CONSTRAINT user_settings_singleton CHECK (id = 1)

@@ -124,3 +124,19 @@ designs/
 
 # Misc
 .spec-workflow/
+
+# Build artifacts
+backend/backend.spec
+build_signature.json
+
+# PNPM
+.pnpm-store/
+.pnpm-debug.log*
+
+# Local configuration overrides
+backend/config/local.py
+rss-desktop/src/config/local.js
+
+# Development data
+backend/data/development/
+backend/data/development.*

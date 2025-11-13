@@ -8,6 +8,7 @@ export interface AppSettings {
   enable_date_filter: boolean
   default_date_range: string
   time_field: string
+  show_entry_summary: boolean
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -15,7 +16,8 @@ export const useSettingsStore = defineStore('settings', () => {
     fetch_interval_minutes: 15,
     enable_date_filter: true,
     default_date_range: '30d',
-    time_field: 'inserted_at'
+    time_field: 'inserted_at',
+    show_entry_summary: true
   })
 
   const loading = ref(false)

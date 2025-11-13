@@ -1,20 +1,53 @@
 {
-  "name": "rss-desktop",
+  "name": "aurora-rss-reader",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
-  "description": "Aurora RSS Reader - AI-powered RSS reading application",
-  "author": "Aurora RSS Team",
+  "description": "🌟 Aurora RSS Reader - AI-powered cross-platform desktop RSS reader with translation and summarization features",
+  "author": {
+    "name": "xiongsircool",
+    "email": "1666526339@qq.com",
+    "url": "https://github.com/xiongsircool"
+  },
+  "homepage": "https://github.com/xiongsircool/aurora-rss-reader#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xiongsircool/aurora-rss-reader.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xiongsircool/aurora-rss-reader/issues"
+  },
+  "keywords": [
+    "rss",
+    "reader",
+    "desktop",
+    "electron",
+    "vue",
+    "ai",
+    "translation",
+    "summarization",
+    "cross-platform",
+    "productivity",
+    "news",
+    "feed",
+    "opml",
+    "rsshub"
+  ],
+  "license": "ARSL",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\" --names \"UI,API\" --prefix-colors \"cyan,green\"",
     "dev:frontend": "vite --host",
-    "dev:backend": "cd ../backend && python3 -m scripts.serve",
+    "dev:backend": "cd ../backend && source .venv/bin/activate && python -m scripts.serve",
     "dev:electron": "vite --mode electron",
     "build": "vue-tsc && vite build",
     "pack": "pnpm build && electron-builder",
     "build:web": "vue-tsc && vite build",
     "preview": "vite preview",
-    "migrate": "cd ../backend && python3 -m scripts.migrate",
+    "migrate": "cd ../backend && source .venv/bin/activate && python -m scripts.migrate",
     "typecheck": "vue-tsc --noEmit",
     "clean": "rm -rf dist dist-electron release .vite out"
   },

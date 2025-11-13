@@ -16,6 +16,7 @@ class UserSettings(SQLModel, table=True):
     auto_refresh: bool = Field(default=True, description="是否自动刷新")
     show_description: bool = Field(default=True, description="是否显示RSS描述")
     items_per_page: int = Field(default=50, description="每页显示条目数")
+    show_entry_summary: bool = Field(default=True, description="时间线是否显示摘要")
 
     # 时间过滤相关设置
     enable_date_filter: bool = Field(default=True, description="是否启用时间过滤")

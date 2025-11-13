@@ -1,0 +1,174 @@
+name: Build All Platforms
+
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS 构建
+          - os: macos-latest
+            platform: mac
+            arch: x64
+            runner_arch: x64
+          - os: macos-latest
+            platform: mac  
+            arch: arm64
+            runner_arch: arm64
+            
+          # Windows 构建
+          - os: windows-latest
+            platform: win
+            arch: x64
+            runner_arch: x64
+          - os: windows-latest
+            platform: win
+            arch: arm64
+            runner_arch: arm64
+            
+          # Linux 构建
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            runner_arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            runner_arch: arm64
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'rss-desktop/package-lock.json'
+          
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+          
+      - name: Install pnpm
+        run: npm install -g pnpm
+        
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            backend/.venv
+            ~/.cache/pip
+          key: ${{ runner.os }}-python-${{ hashFiles('backend/requirements.txt') }}
+          
+      - name: Cache Node dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            rss-desktop/node_modules
+            ~/.pnpm-store
+          key: ${{ runner.os }}-node-${{ hashFiles('rss-desktop/pnpm-lock.yaml') }}
+
+      # 构建后端
+      - name: Build Backend (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd backend
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pyinstaller backend.spec --clean
+          
+      - name: Build Backend (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd backend
+          python -m venv .venv
+          .venv\Scripts\activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pyinstaller backend.spec --clean
+          
+      # 构建前端
+      - name: Install Frontend Dependencies
+        run: |
+          cd rss-desktop
+          pnpm install --frozen-lockfile
+          
+      - name: Build Frontend
+        run: |
+          cd rss-desktop
+          pnpm build
+          
+      # 打包应用
+      - name: Package App (macOS)
+        if: matrix.platform == 'mac'
+        run: |
+          cd rss-desktop
+          pnpm exec electron-builder --mac --${{ matrix.arch }} --publish=never
+          
+      - name: Package App (Windows)
+        if: matrix.platform == 'win'
+        run: |
+          cd rss-desktop
+          pnpm exec electron-builder --win --${{ matrix.arch }} --publish=never
+          
+      - name: Package App (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          cd rss-desktop
+          pnpm exec electron-builder --linux --${{ matrix.arch }} --publish=never
+
+      # 上传构建产物
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurora-rss-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            rss-desktop/release/**/*
+          retention-days: 30
+
+  # 创建 Release
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
+            artifacts/**/*.msi
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

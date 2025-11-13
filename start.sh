@@ -25,6 +25,8 @@ if [ ! -d "backend/.venv" ]; then
     pip install -e .
     cd ..
     echo "✅ Python 环境已创建"
+else
+    echo "✅ Python 虚拟环境已存在"
 fi
 
 # 检查前端依赖
@@ -56,17 +58,19 @@ fi
 
 # 启动应用
 echo ""
-echo "✨ 启动应用..."
+echo "🚀 启动完整开发环境..."
+echo ""
+echo "📍 访问地址:"
 echo "   前端: http://localhost:5173 (或 Vite 指定端口)"
 echo "   后端: http://localhost:15432"
 echo "   健康检查: http://localhost:15432/health"
 echo ""
-echo "按 Ctrl+C 停止服务"
+echo "📝 说明："
+echo "   1. 前端和后端服务将在后台启动"
+echo "   2. Electron 应用窗口会自动打开"
+echo "   3. 按 Ctrl+C 停止所有服务"
 echo ""
 
-# 由 Electron 进程在开发模式自动启动后端
-echo "🛠️  由 Electron 自动启动后端 (开发模式)"
-
-# 启动前端（仅前端，后端已在上面启动）
+# 启动完整开发环境（前端 + 后端 + Electron）
 cd rss-desktop
-pnpm dev:frontend
+pnpm dev

@@ -1447,7 +1447,7 @@ async function handleImportOpml(event: Event) {
                 <span>{{ t('articles.timeSeparator') }}</span>
                 <span>{{ formatDate(entry.published_at) }}</span>
               </div>
-              <p class="entry-card__summary">
+              <p v-if="settingsStore.settings.show_entry_summary" class="entry-card__summary">
                 {{ getEntryPreview(entry) }}
               </p>
             </button>
@@ -2304,6 +2304,7 @@ async function handleImportOpml(event: Event) {
   flex-direction: column;
   gap: clamp(10px, 1vw, 14px);
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
 }
 
@@ -2319,6 +2320,7 @@ async function handleImportOpml(event: Event) {
   color: var(--text-primary);
   box-shadow: 0 4px 14px rgba(15, 17, 21, 0.05);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
+  min-width: 0;
 }
 
 .entry-card:hover {
@@ -2339,6 +2341,7 @@ async function handleImportOpml(event: Event) {
   text-align: left;
   color: inherit;
   font: inherit;
+  min-width: 0;
 }
 
 .entry-card__star {
@@ -2371,6 +2374,9 @@ async function handleImportOpml(event: Event) {
 
 .entry-card__title {
   font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .entry-card__meta {
@@ -2379,6 +2385,14 @@ async function handleImportOpml(event: Event) {
   display: flex;
   gap: 6px;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 2px;
+  min-width: 0;
+}
+
+.entry-card__meta span {
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .star-badge {
@@ -2396,6 +2410,8 @@ async function handleImportOpml(event: Event) {
   overflow: hidden;
   text-overflow: ellipsis;
   max-height: clamp(4.2em, 6vw, 6.3em);
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .details {

@@ -145,11 +145,11 @@ show_results() {
         log "💡 使用说明:"
         if [ "$(uname)" == "Darwin" ]; then
             log "   macOS: 双击 .dmg 文件安装应用"
-            if [ -d "$FRONTEND_DIR/release/1.0.0/mac" ]; then
-                log "   或直接运行: $FRONTEND_DIR/release/1.0.0/mac/Aurora RSS Reader.app"
+            if [ -d "$FRONTEND_DIR/release/0.1.0/mac" ]; then
+                log "   或直接运行: $FRONTEND_DIR/release/0.1.0/mac/Aurora RSS Reader.app"
             fi
-            if [ -d "$FRONTEND_DIR/release/1.0.0/mac-arm64" ]; then
-                log "   Apple Silicon: $FRONTEND_DIR/release/1.0.0/mac-arm64/Aurora RSS Reader.app"
+            if [ -d "$FRONTEND_DIR/release/0.1.0/mac-arm64" ]; then
+                log "   Apple Silicon: $FRONTEND_DIR/release/0.1.0/mac-arm64/Aurora RSS Reader.app"
             fi
         elif [ "$(uname)" == "Linux" ]; then
             log "   Linux: 运行 .AppImage 或安装 .deb 包"

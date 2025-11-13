@@ -3,19 +3,22 @@ import { createPinia } from 'pinia'
 import router from './router'
 import './style.css'
 import App from './App.vue'
-import i18n from './i18n'
-import { useLanguage } from './composables/useLanguage'
+import i18n, { availableLocales, type LocaleCode } from './i18n'
 
 const app = createApp(App)
 const pinia = createPinia()
 
+function bootstrapSavedLanguage() {
+  if (typeof window === 'undefined') return
+  const saved = localStorage.getItem('rss-reader-language') as LocaleCode | null
+  if (saved && availableLocales.some(locale => locale.code === saved)) {
+    i18n.global.locale.value = saved
+  }
+}
+
+bootstrapSavedLanguage()
+
 app.use(pinia)
 app.use(router)
 app.use(i18n)
-
-// 在应用挂载后加载语言设置
 app.mount('#app')
-
-// 初始化语言设置
-const { loadLanguage } = useLanguage()
-loadLanguage()

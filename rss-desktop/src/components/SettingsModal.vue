@@ -80,6 +80,13 @@ const timeField = computed({
   }
 })
 
+const showEntrySummary = computed({
+  get: () => settingsStore.settings.show_entry_summary,
+  set: (value) => {
+    settingsStore.updateSettings({ show_entry_summary: value })
+  }
+})
+
 // 订阅刷新设置 - 与settingsStore同步
 const autoRefresh = computed({
   get: () => settingsStore.settings.fetch_interval_minutes < 1440, // 1440表示禁用自动刷新
@@ -624,6 +631,18 @@ function handleLanguageChange(newLanguage: string) {
 
           <section class="settings-section">
             <h3>{{ t('settings.displaySettings') }}</h3>
+            <div class="form-group">
+              <label>
+                <input
+                  v-model="showEntrySummary"
+                  type="checkbox"
+                  class="form-checkbox"
+                />
+                {{ t('settings.showEntrySummary') }}
+              </label>
+              <p class="form-hint">{{ t('settings.showEntrySummaryDescription') }}</p>
+            </div>
+
             <div class="form-group">
               <label>
                 <input
