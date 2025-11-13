@@ -155,7 +155,11 @@ jobs:
         with:
           name: aurora-rss-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            rss-desktop/release/**/*
+            rss-desktop/release/*/*.dmg
+            rss-desktop/release/*/*-Setup.exe
+            rss-desktop/release/*/*-Portable.exe
+            rss-desktop/release/*/*.AppImage
+            rss-desktop/release/*/*.deb
           retention-days: 30
 
   # 创建 Release

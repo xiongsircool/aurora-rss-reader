@@ -88,4 +88,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aurora-rss-${{ matrix.platform }}
-          path: rss-desktop/release/**/*
+          path: |
+            rss-desktop/release/*/*.dmg
+            rss-desktop/release/*/*-Setup.exe
+            rss-desktop/release/*/*-Portable.exe
+            rss-desktop/release/*/*.AppImage
+            rss-desktop/release/*/*.deb

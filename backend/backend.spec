@@ -128,7 +128,7 @@ exe = EXE(
     name='aurora-backend',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
+    strip=True,
     upx=True,
     console=True,  # 改为True，方便调试和查看日志
     disable_windowed_traceback=False,
@@ -145,7 +145,7 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    strip=False,
+    strip=True,
     upx=True,
     upx_exclude=[],
     name='aurora-backend',
