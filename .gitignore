@@ -118,7 +118,8 @@ notes/
 designs/
 *.draft.md
 *.wip.md
-images/appimages/
+# images/appimages/ - 临时截图目录，如需要可以取消注释
+# images/appimages/
 .claude/
 
 # Misc

@@ -3,7 +3,7 @@ name = "rss-backend"
 version = "0.1.0"
 description = "Local FastAPI service for RSS READER (feeds, storage, AI proxy)."
 authors = [{ name = "RSS READER" }]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
@@ -18,7 +18,8 @@ dependencies = [
   "lxml>=5.3",
   "apscheduler>=3.10",
   "loguru>=0.7",
-  "eval-type-backport>=0.2"
+  "eval-type-backport>=0.2",
+  "python-multipart>=0.0.9"
 ]
 
 [project.optional-dependencies]
@@ -28,6 +29,9 @@ dev = [
   "ruff>=0.6",
   "mypy>=1.11"
 ]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
 
 [build-system]
 requires = ["setuptools>=61"]

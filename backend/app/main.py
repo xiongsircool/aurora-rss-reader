@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.routes import router as api_router
 from app.services.rsshub_manager import rsshub_manager
-from app.core.config import settings
+from app.core.config import settings, APP_DATA_DIR
 from app.db.session import init_db
 from app.services.fetcher import refresh_all_feeds
 
@@ -64,6 +67,19 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    # 健康检查端点
+    @app.get("/health")
+    async def health_check():
+        """健康检查端点，用于确认后端服务已就绪"""
+        return JSONResponse({
+            "status": "healthy",
+            "version": "0.1.0",
+            "timestamp": datetime.now().isoformat(),
+            "environment": settings.app_env,
+            "data_dir": str(APP_DATA_DIR),
+            "is_packaged": getattr(sys, 'frozen', False),
+        })
 
     app.include_router(api_router, prefix="/api")
 

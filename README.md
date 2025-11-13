@@ -98,87 +98,86 @@ Aurora 是一款跨平台桌面 RSS 阅读器，提供现代的三栏阅读体�
 | pnpm    | 10.21.0  |
 | Python  | 3.12.12  |
 
-> 提示：如使用其他版本，请确保能通过 `pnpm dev` 与 `curl http://127.0.0.1:8787/api/health` 这两个最小自检。
+> 提示：如使用其他版本，请确保能通过 `./start.sh` 与 `curl http://127.0.0.1:15432/health` 这两个最小自检。
 
-### 安装与运行
+### 🚀 一键启动开发（推荐）
 
-1) 后端依赖与环境
-
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt  # 或 pip install -e .
-cp .env.example .env
-python -m scripts.migrate
-```
-
-2) 配置后端 `.env`
-
-`backend/.env` 示例（敏感值留空，首次可在应用内设置）：
-
-```env
-APP_ENV=development
-API_HOST=127.0.0.1
-API_PORT=8787
-FETCH_INTERVAL_MINUTES=15
-
-RSSHUB_BASE=https://rsshub.app
-
-GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/  # 默认示例，可替换任意 OpenAI 兼容 API
-GLM_MODEL=glm-4-flash                          # 示例模型，按需调整
-GLM_API_KEY=                                   # OpenAI 兼容 API 的密钥
-```
-
-3) 前端依赖与开发
-
-```bash
-cd ../rss-desktop
-pnpm install
-pnpm dev  # 并行启动前端与后端（UI: 5173, API: 8787）
-```
-
-可选：仅前端 `pnpm dev:frontend`，仅后端 `pnpm dev:backend`。
-
-### 打包桌面应用（Electron）
-
-```bash
-cd rss-desktop
-pnpm build   # 构建前端与类型检查
-pnpm pack    # electron-builder 生成安装包（release/<version>/）
-```
-
-### 一键启动与自检（start.sh）
-
-首次使用，建议通过仓库根目录的 `start.sh` 完成环境准备与快速联调：
-
-1) 前置条件
-
-- 已安装 `Node >= 18`、`pnpm`、`Python >= 3.9`
-- 复制后端环境：`cp backend/.env.example backend/.env`，如需使用 AI，请在 `.env` 中填写 `GLM_API_KEY`
-
-2) 运行
+使用项目根目录的 `start.sh` 脚本，一键完成环境准备与启动：
 
 ```bash
 chmod +x start.sh
 ./start.sh
 ```
 
-脚本会：
-- 创建并使用 `backend/.venv`，安装后端依赖
-- 安装前端依赖 `rss-desktop/node_modules`
-- 初始化数据库 `backend/data/rss.sqlite`
-- 启动前端开发服务器（Electron 在开发模式会自动托管后端）
+**脚本执行步骤：**
+1. 自动检查并创建后端 Python 虚拟环境（`backend/.venv`）
+2. 自动安装后端依赖（requirements.txt）
+3. 自动安装前端依赖（pnpm install）
+4. 自动初始化数据库（SQLite）
+5. 启动开发环境（Electron + 后端服务）
 
-3) 快速自检
+**访问地址：**
+- 前端界面：`http://localhost:5173` （Electron 应用）
+- 后端 API：`http://127.0.0.1:15432`
+- 健康检查：`curl http://127.0.0.1:15432/health`
 
-- 浏览器访问 UI：`http://localhost:5173`
-- 健康检查 API：
-  ```bash
-  curl http://127.0.0.1:8787/api/health
-  # => {"status":"ok"}
-  ```
-  若失败，请检查 `.env`、端口占用与控制台输出。
+### 🔧 手动安装与开发
+
+如果需要手动设置环境：
+
+1) **后端环境设置**
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+python -m scripts.migrate
+```
+
+2) **配置后端 `.env`**
+
+```env
+APP_ENV=development
+API_HOST=127.0.0.1
+API_PORT=15432
+FETCH_INTERVAL_MINUTES=15
+
+RSSHUB_BASE=https://rsshub.app
+
+GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/  # 示例 API
+GLM_MODEL=glm-4-flash                          # 示例模型
+GLM_API_KEY=                                   # OpenAI 兼容 API 密钥
+```
+
+3) **前端开发**
+
+```bash
+cd rss-desktop
+pnpm install
+pnpm dev  # 启动开发服务器
+```
+
+### 📦 构建发布版本
+
+使用优化的构建脚本生成可分发的桌面应用：
+
+```bash
+chmod +x build-release-app.sh
+./build-release-app.sh
+```
+
+**构建流程：**
+1. 自动清理旧的构建文件
+2. 使用 PyInstaller 打包后端二进制文件
+3. 使用 Vite 构建前端资源
+4. 使用 electron-builder 生成交装包
+
+**输出文件位置：**
+- `rss-desktop/release/1.0.0/Aurora RSS Reader-Mac-1.0.0-x64.dmg`（Intel Mac）
+- `rss-desktop/release/1.0.0/Aurora RSS Reader-Mac-1.0.0-arm64.dmg`（Apple Silicon）
+
 
 ## ⚙️ 配置与特性
 
@@ -211,23 +210,51 @@ chmod +x start.sh
 
 ```
 RSSpage/
-├─ backend/
-│  ├─ app/
-│  │  ├─ api/routes/           # FastAPI 路由
-│  │  ├─ core/                  # 配置
-│  │  ├─ db/                    # SQLModel 与迁移脚本
-│  │  ├─ services/              # 抓取、AI、RSSHub 管理
-│  │  └─ schemas/               # Pydantic 模型
-│  ├─ scripts/                  # dev server / 迁移
-│  └─ data/                     # SQLite 数据
-└─ rss-desktop/
-   ├─ src/                      # Vue 应用
-   └─ electron/                 # Electron 主进程
+├─ 📄 README.md                      # 项目文档
+├─ 📄 RSSHUB_CONFIG_GUIDE.md         # RSSHub 配置指南
+├─ 📄 RSSHUB_TROUBLESHOOTING.md      # 故障排除指南
+├─ 🔧 start.sh                       # 开发启动脚本
+├─ 🔧 build-release-app.sh           # 发布构建脚本
+├─ 📁 backend/                        # 后端服务
+│  ├─ 📁 app/                         # 应用核心
+│  │  ├─ 📁 api/routes/              # FastAPI 路由
+│  │  ├─ 📁 core/                    # 配置管理
+│  │  ├─ 📁 db/                      # SQLModel 数据模型
+│  │  ├─ 📁 services/                # 业务服务
+│  │  └─ 📁 schemas/                 # Pydantic 模型
+│  ├─ 📁 scripts/                     # 工具脚本
+│  ├─ 📁 .venv/                       # Python 虚拟环境
+│  ├─ 📄 backend.spec                  # PyInstaller 配置
+│  └─ 📄 requirements.txt              # Python 依赖
+└─ 📁 rss-desktop/                   # 前端应用
+   ├─ 📁 src/                         # Vue 3 源码
+   ├─ 📁 electron/                    # Electron 主进程
+   ├─ 📁 node_modules/                 # 前端依赖
+   └─ 📁 release/                      # 构建输出
 ```
+
+## 🛠️ 项目脚本说明
+
+项目提供了简洁的脚本系统：
+
+### 🚀 开发相关
+- **`start.sh`** - 一键启动开发环境
+  - 自动检查和创建 Python 虚拟环境
+  - 安装前后端依赖
+  - 初始化数据库
+  - 启动 Electron 开发服务器
+
+### 📦 构建相关
+- **`build-release-app.sh`** - 构建发布版本
+  - 清理旧构建文件
+  - 打包后端二进制文件
+  - 构建前端资源
+  - 生成跨平台安装包
 
 ## 📚 相关文档
 
-- 后端说明：`backend/README.md`
+- **RSSHUB_CONFIG_GUIDE.md** - RSSHub 配置指南
+- **RSSHUB_TROUBLESHOOTING.md** - 故障排除指南
 
 ## 🙏 致谢
 

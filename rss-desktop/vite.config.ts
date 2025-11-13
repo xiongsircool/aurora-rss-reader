@@ -10,6 +10,19 @@ export default defineConfig({
       {
         entry: 'electron/main.ts',
       },
+      {
+        entry: 'electron/preload.ts',
+        onstart(options) {
+          options.reload()
+        },
+        vite: {
+          build: {
+            rollupOptions: {
+              external: ['electron']
+            }
+          }
+        }
+      },
     ]),
   ],
   server: {
@@ -17,7 +30,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8787',
+        target: 'http://localhost:15432',
         changeOrigin: true,
         secure: false,
       }

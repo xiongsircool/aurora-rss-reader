@@ -22,5 +22,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, clas
 
 def init_db() -> None:
     """Create tables during first launch (placeholder until Alembic migrations land)."""
-
-    SQLModel.metadata.create_all(bind=engine)
+    try:
+        SQLModel.metadata.create_all(bind=engine)
+    except Exception as e:
+        # 表已存在或其他问题，继续运行
+        print(f"Database init info: {e}")

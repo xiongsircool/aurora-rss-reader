@@ -31,6 +31,9 @@ loguru>=0.7.0
 # 兼容性
 eval-type-backport>=0.2.0
 
+# 文件上传支持
+python-multipart>=0.0.9
+
 # 图像处理（横幅生成工具，可选）
 Pillow>=12.0.0
 numpy>=2.0.0
