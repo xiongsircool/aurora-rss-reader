@@ -51,8 +51,15 @@ jobs:
           fi
           pip install -r requirements.txt pyinstaller
           pyinstaller backend.spec
-          
-      - name: Build Frontend  
+
+      - name: Copy Backend to Frontend
+        shell: bash
+        run: |
+          # 复制后端构建产物到前端目录
+          mkdir -p rss-desktop/dist-electron/aurora-backend
+          cp -r backend/dist/aurora-backend/* rss-desktop/dist-electron/aurora-backend/ || echo "Backend files not found, continuing..."
+
+      - name: Build Frontend
         run: |
           cd rss-desktop
           pnpm install
