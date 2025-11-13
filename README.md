@@ -57,52 +57,69 @@ Aurora RSS Reader 是一个现代化的跨平台桌面 RSS 阅读器，集成了
 
 ### 界面预览
 
-#### 布局模式
+#### 🎨 布局模式
 <div align="center">
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;vertical-align:top;">
-    <img src="images/appimages/三栏式布局.png" alt="三栏式布局" style="width:480px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption style="margin-top:12px;font-size:14px;color:#666;">三栏式布局</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;vertical-align:top;">
-    <img src="images/appimages/一拦式布局.png" alt="一栏式布局" style="width:220px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption style="margin-top:12px;font-size:14px;color:#666;">一栏式布局</figcaption>
-  </figure>
+  <table>
+    <tr>
+      <td align="center" width="60%">
+        <img src="images/appimages/三栏式布局.png" alt="三栏式布局" width="100%" style="max-width:600px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" />
+        <br><strong>三栏式布局</strong>
+        <br><em>经典桌面阅读体验</em>
+      </td>
+      <td align="center" width="40%">
+        <img src="images/appimages/一拦式布局.png" alt="一栏式布局" width="100%" style="max-width:280px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" />
+        <br><strong>一栏式布局</strong>
+        <br><em>专注阅读模式</em>
+      </td>
+    </tr>
+  </table>
 </div>
 
-#### 多语言支持
+#### 🌍 多语言界面
 <div align="center">
-  <figure style="display:inline-block;margin:0 8px 16px;text-align:center;vertical-align:top;">
-    <img src="images/appimages/多语言支持中文.png" alt="中文界面" style="width:220px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption style="margin-top:8px;font-size:13px;color:#666;">中文</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 8px 16px;text-align:center;vertical-align:top;">
-    <img src="images/appimages/多语言支持英文.png" alt="English Interface" style="width:220px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption style="margin-top:8px;font-size:13px;color:#666;">English</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 8px 16px;text-align:center;vertical-align:top;">
-    <img src="images/appimages/多语言支持日语.png" alt="日本語" style="width:220px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption style="margin-top:8px;font-size:13px;color:#666;">日本語</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 8px 16px;text-align:center;vertical-align:top;">
-    <img src="images/appimages/多语言支持韩文.png" alt="한국어" style="width:220px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption style="margin-top:8px;font-size:13px;color:#666;">한국어</figcaption>
-  </figure>
+  <table>
+    <tr>
+      <td align="center" width="25%">
+        <img src="images/appimages/多语言支持中文.png" alt="中文界面" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
+        <br><strong>🇨🇳 中文</strong>
+      </td>
+      <td align="center" width="25%">
+        <img src="images/appimages/多语言支持英文.png" alt="English Interface" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
+        <br><strong>🇺🇸 English</strong>
+      </td>
+      <td align="center" width="25%">
+        <img src="images/appimages/多语言支持日语.png" alt="日本語" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
+        <br><strong>🇯🇵 日本語</strong>
+      </td>
+      <td align="center" width="25%">
+        <img src="images/appimages/多语言支持韩文.png" alt="한국어" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
+        <br><strong>🇰🇷 한국어</strong>
+      </td>
+    </tr>
+  </table>
 </div>
 
-#### 管理功能
+#### ⚙️ 核心功能
 <div align="center">
-  <figure style="display:inline-block;margin:0 12px 20px;text-align:center;vertical-align:top;">
-    <img src="images/appimages/支持订阅分组.png" alt="分组管理" style="width:320px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption style="margin-top:10px;font-size:13px;color:#666;">订阅源分组</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 20px;text-align:center;vertical-align:top;">
-    <img src="images/appimages/支持订阅信息时间过滤设定.png" alt="时间过滤" style="width:320px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption style="margin-top:10px;font-size:13px;color:#666;">时间过滤</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 20px;text-align:center;vertical-align:top;">
-    <img src="images/appimages/支持特定内容收藏.png" alt="收藏功能" style="width:320px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption style="margin-top:10px;font-size:13px;color:#666;">收藏功能</figcaption>
-  </figure>
+  <table>
+    <tr>
+      <td align="center" width="33.33%">
+        <img src="images/appimages/支持订阅分组.png" alt="分组管理" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
+        <br><strong>📁 订阅源分组</strong>
+        <br><em>智能分类管理</em>
+      </td>
+      <td align="center" width="33.33%">
+        <img src="images/appimages/支持订阅信息时间过滤设定.png" alt="时间过滤" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
+        <br><strong>⏰ 时间过滤</strong>
+        <br><em>精准内容筛选</em>
+      </td>
+      <td align="center" width="33.33%">
+        <img src="images/appimages/支持特定内容收藏.png" alt="收藏功能" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
+        <br><strong>⭐ 收藏功能</strong>
+        <br><em>重要内容标记</em>
+      </td>
+    </tr>
+  </table>
 </div>
 
 ## 快速开始
