@@ -8,6 +8,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -173,10 +176,8 @@ jobs:
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.exe
-            artifacts/**/*.msi
             artifacts/**/*.AppImage
             artifacts/**/*.deb
-            artifacts/**/*.rpm
           draft: false
           prerelease: false
           generate_release_notes: true
