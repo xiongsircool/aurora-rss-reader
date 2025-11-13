@@ -29,10 +29,6 @@ jobs:
             platform: win
             arch: x64
             runner_arch: x64
-          - os: windows-latest
-            platform: win
-            arch: arm64
-            runner_arch: arm64
             
           # Linux 构建
           - os: ubuntu-latest
@@ -96,9 +92,9 @@ jobs:
           cd backend
           python -m venv .venv
           source .venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
           pyinstaller backend.spec --clean
           
       - name: Build Backend (Windows)
@@ -107,9 +103,9 @@ jobs:
           cd backend
           python -m venv .venv
           .venv\Scripts\activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
           pyinstaller backend.spec --clean
           
       # 构建前端
@@ -122,6 +118,14 @@ jobs:
         run: |
           cd rss-desktop
           pnpm build
+      
+      - name: Install Linux packaging deps
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          # Required by AppImage tool on Ubuntu 22.04+
+          sudo apt-get install -y libfuse2
           
       # 打包应用
       - name: Package App (macOS)

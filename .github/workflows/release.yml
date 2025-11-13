@@ -13,10 +13,16 @@ jobs:
         include:
           - os: macos-latest
             platform: mac
-            arch: x64,arm64
+            arch: x64
+          - os: macos-latest
+            platform: mac
+            arch: arm64
           - os: ubuntu-latest
             platform: linux
-            arch: x64,arm64
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
           - os: windows-latest
             platform: win
             arch: x64
@@ -26,11 +32,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'pnpm'
+          cache-dependency-path: 'rss-desktop/pnpm-lock.yaml'
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -38,15 +51,7 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      - name: Cache pnpm
-        uses: actions/cache@v3
-        with:
-          path: ~/.pnpm-store
-          key: pnpm-${{ runner.os }}-${{ hashFiles('rss-desktop/pnpm-lock.yaml') }}
-          restore-keys: pnpm-${{ runner.os }}-
+      # pnpm is installed by pnpm/action-setup and caching is handled by setup-node
 
       - name: Build Backend
         shell: bash
@@ -54,19 +59,27 @@ jobs:
           cd backend
           python -m venv .venv
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            .venv/Scripts/activate
+            source .venv/Scripts/activate
           else
             source .venv/bin/activate
           fi
-          pip install -r requirements.txt pyinstaller
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
           pyinstaller backend.spec
+
+      - name: Install Linux packaging deps
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
 
       - name: Build Frontend
         run: |
           cd rss-desktop
           pnpm install --frozen-lockfile
           pnpm build
-          pnpm exec electron-builder --${{ matrix.platform }} --publish=never
+          pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish=never
 
       - name: Upload Release Assets
         uses: actions/upload-artifact@v4
