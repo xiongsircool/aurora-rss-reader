@@ -55,8 +55,9 @@ async def list_feeds(
 
     if cutoff_date:
         if normalized_time_field == "published_at":
+            now = datetime.utcnow()
             unread_stmt = unread_stmt.where(
-                (Entry.published_at >= cutoff_date) |
+                ((Entry.published_at <= now) & (Entry.published_at >= cutoff_date)) |
                 (Entry.published_at.is_(None) & (Entry.inserted_at >= cutoff_date))
             )
         else:

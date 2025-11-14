@@ -77,7 +77,7 @@ async def lifespan(_: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="RSS READER API", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="RSS READER API", version="0.1.2", lifespan=lifespan)
 
     # CORS配置：开发态保持全开放，打包态自动允许 file:///app:// 渲染进程，其余情况使用环境变量
     allow_origins = build_allowed_origins()
@@ -95,7 +95,7 @@ def create_app() -> FastAPI:
         """健康检查端点，用于确认后端服务已就绪"""
         return JSONResponse({
             "status": "healthy",
-            "version": "0.1.0",
+            "version": "0.1.2",
             "timestamp": datetime.now().isoformat(),
             "environment": settings.app_env,
             "data_dir": str(APP_DATA_DIR),

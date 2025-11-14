@@ -22,6 +22,9 @@ beautifulsoup4>=4.12.0
 readability-lxml>=0.8.0
 lxml>=5.3.0
 
+# 时间解析增强
+python-dateutil>=2.8.0
+
 # 任务调度
 apscheduler>=3.10.0
 

@@ -2,17 +2,30 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from time import mktime
 from time import perf_counter
-from typing import Any
+from typing import Any, Tuple
 from urllib.parse import urljoin, urlparse
 
 import feedparser
+
+# 导入增强时间解析器
+try:
+    from dateutil import parser as dateutil_parser
+    HAS_DATEUTIL = True
+except ImportError:
+    HAS_DATEUTIL = False
 import httpx
 from loguru import logger
 from readability import Document
 from sqlmodel import Session, select
+
+# 记录dateutil库状态
+if HAS_DATEUTIL:
+    logger.info("dateutil库已加载，将增强时间解析能力")
+else:
+    logger.info("dateutil库未安装，将使用基础时间解析功能")
 
 from app.db.models import Entry, Feed, FetchLog
 from app.db.session import SessionLocal
@@ -269,21 +282,53 @@ def _extract_content(item: Any) -> str | None:
     return item.get("summary")
 
 
+def _is_reasonable_time(dt: datetime) -> Tuple[bool, Optional[datetime]]:
+    """
+    验证时间是否合理，返回(是否合理, 修正后的时间)
+
+    根据用户建议：
+    - 未来时间 -> 使用导入时间
+    - 过于陈旧 -> 使用导入时间
+    """
+    now = datetime.now(timezone.utc)
+
+    # 检查是否为未来时间（允许1小时时区误差）
+    if dt > (now + timedelta(hours=1)):
+        logger.info("检测到未来时间 %s，将使用导入时间 %s", dt, now)
+        return False, now  # 使用当前时间作为发表时间
+
+    # 检查是否过于陈旧（10年前）
+    if dt < (now - timedelta(days=3650)):
+        logger.info("检测到过于陈旧的时间 %s，将使用导入时间 %s", dt, now)
+        return False, now  # 使用当前时间作为发表时间
+
+    return True, dt
+
+
 def _parse_datetime(item: Any) -> datetime | None:
-    """增强的时间解析函数，支持多种时间格式和位置"""
+    """增强的时间解析函数，融合多库策略和智能时间修正"""
     from email.utils import parsedate_to_datetime
-    
+
+    now = datetime.now(timezone.utc)
+
     # 1. 首先尝试标准的RSS时间字段（已解析的时间结构）
     parsed = item.get("published_parsed") or item.get("updated_parsed")
     if parsed:
         try:
-            timestamp = mktime(parsed)
-            result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-            logger.debug("从published_parsed/updated_parsed解析时间: %s", result)
-            return result
+            # 修复时区计算bug：确保正确处理时区
+            if hasattr(parsed, 'tm_mon'):  # 确保是有效的time_struct
+                timestamp = mktime(parsed)
+                result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+
+                # 验证时间合理性
+                is_reasonable, corrected_time = _is_reasonable_time(result)
+                if is_reasonable:
+                    logger.debug("从published_parsed/updated_parsed解析时间: %s", result)
+                    return result
+                else:
+                    return corrected_time
         except Exception as e:
             logger.debug("解析published_parsed/updated_parsed失败: %s", e)
-            pass
 
     # 2. 尝试其他已解析的时间字段
     time_fields = ["created_parsed", "date_parsed", "pubdate_parsed", "issued_parsed"]
@@ -292,54 +337,87 @@ def _parse_datetime(item: Any) -> datetime | None:
             try:
                 timestamp = mktime(item[field])
                 result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-                logger.debug("从%s解析时间: %s", field, result)
-                return result
+
+                is_reasonable, corrected_time = _is_reasonable_time(result)
+                if is_reasonable:
+                    logger.debug("从%s解析时间: %s", field, result)
+                    return result
+                else:
+                    return corrected_time
             except Exception as e:
                 logger.debug("解析%s失败: %s", field, e)
                 continue
 
-    # 3. 尝试字符串时间字段（支持RSS的<pubDate>标签）
-    # RSS格式示例: "Tue, 04 Nov 2014 00:00:00 GMT"
+    # 3. 尝试字符串时间字段，使用多库策略
     time_str_fields = ["published", "updated", "created", "date", "pubdate", "issued"]
     for field in time_str_fields:
         if field in item:
             time_str = item[field]
             if not time_str:
                 continue
-                
+
             logger.debug("尝试解析时间字符串字段 %s: %s", field, time_str)
-            
-            # 3a. 首先尝试使用email.utils.parsedate_to_datetime解析RFC 822/2822格式
-            # 这是RSS <pubDate>标签的标准格式
+
+            # 3a. 首先尝试使用email.utils.parsedate_to_datetime
             try:
                 result = parsedate_to_datetime(time_str)
-                # 确保时区信息存在
                 if result.tzinfo is None:
                     result = result.replace(tzinfo=timezone.utc)
-                logger.debug("使用parsedate_to_datetime从%s解析时间: %s", field, result)
-                return result
+
+                is_reasonable, corrected_time = _is_reasonable_time(result)
+                if is_reasonable:
+                    logger.debug("使用parsedate_to_datetime从%s解析时间: %s", field, result)
+                    return result
+                else:
+                    return corrected_time
             except Exception as e:
                 logger.debug("parsedate_to_datetime解析%s失败: %s", field, e)
-            
-            # 3b. 尝试使用feedparser内置的日期解析（如果可用）
+
+            # 3b. 使用dateutil增强解析（如果可用）
+            if HAS_DATEUTIL:
+                try:
+                    result = dateutil_parser.parse(time_str)
+                    if result.tzinfo is None:
+                        result = result.replace(tzinfo=timezone.utc)
+
+                    is_reasonable, corrected_time = _is_reasonable_time(result)
+                    if is_reasonable:
+                        logger.info("使用dateutil从%s解析时间: %s", field, result)
+                        return result
+                    else:
+                        return corrected_time
+                except Exception as e:
+                    logger.debug("dateutil解析%s失败: %s", field, e)
+
+            # 3c. 尝试feedparser内置解析
             try:
                 if hasattr(feedparser, '_parse_date'):
                     time_struct = feedparser._parse_date(time_str)
                     if time_struct:
                         timestamp = mktime(time_struct)
                         result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-                        logger.debug("使用feedparser._parse_date从%s解析时间: %s", field, result)
-                        return result
+
+                        is_reasonable, corrected_time = _is_reasonable_time(result)
+                        if is_reasonable:
+                            logger.debug("使用feedparser._parse_date从%s解析时间: %s", field, result)
+                            return result
+                        else:
+                            return corrected_time
             except Exception as e:
                 logger.debug("feedparser._parse_date解析%s失败: %s", field, e)
-            
-            # 3c. 尝试ISO 8601格式
+
+            # 3d. 尝试ISO 8601格式
             try:
                 result = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
                 if result.tzinfo is None:
                     result = result.replace(tzinfo=timezone.utc)
-                logger.debug("使用fromisoformat从%s解析时间: %s", field, result)
-                return result
+
+                is_reasonable, corrected_time = _is_reasonable_time(result)
+                if is_reasonable:
+                    logger.debug("使用fromisoformat从%s解析时间: %s", field, result)
+                    return result
+                else:
+                    return corrected_time
             except Exception as e:
                 logger.debug("fromisoformat解析%s失败: %s", field, e)
                 continue
@@ -349,38 +427,65 @@ def _parse_datetime(item: Any) -> datetime | None:
     if description:
         extracted_time = _extract_time_from_description(description)
         if extracted_time:
-            logger.debug("从描述中提取时间: %s", extracted_time)
-            return extracted_time
+            is_reasonable, corrected_time = _is_reasonable_time(extracted_time)
+            if is_reasonable:
+                logger.debug("从描述中提取时间: %s", extracted_time)
+                return extracted_time
+            else:
+                return corrected_time
 
-    logger.debug("无法解析时间，所有方法均失败")
-    return None
+    # 5. 所有方法都失败，使用导入时间
+    logger.warning("所有时间解析方法均失败，使用导入时间: %s", item.get('title', ''))
+    return now
 
 
 def _extract_time_from_description(description: str) -> datetime | None:
-    """从HTML描述中提取时间信息"""
+    """从HTML描述中提取时间信息，增强版支持多种格式"""
     import re
     from datetime import datetime, timezone
 
     if not description:
         return None
 
-    # 匹配ScienceDirect等格式的时间信息
+    # 扩展的时间格式匹配模式
     patterns = [
-        # "Publication date: December 2025"
+        # ScienceDirect格式
         r'Publication date:\s*([A-Za-z]+\s+\d{4})',
-        # "Publication date: Available online 10 October 2025"
         r'Publication date:\s*Available online\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
-        # "Publication date: June 2026"
         r'Published:\s*([A-Za-z]+\s+\d{4})',
-        # 其他可能的时间格式
         r'Date:\s*([A-Za-z]+\s+\d{4})',
         r'Published:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
+
+        # Nature期刊格式
+        r'First published:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
+        r'Published online:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
+
+        # 其他常见格式
+        r'Online publication date:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
+        r'Received:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
+        r'Accepted:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
     ]
 
     for pattern in patterns:
         match = re.search(pattern, description, re.IGNORECASE)
         if match:
             time_str = match.group(1)
+
+            # 优先使用dateutil解析（如果可用）
+            if HAS_DATEUTIL:
+                try:
+                    result = dateutil_parser.parse(time_str)
+                    if result.tzinfo is None:
+                        result = result.replace(tzinfo=timezone.utc)
+
+                    # 设置为中午12点，避免午夜时间的问题
+                    result = result.replace(hour=12, minute=0, second=0, microsecond=0)
+                    logger.debug("使用dateutil从描述解析时间: %s", result)
+                    return result
+                except Exception as e:
+                    logger.debug("dateutil解析描述时间失败: %s", e)
+
+            # 回退到标准解析
             try:
                 # 解析不同格式的时间字符串
                 if re.match(r'^[A-Za-z]+\s+\d{4}$', time_str):
@@ -452,10 +557,10 @@ def _select_feed_icon(parsed_feed: Any, site_url: str | None, feed_url: str) -> 
             if isinstance(link_type, str) and link_type.startswith("image/"):
                 add_candidate(href)
 
-    # Common Apple touch icons should take precedence over default favicon
+    # Prefer default favicon over Apple touch icons to avoid hotlink/CORS issues
     origin = _build_origin_url(base_url)
     if origin:
-        for extra in ["/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/favicon.ico"]:
+        for extra in ["/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png"]:
             add_candidate(f"{origin}{extra}")
 
     return candidates[0] if candidates else None
@@ -505,32 +610,59 @@ def schedule_refresh(feed_id: str) -> None:
 
 
 async def _get_urls_to_try(original_url: str) -> list[str]:
-    """获取要尝试的URL列表，使用用户配置的RSSHub URL"""
+    """获取要尝试的URL列表，结合用户配置与已知替代方案。
+
+    变更说明：
+    - 原逻辑仅识别固定4个RSSHub域名。现在放宽为“任意包含 rsshub 的域名”均按用户配置的RSSHub基址改写，
+      如 `rsshub.usebio.top` 这类第三方镜像也会被替换，从而使前端设置在更多镜像上生效。
+    """
     from app.services.user_settings_service import user_settings_service
 
-    urls = [original_url]
+    urls: list[str] = [original_url]
 
-    # 如果是RSSHub链接，使用用户配置的RSSHub URL
-    if any(rsshub in original_url for rsshub in ['rsshub.app', 'rsshub.rssforever.com', 'rsshub.ktachibana.party', 'rsshub.cskaoyan.com']):
-        try:
-            # 获取用户配置的RSSHub URL
-            user_rsshub_url = user_settings_service.get_rsshub_url()
+    try:
+        user_rsshub_base = user_settings_service.get_rsshub_url().rstrip('/')
+    except Exception as e:  # 容错：设置读取失败时保持原行为
+        user_rsshub_base = None
+        logger.warning("获取用户RSSHub配置失败，使用原始URL: %s", e)
 
-            # 替换为用户配置的RSSHub URL
-            for old_rsshub in ['rsshub.app', 'rsshub.rssforever.com', 'rsshub.ktachibana.party', 'rsshub.cskaoyan.com']:
-                if original_url.startswith(f"https://{old_rsshub}/"):
-                    converted_url = original_url.replace(f"https://{old_rsshub}/", f"{user_rsshub_url}/")
-                    urls.insert(0, converted_url)  # 将用户配置的URL放在最前面
-                    logger.info("使用用户配置的RSSHub URL: %s -> %s", original_url, converted_url)
-                    break
-                elif original_url.startswith(f"http://{old_rsshub}/"):
-                    converted_url = original_url.replace(f"http://{old_rsshub}/", f"{user_rsshub_url}/")
-                    urls.insert(0, converted_url)
-                    logger.info("使用用户配置的RSSHub URL: %s -> %s", original_url, converted_url)
-                    break
+    # 识别是否为RSSHub类链接（放宽为域名包含rsshub的情况）
+    try:
+        parsed = urlparse(original_url)
+        host = (parsed.netloc or "").lower()
+        is_rsshub_like = (
+            "rsshub" in host or host in {
+                "rsshub.app",
+                "rsshub.rssforever.com",
+                "rsshub.ktachibana.party",
+                "rsshub.cskaoyan.com",
+            }
+        )
 
-        except Exception as e:
-            logger.warning("获取用户RSSHub配置失败，使用原始URL: %s", e)
+        if is_rsshub_like and user_rsshub_base:
+            # 如果原始URL不是用户配置基址开头，则改写为用户配置的RSSHub基址
+            if not original_url.startswith(user_rsshub_base + "/"):
+                rebuilt = f"{user_rsshub_base}{parsed.path or ''}"
+                if parsed.query:
+                    rebuilt += f"?{parsed.query}"
+                # 将用户配置的URL放在最前面尝试
+                urls.insert(0, rebuilt)
+                logger.info("使用用户配置的RSSHub基址改写: %s -> %s", original_url, rebuilt)
+
+            # 同时追加已配置/默认的RSSHub镜像作为备选
+            try:
+                mirrors = await get_rsshub_mirrors()
+                for base in mirrors:
+                    base = base.rstrip('/')
+                    candidate = f"{base}{parsed.path or ''}"
+                    if parsed.query:
+                        candidate += f"?{parsed.query}"
+                    if candidate not in urls:
+                        urls.append(candidate)
+            except Exception as e:  # 若获取失败，忽略
+                logger.debug("获取RSSHub镜像列表失败，跳过镜像扩展: %s", e)
+    except Exception as e:
+        logger.debug("解析/改写RSSHub链接失败，跳过改写: %s", e)
 
     # 检查是否有已知的替代方案
     if original_url in KNOWN_ALTERNATIVES:

@@ -74,9 +74,10 @@ async def list_entries(
 
         # 根据选择的字段进行时间过滤
         if time_field == "published_at":
-            # 使用 published_at，如果为空则回退到 inserted_at
+            # 使用 published_at；屏蔽未来时间；published_at 为空时回退到 inserted_at
+            now = datetime.utcnow()
             stmt = stmt.where(
-                (Entry.published_at >= cutoff_date) |
+                ((Entry.published_at <= now) & (Entry.published_at >= cutoff_date)) |
                 (Entry.published_at.is_(None) & (Entry.inserted_at >= cutoff_date))
             )
         else:
@@ -96,6 +97,7 @@ async def list_entries(
             summary=_entry_preview_summary(entry),
             content=entry.content,
             published_at=entry.published_at,
+            inserted_at=entry.inserted_at,
             read=entry.read,
             starred=entry.starred,
         )
@@ -132,6 +134,7 @@ async def update_entry_state(
         summary=_entry_preview_summary(entry),
         content=entry.content,
         published_at=entry.published_at,
+        inserted_at=entry.inserted_at,
         read=entry.read,
         starred=entry.starred,
     )
@@ -171,6 +174,7 @@ async def list_starred_entries(
             summary=_entry_preview_summary(entry),
             content=entry.content,
             published_at=entry.published_at,
+            inserted_at=entry.inserted_at,
             read=entry.read,
             starred=entry.starred,
         )

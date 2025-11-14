@@ -70,9 +70,11 @@ export const useFeedStore = defineStore('feed', () => {
   async function fetchFeeds(options?: { dateRange?: string; timeField?: string }) {
     loadingFeeds.value = true
     try {
+      const hasDateRange = options && Object.prototype.hasOwnProperty.call(options, 'dateRange')
+      const hasTimeField = options && Object.prototype.hasOwnProperty.call(options, 'timeField')
       const mergedFilters = {
-        dateRange: options?.dateRange ?? lastFeedFilters.value?.dateRange,
-        timeField: options?.timeField ?? lastFeedFilters.value?.timeField,
+        dateRange: hasDateRange ? options?.dateRange : lastFeedFilters.value?.dateRange,
+        timeField: hasTimeField ? options?.timeField : lastFeedFilters.value?.timeField,
       }
       lastFeedFilters.value = mergedFilters
 
@@ -86,7 +88,9 @@ export const useFeedStore = defineStore('feed', () => {
 
       const { data } = await api.get<Feed[]>('/feeds', { params })
       feeds.value = data
-      if (!activeFeedId.value && data.length > 0) {
+      // 仅在没有任何选择时（既未选中订阅，也未选中分组）才设定默认订阅
+      // 避免在分组模式下被刷新订阅列表时意外切回到单个订阅
+      if (!activeFeedId.value && !activeGroupName.value && data.length > 0) {
         activeFeedId.value = data[0].id
       }
     } catch (error) {
@@ -104,7 +108,12 @@ export const useFeedStore = defineStore('feed', () => {
       const { data } = await api.post<Feed>('/feeds', { url })
       feeds.value = [data, ...feeds.value]
       activeFeedId.value = data.id
-      await fetchEntries()
+      // 保留当前的过滤器状态
+      await fetchEntries({
+        unreadOnly: lastEntryFilters.value?.unreadOnly,
+        dateRange: lastEntryFilters.value?.dateRange,
+        timeField: lastEntryFilters.value?.timeField,
+      })
     } catch (error) {
       console.error(error)
       errorMessage.value = '添加订阅失败，请检查链接'
@@ -120,15 +129,26 @@ export const useFeedStore = defineStore('feed', () => {
       for (const feed of groupFeeds) {
         await api.post(`/feeds/${feed.id}/refresh`)
       }
-      await fetchEntries({ groupName: activeGroupName.value })
+      // 保留当前的过滤器状态
+      await fetchEntries({
+        groupName: activeGroupName.value,
+        unreadOnly: lastEntryFilters.value?.unreadOnly,
+        dateRange: lastEntryFilters.value?.dateRange,
+        timeField: lastEntryFilters.value?.timeField,
+      })
       await fetchFeeds()
       return
     }
-    
+
     // 单个订阅源模式
     if (!activeFeedId.value) return
     await api.post(`/feeds/${activeFeedId.value}/refresh`)
-    await fetchEntries()
+    // 保留当前的过滤器状态
+    await fetchEntries({
+      unreadOnly: lastEntryFilters.value?.unreadOnly,
+      dateRange: lastEntryFilters.value?.dateRange,
+      timeField: lastEntryFilters.value?.timeField,
+    })
     await fetchFeeds()
   }
 
@@ -139,7 +159,12 @@ export const useFeedStore = defineStore('feed', () => {
       if (activeFeedId.value === feedId) {
         activeFeedId.value = feeds.value.length > 0 ? feeds.value[0].id : null
         if (activeFeedId.value) {
-          await fetchEntries()
+          // 保留当前的过滤器状态
+          await fetchEntries({
+            unreadOnly: lastEntryFilters.value?.unreadOnly,
+            dateRange: lastEntryFilters.value?.dateRange,
+            timeField: lastEntryFilters.value?.timeField,
+          })
         } else {
           entries.value = []
         }
@@ -180,10 +205,13 @@ export const useFeedStore = defineStore('feed', () => {
     
     loadingEntries.value = true
     try {
+      const hasUnreadOnly = options && Object.prototype.hasOwnProperty.call(options, 'unreadOnly')
+      const hasDateRange = options && Object.prototype.hasOwnProperty.call(options, 'dateRange')
+      const hasTimeField = options && Object.prototype.hasOwnProperty.call(options, 'timeField')
       const mergedFilters = {
-        unreadOnly: options?.unreadOnly ?? lastEntryFilters.value?.unreadOnly ?? false,
-        dateRange: options?.dateRange ?? lastEntryFilters.value?.dateRange,
-        timeField: options?.timeField ?? lastEntryFilters.value?.timeField,
+        unreadOnly: hasUnreadOnly ? (options?.unreadOnly as boolean) : (lastEntryFilters.value?.unreadOnly ?? false),
+        dateRange: hasDateRange ? options?.dateRange : lastEntryFilters.value?.dateRange,
+        timeField: hasTimeField ? options?.timeField : lastEntryFilters.value?.timeField,
       }
       lastEntryFilters.value = mergedFilters
 

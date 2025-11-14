@@ -19,6 +19,7 @@ export interface Entry {
   summary: string | null
   content: string | null
   published_at: string | null
+  inserted_at: string | null
   read: boolean
   starred: boolean
 }

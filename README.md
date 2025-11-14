@@ -18,269 +18,225 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇨🇳 中文</a> • <a href="README_EN.md">🇺🇸 English</a>
+  <a href="README_ZH.md">🇨🇳 中文</a> • <a href="README.md">🇺🇸 English</a>
 </p>
 
 <div align="center">
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 简介
+## 🎉 v0.1.2 Latest Release | 最新版本
 
-Aurora RSS Reader 是一个现代化的跨平台桌面 RSS 阅读器，集成了 AI 翻译和摘要功能。基于 Electron + Vue 3 + FastAPI 技术栈构建，提供流畅的用户体验和强大的功能支持。支持多种布局模式，本地数据存储，以及丰富的自定义选项。
+**Critical Bug Fix Version | 重要Bug修复版本**
 
-**当前版本：v0.1.0**
+- 🐛 **Fixed Time Filtering Issue** - Resolved critical problem with "recent 1 day" filter not working
+- 🐛 **Fixed Category Display Bug** - Categories now show subscriptions correctly when clicked
+- ⚡ **Enhanced RSS Parsing** - Parser success rate improved from ~60% to 83.3%+ with academic journal support
+- 🌐 **RSSHub Mirror Support** - Custom mirror service support for better network stability
+- 🔧 **Updated Dependencies** - Added python-dateutil library support
 
-## 功能特色
+---
 
-### 阅读体验
-- **多种布局模式** - 支持三栏式和一栏式布局
-- **分组管理** - 将 RSS 源按分类整理
-- **全文搜索** - 在标题和内容中快速查找
-- **收藏功能** - 收藏重要文章便于后续阅读
-- **时间过滤** - 按发布时间筛选文章
+## Introduction
 
-### 智能功能
-- **文章摘要** - 自动生成文章要点，快速了解内容
-- **多语言翻译** - 支持全文和标题翻译，阅读无障碍
-- **多语言界面** - 中文、英文、日语、韩语界面支持
-- **灵活配置** - 支持多种翻译和摘要服务
+Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-### 系统功能
-- **本地存储** - SQLite 数据库，离线可用
-- **OPML 导入导出** - 方便数据迁移
-- **自动刷新** - 定时获取最新文章
-- **深色模式** - 支持深色和浅色主题
-- **RSSHub 支持** - 扩展 RSS 源覆盖范围
-- **窗口管理** - 优化的 macOS 窗口生命周期管理
-- **多平台支持** - Windows、macOS、Linux 全平台兼容
+**Current Version: v0.1.2**
 
-### 界面预览
+## Key Features
 
-#### 🎨 布局模式
+### Reading Experience
+- **Multiple Layout Modes** - Support for three-column and single-column layouts
+- **Group Management** - Organize RSS feeds by categories
+- **Full-text Search** - Quick search in titles and content
+- **Favorites Feature** - Bookmark important articles for later reading
+- **Time Filtering** - Filter articles by publication date
+
+### Smart Features
+- **Article Summaries** - Automatically generate key points for quick understanding
+- **Multi-language Translation** - Support full-text and title translation for barrier-free reading
+- **Multi-language Interface** - Chinese, English, Japanese, Korean interface support
+- **Flexible Configuration** - Support multiple translation and summarization services
+
+### System Features
+- **Local Storage** - SQLite database, offline available
+- **OPML Import/Export** - Easy data migration
+- **Auto Refresh** - Periodically fetch latest articles
+- **Dark Mode** - Support dark and light themes
+- **RSSHub Support** - Extend RSS feed coverage
+
+## Interface Preview
+
+### Layout Modes
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" width="60%">
-        <img src="images/appimages/三栏式布局.png" alt="三栏式布局" width="100%" style="max-width:600px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" />
-        <br><strong>三栏式布局</strong>
-        <br><em>经典桌面阅读体验</em>
-      </td>
-      <td align="center" width="40%">
-        <img src="images/appimages/一拦式布局.png" alt="一栏式布局" width="100%" style="max-width:280px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" />
-        <br><strong>一栏式布局</strong>
-        <br><em>专注阅读模式</em>
-      </td>
-    </tr>
-  </table>
+  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/appimages/三栏式布局.png" alt="Three-column layout" style="width:520px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>Three-column layout</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/appimages/一拦式布局.png" alt="Single-column layout" style="width:240px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>Single-column layout</figcaption>
+  </figure>
 </div>
 
-#### 🌍 多语言界面
+### Multi-language Experience
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持中文.png" alt="中文界面" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇨🇳 中文</strong>
-      </td>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持英文.png" alt="English Interface" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇺🇸 English</strong>
-      </td>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持日语.png" alt="日本語" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇯🇵 日本語</strong>
-      </td>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持韩文.png" alt="한국어" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇰🇷 한국어</strong>
-      </td>
-    </tr>
-  </table>
+  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
+    <img src="images/appimages/多语言支持中文.png" alt="Chinese Interface" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>Chinese Interface</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
+    <img src="images/appimages/多语言支持英文.png" alt="English Interface" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>English Interface</figcaption>
+  </figure>
 </div>
 
-#### ⚙️ 核心功能
+### Management Features
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" width="33.33%">
-        <img src="images/appimages/支持订阅分组.png" alt="分组管理" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
-        <br><strong>📁 订阅源分组</strong>
-        <br><em>智能分类管理</em>
-      </td>
-      <td align="center" width="33.33%">
-        <img src="images/appimages/支持订阅信息时间过滤设定.png" alt="时间过滤" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
-        <br><strong>⏰ 时间过滤</strong>
-        <br><em>精准内容筛选</em>
-      </td>
-      <td align="center" width="33.33%">
-        <img src="images/appimages/支持特定内容收藏.png" alt="收藏功能" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
-        <br><strong>⭐ 收藏功能</strong>
-        <br><em>重要内容标记</em>
-      </td>
-    </tr>
-  </table>
+  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
+    <img src="images/appimages/支持订阅分组.png" alt="Group Management" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>Subscription grouping</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
+    <img src="images/appimages/支持订阅信息时间过滤设定.png" alt="Time Filtering" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>Time filtering</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
+    <img src="images/appimages/支持特定内容收藏.png" alt="Favorites" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+    <figcaption>Favorites feature</figcaption>
+  </figure>
 </div>
 
-## 快速开始
+### Multi-language Interface
+<div align="center">
+  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
+    <img src="images/appimages/多语言支持中文.png" alt="Chinese" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
+    <figcaption>Chinese</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
+    <img src="images/appimages/多语言支持英文.png" alt="English" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
+    <figcaption>English</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
+    <img src="images/appimages/多语言支持日语.png" alt="Japanese" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
+    <figcaption>Japanese</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
+    <img src="images/appimages/多语言支持韩文.png" alt="Korean" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
+    <figcaption>Korean</figcaption>
+  </figure>
+</div>
 
-### 系统要求
+## Quick Start
+
+### System Requirements
 - Node.js 18+
 - Python 3.12+
 - pnpm 8+
 
-### 安装运行
+### Installation and Running
 ```bash
-# 克隆仓库
+# Clone the repository
 git clone https://github.com/xiongsircool/aurora-rss-reader.git
 cd aurora-rss-reader
 
-# 一键启动
+# One-click startup
 chmod +x start.sh
 ./start.sh
 ```
 
-启动脚本会自动：
-- 创建 Python 虚拟环境
-- 安装前后端依赖
-- 初始化数据库
-- 启动 Electron 应用
+The startup script will automatically:
+- Create Python virtual environment
+- Install frontend and backend dependencies
+- Initialize database
+- Launch Electron application
 
-### 访问地址
-- **桌面应用**：自动打开 Electron 窗口
-- **Web 界面**：http://localhost:5173
-- **API 服务**：http://127.0.0.1:15432
+### Access URLs
+- **Desktop App**: Electron window opens automatically
+- **Web Interface**: http://localhost:5173
+- **API Service**: http://127.0.0.1:15432
 
-### 配置文件
-编辑 `backend/.env` 配置 AI 和 RSSHub：
+### Configuration File
+Edit `backend/.env` to configure AI and RSSHub:
 
 ```env
 # RSSHub
 RSSHUB_BASE=https://rsshub.app
 
-# AI 配置
+# AI Configuration
 GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
 GLM_MODEL=glm-4-flash
 GLM_API_KEY=your_api_key_here
 ```
 
-### 数据存储目录
-- **macOS**：`~/Library/Application Support/Aurora RSS Reader/rss.sqlite`
-- **Windows**：`%APPDATA%/Aurora RSS Reader/rss.sqlite`
-- **Linux**：`~/.config/aurora-rss-reader/rss.sqlite`
-- 可通过设置环境变量 `AURORA_DATA_DIR` 或在 `backend/.env` 中指定 `SQLITE_PATH` 来覆盖默认位置，方便在多设备或自定义路径间迁移数据。
-
-## 构建发布
+## Build and Release
 
 ```bash
-# 构建安装包
+# Build installation package
 chmod +x build-release-app.sh
 ./build-release-app.sh
 ```
 
-生成的文件：
-- macOS: `Aurora RSS Reader-Mac-0.1.0-{x64,arm64}.dmg`
-- Windows: `Aurora RSS Reader-Setup-0.1.0.exe`
-- Linux: `aurora-rss-reader-0.1.0.AppImage`
+Generated files:
+- macOS: `Aurora RSS Reader-Mac-0.1.2-{x64,arm64}.dmg`
+- Windows: `Aurora RSS Reader-Setup-0.1.2.exe`
+- Linux: `aurora-rss-reader-0.1.2.AppImage`
 
-详细构建说明请参考 [构建文档](docs/development/build.md)。
+## 📋 Documentation | 文档
 
-## 技术栈
+- **[Update Details](UPDATE_README.md)** - Detailed v0.1.2 update content | v0.1.2详细更新内容
+- **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
-- **前端**：Vue 3 + Vite + Pinia + TypeScript
-- **后端**：FastAPI + SQLModel + SQLite
-- **桌面应用**：Electron
-- **构建工具**：PyInstaller + electron-builder
+## Tech Stack
 
-## 项目结构
+- **Frontend**: Vue 3 + Vite + Pinia + TypeScript
+- **Backend**: FastAPI + SQLModel + SQLite
+- **Desktop App**: Electron
+- **Build Tools**: PyInstaller + electron-builder
+
+## Project Structure
 
 ```
 aurora-rss-reader/
-├── rss-desktop/          # 前端代码
-│   ├── src/             # Vue 源码
-│   └── electron/        # Electron 主进程
-├── backend/             # 后端服务
-│   ├── app/            # FastAPI 应用
-│   └── .venv/          # Python 虚拟环境
-├── images/              # 图片资源
-└── start.sh            # 启动脚本
+├── rss-desktop/          # Frontend code
+│   ├── src/             # Vue source code
+│   └── electron/        # Electron main process
+├── backend/             # Backend service
+│   ├── app/            # FastAPI application
+│   └── .venv/          # Python virtual environment
+├── images/              # Image resources
+└── start.sh            # Startup script
 ```
 
-## 📋 更新日志
+## 📋 Documentation | 文档
 
-### v0.1.0 (当前版本)
-#### 新增功能
-- ✨ 多布局模式支持（三栏式、一栏式）
-- ✨ AI 翻译和摘要功能集成
-- ✨ 多语言界面支持（中文、英文、日语、韩语）
-- ✨ RSS 订阅分组管理
-- ✨ 文章收藏和时间过滤
-- ✨ 全文搜索功能
-- ✨ OPML 导入导出
+- **[Update Details](UPDATE_README.md)** - Detailed v0.1.2 update content | v0.1.2详细更新内容
+- **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
-#### 优化改进
-- 🐛 修复 macOS 窗口生命周期管理问题
-- 🎨 优化界面布局和用户体验
-- 🔄 改进时区处理，统一时间显示
-- ⚡ 增强应用启动和窗口恢复性能
+## Support
 
-## 📚 文档
+- **Issue Reporting**: [GitHub Issues](https://github.com/xiongsircool/aurora-rss-reader/issues)
+- **Feature Suggestions**: [GitHub Discussions](https://github.com/xiongsircool/aurora-rss-reader/discussions)
+- **Email Contact**: 1666526339@qq.com
 
-- **[完整文档](docs/README.md)** - 所有文档的入口
-- **[RSSHub 配置](docs/guides/RSSHUB_CONFIG_GUIDE.md)** - 自定义 RSSHub 实例
-- **[RSSHub 故障排除](docs/guides/RSSHUB_TROUBLESHOOTING.md)** - 连接问题排查
-- **[开发指南](docs/development/CONTRIBUTING.md)** - 贡献代码和开发设置
-- **[后端文档](docs/development/backend.md)** - 后端架构和 API
-- **[构建文档](docs/development/build.md)** - 构建和部署说明
-- **[更新日志](docs/CHANGELOG.md)** - 详细版本更新记录
+## License
 
-## ❓ 常见问题
-
-### macOS 相关
-**Q: macOS 上关闭窗口后，为什么从 dock 栏点击会报错？**
-A: 这个问题已在 v0.1.0 版本中修复。如果仍有问题，请确保使用最新版本。
-
-**Q: 如何在 macOS 上完全退出应用？**
-A: 使用 `Cmd + Q` 快捷键或右键点击 dock 图标选择退出。
-
-### 配置相关
-**Q: 如何配置 AI 服务？**
-A: 编辑 `backend/.env` 文件，添加相应的 API 密钥。详细配置请参考 [配置文档](docs/guides/RSSHUB_CONFIG_GUIDE.md)。
-
-**Q: 数据存储在哪里？**
-A: 数据默认存储在系统应用数据目录：
-- macOS: `~/Library/Application Support/Aurora RSS Reader/rss.sqlite`
-- Windows: `%APPDATA%/Aurora RSS Reader/rss.sqlite`
-- Linux: `~/.config/aurora-rss-reader/rss.sqlite`
-
-### 性能相关
-**Q: 应用启动慢怎么办？**
-A: 检查后端服务是否正常启动，可以查看终端输出的启动日志。
-
-## 支持
-
-- **问题反馈**：[GitHub Issues](https://github.com/xiongsircool/aurora-rss-reader/issues)
-- **功能建议**：[GitHub Discussions](https://github.com/xiongsircool/aurora-rss-reader/discussions)
-- **邮件联系**：1666526339@qq.com
-
-## 许可证
-
-本项目使用 [GNU General Public License v3.0](LICENSE)，这是一个 copyleft 开源许可证，要求衍生作品也必须开源。
+This project uses [GNU General Public License v3.0](LICENSE), which is a copyleft open source license requiring derivative works to also be open source.
 
 ---
 
-## 🎯 未来规划
+## 🎯 Future Roadmap
 
-### 近期计划 (v0.2)
-- [ ] **移动端支持** - 开发iOS和Android平台的移动应用
-- [ ] **AI日报功能** - 智能生成每日热点新闻摘要和个性化推荐
-- [ ] **播客支持** - 支持音频播客订阅和播放功能
-- [ ] **阅读统计** - 个人阅读习惯分析和数据可视化
+### Short-term Plans (v0.2)
+- [ ] **Mobile Support** - Develop iOS and Android mobile applications
+- [ ] **AI Daily Briefing** - Smart daily news summaries and personalized recommendations
+- [ ] **Podcast Support** - Support for audio podcast subscription and playback
+- [ ] **Reading Analytics** - Personal reading habits analysis and data visualization
 
-### 中期计划 (v0.3)
-- [ ] **数据同步** - 跨设备数据同步和云备份
-- [ ] **插件系统** - 支持第三方插件扩展功能
+### Mid-term Plans (v0.3)
+- [ ] **Data Synchronization** - Cross-device data sync and cloud backup
+- [ ] **Plugin System** - Support for third-party plugin extensions
 
 ---
 
-觉得有用就给个 ⭐ 吧！
+Give it a ⭐ if you find it useful!

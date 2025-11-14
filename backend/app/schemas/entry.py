@@ -16,6 +16,7 @@ class EntryRead(SQLModel):
     summary: Optional[str]
     content: Optional[str]
     published_at: Optional[datetime]
+    inserted_at: Optional[datetime]
     read: bool
     starred: bool
 

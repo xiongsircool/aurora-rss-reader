@@ -92,9 +92,10 @@ build/
 # Database
 *.sqlite
 *.sqlite3
+*.sqlite-shm
+*.sqlite-wal
 *.db
-backend/data/*.sqlite
-backend/data/*.db
+backend/data/*
 
 # Temporary files
 *.tmp
@@ -140,3 +141,9 @@ rss-desktop/src/config/local.js
 # Development data
 backend/data/development/
 backend/data/development.*
+
+./tmp
+
+# Archived documentation
+archive/
+docs_archive/

@@ -18,6 +18,13 @@ import type { Entry, Feed } from '../types'
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:15432/api'
+
+function iconSrcFor(url?: string | null) {
+  if (!url) return undefined
+  return `${API_BASE}/icons/proxy?url=${encodeURIComponent(url)}`
+}
+
 const store = useFeedStore()
 const aiStore = useAIStore()
 const favoritesStore = useFavoritesStore()
@@ -110,7 +117,14 @@ const FEED_ICON_COLORS = [
   '#6B705C'
 ]
 
-const brokenFeedIcons = ref<Record<string, string>>({})
+const brokenFeedIcons = ref<Record<string, boolean>>({})
+// Track which icon URLs have loaded successfully to avoid broken-image flashes
+const loadedIconUrls = ref<Record<string, boolean>>({})
+
+function handleFeedIconLoad(_feedId: string, url?: string | null) {
+  if (!url) return
+  loadedIconUrls.value = { ...loadedIconUrls.value, [url]: true }
+}
 
 // 布局状态管理
 const DEFAULT_VIEWPORT_WIDTH = typeof window !== 'undefined' ? window.innerWidth : 1440
@@ -347,14 +361,22 @@ function isEntryActive(entryId: string) {
 function handleFeedIconError(feedId: string, failedUrl?: string | null) {
   brokenFeedIcons.value = {
     ...brokenFeedIcons.value,
-    [feedId]: failedUrl || '__error__'
+    [feedId]: true
+  }
+  if (failedUrl) {
+    const { [failedUrl]: _omit, ...rest } = loadedIconUrls.value
+    loadedIconUrls.value = rest
   }
 }
 
-function shouldShowFeedIcon(feed?: Feed | null) {
-  if (!feed?.favicon_url) return false
-  const failedUrl = brokenFeedIcons.value[feed.id]
-  return failedUrl !== feed.favicon_url
+function isFeedIconBroken(feed?: Feed | null) {
+  if (!feed?.favicon_url) return true
+  return !!brokenFeedIcons.value[feed.id]
+}
+
+function isFeedIconLoaded(url?: string | null) {
+  if (!url) return false
+  return !!loadedIconUrls.value[url]
 }
 
 function getFeedInitial(text?: string | null) {
@@ -1193,14 +1215,15 @@ async function handleImportOpml(event: Event) {
                     aria-hidden="true"
                   >
                     <img
-                      v-if="shouldShowFeedIcon(feedMap[feed.id])"
-                      :src="feedMap[feed.id]?.favicon_url || undefined"
+                      v-show="!isFeedIconBroken(feedMap[feed.id]) && isFeedIconLoaded(iconSrcFor(feedMap[feed.id]?.favicon_url))"
+                      :src="iconSrcFor(feedMap[feed.id]?.favicon_url) || undefined"
                       :alt="`${feed.title} 图标`"
                       loading="lazy"
                       decoding="async"
-                      @error="handleFeedIconError(feed.id, feedMap[feed.id]?.favicon_url)"
+                      @load="handleFeedIconLoad(feed.id, iconSrcFor(feedMap[feed.id]?.favicon_url))"
+                      @error="handleFeedIconError(feed.id, iconSrcFor(feedMap[feed.id]?.favicon_url))"
                     />
-                    <span class="feed-icon__initial" v-else>
+                    <span class="feed-icon__initial" v-show="isFeedIconBroken(feedMap[feed.id]) || !isFeedIconLoaded(iconSrcFor(feedMap[feed.id]?.favicon_url))">
                       {{ getFeedInitial(feed.title) }}
                     </span>
                   </span>
@@ -1283,14 +1306,15 @@ async function handleImportOpml(event: Event) {
                   aria-hidden="true"
                 >
                   <img
-                    v-if="shouldShowFeedIcon(feed)"
-                    :src="feed.favicon_url || undefined"
+                    v-show="!isFeedIconBroken(feed) && isFeedIconLoaded(iconSrcFor(feed?.favicon_url))"
+                    :src="iconSrcFor(feed.favicon_url) || undefined"
                     :alt="`${feed.title || feed.url} 图标`"
                     loading="lazy"
                     decoding="async"
-                    @error="handleFeedIconError(feed.id, feed.favicon_url)"
+                    @load="handleFeedIconLoad(feed.id, iconSrcFor(feed.favicon_url))"
+                    @error="handleFeedIconError(feed.id, iconSrcFor(feed.favicon_url))"
                   />
-                  <span v-else class="feed-icon__initial">{{ getFeedInitial(feed.title || feed.url) }}</span>
+                  <span class="feed-icon__initial" v-show="isFeedIconBroken(feed) || !isFeedIconLoaded(iconSrcFor(feed?.favicon_url))">{{ getFeedInitial(feed.title || feed.url) }}</span>
                 </div>
                 <div class="feed-item__info">
                   <span class="feed-item__title">{{ feed.title || feed.url }}</span>
