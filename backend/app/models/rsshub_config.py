@@ -5,6 +5,8 @@ from typing import Optional
 from sqlmodel import SQLModel, Field
 from datetime import datetime
 
+from app.services.rsshub_defaults import get_default_rsshub_mirrors
+
 
 class RSSHubConfig(SQLModel, table=True):
     """RSSHub镜像配置"""
@@ -42,30 +44,4 @@ class RSSHubURLMapping(SQLModel, table=True):
 
 
 # RSSHub镜像预设配置
-DEFAULT_RSSHUB_MIRRORS = [
-    {
-        "name": "主镜像 (官方)",
-        "base_url": "https://rsshub.app",
-        "priority": 1,
-        "is_default": True,
-        "description": "RSSHub官方镜像"
-    },
-    {
-        "name": "备用镜像1",
-        "base_url": "https://rsshub.rssforever.com",
-        "priority": 2,
-        "description": "RSSHub备用镜像1"
-    },
-    {
-        "name": "备用镜像2",
-        "base_url": "https://rsshub.ktachibana.party",
-        "priority": 3,
-        "description": "RSSHub备用镜像2"
-    },
-    {
-        "name": "备用镜像3",
-        "base_url": "https://rsshub.cskaoyan.com",
-        "priority": 4,
-        "description": "RSSHub备用镜像3"
-    }
-]
+DEFAULT_RSSHUB_MIRRORS = get_default_rsshub_mirrors()

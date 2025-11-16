@@ -2,13 +2,11 @@
 RSS源的特殊配置和处理规则
 """
 
+from app.services.rsshub_defaults import get_default_rsshub_base_urls
+
+
 # RSSHub备用镜像配置 (作为备用，主要使用动态配置)
-DEFAULT_RSSHUB_MIRRORS = [
-    'https://rsshub.app',
-    'https://rsshub.rssforever.com',
-    'https://rsshub.ktachibana.party',
-    'https://rsshub.cskaoyan.com'
-]
+DEFAULT_RSSHUB_MIRRORS = get_default_rsshub_base_urls()
 
 # 动态获取RSSHub镜像的函数
 async def get_rsshub_mirrors():
@@ -19,7 +17,7 @@ async def get_rsshub_mirrors():
         return [mirror.base_url for mirror in mirrors]
     except Exception:
         # 如果动态获取失败，使用默认配置
-        return DEFAULT_RSSHUB_MIRRORS
+        return get_default_rsshub_base_urls()
 
 # 需要特殊User-Agent的域名
 SPECIAL_USER_AGENTS = {
