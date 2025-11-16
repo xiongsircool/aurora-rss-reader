@@ -239,6 +239,8 @@
     "autoTranslationHint": "新文章自动翻译到指定语言",
     "autoTitleTranslation": "自动标题翻译",
     "autoTitleTranslationHint": "在原标题下方显示翻译后的标题",
+    "autoTitleTranslationLimitLabel": "自动翻译最新 {count} 条标题",
+    "autoTitleTranslationLimitHint": "批量越大越消耗模型调用，系统会限制并发（≤{concurrency} 个请求）以保护服务",
     "translationTargetLanguage": "翻译目标语言",
     "subscriptionUpdate": "订阅更新",
     "autoRefresh": "自动刷新订阅",

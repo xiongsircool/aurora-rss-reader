@@ -14,6 +14,12 @@ import LoadingSpinner from '../components/LoadingSpinner.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import LogoMark from '../components/LogoMark.vue'
 import type { Entry, Feed } from '../types'
+import {
+  clampAutoTitleTranslationLimit,
+  getRecommendedTitleTranslationConcurrency,
+  TITLE_TRANSLATION_CONCURRENCY_FALLBACK
+} from '../constants/translation'
+import type { NavigatorConnection } from '../constants/translation'
 
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
@@ -87,6 +93,75 @@ const titleTranslationLoadingMap = ref<Record<string, boolean>>({})
 const titleTranslationLanguageLabel = computed(() =>
   (aiFeatures.value?.translation_language || '').toUpperCase(),
 )
+const maxAutoTitleTranslations = computed(() =>
+  clampAutoTitleTranslationLimit(settingsStore.settings.max_auto_title_translations)
+)
+const titleTranslationConcurrency = ref(getRecommendedTitleTranslationConcurrency())
+const titleTranslationQueue: Array<() => void> = []
+let activeTitleTranslationTasks = 0
+let detachConnectionListener: (() => void) | null = null
+
+function bindConnectionListener() {
+  if (typeof navigator === 'undefined') return
+  const nav = navigator as Navigator & {
+    connection?: NavigatorConnection
+  }
+  const connection = nav.connection
+  if (!connection) return
+  const handler = () => {
+    titleTranslationConcurrency.value = getRecommendedTitleTranslationConcurrency()
+  }
+  if (connection.addEventListener) {
+    connection.addEventListener('change', handler)
+    detachConnectionListener = () => connection.removeEventListener?.('change', handler)
+    return
+  }
+  if ('onchange' in connection) {
+    const previous = connection.onchange
+    const wrapper = function (this: NavigatorConnection, event: Event) {
+      handler()
+      previous?.call(this, event)
+    }
+    connection.onchange = wrapper
+    detachConnectionListener = () => {
+      if (connection.onchange === wrapper) {
+        connection.onchange = previous ?? null
+      }
+    }
+  }
+}
+
+function cleanupConnectionListener() {
+  detachConnectionListener?.()
+  detachConnectionListener = null
+}
+
+function releaseTitleTranslationSlot() {
+  activeTitleTranslationTasks = Math.max(0, activeTitleTranslationTasks - 1)
+  const next = titleTranslationQueue.shift()
+  if (next) {
+    next()
+  }
+}
+
+async function acquireTitleTranslationSlot() {
+  const limit = Math.max(1, titleTranslationConcurrency.value || TITLE_TRANSLATION_CONCURRENCY_FALLBACK)
+  while (activeTitleTranslationTasks >= limit) {
+    await new Promise<void>((resolve) => {
+      titleTranslationQueue.push(resolve)
+    })
+  }
+  activeTitleTranslationTasks++
+}
+
+async function withTitleTranslationSemaphore<T>(task: () => Promise<T>): Promise<T> {
+  await acquireTitleTranslationSlot()
+  try {
+    return await task()
+  } finally {
+    releaseTitleTranslationSlot()
+  }
+}
 const editingFeedId = ref<string | null>(null)
 const editingGroupName = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -104,7 +179,6 @@ const showToast = ref(false)
 const toastMessage = ref('')
 const toastType = ref<'success' | 'error' | 'info'>('info')
 const showSettings = ref(false)
-const MAX_AUTO_TITLE_TRANSLATIONS = Number.POSITIVE_INFINITY
 const NO_SUMMARY_TEXT = computed(() => t('ai.noSummary'))
 const FEED_ICON_COLORS = [
   '#FF8A3D',
@@ -263,7 +337,9 @@ async function ensureTitleTranslation(entry: Entry) {
   }
   titleTranslationLoadingMap.value[cacheKey] = true
   try {
-    await store.requestTitleTranslation(entry.id, aiFeatures.value?.translation_language || 'zh')
+    await withTitleTranslationSemaphore(() =>
+      store.requestTitleTranslation(entry.id, aiFeatures.value?.translation_language || 'zh')
+    )
   } catch (error) {
     console.error('标题翻译失败:', error)
   } finally {
@@ -534,6 +610,7 @@ function handleMouseUp() {
 }
 
 onMounted(async () => {
+  bindConnectionListener()
   refreshViewportWidth()
   const savedTheme = localStorage.getItem('theme')
   darkMode.value = savedTheme === 'dark'
@@ -583,6 +660,7 @@ onMounted(async () => {
 
 // 组件卸载时清理事件监听器
 onUnmounted(() => {
+  cleanupConnectionListener()
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('mouseup', handleMouseUp)
   window.removeEventListener('resize', handleWindowResize)
@@ -647,13 +725,14 @@ watch(
     entries: filteredEntries.value,
     language: aiFeatures.value?.translation_language,
     auto: aiFeatures.value?.auto_title_translation,
+    limit: maxAutoTitleTranslations.value
   }),
-  ({ entries, auto }) => {
+  ({ entries, auto, limit }) => {
     if (!auto) {
       titleTranslationLoadingMap.value = {}
       return
     }
-    const topEntries = (entries || []).slice(0, MAX_AUTO_TITLE_TRANSLATIONS) as Entry[]
+    const topEntries = (entries || []).slice(0, limit) as Entry[]
     topEntries.forEach((entry) => {
       ensureTitleTranslation(entry)
     })

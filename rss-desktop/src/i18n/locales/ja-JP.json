@@ -239,6 +239,8 @@
     "autoTranslationHint": "新しい記事を指定言語に自動翻訳",
     "autoTitleTranslation": "自動タイトル翻訳",
     "autoTitleTranslationHint": "元のタイトルの下に翻訳されたタイトルを表示",
+    "autoTitleTranslationLimitLabel": "最新 {count} 件のタイトルを自動翻訳",
+    "autoTitleTranslationLimitHint": "件数が多いほどAPI負荷が増えます。サービスを守るため同時リクエストは {concurrency} 件以下に制御されます。",
     "translationTargetLanguage": "翻訳対象言語",
     "subscriptionUpdate": "購読更新",
     "autoRefresh": "購読を自動更新",

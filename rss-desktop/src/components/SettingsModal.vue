@@ -5,6 +5,12 @@ import { useLanguage } from '../composables/useLanguage'
 import type { LocaleCode } from '../i18n'
 import { useAIStore, type AIServiceKey } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import {
+  clampAutoTitleTranslationLimit,
+  MAX_AUTO_TITLE_TRANSLATIONS,
+  MIN_AUTO_TITLE_TRANSLATIONS,
+  TITLE_TRANSLATION_CONCURRENCY_FALLBACK
+} from '../constants/translation'
 
 const props = defineProps<{
   show: boolean
@@ -86,6 +92,21 @@ const showEntrySummary = computed({
     settingsStore.updateSettings({ show_entry_summary: value })
   }
 })
+
+const autoTitleTranslationLimit = computed({
+  get: () => settingsStore.settings.max_auto_title_translations,
+  set: (value: number) => {
+    const clamped = clampAutoTitleTranslationLimit(value)
+    settingsStore.updateSettings({ max_auto_title_translations: clamped })
+  }
+})
+
+const autoTitleTranslationLimitBounds = {
+  min: MIN_AUTO_TITLE_TRANSLATIONS,
+  max: MAX_AUTO_TITLE_TRANSLATIONS
+}
+
+const titleTranslationConcurrencyHint = Math.max(1, TITLE_TRANSLATION_CONCURRENCY_FALLBACK)
 
 // 订阅刷新设置 - 与settingsStore同步
 const autoRefresh = computed({
@@ -633,6 +654,30 @@ function handleLanguageChange(newLanguage: string) {
                 <option value="es">{{ t('languages.es') }}</option>
               </select>
             </div>
+
+            <div class="form-group title-translation-limit">
+              <div class="title-translation-limit__label">
+                <label>
+                  {{ t('settings.autoTitleTranslationLimitLabel', { count: autoTitleTranslationLimit }) }}
+                </label>
+                <span class="limit-value">{{ autoTitleTranslationLimit }}</span>
+              </div>
+              <input
+                type="range"
+                class="form-range"
+                v-model.number="autoTitleTranslationLimit"
+                :min="autoTitleTranslationLimitBounds.min"
+                :max="autoTitleTranslationLimitBounds.max"
+                :disabled="!localConfig.features.auto_title_translation"
+              />
+              <div class="range-scale">
+                <span>{{ autoTitleTranslationLimitBounds.min }}</span>
+                <span>{{ autoTitleTranslationLimitBounds.max }}</span>
+              </div>
+              <p class="form-hint">
+                {{ t('settings.autoTitleTranslationLimitHint', { concurrency: titleTranslationConcurrencyHint }) }}
+              </p>
+            </div>
           </section>
 
           <section class="settings-section">
@@ -957,6 +1002,49 @@ function handleLanguageChange(newLanguage: string) {
   color: var(--text-primary, #0f1419);
   transition: border-color 0.2s, box-shadow 0.2s;
   box-shadow: inset 0 1px 2px rgba(15, 20, 25, 0.04);
+}
+
+.form-range {
+  width: 100%;
+  margin-top: 4px;
+  accent-color: var(--settings-accent, #4c74ff);
+}
+
+.form-range::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--settings-accent, #4c74ff);
+  cursor: pointer;
+}
+
+.form-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: var(--settings-accent, #4c74ff);
+  cursor: pointer;
+}
+
+.title-translation-limit__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title-translation-limit .limit-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--settings-accent, #4c74ff);
+}
+
+.range-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--settings-muted, #5a6276);
+  margin-top: 4px;
 }
 
 .form-input::placeholder {
