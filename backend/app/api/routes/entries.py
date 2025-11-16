@@ -9,8 +9,9 @@ from app.db.deps import get_session
 from app.db.models import Entry, Feed
 from app.schemas.entry import EntryRead, EntryStateUpdate
 from app.utils.text import clean_html_text
-from sqlalchemy import func
 from typing import Optional
+from sqlalchemy import func
+from app.services.user_settings_service import user_settings_service
 
 router = APIRouter(prefix="/entries", tags=["entries"])
 
@@ -26,11 +27,15 @@ async def list_entries(
     feed_id: str | None = None,
     group_name: str | None = Query(default=None, description="分组名称，用于获取该分组下所有订阅源的文章"),
     unread_only: bool = Query(default=False),
-    limit: int = Query(default=50, le=200),
+    limit: int | None = Query(default=None, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     date_range: str | None = Query(default=None, description="时间范围: '1d', '7d', '30d', '90d', '180d', '365d'"),
     time_field: str = Query(default="inserted_at", description="时间字段: 'published_at' 或 'inserted_at'"),
 ) -> list[EntryRead]:
+    if limit is None:
+        user_limit = user_settings_service.get_settings().items_per_page
+        limit = max(1, min(user_limit, 200))
+
     stmt = (
         select(Entry, Feed.title)
         .join(Feed, Feed.id == Entry.feed_id)

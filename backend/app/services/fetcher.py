@@ -223,17 +223,35 @@ async def _persist_entries(feed_id: str, parsed: Any) -> int:
     if not parsed.entries:
         return 0
 
+    entries_with_guid: list[tuple[str, Any]] = []
+    guid_set: set[str] = set()
+    for item in parsed.entries:
+        guid = _extract_guid(item)
+        if not guid:
+            continue
+        if guid in guid_set:
+            continue
+        guid_set.add(guid)
+        entries_with_guid.append((guid, item))
+
+    if not entries_with_guid:
+        return 0
+
     new_items = 0
     with SessionLocal() as session:
-        for item in parsed.entries:
-            guid = _extract_guid(item)
-            if not guid:
-                continue
+        existing_rows = session.exec(
+            select(Entry.guid).where(
+                Entry.feed_id == feed_id,
+                Entry.guid.in_(guid_set),
+            )
+        ).all()
+        existing_guids = {
+            row if isinstance(row, str) else row[0]
+            for row in existing_rows
+        }
 
-            exists = session.exec(
-                select(Entry).where(Entry.feed_id == feed_id, Entry.guid == guid)
-            ).first()
-            if exists:
+        for guid, item in entries_with_guid:
+            if guid in existing_guids:
                 continue
 
             raw_summary = item.get("summary") or item.get("subtitle")

@@ -2,8 +2,10 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import api from '../api/client'
 import type { Entry, Feed, SummaryResult, TranslationResult } from '../types'
+import { useSettingsStore } from './settingsStore'
 
 export const useFeedStore = defineStore('feed', () => {
+  const settingsStore = useSettingsStore()
   const feeds = ref<Feed[]>([])
   const entries = ref<Entry[]>([])
   const activeFeedId = ref<string | null>(null)
@@ -215,7 +217,13 @@ export const useFeedStore = defineStore('feed', () => {
       }
       lastEntryFilters.value = mergedFilters
 
-      const params: Record<string, string | number | boolean> = { limit: 100 }
+      const resolveLimit = () => {
+        const value = settingsStore.settings.items_per_page
+        if (!value || Number.isNaN(value)) return 50
+        return Math.min(Math.max(value, 1), 200)
+      }
+
+      const params: Record<string, string | number | boolean> = { limit: resolveLimit() }
 
       // 优先使用 feedId，其次使用 groupName
       if (targetFeed) {

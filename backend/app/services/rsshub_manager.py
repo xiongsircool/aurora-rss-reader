@@ -63,33 +63,32 @@ class RSSHubManager:
                 session.add(existing)
                 session.commit()
                 session.refresh(existing)
-                return existing
+                mirror = existing
+            else:
+                # 如果设置为默认，清除其他默认设置
+                if is_default:
+                    for item in session.exec(select(RSSHubConfig).where(RSSHubConfig.is_default == True)).all():
+                        item.is_default = False
+                        session.add(item)
 
-            # 如果设置为默认，清除其他默认设置
-            if is_default:
-                session.exec(
-                    select(RSSHubConfig).where(RSSHubConfig.is_default == True)
-                ).all()
-                for item in session.exec(select(RSSHubConfig).where(RSSHubConfig.is_default == True)).all():
-                    item.is_default = False
-                    session.add(item)
+                # 创建新镜像
+                if priority is None:
+                    # 自动分配最低优先级
+                    max_priority = session.exec(
+                        select(RSSHubConfig).order_by(RSSHubConfig.priority.desc())
+                    ).first()
+                    priority = (max_priority.priority + 1) if max_priority else 1
 
-            # 创建新镜像
-            if priority is None:
-                # 自动分配最低优先级
-                max_priority = session.exec(select(RSSHubConfig)).order_by(RSSHubConfig.priority.desc()).first()
-                priority = (max_priority.priority + 1) if max_priority else 1
-
-            mirror = RSSHubConfig(
-                name=name,
-                base_url=base_url.rstrip('/'),
-                priority=priority,
-                is_default=is_default,
-                description=description
-            )
-            session.add(mirror)
-            session.commit()
-            session.refresh(mirror)
+                mirror = RSSHubConfig(
+                    name=name,
+                    base_url=base_url.rstrip('/'),
+                    priority=priority,
+                    is_default=is_default,
+                    description=description
+                )
+                session.add(mirror)
+                session.commit()
+                session.refresh(mirror)
 
         self._clear_cache()
         return mirror

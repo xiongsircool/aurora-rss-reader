@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useLanguage } from '../composables/useLanguage'
 import type { LocaleCode } from '../i18n'
 import { useAIStore, type AIServiceKey } from '../stores/aiStore'
-import { useSettingsStore } from '../stores/settingsStore'
+import { useSettingsStore, type AppSettings } from '../stores/settingsStore'
 
 const props = defineProps<{
   show: boolean
@@ -59,48 +59,106 @@ const selectedLanguage = computed({
 })
 
 // 显示设置 - 与settingsStore同步
+type LocalSettings = Pick<
+  AppSettings,
+  'enable_date_filter' | 'default_date_range' | 'time_field' | 'show_entry_summary' | 'fetch_interval_minutes'
+>
+
+const localSettings = ref<LocalSettings>({
+  enable_date_filter: settingsStore.settings.enable_date_filter,
+  default_date_range: settingsStore.settings.default_date_range,
+  time_field: settingsStore.settings.time_field,
+  show_entry_summary: settingsStore.settings.show_entry_summary,
+  fetch_interval_minutes: settingsStore.settings.fetch_interval_minutes,
+})
+
+const lastActiveInterval = ref(
+  localSettings.value.fetch_interval_minutes < 1440
+    ? localSettings.value.fetch_interval_minutes
+    : 15
+)
+
+function syncSettingsFromStore() {
+  const storeSettings = settingsStore.settings as AppSettings
+  localSettings.value = {
+    enable_date_filter: storeSettings.enable_date_filter,
+    default_date_range: storeSettings.default_date_range,
+    time_field: storeSettings.time_field,
+    show_entry_summary: storeSettings.show_entry_summary,
+    fetch_interval_minutes: storeSettings.fetch_interval_minutes,
+  }
+  if (storeSettings.fetch_interval_minutes < 1440) {
+    lastActiveInterval.value = storeSettings.fetch_interval_minutes
+  }
+}
+
+watch(
+  () => ({
+    enable_date_filter: settingsStore.settings.enable_date_filter,
+    default_date_range: settingsStore.settings.default_date_range,
+    time_field: settingsStore.settings.time_field,
+    show_entry_summary: settingsStore.settings.show_entry_summary,
+    fetch_interval_minutes: settingsStore.settings.fetch_interval_minutes,
+  }),
+  () => {
+    syncSettingsFromStore()
+  },
+  { immediate: true }
+)
+
 const enableDateFilter = computed({
-  get: () => settingsStore.settings.enable_date_filter,
-  set: (value) => {
-    settingsStore.updateSettings({ enable_date_filter: value })
+  get: () => localSettings.value.enable_date_filter,
+  set: (value: boolean) => {
+    localSettings.value.enable_date_filter = value
   }
 })
 
 const defaultDateRange = computed({
-  get: () => settingsStore.settings.default_date_range,
-  set: (value) => {
-    settingsStore.updateSettings({ default_date_range: value })
+  get: () => localSettings.value.default_date_range,
+  set: (value: string) => {
+    localSettings.value.default_date_range = value
   }
 })
 
 const timeField = computed({
-  get: () => settingsStore.settings.time_field,
-  set: (value) => {
-    settingsStore.updateSettings({ time_field: value })
+  get: () => localSettings.value.time_field,
+  set: (value: string) => {
+    localSettings.value.time_field = value
   }
 })
 
 const showEntrySummary = computed({
-  get: () => settingsStore.settings.show_entry_summary,
-  set: (value) => {
-    settingsStore.updateSettings({ show_entry_summary: value })
+  get: () => localSettings.value.show_entry_summary,
+  set: (value: boolean) => {
+    localSettings.value.show_entry_summary = value
   }
 })
 
-// 订阅刷新设置 - 与settingsStore同步
 const autoRefresh = computed({
-  get: () => settingsStore.settings.fetch_interval_minutes < 1440, // 1440表示禁用自动刷新
-  set: (_value) => {
-    // 这里我们可以通过setInterval来控制，但为了简单起见，我们假设总是启用
-    // 实际的实现可能需要更复杂的逻辑
+  get: () => localSettings.value.fetch_interval_minutes < 1440,
+  set: (enabled: boolean) => {
+    if (!enabled) {
+      if (localSettings.value.fetch_interval_minutes < 1440) {
+        lastActiveInterval.value = localSettings.value.fetch_interval_minutes
+      }
+      localSettings.value.fetch_interval_minutes = 1440
+      return
+    }
+
+    const fallback = lastActiveInterval.value ?? 15
+    const normalized = Math.min(Math.max(fallback, 5), 1439)
+    localSettings.value.fetch_interval_minutes = normalized
   }
 })
 
 const fetchInterval = computed({
-  get: () => settingsStore.settings.fetch_interval_minutes,
-  set: (value) => {
-    if (value >= 5 && value <= 1440) {
-      settingsStore.updateSettings({ fetch_interval_minutes: value })
+  get: () => localSettings.value.fetch_interval_minutes,
+  set: (value: number) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return
+    const normalized = Math.min(Math.max(value, 5), 1440)
+    localSettings.value.fetch_interval_minutes = normalized
+    if (normalized < 1440) {
+      lastActiveInterval.value = normalized
     }
   }
 })
@@ -145,6 +203,7 @@ watch(() => props.show, async (show) => {
       fetchRSSHubUrl()
     ])
     syncFromStore()
+    syncSettingsFromStore()
     serviceTestResult.value.summary = null
     serviceTestResult.value.translation = null
     rsshubTestResult.value = null
@@ -278,8 +337,13 @@ async function saveSettings() {
       console.error('AI配置保存失败')
     }
 
-    // 设置已经通过computed属性自动保存了，不需要额外操作
-    // 因为enableDateFilter、defaultDateRange、timeField、fetchInterval都使用了computed的setter
+    await settingsStore.updateSettings({
+      enable_date_filter: localSettings.value.enable_date_filter,
+      default_date_range: localSettings.value.default_date_range,
+      time_field: localSettings.value.time_field,
+      show_entry_summary: localSettings.value.show_entry_summary,
+      fetch_interval_minutes: localSettings.value.fetch_interval_minutes,
+    })
 
     emit('close')
   } catch (error) {
