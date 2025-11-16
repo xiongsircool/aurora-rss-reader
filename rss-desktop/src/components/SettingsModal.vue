@@ -96,14 +96,11 @@ const autoRefresh = computed({
   }
 })
 
-const fetchInterval = computed({
-  get: () => settingsStore.settings.fetch_interval_minutes,
-  set: (value) => {
-    if (value >= 5 && value <= 1440) {
-      settingsStore.updateSettings({ fetch_interval_minutes: value })
-    }
-  }
-})
+const FETCH_INTERVAL_MIN = 5
+const FETCH_INTERVAL_MAX = 1440
+
+const fetchIntervalInput = ref<number | null>(settingsStore.settings.fetch_interval_minutes)
+const fetchIntervalError = ref('')
 
 
 function syncFromStore() {
@@ -136,6 +133,18 @@ watch(() => aiStore.config, () => {
   syncFromStore()
 }, { deep: true })
 
+watch(fetchIntervalInput, (value) => {
+  if (value !== null && !Number.isNaN(value) && value >= FETCH_INTERVAL_MIN && value <= FETCH_INTERVAL_MAX) {
+    fetchIntervalError.value = ''
+  }
+})
+
+watch(() => settingsStore.settings.fetch_interval_minutes, (newValue) => {
+  if (typeof newValue === 'number') {
+    fetchIntervalInput.value = newValue
+  }
+})
+
 // 监听模态框显示状态
 watch(() => props.show, async (show) => {
   if (show) {
@@ -145,6 +154,7 @@ watch(() => props.show, async (show) => {
       fetchRSSHubUrl()
     ])
     syncFromStore()
+    fetchIntervalInput.value = settingsStore.settings.fetch_interval_minutes
     serviceTestResult.value.summary = null
     serviceTestResult.value.translation = null
     rsshubTestResult.value = null
@@ -263,6 +273,11 @@ async function saveRSSHubUrl() {
 
 async function saveSettings() {
   try {
+    const fetchIntervalValid = await commitFetchInterval()
+    if (!fetchIntervalValid) {
+      return
+    }
+
     // 先保存RSSHub URL
     if (rsshubUrl.value) {
       await saveRSSHubUrl()
@@ -285,6 +300,48 @@ async function saveSettings() {
   } catch (error) {
     console.error('保存设置失败:', error)
   }
+}
+
+function validateFetchInterval(value: number | null) {
+  if (value === null || Number.isNaN(value)) {
+    fetchIntervalError.value = t('settings.refreshIntervalErrorRequired')
+    return null
+  }
+
+  if (value < FETCH_INTERVAL_MIN || value > FETCH_INTERVAL_MAX) {
+    fetchIntervalError.value = t('settings.refreshIntervalErrorRange', {
+      min: FETCH_INTERVAL_MIN,
+      max: FETCH_INTERVAL_MAX
+    })
+    return null
+  }
+
+  fetchIntervalError.value = ''
+  return value
+}
+
+async function commitFetchInterval() {
+  const validValue = validateFetchInterval(fetchIntervalInput.value)
+  if (validValue === null) {
+    return false
+  }
+
+  if (validValue === settingsStore.settings.fetch_interval_minutes) {
+    return true
+  }
+
+  try {
+    await settingsStore.updateSettings({ fetch_interval_minutes: validValue })
+    return true
+  } catch (error) {
+    console.error('刷新间隔保存失败', error)
+    fetchIntervalError.value = t('settings.refreshIntervalErrorSubmit')
+    return false
+  }
+}
+
+async function handleFetchIntervalChange() {
+  await commitFetchInterval()
 }
 
 function handleClose() {
@@ -594,14 +651,18 @@ function handleLanguageChange(newLanguage: string) {
             <div class="form-group">
               <label>{{ t('settings.refreshInterval') }}</label>
               <input
-                v-model.number="fetchInterval"
+                v-model.number="fetchIntervalInput"
                 type="number"
                 min="5"
                 max="1440"
+                @change="handleFetchIntervalChange"
                 class="form-input"
               />
               <p class="form-hint">
                 {{ t('settings.refreshIntervalDescription') }}
+              </p>
+              <p v-if="fetchIntervalError" class="form-error">
+                {{ fetchIntervalError }}
               </p>
             </div>
           </section>
@@ -934,6 +995,12 @@ function handleLanguageChange(newLanguage: string) {
   margin-top: 6px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.form-error {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #c43838;
 }
 
 .form-hint a {
