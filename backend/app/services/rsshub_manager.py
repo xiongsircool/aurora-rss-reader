@@ -5,7 +5,8 @@ import asyncio
 from typing import List, Optional
 from sqlmodel import Session, select
 from app.db.session import SessionLocal
-from app.models.rsshub_config import RSSHubConfig, RSSHubURLMapping, DEFAULT_RSSHUB_MIRRORS
+from app.models.rsshub_config import RSSHubConfig, RSSHubURLMapping
+from app.services.rsshub_defaults import get_default_rsshub_mirrors
 
 
 class RSSHubManager:
@@ -202,7 +203,7 @@ class RSSHubManager:
         with SessionLocal() as session:
             existing_mirrors = session.exec(select(RSSHubConfig)).all()
             if len(existing_mirrors) == 0:
-                for mirror_data in DEFAULT_RSSHUB_MIRRORS:
+                for mirror_data in get_default_rsshub_mirrors():
                     mirror = RSSHubConfig(**mirror_data)
                     session.add(mirror)
                 session.commit()
