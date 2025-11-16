@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '../api/client'
+import { clampAutoTitleTranslationLimit, getDefaultAutoTitleTranslationLimit } from '../constants/translation'
 
 export interface AppSettings {
   fetch_interval_minutes: number
@@ -9,6 +10,7 @@ export interface AppSettings {
   default_date_range: string
   time_field: string
   show_entry_summary: boolean
+  max_auto_title_translations: number
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -17,7 +19,8 @@ export const useSettingsStore = defineStore('settings', () => {
     enable_date_filter: true,
     default_date_range: '30d',
     time_field: 'inserted_at',
-    show_entry_summary: true
+    show_entry_summary: true,
+    max_auto_title_translations: getDefaultAutoTitleTranslationLimit()
   })
 
   const loading = ref(false)
@@ -29,8 +32,15 @@ export const useSettingsStore = defineStore('settings', () => {
     error.value = null
 
     try {
-      const { data } = await api.get<AppSettings>('/settings')
-      settings.value = data
+      const { data } = await api.get<Partial<AppSettings>>('/settings')
+      const merged = {
+        ...settings.value,
+        ...data
+      }
+      merged.max_auto_title_translations = clampAutoTitleTranslationLimit(
+        merged.max_auto_title_translations
+      )
+      settings.value = merged
       return data
     } catch (err) {
       console.error('Failed to fetch settings:', err)
@@ -47,10 +57,17 @@ export const useSettingsStore = defineStore('settings', () => {
     error.value = null
 
     try {
-      const { data } = await api.patch('/settings', newSettings)
+      const { data } = await api.patch<Partial<AppSettings>>('/settings', newSettings)
 
       // 使用后端返回的数据更新本地状态，确保数据一致性
-      settings.value = { ...settings.value, ...data }
+      const merged = {
+        ...settings.value,
+        ...data
+      }
+      merged.max_auto_title_translations = clampAutoTitleTranslationLimit(
+        merged.max_auto_title_translations
+      )
+      settings.value = merged
 
       return data
     } catch (err) {

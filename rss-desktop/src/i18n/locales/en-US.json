@@ -239,6 +239,8 @@
     "autoTranslationHint": "Auto-translate new articles to specified language",
     "autoTitleTranslation": "Auto Title Translation",
     "autoTitleTranslationHint": "Display translated title below original title",
+    "autoTitleTranslationLimitLabel": "Auto translate top {count} entries",
+    "autoTitleTranslationLimitHint": "Larger batches will generate more AI traffic. Requests are throttled (≤{concurrency} concurrent calls) to protect the service.",
     "translationTargetLanguage": "Translation Target Language",
     "subscriptionUpdate": "Subscription Update",
     "autoRefresh": "Auto Refresh Subscriptions",

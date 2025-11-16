@@ -243,6 +243,8 @@
     "autoTranslationHint": "새 기사를 지정된 언어로 자동 번역",
     "autoTitleTranslation": "자동 제목 번역",
     "autoTitleTranslationHint": "원본 제목 아래에 번역된 제목 표시",
+    "autoTitleTranslationLimitLabel": "최근 {count}개의 제목 자동 번역",
+    "autoTitleTranslationLimitHint": "배치가 클수록 AI 호출 비용이 증가합니다. 서비스를 보호하기 위해 동시에 {concurrency}개 이하로 제한됩니다.",
     "translationTargetLanguage": "번역 대상 언어",
     "subscriptionUpdate": "구독 업데이트",
     "autoRefresh": "구독 자동 새로고침",
