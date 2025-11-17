@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime, timezone, timedelta
-from time import mktime
+from calendar import timegm
 from time import perf_counter
 from typing import Any, Tuple
 from urllib.parse import urljoin, urlparse
@@ -317,7 +317,7 @@ def _parse_datetime(item: Any) -> datetime | None:
         try:
             # 修复时区计算bug：确保正确处理时区
             if hasattr(parsed, 'tm_mon'):  # 确保是有效的time_struct
-                timestamp = mktime(parsed)
+                timestamp = timegm(parsed)
                 result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
 
                 # 验证时间合理性
@@ -335,7 +335,7 @@ def _parse_datetime(item: Any) -> datetime | None:
     for field in time_fields:
         if field in item:
             try:
-                timestamp = mktime(item[field])
+                timestamp = timegm(item[field])
                 result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
 
                 is_reasonable, corrected_time = _is_reasonable_time(result)
@@ -394,7 +394,7 @@ def _parse_datetime(item: Any) -> datetime | None:
                 if hasattr(feedparser, '_parse_date'):
                     time_struct = feedparser._parse_date(time_str)
                     if time_struct:
-                        timestamp = mktime(time_struct)
+                        timestamp = timegm(time_struct)
                         result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
 
                         is_reasonable, corrected_time = _is_reasonable_time(result)
