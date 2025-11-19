@@ -671,8 +671,8 @@ function handleLanguageChange(newLanguage: string) {
                 :disabled="!localConfig.features.auto_title_translation"
               />
               <div class="range-scale">
-                <span>{{ autoTitleTranslationLimitBounds.min }}</span>
-                <span>{{ autoTitleTranslationLimitBounds.max }}</span>
+                <span>{{ autoTitleTranslationLimitBounds.min }} (慢速省流)</span>
+                <span>{{ autoTitleTranslationLimitBounds.max }} (快速耗流)</span>
               </div>
               <p class="form-hint">
                 {{ t('settings.autoTitleTranslationLimitHint', { concurrency: titleTranslationConcurrencyHint }) }}
@@ -898,12 +898,12 @@ function handleLanguageChange(newLanguage: string) {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .settings-section {
   margin-bottom: 24px;
-  padding: 18px 20px;
+  padding: 20px 22px;
   border-radius: 14px;
   background: #f8faff;
   border: 1px solid rgba(76, 116, 255, 0.08);
@@ -915,10 +915,11 @@ function handleLanguageChange(newLanguage: string) {
 }
 
 .settings-section h3 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
+  margin: 0 0 18px 0;
+  font-size: 16.5px;
   color: var(--text-primary);
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .ai-config-grid {
@@ -989,8 +990,8 @@ function handleLanguageChange(newLanguage: string) {
   display: block;
   margin-bottom: 8px;
   font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 500;
+  color: #1a1f2e;
+  font-weight: 600;
 }
 
 .form-input,
@@ -1050,7 +1051,7 @@ function handleLanguageChange(newLanguage: string) {
 }
 
 .form-input::placeholder {
-  color: rgba(90, 98, 118, 0.62);
+  color: rgba(90, 98, 118, 0.8);
 }
 
 .form-input:focus,
@@ -1084,7 +1085,8 @@ function handleLanguageChange(newLanguage: string) {
 .form-hint {
   margin-top: 6px;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #5a6276;
+  line-height: 1.5;
 }
 
 .form-error {
@@ -1357,123 +1359,154 @@ function handleLanguageChange(newLanguage: string) {
   transform: scale(0.9);
 }
 
-/* =====================
-   Dark mode overrides
-   ===================== */
-:global(.dark) .modal-backdrop {
-  background: rgba(0, 0, 0, 0.6);
-}
-
-:global(.dark) .modal-content {
-  background: linear-gradient(180deg, #181b22 0%, #0f1115 100%);
-  color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.6),
-    0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-:global(.dark) .modal-header {
-  border-color: var(--border-color);
-}
-
-:global(.dark) .close-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-:global(.dark) .modal-body {
-  background: rgba(24, 27, 34, 0.7);
-}
-
-:global(.dark) .settings-section {
-  background: rgba(255, 255, 255, 0.035);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-}
-
-:global(.dark) .ghost-btn {
-  border-color: rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary);
-}
-:global(.dark) .ghost-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-:global(.dark) .form-input,
-:global(.dark) .form-select {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border-color: var(--border-color);
-  box-shadow: none;
-}
-:global(.dark) .form-input::placeholder {
-  color: var(--text-secondary);
-}
-
-:global(.dark) .radio-label,
-:global(.dark) .checkbox-label {
-  color: var(--text-primary);
-}
-
-:global(.dark) .test-result {
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
-}
-
-:global(.dark) .about-content {
-  border-color: var(--border-color);
-}
-
-:global(.dark) .app-version {
-  background: rgba(0, 122, 255, 0.15);
-  color: #71b3ff;
-  border-color: rgba(0, 122, 255, 0.35);
-}
-
-:global(.dark) .feature-badge {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: var(--text-secondary);
-}
-
-:global(.dark) .about-link {
-  background: var(--bg-surface);
-  border-color: var(--border-color);
-  color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-:global(.dark) .about-link:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--accent);
-}
-
-:global(.dark) .about-footer {
-  border-color: var(--border-color);
-  color: var(--text-secondary);
-}
-
-:global(.dark) .modal-footer {
-  border-color: var(--border-color);
-}
-
-:global(.dark) .btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-}
-:global(.dark) .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
 /* Modal body scrollbar styling */
 .modal-body::-webkit-scrollbar { width: 8px; height: 8px; }
 .modal-body::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.18); border-radius: 8px; }
 .modal-body:hover::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.28); }
-:global(.dark) .modal-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
-:global(.dark) .modal-body:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
 .modal-body { scrollbar-width: thin; scrollbar-color: rgba(15, 17, 21, 0.28) transparent; }
-:global(.dark) .modal-body { scrollbar-color: rgba(255, 255, 255, 0.36) transparent; }
+</style>
+
+<style>
+/* =====================
+   Dark mode overrides (Global)
+   ===================== */
+html.dark .modal-backdrop {
+  background: rgba(0, 0, 0, 0.6) !important;
+}
+
+html.dark .modal-content {
+  background: linear-gradient(180deg, #181b22 0%, #0f1115 100%) !important;
+  color: #f5f6fa !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.dark .modal-header {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+html.dark .modal-header h2 {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+html.dark .close-btn {
+  color: #9ba1b3 !important;
+}
+
+html.dark .close-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+html.dark .modal-body {
+  background: #0f1115 !important;
+  scrollbar-color: rgba(255, 255, 255, 0.36) transparent;
+}
+
+html.dark .modal-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
+html.dark .modal-body:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
+
+html.dark .settings-section {
+  background: #1a1e26 !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark .settings-section h3 {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+html.dark .ghost-btn {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #f5f6fa !important;
+}
+
+html.dark .ghost-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+html.dark .form-input,
+html.dark .form-select {
+  background: #181b22 !important;
+  color: #f5f6fa !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: none !important;
+}
+
+html.dark .form-input::placeholder {
+  color: rgba(155, 161, 179, 0.7) !important;
+}
+
+html.dark .radio-label,
+html.dark .checkbox-label {
+  color: #f5f6fa !important;
+}
+
+html.dark .form-group label {
+  color: #e8eaef !important;
+  font-weight: 600;
+}
+
+html.dark .form-hint {
+  color: #a0a6ba !important;
+}
+
+html.dark .test-result {
+  background: rgba(255, 255, 255, 0.04) !important;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35) !important;
+  color: #f5f6fa;
+}
+
+html.dark .about-content {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+html.dark .app-version {
+  background: rgba(0, 122, 255, 0.15) !important;
+  color: #71b3ff !important;
+  border-color: rgba(0, 122, 255, 0.35) !important;
+}
+
+html.dark .feature-badge {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #9ba1b3 !important;
+}
+
+html.dark .about-link {
+  background: #181b22 !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #f5f6fa !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark .about-link:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--accent) !important;
+}
+
+html.dark .about-footer {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #9ba1b3 !important;
+}
+
+html.dark .modal-footer {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+html.dark .btn-secondary {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #f5f6fa !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+}
+
+html.dark .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
 </style>

@@ -8,8 +8,10 @@ export type NavigatorConnection = {
   onchange?: ((this: NavigatorConnection, ev: Event) => unknown) | null
 }
 
-export const MIN_AUTO_TITLE_TRANSLATIONS = 3
-export const MAX_AUTO_TITLE_TRANSLATIONS = 12
+// 自动标题翻译并发设置（用于前端滑块）
+// 这里的“限制”已经语义化为“并发数”
+export const MIN_AUTO_TITLE_TRANSLATIONS = 0
+export const MAX_AUTO_TITLE_TRANSLATIONS = 30
 export const TITLE_TRANSLATION_CONCURRENCY_FALLBACK = 2
 
 function clamp(value: number, min: number, max: number) {
