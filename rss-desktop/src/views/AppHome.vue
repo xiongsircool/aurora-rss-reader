@@ -14,12 +14,7 @@ import LoadingSpinner from '../components/LoadingSpinner.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import LogoMark from '../components/LogoMark.vue'
 import type { Entry, Feed } from '../types'
-import {
-  clampAutoTitleTranslationLimit,
-  getRecommendedTitleTranslationConcurrency,
-  TITLE_TRANSLATION_CONCURRENCY_FALLBACK
-} from '../constants/translation'
-import type { NavigatorConnection } from '../constants/translation'
+import { TITLE_TRANSLATION_CONCURRENCY_FALLBACK } from '../constants/translation'
 
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
@@ -93,48 +88,17 @@ const titleTranslationLoadingMap = ref<Record<string, boolean>>({})
 const titleTranslationLanguageLabel = computed(() =>
   (aiFeatures.value?.translation_language || '').toUpperCase(),
 )
-const maxAutoTitleTranslations = computed(() =>
-  clampAutoTitleTranslationLimit(settingsStore.settings.max_auto_title_translations)
-)
-const titleTranslationConcurrency = ref(getRecommendedTitleTranslationConcurrency())
+// 标题翻译并发数：完全由用户设置控制（/settings.max_auto_title_translations）
+const titleTranslationConcurrency = computed(() => {
+  const raw = settingsStore.settings.max_auto_title_translations
+  if (typeof raw !== 'number' || Number.isNaN(raw) || !Number.isFinite(raw)) {
+    return TITLE_TRANSLATION_CONCURRENCY_FALLBACK
+  }
+  // 并发数至少为 1，避免死锁
+  return Math.max(1, raw)
+})
 const titleTranslationQueue: Array<() => void> = []
 let activeTitleTranslationTasks = 0
-let detachConnectionListener: (() => void) | null = null
-
-function bindConnectionListener() {
-  if (typeof navigator === 'undefined') return
-  const nav = navigator as Navigator & {
-    connection?: NavigatorConnection
-  }
-  const connection = nav.connection
-  if (!connection) return
-  const handler = () => {
-    titleTranslationConcurrency.value = getRecommendedTitleTranslationConcurrency()
-  }
-  if (connection.addEventListener) {
-    connection.addEventListener('change', handler)
-    detachConnectionListener = () => connection.removeEventListener?.('change', handler)
-    return
-  }
-  if ('onchange' in connection) {
-    const previous = connection.onchange
-    const wrapper = function (this: NavigatorConnection, event: Event) {
-      handler()
-      previous?.call(this, event)
-    }
-    connection.onchange = wrapper
-    detachConnectionListener = () => {
-      if (connection.onchange === wrapper) {
-        connection.onchange = previous ?? null
-      }
-    }
-  }
-}
-
-function cleanupConnectionListener() {
-  detachConnectionListener?.()
-  detachConnectionListener = null
-}
 
 function releaseTitleTranslationSlot() {
   activeTitleTranslationTasks = Math.max(0, activeTitleTranslationTasks - 1)
@@ -145,7 +109,10 @@ function releaseTitleTranslationSlot() {
 }
 
 async function acquireTitleTranslationSlot() {
-  const limit = Math.max(1, titleTranslationConcurrency.value || TITLE_TRANSLATION_CONCURRENCY_FALLBACK)
+  const limit = Math.max(
+    1,
+    titleTranslationConcurrency.value || TITLE_TRANSLATION_CONCURRENCY_FALLBACK,
+  )
   while (activeTitleTranslationTasks >= limit) {
     await new Promise<void>((resolve) => {
       titleTranslationQueue.push(resolve)
@@ -179,6 +146,9 @@ const showToast = ref(false)
 const toastMessage = ref('')
 const toastType = ref<'success' | 'error' | 'info'>('info')
 const showSettings = ref(false)
+const showWebView = ref(false)
+const webViewLoading = ref(false)
+const isElectron = computed(() => !!(window as any).electron)
 const NO_SUMMARY_TEXT = computed(() => t('ai.noSummary'))
 const FEED_ICON_COLORS = [
   '#FF8A3D',
@@ -344,6 +314,33 @@ async function ensureTitleTranslation(entry: Entry) {
     console.error('标题翻译失败:', error)
   } finally {
     delete titleTranslationLoadingMap.value[cacheKey]
+  }
+}
+
+// 批量翻译函数：用于处理大量条目的翻译
+async function batchEnsureTitleTranslations(entries: Entry[], maxConcurrency?: number) {
+  if (!aiFeatures.value?.auto_title_translation || !entries?.length) {
+    return
+  }
+
+  // 过滤需要翻译的条目
+  const entriesNeedingTranslation = entries.filter(entry => {
+    if (!entry?.id || !entry.title) return false
+    const cacheKey = getTitleTranslationCacheKey(entry.id)
+    return !store.titleTranslationCache[cacheKey] && !titleTranslationLoadingMap.value[cacheKey]
+  })
+
+  if (!entriesNeedingTranslation.length) return
+
+  // 根据设置的最大并发数限制并发
+  const concurrency = maxConcurrency || Math.max(1, titleTranslationConcurrency.value || TITLE_TRANSLATION_CONCURRENCY_FALLBACK)
+
+  // 分批处理翻译请求
+  for (let i = 0; i < entriesNeedingTranslation.length; i += concurrency) {
+    const batch = entriesNeedingTranslation.slice(i, i + concurrency)
+    await Promise.allSettled(
+      batch.map(entry => ensureTitleTranslation(entry))
+    )
   }
 }
 
@@ -610,7 +607,6 @@ function handleMouseUp() {
 }
 
 onMounted(async () => {
-  bindConnectionListener()
   refreshViewportWidth()
   const savedTheme = localStorage.getItem('theme')
   darkMode.value = savedTheme === 'dark'
@@ -660,7 +656,6 @@ onMounted(async () => {
 
 // 组件卸载时清理事件监听器
 onUnmounted(() => {
-  cleanupConnectionListener()
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('mouseup', handleMouseUp)
   window.removeEventListener('resize', handleWindowResize)
@@ -679,6 +674,8 @@ watch(
       summaryText.value = ''
       showTranslation.value = false
       translatedContent.value = { title: null, content: null }
+      showWebView.value = false
+      webViewLoading.value = false
       return
     }
     const cached = store.summaryCache[entry.id]
@@ -725,17 +722,19 @@ watch(
     entries: filteredEntries.value,
     language: aiFeatures.value?.translation_language,
     auto: aiFeatures.value?.auto_title_translation,
-    limit: maxAutoTitleTranslations.value
+    concurrency: titleTranslationConcurrency.value
   }),
-  ({ entries, auto, limit }) => {
+  ({ entries, auto, concurrency }) => {
     if (!auto) {
       titleTranslationLoadingMap.value = {}
       return
     }
-    const topEntries = (entries || []).slice(0, limit) as Entry[]
-    topEntries.forEach((entry) => {
-      ensureTitleTranslation(entry)
-    })
+    // 使用批量翻译：翻译所有可见的条目，但根据网络状况智能控制并发
+    const allEntries = (entries || []) as Entry[]
+    if (allEntries.length > 0) {
+      // 对于大量条目，使用批量翻译以提高效率，传递当前的并发设置
+      batchEnsureTitleTranslations(allEntries, concurrency)
+    }
   },
   { immediate: true },
 )
@@ -1044,8 +1043,22 @@ async function toggleStarFromList(entry: any) {
 }
 
 function openExternal(url?: string | null) {
-  if (url) {
+  if (!url) return
+  
+  // 在 Electron 环境中使用 shell.openExternal 调用系统默认浏览器
+  if (window.electron?.shell) {
+    window.electron.shell.openExternal(url)
+  } else {
+    // 在 Web 环境中回退到 window.open
     window.open(url, '_blank')
+  }
+}
+
+function toggleWebView() {
+  showWebView.value = !showWebView.value
+  // 如果打开阅读模式，关闭翻译视图避免冲突
+  if (showWebView.value) {
+    showTranslation.value = false
   }
 }
 
@@ -1695,6 +1708,9 @@ async function handleImportOpml(event: Event) {
 
         <div class="details__actions">
           <button @click="openExternal(currentSelectedEntry.url)">{{ t('feeds.openOriginal') }}</button>
+          <button @click="toggleWebView" :class="{ active: showWebView }">
+            {{ showWebView ? t('articles.showOriginal') : '阅读模式' }}
+          </button>
           <button @click="toggleStar">
             {{ currentSelectedEntry.starred ? t('articles.cancelFavorite') : t('articles.addFavorite') }}
           </button>
@@ -1726,7 +1742,25 @@ async function handleImportOpml(event: Event) {
           </button>
         </div>
 
+        <!-- 阅读模式：显示 webview 或 iframe -->
+        <div v-if="showWebView && currentSelectedEntry.url" class="webview-container">
+          <webview 
+            v-if="isElectron"
+            :src="currentSelectedEntry.url"
+            class="webview-frame"
+          ></webview>
+          <iframe
+            v-else
+            :src="currentSelectedEntry.url"
+            class="webview-frame"
+            frameborder="0"
+            sandbox="allow-scripts allow-same-origin allow-popups"
+          ></iframe>
+        </div>
+
+        <!-- RSS 内容：仅在非阅读模式时显示 -->
         <article 
+          v-if="!showWebView"
           class="details__body" 
           v-html="showTranslation && translatedContent.content ? translatedContent.content : currentSelectedEntry.content"
         ></article>

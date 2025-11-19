@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -19,6 +20,16 @@ from app.services.user_settings_service import ensure_user_settings_schema
 
 # 允许所有localhost端口访问
 import re
+
+
+def is_packaged_runtime() -> bool:
+    """
+    检测是否为打包运行环境（PyInstaller / Nuitka）。
+
+    - PyInstaller: sys.frozen = True
+    - Nuitka onefile: 环境变量 NUITKA_ONEFILE_PARENT 存在
+    """
+    return getattr(sys, "frozen", False) or bool(os.getenv("NUITKA_ONEFILE_PARENT"))
 
 def is_localhost_origin(origin: str) -> bool:
     """检查是否为localhost或127.0.0.1的任何端口"""
@@ -40,7 +51,7 @@ def build_allowed_origins() -> list[str]:
         return ["*"]
 
     allowed = set(settings.frontend_origins or [])
-    is_packaged = getattr(sys, 'frozen', False)
+    is_packaged = is_packaged_runtime()
 
     if is_packaged:
         # Electron 渲染进程从 file:// 加载时，Origin 会被标记为 "null"
@@ -101,7 +112,7 @@ def create_app() -> FastAPI:
             "timestamp": datetime.now().isoformat(),
             "environment": settings.app_env,
             "data_dir": str(APP_DATA_DIR),
-            "is_packaged": getattr(sys, 'frozen', False),
+            "is_packaged": is_packaged_runtime(),
         })
 
     app.include_router(api_router, prefix="/api")
