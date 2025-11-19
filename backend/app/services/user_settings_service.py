@@ -20,6 +20,7 @@ def ensure_user_settings_schema():
         "enable_date_filter": "ALTER TABLE user_settings ADD COLUMN enable_date_filter BOOLEAN NOT NULL DEFAULT 1",
         "default_date_range": "ALTER TABLE user_settings ADD COLUMN default_date_range TEXT NOT NULL DEFAULT '30d'",
         "time_field": "ALTER TABLE user_settings ADD COLUMN time_field TEXT NOT NULL DEFAULT 'inserted_at'",
+        "max_auto_title_translations": "ALTER TABLE user_settings ADD COLUMN max_auto_title_translations INTEGER NOT NULL DEFAULT 6",
     }
 
     with engine.connect() as connection:

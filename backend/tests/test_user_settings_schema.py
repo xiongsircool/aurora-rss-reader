@@ -54,6 +54,9 @@ def test_get_settings_backfills_missing_columns(tmp_path):
         assert settings.enable_date_filter is True
         assert settings.default_date_range == "30d"
         assert settings.time_field == "inserted_at"
+        # 新增字段应当在旧库上自动回填
+        assert isinstance(settings.max_auto_title_translations, int)
+        assert settings.max_auto_title_translations >= 0
     finally:
         service_module.engine = original_engine
         service_module.SessionLocal = original_session_local

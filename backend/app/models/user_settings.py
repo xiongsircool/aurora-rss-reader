@@ -17,6 +17,10 @@ class UserSettings(SQLModel, table=True):
     show_description: bool = Field(default=True, description="是否显示RSS描述")
     items_per_page: int = Field(default=50, description="每页显示条目数")
     show_entry_summary: bool = Field(default=True, description="时间线是否显示摘要")
+    max_auto_title_translations: int = Field(
+        default=6,
+        description="自动标题翻译并发限制（同时请求数）",
+    )
 
     # 时间过滤相关设置
     enable_date_filter: bool = Field(default=True, description="是否启用时间过滤")

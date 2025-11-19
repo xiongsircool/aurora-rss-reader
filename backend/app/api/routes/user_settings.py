@@ -20,6 +20,7 @@ class UserSettingsResponse(BaseModel):
     show_description: bool
     items_per_page: int
     show_entry_summary: bool
+    max_auto_title_translations: int
     # 时间过滤相关设置
     enable_date_filter: bool
     default_date_range: str
@@ -34,6 +35,7 @@ class UserSettingsUpdate(BaseModel):
     show_description: Optional[bool] = None
     items_per_page: Optional[int] = None
     show_entry_summary: Optional[bool] = None
+    max_auto_title_translations: Optional[int] = None
     # 时间过滤相关设置
     enable_date_filter: Optional[bool] = None
     default_date_range: Optional[str] = None
@@ -58,7 +60,8 @@ async def get_settings():
         show_entry_summary=settings.show_entry_summary,
         enable_date_filter=settings.enable_date_filter,
         default_date_range=settings.default_date_range,
-        time_field=settings.time_field
+        time_field=settings.time_field,
+        max_auto_title_translations=settings.max_auto_title_translations,
     )
 
 
@@ -79,7 +82,8 @@ async def update_settings(update_data: UserSettingsUpdate):
             show_entry_summary=settings.show_entry_summary,
             enable_date_filter=settings.enable_date_filter,
             default_date_range=settings.default_date_range,
-            time_field=settings.time_field
+            time_field=settings.time_field,
+            max_auto_title_translations=settings.max_auto_title_translations,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"更新设置失败: {str(e)}")
@@ -100,7 +104,8 @@ async def update_rsshub_url(update_data: RSSHubURLUpdate):
             show_entry_summary=settings.show_entry_summary,
             enable_date_filter=settings.enable_date_filter,
             default_date_range=settings.default_date_range,
-            time_field=settings.time_field
+            time_field=settings.time_field,
+            max_auto_title_translations=settings.max_auto_title_translations,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"更新RSSHub URL失败: {str(e)}")
