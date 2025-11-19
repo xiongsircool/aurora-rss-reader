@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { spawn, ChildProcess } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
@@ -38,7 +38,11 @@ let devtoolsOpened = false
 const BACKEND_HOST = '127.0.0.1'
 const BACKEND_PORT = 15432
 const HEALTH_CHECK_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/health`
-const HEALTH_CHECK_TIMEOUT = 30000 // 30秒超时
+// Windows 下首次启动可能需要较长时间初始化，适当放宽超时时间
+const HEALTH_CHECK_TIMEOUT =
+  process.platform === 'win32'
+    ? 3 * 60 * 1000 // Windows: 最长约 3 分钟
+    : 60 * 1000 // 其他平台: 60 秒
 const HEALTH_CHECK_INTERVAL = 500 // 每500ms检查一次
 
 function resolvePreloadPath(): string {
@@ -284,6 +288,7 @@ function createWindow() {
       preload: PRELOAD_PATH,
       nodeIntegration: false,
       contextIsolation: true,
+      webviewTag: true, // Enable <webview> tag for in-app reading mode
     },
   })
 
@@ -405,6 +410,17 @@ function loadRendererContent() {
  * 应用启动
  */
 app.whenReady().then(async () => {
+  // 注册 IPC 处理器：用于在系统默认浏览器中打开链接
+  ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+    if (url && typeof url === 'string') {
+      try {
+        await shell.openExternal(url)
+      } catch (error) {
+        console.error('Failed to open external URL:', url, error)
+      }
+    }
+  })
+
   console.log('🎯 Aurora RSS Reader 启动中...')
   console.log(`   开发模式: ${isDev}`)
   console.log(`   用户数据目录: ${app.getPath('userData')}`)
@@ -429,7 +445,11 @@ app.whenReady().then(async () => {
 
     loadRendererContent()
   } else {
-    showStartupStatus('正在启动后端服务，请稍候...')
+    const startupMessage = process.platform === 'win32'
+      ? '正在启动后端服务（Windows 首次启动可能需要 2-3 分钟进行初始化，请耐心等待）...'
+      : '正在启动后端服务，请稍候...'
+
+    showStartupStatus(startupMessage)
 
     const backendStarted = await startBackend()
 
