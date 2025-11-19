@@ -2804,6 +2804,27 @@ async function handleImportOpml(event: Event) {
   word-break: break-word;
 }
 
+/* Webview 容器样式 */
+.webview-container {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  min-height: 500px;
+}
+
+.webview-frame {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  border: none;
+  background: #fff;
+}
+
 .summary-card {
   display: flex;
   flex-direction: column;
