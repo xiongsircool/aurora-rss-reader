@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>测试导入</title>
+    <dateCreated>2025-11-19T03:00:00</dateCreated>
+  </head>
+  <body>
+    <outline text="技术新闻" xmlUrl="https://feeds.feedburner.com/techcrunch" htmlUrl="https://techcrunch.com" category="技术" />
+    <outline text="开源资讯" xmlUrl="https://opensource.com/feed" htmlUrl="https://opensource.com" category="开源" />
+    <outline text="Rust社区" xmlUrl="https://users.rust-lang.org/rss" htmlUrl="https://users.rust-lang.org" category="编程" />
+  </body>
+</opml>

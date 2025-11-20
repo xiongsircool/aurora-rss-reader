@@ -23,21 +23,23 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.2 最新版本 | Latest Version
+### 🎉 v0.1.3 最新版本 | Latest Version
 
-**重要Bug修复版本 | Critical Bug Fix Release**
+**性能与功能重大更新 | Major Performance & Feature Update**
 
-- 🐛 **修复时间过滤问题** - 解决了"最近一天"不过滤的关键问题
-- 🐛 **修复分类显示Bug** - 点击分类后订阅列表现在可以正常显示
-- ⚡ **RSS解析增强** - 解析成功率提升到83.3%+，支持更多学术期刊
-- 🌐 **RSSHub镜像支持** - 提高网络访问稳定性和可用性
-- 🔧 **依赖更新** - 新增python-dateutil库支持
+- 🦀 **Rust 后端** - 全面迁移至 Rust 后端，显著提升性能和内存效率
+- 📖 **阅读模式** - 新增沉浸式阅读模式（实验性功能，部分反爬网站可能受限）
+- ⏰ **时间过滤增强** - 新增 2 天和 3 天过滤选项，更灵活的内容管理
+- � **翻译显示优化** - 新增标题翻译显示模式设置
+- ⚡ **翻译并发控制** - 增加翻译条目并发数量限制，避免 API 速率限制
+
+---
 
 ---
 
 Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + FastAPI stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.2**
+**Current Version: v0.1.3**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -48,7 +50,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.2**
+**Current Version: v0.1.3**
 
 ### Features | 功能特色
 
@@ -189,7 +191,7 @@ chmod +x start.sh
 
 ### 系统要求
 - Node.js 18+
-- Python 3.12+
+- Rust 1.70+ (包含 Cargo)
 - pnpm 8+
 
 ### 安装运行
@@ -204,8 +206,8 @@ chmod +x start.sh
 ```
 
 启动脚本会自动：
-- 创建 Python 虚拟环境
-- 安装前后端依赖
+- 构建 Rust 后端（开发模式）
+- 安装前端依赖
 - 初始化数据库
 - 启动 Electron 应用
 
@@ -215,7 +217,7 @@ chmod +x start.sh
 - **API 服务**：http://127.0.0.1:15432
 
 ### 配置文件
-编辑 `backend/.env` 配置 AI 和 RSSHub：
+编辑 `rust-backend/.env` 配置 AI 和 RSSHub：
 
 ```env
 # RSSHub
@@ -231,7 +233,7 @@ GLM_API_KEY=your_api_key_here
 - **macOS**：`~/Library/Application Support/Aurora RSS Reader/rss.sqlite`
 - **Windows**：`%APPDATA%/Aurora RSS Reader/rss.sqlite`
 - **Linux**：`~/.config/aurora-rss-reader/rss.sqlite`
-- 可通过设置环境变量 `AURORA_DATA_DIR` 或在 `backend/.env` 中指定 `SQLITE_PATH` 来覆盖默认位置，方便在多设备或自定义路径间迁移数据。
+- 可通过设置环境变量 `AURORA_DATA_DIR` 或在 `rust-backend/.env` 中指定 `SQLITE_PATH` 来覆盖默认位置，方便在多设备或自定义路径间迁移数据。
 
 ## 构建发布
 
@@ -242,16 +244,16 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `Aurora RSS Reader-Mac-0.1.2-{x64,arm64}.dmg`
-- Windows: `Aurora RSS Reader-Setup-0.1.2.exe`
-- Linux: `aurora-rss-reader-0.1.2.AppImage`
+- macOS: `Aurora RSS Reader-Mac-0.1.3-{x64,arm64}.dmg`
+- Windows: `Aurora RSS Reader-Setup-0.1.3.exe`
+- Linux: `aurora-rss-reader-0.1.3.AppImage`
 
 ## 技术栈
 
 - **前端**：Vue 3 + Vite + Pinia + TypeScript
-- **后端**：FastAPI + SQLModel + SQLite
+- **后端**：Rust + Axum + SeaORM + SQLite
 - **桌面应用**：Electron
-- **构建工具**：PyInstaller + electron-builder
+- **构建工具**：Cargo + electron-builder
 
 ## 项目结构
 
@@ -260,16 +262,16 @@ aurora-rss-reader/
 ├── rss-desktop/          # 前端代码
 │   ├── src/             # Vue 源码
 │   └── electron/        # Electron 主进程
-├── backend/             # 后端服务
-│   ├── app/            # FastAPI 应用
-│   └── .venv/          # Python 虚拟环境
+├── rust-backend/        # Rust 后端服务
+│   ├── src/            # Rust 源码
+│   └── Cargo.toml      # Rust 依赖
 ├── images/              # 图片资源
 └── start.sh            # 启动脚本
 ```
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.2 (当前版本 | Current Version) 🎉
+### v0.1.3 (当前版本 | Current Version) 🎉
 **重要Bug修复版本 | Critical Bug Fix Release**
 
 #### 🐛 Bug修复 | Bug Fixes
@@ -307,7 +309,7 @@ aurora-rss-reader/
 
 ## 📚 文档 | Documentation
 
-- **[更新说明](UPDATE_README.md)** - v0.1.2详细更新内容
+- **[更新说明](UPDATE_README.md)** - v0.1.3详细更新内容
 - **完整项目文档** - 旧版本文档已归档至 `docs_archive/` 目录
 
 ## ❓ 常见问题
@@ -321,7 +323,7 @@ A: 使用 `Cmd + Q` 快捷键或右键点击 dock 图标选择退出。
 
 ### 配置相关
 **Q: 如何配置 AI 服务？**
-A: 编辑 `backend/.env` 文件，添加相应的 API 密钥。
+A: 编辑 `rust-backend/.env` 文件，添加相应的 API 密钥。
 
 **Q: 数据存储在哪里？**
 A: 数据默认存储在系统应用数据目录：

@@ -247,6 +247,11 @@
     "autoTitleTranslationHint": "원본 제목 아래에 번역된 제목 표시",
     "autoTitleTranslationLimitLabel": "최근 {count}개의 제목 자동 번역",
     "autoTitleTranslationLimitHint": "배치가 클수록 AI 호출 비용이 증가합니다. 서비스를 보호하기 위해 동시에 {concurrency}개 이하로 제한됩니다.",
+    "translationDisplayMode": "번역 표시 모드",
+    "translationModeReplace": "대체 모드",
+    "translationModeBilingualOriginalFirst": "이중 언어 (원본 먼저)",
+    "translationModeBilingualTranslationFirst": "이중 언어 (번역 먼저)",
+    "translationDisplayModeHint": "번역된 콘텐츠의 표시 방식을 선택합니다. 이중 언어 모드는 원본과 번역을 동시에 표시하여 학습에 적합합니다.",
     "translationTargetLanguage": "번역 대상 언어",
     "subscriptionUpdate": "구독 업데이트",
     "autoRefresh": "구독 자동 새로고침",
@@ -280,7 +285,8 @@
     "saveSettings": "설정 저장",
     "cancel": "취소",
     "appName": "Aurora Feeds",
-    "appVersion": "v{version}"
+    "appVersion": "v{version}",
+    "backendInfo": "🦀 Rust 백엔드 | 고성능 크로스플랫폼"
   },
   "groups": {
     "title": "그룹",
@@ -365,6 +371,15 @@
     "fr": "Français",
     "de": "Deutsch",
     "es": "Español"
+  },
+  "readingMode": {
+    "smartReading": "스마트 읽기 모드",
+    "closeReading": "읽기 모드 닫기",
+    "extracting": "기사 내용 추출 중...",
+    "loadFailed": "읽기 모드 로드 실패",
+    "retry": "다시 시도",
+    "openInBrowser": "브라우저에서 열기",
+    "notSupported": "이 페이지는 스마트 읽기 모드를 지원하지 않습니다. 원본 콘텐츠를 표시합니다"
   },
   "layout": {
     "themeToggleTitle": "라이트 모드로 전환",

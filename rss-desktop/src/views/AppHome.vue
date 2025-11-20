@@ -15,6 +15,7 @@ import SettingsModal from '../components/SettingsModal.vue'
 import LogoMark from '../components/LogoMark.vue'
 import type { Entry, Feed } from '../types'
 import { TITLE_TRANSLATION_CONCURRENCY_FALLBACK } from '../constants/translation'
+import { readingModeHandler, type ReadableArticle } from '../utils/readingMode'
 
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
@@ -85,9 +86,7 @@ const translatedContent = ref<{
   content: string | null
 }>({ title: null, content: null })
 const titleTranslationLoadingMap = ref<Record<string, boolean>>({})
-const titleTranslationLanguageLabel = computed(() =>
-  (aiFeatures.value?.translation_language || '').toUpperCase(),
-)
+
 // 标题翻译并发数：完全由用户设置控制（/settings.max_auto_title_translations）
 const titleTranslationConcurrency = computed(() => {
   const raw = settingsStore.settings.max_auto_title_translations
@@ -148,7 +147,39 @@ const toastType = ref<'success' | 'error' | 'info'>('info')
 const showSettings = ref(false)
 const showWebView = ref(false)
 const webViewLoading = ref(false)
+const readableArticle = ref<ReadableArticle | null>(null)
+const readingModeError = ref<string | null>(null)
 const isElectron = computed(() => !!(window as any).electron)
+
+// 翻译显示模式计算属性
+const translationDisplayMode = computed(() =>
+  settingsStore.settings.translation_display_mode || 'replace'
+)
+
+// 翻译显示模式处理
+const translationMode = computed(() => {
+  return translationDisplayMode.value || 'replace'
+})
+
+// Debug watcher for translation mode
+watch(translationMode, (newVal) => {
+  console.log('AppHome: translationMode changed to:', newVal)
+})
+
+
+
+// 判断是否为替换模式（用于标题翻译）
+function isTranslationModeReplace() {
+  return translationMode.value === 'replace'
+}
+
+// 判断是否为双语模式（用于标题翻译）
+function isTranslationModeBilingual() {
+  return translationMode.value === 'bilingual_original_first' || translationMode.value === 'bilingual_translation_first'
+}
+
+// 双语显示的内容处理
+
 const NO_SUMMARY_TEXT = computed(() => t('ai.noSummary'))
 const FEED_ICON_COLORS = [
   '#FF8A3D',
@@ -669,13 +700,25 @@ onUnmounted(() => {
 
 watch(
   () => currentSelectedEntry.value,
-  async (entry) => {
+  async (entry, oldEntry) => {
+    // 当文章切换时，清理阅读模式状态
+    if (oldEntry && entry && oldEntry.id !== entry.id) {
+      showWebView.value = false
+      webViewLoading.value = false
+      readableArticle.value = null
+      readingModeError.value = null
+      showTranslation.value = false
+      translatedContent.value = { title: null, content: null }
+    }
+
     if (!entry) {
       summaryText.value = ''
       showTranslation.value = false
       translatedContent.value = { title: null, content: null }
       showWebView.value = false
       webViewLoading.value = false
+      readableArticle.value = null
+      readingModeError.value = null
       return
     }
     const cached = store.summaryCache[entry.id]
@@ -830,6 +873,7 @@ watch(
   }
 )
 
+
 function formatDate(date?: string | null) {
   if (!date) return '未知时间'
   // 后端时间为UTC，统一转成本地再做相对时间
@@ -949,13 +993,13 @@ async function handleSummary() {
 
 async function handleTranslation() {
   if (!currentSelectedEntry.value) return
-  
+
   // If already showing translation, toggle back to original
   if (showTranslation.value) {
     showTranslation.value = false
     return
   }
-  
+
   // If translation already cached, just show it
   const cacheKey = `${currentSelectedEntry.value.id}_${translationLanguage.value}`
   if (store.translationCache[cacheKey]) {
@@ -965,9 +1009,10 @@ async function handleTranslation() {
       content: cached.content,
     }
     showTranslation.value = true
+    showNotification('翻译成功', 'success')
     return
   }
-  
+
   // Otherwise, request translation
   translationLoading.value = true
   try {
@@ -1059,6 +1104,38 @@ function toggleWebView() {
   // 如果打开阅读模式，关闭翻译视图避免冲突
   if (showWebView.value) {
     showTranslation.value = false
+    loadReadableArticle()
+  } else {
+    // 清理阅读模式状态
+    readableArticle.value = null
+    readingModeError.value = null
+    webViewLoading.value = false
+  }
+}
+
+async function loadReadableArticle() {
+  if (!currentSelectedEntry.value?.url) {
+    return
+  }
+
+  webViewLoading.value = true
+  readingModeError.value = null
+
+  try {
+    const article = await readingModeHandler.extractArticle(currentSelectedEntry.value.url)
+    readableArticle.value = article
+  } catch (error) {
+    console.error('加载阅读模式失败:', error)
+    readingModeError.value = error instanceof Error ? error.message : '加载失败'
+    readableArticle.value = null
+  } finally {
+    webViewLoading.value = false
+  }
+}
+
+function retryReadingMode() {
+  if (currentSelectedEntry.value?.url) {
+    loadReadableArticle()
   }
 }
 
@@ -1650,17 +1727,40 @@ async function handleImportOpml(event: Event) {
             :class="['entry-card', { active: isEntryActive(entry.id), unread: !entry.read }]"
           >
             <button class="entry-card__main" @click="handleEntrySelect(entry.id)">
-              <div class="entry-card__title">{{ entry.title || '未命名文章' }}</div>
-              <div
-                v-if="aiFeatures.auto_title_translation && (getTranslatedTitle(entry.id) || isTitleTranslationLoading(entry.id))"
-                class="entry-card__translated-title"
-              >
-                <span class="translation-label">{{ t('articles.translationLabel', { language: titleTranslationLanguageLabel }) }}</span>
-                <template v-if="getTranslatedTitle(entry.id)">
-                  {{ getTranslatedTitle(entry.id) }}
+              <!-- 标题显示模式处理 -->
+              <div class="entry-card__title">
+                <!-- 替换模式：显示翻译标题（如果可用） -->
+                <template v-if="isTranslationModeReplace()">
+                  <template v-if="getTranslatedTitle(entry.id)">
+                    {{ getTranslatedTitle(entry.id) }}
+                  </template>
+                  <template v-else>
+                    {{ entry.title || '未命名文章' }}
+                  </template>
                 </template>
-                <span v-else class="loading-indicator">{{ t('articles.translatingTitle') }}</span>
+
+                <!-- 双语模式：同时显示原文和翻译 -->
+                <template v-else-if="isTranslationModeBilingual()">
+                  <div class="bilingual-title-entry" :class="{ 'translation-first': translationMode === 'bilingual_translation_first' }">
+                    <div class="original-title-entry">{{ entry.title || '未命名文章' }}</div>
+                    <div v-if="aiFeatures.auto_title_translation" class="translated-title-entry">
+                      <template v-if="getTranslatedTitle(entry.id)">
+                        {{ getTranslatedTitle(entry.id) }}
+                      </template>
+                      <template v-else-if="isTitleTranslationLoading(entry.id)">
+                        <span class="loading-indicator">{{ t('articles.translatingTitle') }}</span>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- 原文模式：只显示原文 -->
+                <template v-else>
+                  {{ entry.title || '未命名文章' }}
+                </template>
               </div>
+
+              <!-- 翻译状态指示器已移除 -->
               <div class="entry-card__meta">
                 <span>{{ entry.feed_title }}</span>
                 <span>{{ t('articles.timeSeparator') }}</span>
@@ -1699,7 +1799,9 @@ async function handleImportOpml(event: Event) {
       <div v-if="currentSelectedEntry" class="details__content">
         <div class="details__header">
           <p class="muted">{{ currentSelectedEntry.feed_title }}</p>
-          <h2>{{ showTranslation && translatedContent.title ? translatedContent.title : currentSelectedEntry.title }}</h2>
+          <h2>
+            {{ showTranslation && translatedContent.title ? translatedContent.title : currentSelectedEntry.title }}
+          </h2>
           <p class="muted">
             {{ currentSelectedEntry.author || t('feeds.authorUnknown') }} {{ t('articles.timeSeparator') }}
             {{ formatDate(currentSelectedEntry.published_at) }}
@@ -1708,8 +1810,9 @@ async function handleImportOpml(event: Event) {
 
         <div class="details__actions">
           <button @click="openExternal(currentSelectedEntry.url)">{{ t('feeds.openOriginal') }}</button>
-          <button @click="toggleWebView" :class="{ active: showWebView }">
-            {{ showWebView ? t('articles.showOriginal') : '阅读模式' }}
+          <button @click="toggleWebView" :class="{ 'reading-mode-active': showWebView }">
+            <span v-if="showWebView">📖 {{ t('readingMode.closeReading') }}</span>
+            <span v-else>🔍 {{ t('readingMode.smartReading') }}</span>
           </button>
           <button @click="toggleStar">
             {{ currentSelectedEntry.starred ? t('articles.cancelFavorite') : t('articles.addFavorite') }}
@@ -1742,26 +1845,81 @@ async function handleImportOpml(event: Event) {
           </button>
         </div>
 
-        <!-- 阅读模式：显示 webview 或 iframe -->
-        <div v-if="showWebView && currentSelectedEntry.url" class="webview-container">
-          <webview 
-            v-if="isElectron"
-            :src="currentSelectedEntry.url"
-            class="webview-frame"
-          ></webview>
-          <iframe
-            v-else
-            :src="currentSelectedEntry.url"
-            class="webview-frame"
-            frameborder="0"
-            sandbox="allow-scripts allow-same-origin allow-popups"
-          ></iframe>
+        <!-- 智能阅读模式 -->
+        <div v-if="showWebView && currentSelectedEntry.url" class="webview-container reading-mode-wrapper">
+          <!-- 阅读模式指示器 -->
+          <div class="reading-mode-indicator">
+            <div class="indicator-content">
+              <span class="indicator-icon">📖</span>
+              <span class="indicator-text">{{ t('readingMode.smartReading') }}</span>
+              <button @click="toggleWebView" class="indicator-close" :title="t('readingMode.closeReading')">
+                ✕
+              </button>
+            </div>
+          </div>
+          <!-- 加载状态 -->
+          <div v-if="webViewLoading" class="reading-mode-loading">
+            <LoadingSpinner />
+            <p>{{ t('readingMode.extracting') }}</p>
+          </div>
+
+          <!-- 错误状态 -->
+          <div v-else-if="readingModeError" class="reading-mode-error">
+            <div class="error-content">
+              <h3>📖 {{ t('readingMode.loadFailed') }}</h3>
+              <p>{{ readingModeError }}</p>
+              <div class="error-actions">
+                <button @click="retryReadingMode" class="btn-retry">{{ t('readingMode.retry') }}</button>
+                <button @click="openExternal(currentSelectedEntry.url)" class="btn-external">
+                  {{ t('readingMode.openInBrowser') }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 智能阅读内容 -->
+          <div v-else-if="readableArticle" class="reading-mode-content">
+            <div class="reading-header">
+              <h1 class="reading-title">{{ readableArticle.title || currentSelectedEntry.title }}</h1>
+              <div class="reading-meta" v-if="readableArticle.byline || readableArticle.siteName">
+                <span v-if="readableArticle.byline" class="reading-byline">{{ readableArticle.byline }}</span>
+                <span v-if="readableArticle.siteName" class="reading-site">{{ readableArticle.siteName }}</span>
+                <span v-if="readableArticle.publishedTime" class="reading-time">
+                  {{ new Date(readableArticle.publishedTime).toLocaleDateString() }}
+                </span>
+              </div>
+            </div>
+
+            <div
+              class="reading-body"
+              v-html="readableArticle.content"
+            ></div>
+          </div>
+
+          <!-- 回退到原始webview -->
+          <div v-else class="reading-fallback">
+            <div class="fallback-notice">
+              <p>{{ t('readingMode.notSupported') }}</p>
+            </div>
+            <webview
+              v-if="isElectron"
+              :src="currentSelectedEntry.url"
+              class="webview-frame"
+            ></webview>
+            <iframe
+              v-else
+              :src="currentSelectedEntry.url"
+              class="webview-frame"
+              frameborder="0"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+            ></iframe>
+          </div>
         </div>
 
         <!-- RSS 内容：仅在非阅读模式时显示 -->
-        <article 
+        <article
           v-if="!showWebView"
-          class="details__body" 
+          class="details__body"
           v-html="showTranslation && translatedContent.content ? translatedContent.content : currentSelectedEntry.content"
         ></article>
       </div>
@@ -2640,6 +2798,54 @@ async function handleImportOpml(event: Event) {
   overflow-wrap: anywhere;
 }
 
+.bilingual-title-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bilingual-title-entry.translation-first {
+  flex-direction: column-reverse;
+}
+
+/* 默认样式：原文在前时 */
+.original-title-entry {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.translated-title-entry {
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.3;
+  font-style: italic;
+}
+
+/* 当译文在前时，交换样式权重 */
+.bilingual-title-entry.translation-first .translated-title-entry {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.4;
+  font-style: normal;
+}
+
+.bilingual-title-entry.translation-first .original-title-entry {
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.entry-card__translation-indicator {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
 .entry-card__meta {
   font-size: 12px;
   color: var(--text-secondary);
@@ -2666,6 +2872,7 @@ async function handleImportOpml(event: Event) {
   font-size: 14px;
   line-height: 1.4;
   display: -webkit-box;
+  line-clamp: 3;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -2825,6 +3032,452 @@ async function handleImportOpml(event: Event) {
   background: #fff;
 }
 
+/* 阅读模式包装器 */
+.reading-mode-wrapper {
+  border: 2px solid var(--accent);
+  box-shadow: 0 4px 20px rgba(76, 116, 255, 0.1);
+}
+
+/* 阅读模式指示器 */
+.reading-mode-indicator {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+  color: white;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.indicator-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 800px;
+  margin: 0 auto;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.indicator-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.indicator-text {
+  flex: 1;
+  text-align: center;
+}
+
+.indicator-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.indicator-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+/* 智能阅读模式样式 */
+.reading-mode-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  gap: 16px;
+  color: var(--text-secondary);
+}
+
+.reading-mode-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  padding: 32px;
+}
+
+.error-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.error-content h3 {
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.error-content p {
+  margin: 0 0 20px 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.error-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btn-retry,
+.btn-external {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* 阅读模式激活状态的按钮样式 */
+.reading-mode-active {
+  background: var(--accent) !important;
+  color: white !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 2px 8px rgba(76, 116, 255, 0.3);
+}
+
+.reading-mode-active:hover {
+  background: var(--accent-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 116, 255, 0.4);
+}
+
+.btn-retry {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-retry:hover {
+  background: var(--accent-hover);
+}
+
+.btn-external {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-external:hover {
+  background: var(--bg-hover);
+}
+
+.reading-mode-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.reading-header {
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 24px;
+}
+
+.reading-title {
+  margin: 0 0 16px 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.reading-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.reading-byline {
+  font-weight: 500;
+}
+
+.reading-site {
+  background: var(--bg-hover);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.reading-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reading-body {
+  line-height: 1.7;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.reading-body h1,
+.reading-body h2,
+.reading-body h3,
+.reading-body h4,
+.reading-body h5,
+.reading-body h6 {
+  margin: 24px 0 16px 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.reading-body h1 { font-size: 24px; }
+.reading-body h2 { font-size: 22px; }
+.reading-body h3 { font-size: 20px; }
+.reading-body h4 { font-size: 18px; }
+
+.reading-body p {
+  margin: 16px 0;
+}
+
+.reading-body blockquote {
+  margin: 20px 0;
+  padding: 16px 20px;
+  border-left: 4px solid var(--accent);
+  background: var(--bg-hover);
+  font-style: italic;
+}
+
+.reading-body ul,
+.reading-body ol {
+  margin: 16px 0;
+  padding-left: 24px;
+}
+
+.reading-body li {
+  margin: 8px 0;
+}
+
+.reading-body pre {
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--bg-hover);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.reading-body code {
+  background: var(--bg-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.reading-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
+.reading-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.reading-body a:hover {
+  text-decoration: underline;
+}
+
+.reading-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+.reading-body th,
+.reading-body td {
+  border: 1px solid var(--border-color);
+  padding: 12px;
+  text-align: left;
+}
+
+.reading-body th {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+.reading-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.fallback-notice {
+  padding: 16px 20px;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* 双语对照样式 */
+.bilingual-title {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.original-title,
+.translated-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  transition: all 0.2s ease;
+}
+
+.original-title:hover,
+.translated-title:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(76, 116, 255, 0.1);
+}
+
+/* 第二个标题的样式（用于区分优先级） */
+.second-title {
+  opacity: 0.85;
+  border-style: dashed;
+}
+
+.second-title:hover {
+  opacity: 1;
+  border-style: solid;
+}
+
+.title-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  display: inline-block;
+  width: fit-content;
+}
+
+.original-title .title-label {
+  background: rgba(255, 152, 0, 0.1);
+  color: #ff9800;
+}
+
+.translated-title .title-label {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+}
+
+.original-title h3,
+.translated-title h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.original-title h3 {
+  color: var(--text-primary);
+}
+
+.translated-title h3 {
+  color: var(--text-primary);
+}
+
+.bilingual-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  min-height: 0;
+}
+
+.original-content,
+.translated-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.content-header {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.content-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.original-content .content-label {
+  background: rgba(255, 152, 0, 0.1);
+  color: #ff9800;
+}
+
+.translated-content .content-label {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+}
+
+/* 响应式设计 - 在小屏幕上垂直排列 */
+@media (max-width: 1024px) {
+  .bilingual-content {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .bilingual-title {
+    gap: 12px;
+  }
+
+  .original-title h3,
+  .translated-title h3 {
+    font-size: 18px;
+  }
+}
+
+/* 暗黑模式适配 */
+html.dark .original-title .title-label {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ffb74d;
+}
+
+html.dark .translated-title .title-label {
+  background: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+}
+
+html.dark .content-header {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
 .summary-card {
   display: flex;
   flex-direction: column;
@@ -2962,16 +3615,7 @@ async function handleImportOpml(event: Event) {
   }
 }
 
-/* 翻译标题样式 */
-.entry-card__translated-title {
-  margin-top: 0.35rem;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
+/* 翻译标签样式 */
 .translation-label {
   display: inline-flex;
   align-items: center;

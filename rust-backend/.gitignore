@@ -1,0 +1,53 @@
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Distribution
+dist/
+build/
+
+# Docker
+.dockerignore
+
+# Backup files
+*.bak
+*.backup
+
+# Test artifacts
+test-data/
+test-results/
+
+# Profiling
+profiling/
+*.perf

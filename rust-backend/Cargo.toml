@@ -1,0 +1,89 @@
+[package]
+name = "rss-backend"
+version = "0.1.3"
+edition = "2021"
+authors = ["RSS Reader Team"]
+description = "A high-performance RSS reader backend in Rust"
+
+[dependencies]
+# Web framework
+axum = { version = "0.7", features = ["macros", "multipart"] }
+tokio = { version = "1.0", features = ["full"] }
+tower = { version = "0.4", features = ["util", "timeout", "load-shed"] }
+tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "debug-print"] }
+sea-orm-migration = "0.12"
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json", "stream", "cookies"] }
+
+# RSS/Atom parsing
+feed-rs = "1.4"
+
+# OPML parsing
+opml = "1.1"
+
+# HTML parsing
+scraper = "0.18"
+
+# Base64 encoding
+base64 = "0.21"
+# readability = "0.3"  # Temporarily commented, may need alternative
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Configuration
+config = "0.14"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Task scheduling
+tokio-cron-scheduler = "0.10"
+
+# AI integration
+async-openai = "0.20"
+
+# Caching
+lru = "0.12"
+dashmap = "5.5"
+
+# File system
+dirs = "5.0"
+
+# Async traits
+async-trait = "0.1"
+
+[dev-dependencies]
+tempfile = "3.8"
+testcontainers = "0.15"
+
+# Release optimizations
+[profile.release]
+lto = true           # Link-time optimization
+codegen-units = 1    # Better optimization
+panic = "abort"      # Smaller binaries
+strip = true         # Strip debug symbols
+
+[lib]
+name = "rss_backend"
+path = "src/lib.rs"
+
+# Custom binary targets
+[[bin]]
+name = "rss-backend"
+path = "src/main.rs"

@@ -48,28 +48,80 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'rss-desktop/pnpm-lock.yaml'
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          python-version: '3.12'
-          cache: 'pip'
+          toolchain: stable
+          targets: ${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-gnu' || '' }}
 
-      # pnpm is installed by pnpm/action-setup and caching is handled by setup-node
+      - name: Setup Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: rust-backend
 
-      - name: Build Backend
+      # 交叉编译支持（Linux ARM64）
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      # 构建后端
+      - name: Build Rust Backend (Unix x64)
+        if: runner.os != 'Windows' && matrix.arch == 'x64'
+        run: |
+          cd rust-backend
+          RUST_ENV=production cargo build --release
+
+      - name: Build Rust Backend (Unix ARM64)
+        if: runner.os != 'Windows' && matrix.arch == 'arm64'
+        run: |
+          cd rust-backend
+          RUST_ENV=production cargo build --release --target aarch64-unknown-linux-gnu || cargo build --release
+
+      - name: Build Rust Backend (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd rust-backend
+          $env:RUST_ENV="production"
+          cargo build --release
+
+      # 准备后端二进制文件
+      - name: Prepare Backend Binary
         shell: bash
         run: |
-          cd backend
-          python -m venv .venv
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            source .venv/Scripts/activate
+          # 创建目标目录
+          mkdir -p rss-desktop/resources/backend
+          
+          # 确定源文件路径和目标文件名
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            SRC_PATH="rust-backend/target/release/rss-backend.exe"
+            DST_PATH="rss-desktop/resources/backend/aurora-backend.exe"
+          elif [ "${{ matrix.arch }}" = "arm64" ] && [ "${{ runner.os }}" = "Linux" ]; then
+            SRC_PATH="rust-backend/target/aarch64-unknown-linux-gnu/release/rss-backend"
+            # 如果交叉编译失败回退到普通编译
+            if [ ! -f "$SRC_PATH" ]; then
+              SRC_PATH="rust-backend/target/release/rss-backend"
+            fi
+            DST_PATH="rss-desktop/resources/backend/aurora-backend"
           else
-            source .venv/bin/activate
+            SRC_PATH="rust-backend/target/release/rss-backend"
+            DST_PATH="rss-desktop/resources/backend/aurora-backend"
           fi
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
-          pyinstaller backend.spec
+          
+          # 复制并重命名
+          echo "Copying $SRC_PATH to $DST_PATH"
+          cp "$SRC_PATH" "$DST_PATH"
+          
+          # 确保可执行权限
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            chmod +x "$DST_PATH"
+          fi
+          
+          # 验证文件存在
+          ls -l "$DST_PATH"
 
+      # 安装 Linux 打包依赖
       - name: Install Linux packaging deps
         if: matrix.platform == 'linux'
         shell: bash
@@ -77,20 +129,52 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libfuse2
 
-      - name: Build Frontend
+      # 构建前端
+      - name: Build Frontend and Electron App
         run: |
           cd rss-desktop
           pnpm install --frozen-lockfile
           pnpm build
           pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish=never
 
+      # 上传构建产物
       - name: Upload Release Assets
         uses: actions/upload-artifact@v4
         with:
-          name: aurora-rss-${{ matrix.platform }}
+          name: aurora-rss-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             rss-desktop/release/*/*.dmg
             rss-desktop/release/*/*-Setup.exe
             rss-desktop/release/*/*-Portable.exe
             rss-desktop/release/*/*.AppImage
             rss-desktop/release/*/*.deb
+          retention-days: 30
+
+  # 创建 Release
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

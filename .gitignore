@@ -148,4 +148,12 @@ backend/data/development.*
 archive/
 docs_archive/
 
+# Rust
+rust-backend/target/
+rust-backend/Cargo.lock
+**/*.rs.bk
+rust-backend/.cargo/
+**/target/
+*.pdb
+
 CLAUDE.md

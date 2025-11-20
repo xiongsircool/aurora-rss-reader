@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  rss-backend:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      - APP_ENV=production
+      - API_HOST=0.0.0.0
+      - API_PORT=8787
+      - RSSHUB_BASE=https://rsshub.app
+      - FETCH_INTERVAL_MINUTES=15
+      - GLM_API_KEY=${GLM_API_KEY}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8787/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - rss-backend
+    restart: unless-stopped

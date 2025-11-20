@@ -243,6 +243,11 @@
     "autoTitleTranslationHint": "元のタイトルの下に翻訳されたタイトルを表示",
     "autoTitleTranslationLimitLabel": "最新 {count} 件のタイトルを自動翻訳",
     "autoTitleTranslationLimitHint": "件数が多いほどAPI負荷が増えます。サービスを守るため同時リクエストは {concurrency} 件以下に制御されます。",
+    "translationDisplayMode": "翻訳表示モード",
+    "translationModeReplace": "置換モード",
+    "translationModeBilingualOriginalFirst": "対訳（原文が上）",
+    "translationModeBilingualTranslationFirst": "対訳（訳文が上）",
+    "translationDisplayModeHint": "翻訳されたコンテンツの表示方法を選択します。対訳モードでは原文と訳文の両方が表示され、学習に最適です。",
     "translationTargetLanguage": "翻訳対象言語",
     "subscriptionUpdate": "購読更新",
     "autoRefresh": "購読を自動更新",
@@ -276,7 +281,8 @@
     "saveSettings": "設定を保存",
     "cancel": "キャンセル",
     "appName": "Aurora Feeds",
-    "appVersion": "v{version}"
+    "appVersion": "v{version}",
+    "backendInfo": "🦀 Rust バックエンド | 高性能クロスプラットフォーム"
   },
   "groups": {
     "title": "グループ",
@@ -357,6 +363,15 @@
     "fr": "Français",
     "de": "Deutsch",
     "es": "Español"
+  },
+  "readingMode": {
+    "smartReading": "スマートリーディングモード",
+    "closeReading": "リーディングモードを閉じる",
+    "extracting": "記事内容を抽出中...",
+    "loadFailed": "リーディングモードの読み込みに失敗しました",
+    "retry": "再試行",
+    "openInBrowser": "ブラウザで開く",
+    "notSupported": "このページはスマートリーディングモードに対応していません。元のコンテンツを表示します"
   },
   "filters": {
     "last1Day": "過去1日",

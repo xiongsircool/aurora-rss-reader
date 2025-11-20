@@ -243,6 +243,11 @@
     "autoTitleTranslationHint": "在原标题下方显示翻译后的标题（所有可见标题都会被翻译）",
     "autoTitleTranslationLimitLabel": "翻译并发限制：{count} 个请求",
     "autoTitleTranslationLimitHint": "控制同时翻译的请求数量，数值越高翻译越快但消耗越大。系统会智能限制以保护服务。",
+    "translationDisplayMode": "翻译显示模式",
+    "translationModeReplace": "替换模式",
+    "translationModeBilingualOriginalFirst": "双语对照（原文在上）",
+    "translationModeBilingualTranslationFirst": "双语对照（译文在上）",
+    "translationDisplayModeHint": "选择翻译内容的显示方式。双语对照模式会同时显示原文和译文，适合学习使用。",
     "translationTargetLanguage": "翻译目标语言",
     "subscriptionUpdate": "订阅更新",
     "autoRefresh": "自动刷新订阅",
@@ -276,7 +281,8 @@
     "saveSettings": "保存设置",
     "cancel": "取消",
     "appName": "Aurora Feeds",
-    "appVersion": "v{version}"
+    "appVersion": "v{version}",
+    "backendInfo": "🦀 Rust 后端 | 高性能跨平台"
   },
   "groups": {
     "title": "分组",
@@ -357,6 +363,15 @@
     "fr": "Français",
     "de": "Deutsch",
     "es": "Español"
+  },
+  "readingMode": {
+    "smartReading": "智能阅读模式",
+    "closeReading": "关闭阅读模式",
+    "extracting": "正在提取文章内容...",
+    "loadFailed": "阅读模式加载失败",
+    "retry": "重试",
+    "openInBrowser": "在浏览器中打开",
+    "notSupported": "此页面不支持智能阅读模式，将显示原始内容"
   },
   "filters": {
     "last1Day": "最近1天",

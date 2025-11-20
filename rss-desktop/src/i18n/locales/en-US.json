@@ -243,6 +243,11 @@
     "autoTitleTranslationHint": "Display translated title below original title (all visible titles will be translated)",
     "autoTitleTranslationLimitLabel": "Translation concurrency limit: {count} requests",
     "autoTitleTranslationLimitHint": "Control concurrent translation requests. Higher values translate faster but consume more resources. System throttles automatically to protect the service.",
+    "translationDisplayMode": "Translation Display Mode",
+    "translationModeReplace": "Replace Mode",
+    "translationModeBilingualOriginalFirst": "Bilingual (Original First)",
+    "translationModeBilingualTranslationFirst": "Bilingual (Translation First)",
+    "translationDisplayModeHint": "Choose how translated content is displayed. Bilingual mode shows both original and translated text, ideal for learning.",
     "translationTargetLanguage": "Translation Target Language",
     "subscriptionUpdate": "Subscription Update",
     "autoRefresh": "Auto Refresh Subscriptions",
@@ -276,7 +281,8 @@
     "saveSettings": "Save Settings",
     "cancel": "Cancel",
     "appName": "Aurora Feeds",
-    "appVersion": "v{version}"
+    "appVersion": "v{version}",
+    "backendInfo": "🦀 Rust Backend | High-Performance Cross-Platform"
   },
   "groups": {
     "title": "Groups",
@@ -357,6 +363,15 @@
     "fr": "Français",
     "de": "Deutsch",
     "es": "Español"
+  },
+  "readingMode": {
+    "smartReading": "Smart Reading Mode",
+    "closeReading": "Close Reading Mode",
+    "extracting": "Extracting article content...",
+    "loadFailed": "Reading mode failed to load",
+    "retry": "Retry",
+    "openInBrowser": "Open in Browser",
+    "notSupported": "This page does not support smart reading mode, displaying original content"
   },
   "filters": {
     "last1Day": "Last 1 day",

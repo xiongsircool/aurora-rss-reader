@@ -101,6 +101,9 @@ const autoTitleTranslationLimit = computed({
   }
 })
 
+// 使用本地ref存储翻译显示模式，避免每次改变都调用API
+const translationDisplayMode = ref(settingsStore.settings.translation_display_mode || 'replace')
+
 const autoTitleTranslationLimitBounds = {
   min: MIN_AUTO_TITLE_TRANSLATIONS,
   max: MAX_AUTO_TITLE_TRANSLATIONS
@@ -176,6 +179,7 @@ watch(() => props.show, async (show) => {
     ])
     syncFromStore()
     fetchIntervalInput.value = settingsStore.settings.fetch_interval_minutes
+    translationDisplayMode.value = settingsStore.settings.translation_display_mode || 'replace'
     serviceTestResult.value.summary = null
     serviceTestResult.value.translation = null
     rsshubTestResult.value = null
@@ -314,7 +318,12 @@ async function saveSettings() {
       console.error('AI配置保存失败')
     }
 
-    // 设置已经通过computed属性自动保存了，不需要额外操作
+    // 保存翻译显示模式（使用localStorage，因为后端可能不支持此字段）
+    await settingsStore.updateSettings({ 
+      translation_display_mode: translationDisplayMode.value 
+    })
+
+    // 其他设置已经通过computed属性自动保存了
     // 因为enableDateFilter、defaultDateRange、timeField、fetchInterval都使用了computed的setter
 
     emit('close')
@@ -678,6 +687,18 @@ function handleLanguageChange(newLanguage: string) {
                 {{ t('settings.autoTitleTranslationLimitHint', { concurrency: titleTranslationConcurrencyHint }) }}
               </p>
             </div>
+
+            <div class="form-group">
+              <label>{{ t('settings.translationDisplayMode') }}</label>
+              <select v-model="translationDisplayMode" class="form-select">
+                <option value="replace">{{ t('settings.translationModeReplace') }}</option>
+                <option value="bilingual_original_first">{{ t('settings.translationModeBilingualOriginalFirst') }}</option>
+                <option value="bilingual_translation_first">{{ t('settings.translationModeBilingualTranslationFirst') }}</option>
+              </select>
+              <p class="form-hint">
+                {{ t('settings.translationDisplayModeHint') }}
+              </p>
+            </div>
           </section>
 
           <section class="settings-section">
@@ -788,6 +809,7 @@ function handleLanguageChange(newLanguage: string) {
               <div class="about-header">
                 <h4 class="app-title">{{ t('settings.appName', { name: 'Aurora Feeds' }) }}</h4>
                 <span class="app-version">{{ t('settings.appVersion', { version: '0.1.2' }) }}</span>
+                <div class="backend-info">{{ t('settings.backendInfo') }}</div>
               </div>
               <p class="app-name-note">
                 {{ t('settings.appNameDescription', { name: 'Aurora Feeds' }) }}
@@ -1216,6 +1238,19 @@ function handleLanguageChange(newLanguage: string) {
   border: 1px solid rgba(0, 122, 255, 0.2);
 }
 
+.backend-info {
+  display: inline-block;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, rgba(255, 140, 0, 0.1), rgba(255, 69, 0, 0.1));
+  color: #ff6b35;
+  font-size: 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 107, 53, 0.2);
+  font-weight: 500;
+  margin-top: 6px;
+  margin-left: 8px;
+}
+
 .app-description {
   font-size: 14px;
   color: var(--text-primary);
@@ -1470,6 +1505,12 @@ html.dark .app-version {
   background: rgba(0, 122, 255, 0.15) !important;
   color: #71b3ff !important;
   border-color: rgba(0, 122, 255, 0.35) !important;
+}
+
+html.dark .backend-info {
+  background: linear-gradient(135deg, rgba(255, 140, 0, 0.15), rgba(255, 69, 0, 0.15)) !important;
+  color: #ff9b6b !important;
+  border-color: rgba(255, 107, 53, 0.35) !important;
 }
 
 html.dark .feature-badge {

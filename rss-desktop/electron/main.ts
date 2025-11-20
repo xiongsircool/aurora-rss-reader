@@ -22,6 +22,11 @@ export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
+// 在开发模式下禁用安全警告（这些警告在打包后不会出现）
+if (VITE_DEV_SERVER_URL) {
+  process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true'
+}
+
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
@@ -289,6 +294,10 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webviewTag: true, // Enable <webview> tag for in-app reading mode
+      // 在开发模式下禁用 webSecurity 以支持阅读模式跨域请求
+      // 生产环境中建议使用后端代理服务
+      webSecurity: !isDev,
+      allowRunningInsecureContent: isDev
     },
   })
 

@@ -18,8 +18,9 @@
   ],
   "extraResources": [
     {
-      "from": "../backend/dist/aurora-backend",
-      "to": "backend"
+      "from": "resources/backend",
+      "to": "backend",
+      "filter": ["**/*"]
     }
   ],
   "mac": {

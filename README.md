@@ -25,15 +25,15 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.1.2 Latest Release | 最新版本
+## 🎉 v0.1.3 Latest Release | 最新版本
 
-**Critical Bug Fix Version | 重要Bug修复版本**
+**Major Performance & Feature Update | 性能与功能重大更新**
 
-- 🐛 **Fixed Time Filtering Issue** - Resolved critical problem with "recent 1 day" filter not working
-- 🐛 **Fixed Category Display Bug** - Categories now show subscriptions correctly when clicked
-- ⚡ **Enhanced RSS Parsing** - Parser success rate improved from ~60% to 83.3%+ with academic journal support
-- 🌐 **RSSHub Mirror Support** - Custom mirror service support for better network stability
-- 🔧 **Updated Dependencies** - Added python-dateutil library support
+- 🦀 **Rust Backend** - Fully migrated to Rust backend for superior performance and memory efficiency
+- 📖 **Reading Mode** - Added immersive reading mode (experimental support for anti-crawl sites)
+- ⏰ **Enhanced Time Filtering** - Added 2-day and 3-day filter options for better content management
+- 🌐 **Translation Options** - Added title translation display mode settings
+- ⚡ **Concurrency Control** - Added concurrency limits for translation tasks to prevent API throttling
 
 ---
 
@@ -41,7 +41,7 @@
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.2**
+**Current Version: v0.1.3**
 
 ## Key Features
 
@@ -131,7 +131,7 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 
 ### System Requirements
 - Node.js 18+
-- Python 3.12+
+- Rust 1.70+ (with Cargo)
 - pnpm 8+
 
 ### Installation and Running
@@ -146,8 +146,8 @@ chmod +x start.sh
 ```
 
 The startup script will automatically:
-- Create Python virtual environment
-- Install frontend and backend dependencies
+- Build Rust backend in development mode
+- Install frontend dependencies
 - Initialize database
 - Launch Electron application
 
@@ -157,7 +157,7 @@ The startup script will automatically:
 - **API Service**: http://127.0.0.1:15432
 
 ### Configuration File
-Edit `backend/.env` to configure AI and RSSHub:
+Edit `rust-backend/.env` to configure AI and RSSHub:
 
 ```env
 # RSSHub
@@ -178,21 +178,21 @@ chmod +x build-release-app.sh
 ```
 
 Generated files:
-- macOS: `Aurora RSS Reader-Mac-0.1.2-{x64,arm64}.dmg`
-- Windows: `Aurora RSS Reader-Setup-0.1.2.exe`
-- Linux: `aurora-rss-reader-0.1.2.AppImage`
+- macOS: `Aurora RSS Reader-Mac-0.1.3-{x64,arm64}.dmg`
+- Windows: `Aurora RSS Reader-Setup-0.1.3.exe`
+- Linux: `aurora-rss-reader-0.1.3.AppImage`
 
 ## 📋 Documentation | 文档
 
-- **[Update Details](UPDATE_README.md)** - Detailed v0.1.2 update content | v0.1.2详细更新内容
+- **[Update Details](UPDATE_README.md)** - Detailed v0.1.3 update content | v0.1.3详细更新内容
 - **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
 ## Tech Stack
 
 - **Frontend**: Vue 3 + Vite + Pinia + TypeScript
-- **Backend**: FastAPI + SQLModel + SQLite
+- **Backend**: Rust + Axum + SeaORM + SQLite
 - **Desktop App**: Electron
-- **Build Tools**: PyInstaller + electron-builder
+- **Build Tools**: Cargo + electron-builder
 
 ## Project Structure
 
@@ -201,16 +201,16 @@ aurora-rss-reader/
 ├── rss-desktop/          # Frontend code
 │   ├── src/             # Vue source code
 │   └── electron/        # Electron main process
-├── backend/             # Backend service
-│   ├── app/            # FastAPI application
-│   └── .venv/          # Python virtual environment
+├── rust-backend/        # Rust backend service
+│   ├── src/            # Rust source code
+│   └── Cargo.toml      # Rust dependencies
 ├── images/              # Image resources
 └── start.sh            # Startup script
 ```
 
 ## 📋 Documentation | 文档
 
-- **[Update Details](UPDATE_README.md)** - Detailed v0.1.2 update content | v0.1.2详细更新内容
+- **[Update Details](UPDATE_README.md)** - Detailed v0.1.3 update content | v0.1.3详细更新内容
 - **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
 ## Support

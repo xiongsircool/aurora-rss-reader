@@ -2,10 +2,10 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import './style.css'
-import App from './App.vue'
+import RootApp from './App.vue'
 import i18n, { availableLocales, type LocaleCode } from './i18n'
 
-const app = createApp(App)
+const app = createApp(RootApp)
 const pinia = createPinia()
 
 function bootstrapSavedLanguage() {
