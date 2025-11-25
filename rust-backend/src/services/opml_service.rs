@@ -1,9 +1,10 @@
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set, QueryOrder,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 use tracing::{error, info, warn};
 
-use crate::models::feed::{Entity as Feed, ActiveModel as FeedActiveModel};
+use crate::models::feed::{ActiveModel as FeedActiveModel, Entity as Feed};
+use crate::services::fetcher::RSSFetcher;
 
 pub struct OPMLService {
     db: DatabaseConnection,
@@ -33,15 +34,40 @@ impl OPMLService {
     }
 
     /// Import feeds from OPML content
-    pub async fn import_opml(&self, opml_content: &str) -> Result<Vec<OPMLEntry>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn import_opml(
+        &self,
+        opml_content: &str,
+    ) -> Result<Vec<OPMLEntry>, Box<dyn std::error::Error + Send + Sync>> {
         // Parse OPML content
         let opml_document = opml::OPML::from_str(opml_content)?;
 
         let mut imported_feeds = Vec::new();
 
-        // Process each outline in the OPML
-        for outline in opml_document.body.outlines {
-            if let (Some(xml_url), Some(title)) = (outline.xml_url.as_ref(), Some(&outline.text)) {
+        // Process each outline in the OPML with nested structure support
+        // Use iterative approach to avoid recursion
+        let mut stack: Vec<(&opml::Outline, Option<String>)> = opml_document
+            .body
+            .outlines
+            .iter()
+            .map(|outline| (outline, None))
+            .collect();
+
+        while let Some((outline, parent_category)) = stack.pop() {
+            // Process current outline
+            if let Some(xml_url) = &outline.xml_url {
+                // This is a feed entry
+                let category = if outline.xml_url.is_some() && outline.html_url.is_some() {
+                    // This is likely a feed, use the parent category
+                    parent_category.clone()
+                } else {
+                    // This might be a category name, use it
+                    if !outline.text.is_empty() {
+                        Some(outline.text.clone())
+                    } else {
+                        parent_category.clone()
+                    }
+                };
+
                 // Check if feed already exists
                 let existing_feed = Feed::find()
                     .filter(crate::models::feed::Column::Url.eq(xml_url))
@@ -49,13 +75,20 @@ impl OPMLService {
                     .await?;
 
                 if existing_feed.is_none() {
+                    let title = if !outline.text.is_empty() {
+                        outline.text.clone()
+                    } else {
+                        // Fallback: extract title from URL or use a default
+                        extract_title_from_url(xml_url)
+                    };
+
                     // Create new feed from OPML entry
                     let opml_entry = OPMLEntry {
                         title: title.clone(),
                         html_url: outline.html_url.clone().unwrap_or_default(),
                         xml_url: xml_url.clone(),
                         description: outline.description.clone(),
-                        category: outline.category.clone(),
+                        category: category.clone(),
                     };
 
                     // Insert into database
@@ -63,7 +96,7 @@ impl OPMLService {
                         id: Set(uuid::Uuid::new_v4().to_string()),
                         title: Set(title.clone()),
                         url: Set(xml_url.clone()),
-                        category: Set(outline.category.clone()),
+                        category: Set(category),
                         favicon: Set(None),
                         update_interval: Set(Some(60)), // Default 60 minutes
                         last_updated: Set(None),
@@ -74,9 +107,21 @@ impl OPMLService {
                     };
 
                     match new_feed.insert(&self.db).await {
-                        Ok(_) => {
+                        Ok(inserted_feed) => {
                             info!("Successfully imported feed: {}", title);
                             imported_feeds.push(opml_entry);
+
+                            // Trigger immediate refresh in background
+                            let db_clone = self.db.clone();
+                            let feed_id = inserted_feed.id.clone();
+                            tokio::spawn(async move {
+                                if let Ok(fetcher) = RSSFetcher::new(db_clone) {
+                                    match fetcher.fetch_feed(&feed_id).await {
+                                        Ok(_) => info!("Initial refresh successful for imported feed: {}", feed_id),
+                                        Err(e) => warn!("Initial refresh failed for imported feed {}: {}", feed_id, e),
+                                    }
+                                }
+                            });
                         }
                         Err(e) => {
                             error!("Failed to import feed {}: {}", title, e);
@@ -85,6 +130,18 @@ impl OPMLService {
                 } else {
                     warn!("Feed already exists, skipping: {}", xml_url);
                 }
+            }
+
+            // Add child outlines to the stack (reverse order to maintain hierarchy)
+            let current_category = if outline.xml_url.is_none() && !outline.text.is_empty() {
+                // This outline looks like a category/group
+                Some(outline.text.clone())
+            } else {
+                parent_category
+            };
+
+            for child_outline in outline.outlines.iter().rev() {
+                stack.push((child_outline, current_category.clone()));
             }
         }
 
@@ -118,7 +175,10 @@ impl OPMLService {
     }
 
     /// Generate OPML XML content
-    fn generate_opml_xml(&self, feeds: Vec<OPMLExportFeed>) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    fn generate_opml_xml(
+        &self,
+        feeds: Vec<OPMLExportFeed>,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let mut xml = String::new();
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
         xml.push('\n');
@@ -126,7 +186,10 @@ impl OPMLService {
         xml.push('\n');
         xml.push_str("  <head>\n");
         xml.push_str("    <title>RSS Feeds Export</title>\n");
-        xml.push_str(&format!("    <dateCreated>{}</dateCreated>\n", chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S")));
+        xml.push_str(&format!(
+            "    <dateCreated>{}</dateCreated>\n",
+            chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S")
+        ));
         xml.push_str("  </head>\n");
         xml.push_str("  <body>\n");
 
@@ -151,6 +214,42 @@ impl OPMLService {
 
         Ok(xml)
     }
+}
+
+/// Extract a title from URL when no title is provided
+fn extract_title_from_url(url: &str) -> String {
+    // Try to extract a meaningful title from the URL
+    if let Some(last_part) = url.split('/').last() {
+        if let Some(name_without_ext) = last_part.split('.').next() {
+            // Convert dashes and underscores to spaces and capitalize
+            let title = name_without_ext
+                .replace(['-', '_'], " ")
+                .split_whitespace()
+                .map(|word| {
+                    let mut chars = word.chars();
+                    match chars.next() {
+                        None => String::new(),
+                        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                    }
+                })
+                .collect::<Vec<String>>()
+                .join(" ");
+
+            if !title.is_empty() && title.len() > 2 {
+                return title;
+            }
+        }
+    }
+
+    // Fallback: use domain name
+    if let Ok(parsed_url) = url::Url::parse(url) {
+        if let Some(domain) = parsed_url.domain() {
+            return domain.to_string();
+        }
+    }
+
+    // Final fallback: use a generic name
+    "Unknown RSS Feed".to_string()
 }
 
 /// Escape XML special characters

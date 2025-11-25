@@ -41,7 +41,7 @@
   "scripts": {
     "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\" --names \"UI,API\" --prefix-colors \"cyan,green\"",
     "dev:frontend": "vite --host",
-    "dev:backend": "cd ../rust-backend && RUST_ENV=development cargo run",
+    "dev:backend": "cd ../rust-backend && cargo run",
     "dev:electron": "vite --mode electron",
     "build": "vue-tsc && vite build",
     "pack": "pnpm build && electron-builder",

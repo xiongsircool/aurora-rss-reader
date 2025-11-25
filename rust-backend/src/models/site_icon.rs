@@ -1,21 +1,31 @@
 use chrono::{DateTime, Utc};
+use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SiteIcon {
+// SeaORM Entity Model
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[sea_orm(table_name = "site_icons")]
+pub struct Model {
+    #[sea_orm(primary_key)]
     pub id: String,
     pub domain: String,
     pub icon_url: Option<String>,
-    pub icon_data: Option<String>,
-    pub icon_type: Option<String>,
-    pub icon_size: Option<i32>,
+    pub icon_data: Option<String>,  // Base64 encoded icon data
+    pub icon_type: Option<String>,  // e.g., "image/png", "image/x-icon"
+    pub icon_size: Option<i32>,     // Size in bytes
     pub last_fetched: Option<DateTime<Utc>>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<DateTime<Utc>>, // Cache expiration
     pub error_count: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}
+
+// Request/Response DTOs
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SiteIconResponse {
     pub domain: String,
@@ -29,22 +39,4 @@ pub struct SiteIconResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IconCacheRequest {
     pub force_refresh: Option<bool>,
-}
-
-impl From<crate::models::site_icon_entity::Model> for SiteIcon {
-    fn from(model: crate::models::site_icon_entity::Model) -> Self {
-        Self {
-            id: model.id,
-            domain: model.domain,
-            icon_url: model.icon_url,
-            icon_data: model.icon_data,
-            icon_type: model.icon_type,
-            icon_size: model.icon_size,
-            last_fetched: model.last_fetched,
-            expires_at: model.expires_at,
-            error_count: model.error_count,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
-        }
-    }
 }

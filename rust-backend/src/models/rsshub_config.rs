@@ -1,9 +1,12 @@
 use chrono::{DateTime, Utc};
+use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
 
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
-pub struct RSSHubConfig {
+// SeaORM Entity Model
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[sea_orm(table_name = "rsshub_configs")]
+pub struct Model {
+    #[sea_orm(primary_key)]
     pub id: String,
     pub url: String,
     pub priority: i32,
@@ -15,6 +18,12 @@ pub struct RSSHubConfig {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}
+
+// Request/Response DTOs
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateRSSHubConfigRequest {
     pub url: String,
@@ -29,7 +38,6 @@ pub struct UpdateRSSHubConfigRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub struct RSSHubConfigResponse {
     pub id: String,
     pub url: String,
@@ -42,18 +50,18 @@ pub struct RSSHubConfigResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<RSSHubConfig> for RSSHubConfigResponse {
-    fn from(config: RSSHubConfig) -> Self {
+impl From<Model> for RSSHubConfigResponse {
+    fn from(model: Model) -> Self {
         Self {
-            id: config.id,
-            url: config.url,
-            priority: config.priority,
-            is_active: config.is_active,
-            last_tested: config.last_tested,
-            response_time: config.response_time,
-            error_count: config.error_count,
-            created_at: config.created_at,
-            updated_at: config.updated_at,
+            id: model.id,
+            url: model.url,
+            priority: model.priority,
+            is_active: model.is_active,
+            last_tested: model.last_tested,
+            response_time: model.response_time,
+            error_count: model.error_count,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
         }
     }
 }

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use sea_orm::entity::prelude::*;
 use sea_orm::{DeriveEntityModel, Set};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
@@ -38,16 +38,21 @@ impl ActiveModelBehavior for ActiveModel {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateFeedRequest {
-    pub title: String,
+    #[serde(default)]
+    pub title: Option<String>,
     pub url: String,
+    #[serde(default, alias = "group_name")]
     pub category: Option<String>,
     pub update_interval: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateFeedRequest {
+    #[serde(default)]
     pub title: Option<String>,
+    #[serde(default, alias = "group_name")]
     pub category: Option<String>,
+    #[serde(default)]
     pub update_interval: Option<i32>,
 }
 
@@ -69,11 +74,11 @@ pub struct FeedResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FeedListQuery {
-    pub group_name: Option<String>,  // 分组过滤
-    pub date_range: Option<String>,   // 时间范围：1d, 2d, 3d, 7d, 30d, 90d, 180d, 365d, all
-    pub time_field: Option<String>,    // 时间字段：inserted_at, published_at
-    pub limit: Option<u32>,           // 分页大小
-    pub offset: Option<u32>,          // 分页偏移
+    pub group_name: Option<String>, // 分组过滤
+    pub date_range: Option<String>, // 时间范围：1d, 2d, 3d, 7d, 30d, 90d, 180d, 365d, all
+    pub time_field: Option<String>, // 时间字段：inserted_at, published_at
+    pub limit: Option<u32>,         // 分页大小
+    pub offset: Option<u32>,        // 分页偏移
 }
 
 impl From<Model> for FeedResponse {

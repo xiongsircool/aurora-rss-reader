@@ -1,7 +1,7 @@
-use sea_orm::{Database, DatabaseConnection, DbErr, ConnectionTrait};
-use std::sync::Arc;
 use crate::config::Config;
 use crate::models::user_settings;
+use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbErr};
+use std::sync::Arc;
 
 pub mod migrations;
 
@@ -11,19 +11,22 @@ pub type DbConnection = Arc<DatabaseConnection>;
 pub async fn establish_connection(config: &Config) -> Result<DatabaseConnection, DbErr> {
     // Ensure data directory exists. The database_url uses the `sqlite:` URL scheme,
     // so we need to extract the actual filesystem path before creating directories.
+    // Use synchronous fs to ensure directory is created before database connection
     if let Some(db_path) = config
         .database_url
         .strip_prefix("sqlite://")
         .or_else(|| config.database_url.strip_prefix("sqlite:"))
     {
         if let Some(parent) = std::path::Path::new(db_path).parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
+            std::fs::create_dir_all(parent)
                 .map_err(|e| DbErr::Custom(format!("Failed to create data directory: {}", e)))?;
+            tracing::info!("Ensured data directory exists: {}", parent.display());
         }
     }
 
+    tracing::info!("Connecting to database: {}", config.database_url);
     let db = Database::connect(&config.database_url).await?;
+    tracing::info!("Database connection established");
 
     // Run migrations
     migrations::run_migrations(&db).await?;
@@ -75,13 +78,10 @@ async fn init_default_data(db: &DatabaseConnection) -> Result<(), DbErr> {
 }
 
 pub async fn health_check(db: &DatabaseConnection) -> Result<(), DbErr> {
-    use sea_orm::Statement;
     use sea_orm::DatabaseBackend;
+    use sea_orm::Statement;
 
-    let stmt = Statement::from_string(
-        DatabaseBackend::Sqlite,
-        "SELECT 1".to_string(),
-    );
+    let stmt = Statement::from_string(DatabaseBackend::Sqlite, "SELECT 1".to_string());
 
     db.query_one(stmt).await?;
     Ok(())

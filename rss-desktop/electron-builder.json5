@@ -18,9 +18,16 @@
   ],
   "extraResources": [
     {
-      "from": "resources/backend",
+      "from": "resources",
       "to": "backend",
-      "filter": ["**/*"]
+      "filter": [
+        "aurora-backend",
+        "aurora-backend.exe",
+        "rss-backend",
+        "rss-backend.exe",
+        "start-backend.sh",
+        "start-backend.bat"
+      ]
     }
   ],
   "mac": {

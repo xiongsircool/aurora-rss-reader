@@ -1,0 +1,42 @@
+# Aurora RSS Reader - Configuration File Example
+# 复制此文件为 config.toml 并根据需要修改配置
+# Copy this file to config.toml and modify as needed
+
+[server]
+# 服务器监听地址
+# Server listening address
+host = "127.0.0.1"
+port = 27495
+
+[database]
+# 数据库文件路径（相对于当前目录或绝对路径）
+# Database file path (relative to current directory or absolute path)
+# 可以通过 AURORA_DATA_DIR 环境变量覆盖数据目录
+# Can be overridden by AURORA_DATA_DIR environment variable
+path = "data/rss.db"
+
+[rsshub]
+# RSSHub 服务配置
+# RSSHub service configuration
+base_url = "https://rsshub.app"
+fetch_interval_minutes = 15
+max_articles_per_feed = 1000
+
+[ai]
+# GLM-4-Flash AI 配置
+# GLM-4-Flash AI configuration
+base_url = "https://open.bigmodel.cn"
+model = "glm-4-flash"
+
+# API Key 配置方式（优先级从高到低）：
+# API Key configuration (priority from high to low):
+# 1. 环境变量 AURORA_GLM_API_KEY
+# 2. 此配置文件中的 api_key
+# 请将您的 API Key 填写在下方（或使用环境变量）
+# Please fill in your API Key below (or use environment variable)
+api_key = "your_api_key_here"
+
+[app]
+# 应用默认语言
+# Application default language
+default_language = "zh-CN"

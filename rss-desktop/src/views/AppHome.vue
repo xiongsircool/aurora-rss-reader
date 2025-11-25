@@ -20,7 +20,7 @@ import { readingModeHandler, type ReadableArticle } from '../utils/readingMode'
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:15432/api'
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:27495/api'
 
 function iconSrcFor(url?: string | null) {
   if (!url) return undefined
@@ -176,6 +176,16 @@ function isTranslationModeReplace() {
 // 判断是否为双语模式（用于标题翻译）
 function isTranslationModeBilingual() {
   return translationMode.value === 'bilingual_original_first' || translationMode.value === 'bilingual_translation_first'
+}
+
+// 获取刷新按钮文本
+function getRefreshButtonText() {
+  if (showFavoritesOnly.value) {
+    return store.refreshingGroup ? '刷新中...' : t('navigation.refreshFavorites')
+  }
+
+  // 统一显示"刷新"，loading时显示"刷新中..."
+  return store.refreshingGroup ? '刷新中...' : '刷新'
 }
 
 // 双语显示的内容处理
@@ -937,8 +947,8 @@ function startBackgroundSync() {
     window.clearInterval(backgroundSyncTimer.value)
     backgroundSyncTimer.value = null
   }
-  // 页面可见时每3s同步一次，不可见时每6s同步（轻量，只刷新左侧计数）
-  const intervalMs = document.hidden ? 6000 : 3000
+  // 页面可见时每30s同步一次，不可见时每60s同步（轻量，只刷新左侧计数）
+  const intervalMs = document.hidden ? 60000 : 30000
   backgroundSyncTimer.value = window.setInterval(() => {
     if (showFavoritesOnly.value) {
       // 收藏视图：只需刷新收藏统计与列表（轻量）
@@ -1589,10 +1599,12 @@ async function handleImportOpml(event: Event) {
         <div class="timeline__actions">
           <button
             class="timeline-action-btn"
+            :class="{ loading: store.refreshingGroup || timelineLoading }"
+            :disabled="store.refreshingGroup || timelineLoading"
             @click="showFavoritesOnly ? loadFavoritesData({ includeEntries: true }) : store.refreshActiveFeed()"
           >
             <span class="timeline-action-btn__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
+              <svg v-if="!store.refreshingGroup && !timelineLoading" viewBox="0 0 24 24" focusable="false">
                 <path
                   d="M4 4v6h6"
                   stroke="currentColor"
@@ -1626,8 +1638,9 @@ async function handleImportOpml(event: Event) {
                   fill="none"
                 />
               </svg>
+              <div v-else class="btn-loading-spinner"></div>
             </span>
-            <span>{{ showFavoritesOnly ? t('navigation.refreshFavorites') : t('navigation.refreshSubscription') }}</span>
+            <span>{{ getRefreshButtonText() }}</span>
           </button>
           <button
             v-if="showFavoritesOnly"
@@ -2574,6 +2587,26 @@ async function handleImportOpml(event: Event) {
 
 .timeline-action-btn--ghost:active {
   box-shadow: 0 4px 12px rgba(15, 17, 21, 0.12);
+}
+
+.timeline-action-btn.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.timeline-action-btn.loading:hover {
+  transform: none;
+  box-shadow: 0 6px 16px rgba(255, 122, 24, 0.3);
+}
+
+.btn-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 .timeline__controls {

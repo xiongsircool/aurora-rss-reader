@@ -4,13 +4,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use sea_orm::DatabaseConnection;
 use crate::services::fetcher::RSSFetcher;
 use crate::services::icon_service::IconService;
-use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+use sea_orm::DatabaseConnection;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduledTask {
@@ -90,14 +90,18 @@ impl TaskScheduler {
     }
 
     /// 初始化默认任务
-    async fn initialize_default_tasks(&self, scheduler: &JobScheduler) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // RSS 源刷新任务 - 每15分钟执行一次
+    async fn initialize_default_tasks(
+        &self,
+        scheduler: &JobScheduler,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // RSS 源刷新任务 - 每分钟检查一次，但根据设置决定是否执行
         self.add_task(
             "RSS Feed Refresh",
             TaskType::FeedRefresh,
-            "0 */15 * * * *", // 每15分钟的0秒执行
+            "0 * * * * *", // 每分钟执行一次检查
             scheduler,
-        ).await?;
+        )
+        .await?;
 
         // 图标缓存清理任务 - 每天凌晨2点执行
         self.add_task(
@@ -105,7 +109,8 @@ impl TaskScheduler {
             TaskType::IconCleanup,
             "0 0 2 * * *", // 每天凌晨2点0分0秒
             scheduler,
-        ).await?;
+        )
+        .await?;
 
         // 健康检查任务 - 每5分钟执行一次
         self.add_task(
@@ -113,7 +118,8 @@ impl TaskScheduler {
             TaskType::HealthCheck,
             "0 */5 * * * *", // 每5分钟的0秒执行
             scheduler,
-        ).await?;
+        )
+        .await?;
 
         Ok(())
     }
@@ -139,12 +145,38 @@ impl TaskScheduler {
             let tasks = tasks.clone();
             let task_id = task_id_for_closure.clone();
             let task_name = task_name.clone();
+            let task_type = task_type_for_closure;
 
             Box::pin(async move {
                 let start_time = Utc::now();
+
+                // 检查是否需要执行任务
+                if let TaskType::FeedRefresh = task_type {
+                    let settings_service = crate::services::user_settings_service::Service::new(db.clone());
+                    if let Ok(settings) = settings_service.get_settings().await {
+                        // 1. 检查自动刷新开关
+                        if !settings.auto_refresh {
+                            // 自动刷新已关闭，跳过
+                            return;
+                        }
+
+                        // 2. 检查刷新间隔
+                        let tasks_guard = tasks.read().await;
+                        if let Some(task) = tasks_guard.get(&task_id) {
+                            if let Some(last_run) = task.last_run {
+                                let elapsed = start_time.signed_duration_since(last_run);
+                                if elapsed.num_minutes() < settings.fetch_interval_minutes as i64 {
+                                    // 还没到刷新时间，跳过
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 debug!("Executing task: {}", task_name);
 
-                let result = match task_type_for_closure {
+                let result = match task_type {
                     TaskType::FeedRefresh => execute_feed_refresh_task(db.clone()).await,
                     TaskType::IconCleanup => execute_icon_cleanup_task(db.clone()).await,
                     TaskType::HealthCheck => execute_health_check_task(db.clone()).await,
@@ -165,10 +197,12 @@ impl TaskScheduler {
                     }
                 }
 
-                info!("Task {} completed in {}ms with success: {}",
-                      task_name,
-                      result.duration_ms.unwrap_or(0),
-                      result.success);
+                info!(
+                    "Task {} completed in {}ms with success: {}",
+                    task_name,
+                    result.duration_ms.unwrap_or(0),
+                    result.success
+                );
             })
         })?;
 
@@ -205,17 +239,29 @@ impl TaskScheduler {
     }
 
     /// 获取任务执行历史
-    pub async fn get_task_history(&self, _task_id: &str, _limit: Option<usize>) -> Vec<TaskExecutionResult> {
+    pub async fn get_task_history(
+        &self,
+        _task_id: &str,
+        _limit: Option<usize>,
+    ) -> Vec<TaskExecutionResult> {
         // TODO: 实现任务历史记录功能
         vec![]
     }
 
     /// 启用/禁用任务
-    pub async fn toggle_task(&self, task_id: &str, enabled: bool) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn toggle_task(
+        &self,
+        task_id: &str,
+        enabled: bool,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut tasks_guard = self.tasks.write().await;
         if let Some(task) = tasks_guard.get_mut(task_id) {
             task.enabled = enabled;
-            info!("Task '{}' {}", task.name, if enabled { "enabled" } else { "disabled" });
+            info!(
+                "Task '{}' {}",
+                task.name,
+                if enabled { "enabled" } else { "disabled" }
+            );
             Ok(())
         } else {
             Err(format!("Task with ID {} not found", task_id).into())
@@ -223,7 +269,10 @@ impl TaskScheduler {
     }
 
     /// 手动执行任务
-    pub async fn execute_task_manually(&self, task_id: &str) -> Result<TaskExecutionResult, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn execute_task_manually(
+        &self,
+        task_id: &str,
+    ) -> Result<TaskExecutionResult, Box<dyn std::error::Error + Send + Sync>> {
         let tasks_guard = self.tasks.read().await;
         if let Some(task) = tasks_guard.get(task_id) {
             let start_time = Utc::now();
@@ -269,7 +318,21 @@ async fn execute_feed_refresh_task(db: DatabaseConnection) -> TaskExecutionResul
         .await
     {
         Ok(feeds) => {
-            let fetcher = RSSFetcher::new(db.clone());
+            let fetcher = match RSSFetcher::new(db.clone()) {
+                Ok(fetcher) => fetcher,
+                Err(e) => {
+                    tracing::error!("Failed to create RSS fetcher: {}", e);
+                    return TaskExecutionResult {
+                        task_id: "feed_refresh".to_string(),
+                        task_name: "RSS Feed Refresh".to_string(),
+                        started_at: chrono::Utc::now(),
+                        completed_at: Some(chrono::Utc::now()),
+                        success: false,
+                        message: format!("Failed to create RSS fetcher: {}", e),
+                        duration_ms: Some(0),
+                    };
+                }
+            };
             let mut success_count = 0;
             let mut error_count = 0;
             let feeds_count = feeds.len();
@@ -293,7 +356,10 @@ async fn execute_feed_refresh_task(db: DatabaseConnection) -> TaskExecutionResul
                 started_at: start_time,
                 completed_at: Some(completed_at),
                 success: error_count == 0,
-                message: format!("Refreshed {} feeds, {} successful, {} failed", feeds_count, success_count, error_count),
+                message: format!(
+                    "Refreshed {} feeds, {} successful, {} failed",
+                    feeds_count, success_count, error_count
+                ),
                 duration_ms: Some(duration.num_milliseconds() as u64),
             }
         }
@@ -368,16 +434,18 @@ async fn execute_health_check_task(db: DatabaseConnection) -> TaskExecutionResul
         started_at: start_time,
         completed_at: Some(completed_at),
         success: db_healthy,
-        message: format!("Database: {}, Memory: {} MB",
-                       if db_healthy { "OK" } else { "ERROR" },
-                       memory_usage),
+        message: format!(
+            "Database: {}, Memory: {} MB",
+            if db_healthy { "OK" } else { "ERROR" },
+            memory_usage
+        ),
         duration_ms: Some(duration.num_milliseconds() as u64),
     }
 }
 
 fn get_memory_usage() -> u64 {
     // 简单的内存使用估算（实际应用中可以使用更精确的方法）
-    
+
     // 这里只是示例，实际应该使用系统调用来获取真实的内存使用情况
     0 // 占位符
 }

@@ -32,6 +32,11 @@ info() {
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/rust-backend"
 FRONTEND_DIR="$PROJECT_ROOT/rss-desktop"
+BACKEND_BINARY_NAME="aurora-backend"
+BACKEND_BINARY="$BACKEND_BINARY_NAME"
+if [ "$(uname)" = "Windows" ]; then
+    BACKEND_BINARY="$BACKEND_BINARY_NAME.exe"
+fi
 
 # 显示构建信息
 show_build_info() {
@@ -95,11 +100,8 @@ clean_build() {
     rm -rf "$FRONTEND_DIR/dist-electron"
     rm -rf "$FRONTEND_DIR/release"
 
-    # 清理 Rust 后端构建产物（保留 release 二进制文件以节省时间）
-    if [ -f "$BACKEND_DIR/target/release/rss-backend" ]; then
-        warn "保留现有 Rust 二进制文件以节省构建时间"
-        warn "如需完全重新构建，请删除 $BACKEND_DIR/target/release/"
-    fi
+    # 清理 Rust 后端构建产物（强制重新构建，避免旧二进制被误用）
+    rm -rf "$BACKEND_DIR/target/release"
 
     log "✅ 清理完成"
 }
@@ -110,21 +112,8 @@ build_backend() {
 
     cd "$BACKEND_DIR"
 
-    # 检查是否已存在二进制文件
-    if [ -f "target/release/rss-backend" ]; then
-        warn "发现现有的 Rust 后端二进制文件"
-        read -p "是否重新构建？(y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            log "📦 重新编译 Rust 后端（生产模式）..."
-            RUST_ENV=production cargo build --release
-        else
-            log "⚡ 使用现有二进制文件"
-        fi
-    else
-        log "📦 编译 Rust 后端（生产模式）..."
-        RUST_ENV=production cargo build --release
-    fi
+    log "📦 编译 Rust 后端（生产模式）..."
+    RUST_ENV=production cargo build --release
 
     if [ ! -f "target/release/rss-backend" ]; then
         error "Rust 后端构建失败"
@@ -166,20 +155,25 @@ copy_backend_to_frontend() {
     mkdir -p "$FRONTEND_DIR/resources"
 
     # 确定二进制文件名
-    local binary_name="rss-backend"
+    local actual_binary="rss-backend"
+    local target_binary="$BACKEND_BINARY"
     if [ "$(uname)" = "Windows" ]; then
-        binary_name="rss-backend.exe"
+        actual_binary="rss-backend.exe"
     fi
 
-    local src_path="$BACKEND_DIR/target/release/$binary_name"
-    local dst_path="$FRONTEND_DIR/resources/$binary_name"
+    local src_path="$BACKEND_DIR/target/release/$actual_binary"
+    local dst_path="$FRONTEND_DIR/resources/$target_binary"
+    local dst_path_compat="$FRONTEND_DIR/resources/$actual_binary" # 兼容旧命名
 
     if [ ! -f "$src_path" ]; then
         error "后端二进制文件未找到: $src_path"
     fi
 
     cp "$src_path" "$dst_path"
+    # 同时也写一份旧名字，避免配置遗漏
+    cp "$src_path" "$dst_path_compat"
     chmod +x "$dst_path" 2>/dev/null || true
+    chmod +x "$dst_path_compat" 2>/dev/null || true
 
     info "✅ 后端二进制文件已复制: $dst_path"
 }
@@ -190,9 +184,11 @@ create_backend_launcher() {
 
     mkdir -p "$FRONTEND_DIR/resources"
 
+    local backend_binary="$BACKEND_BINARY"
+
     if [ "$(uname)" = "Windows" ]; then
         # Windows 启动脚本
-        cat > "$FRONTEND_DIR/resources/start-backend.bat" << 'EOF'
+        cat > "$FRONTEND_DIR/resources/start-backend.bat" << EOF
 @echo off
 cd /d "%~dp0"
 
@@ -200,11 +196,11 @@ REM 设置生产模式环境变量
 set RUST_ENV=production
 
 REM 启动后端服务
-start /B rss-backend.exe
+start /B ${backend_binary}
 EOF
     else
         # Unix 启动脚本
-        cat > "$FRONTEND_DIR/resources/start-backend.sh" << 'EOF'
+        cat > "$FRONTEND_DIR/resources/start-backend.sh" << EOF
 #!/bin/bash
 cd "$(dirname "$0")"
 
@@ -212,7 +208,7 @@ cd "$(dirname "$0")"
 export RUST_ENV=production
 
 # 启动后端服务
-./rss-backend
+./${backend_binary}
 EOF
         chmod +x "$FRONTEND_DIR/resources/start-backend.sh"
     fi
@@ -241,13 +237,21 @@ package_app() {
 run_basic_tests() {
     log "🧪 运行基本测试..."
 
-    # 测试后端二进制文件
-    local binary_path="$FRONTEND_DIR/resources/rss-backend"
-    if [ "$(uname)" = "Windows" ]; then
-        binary_path="$FRONTEND_DIR/resources/rss-backend.exe"
-    fi
+    # 测试后端二进制文件（兼容不同命名）
+    local binary_candidates=(
+        "$FRONTEND_DIR/resources/$BACKEND_BINARY"
+        "$FRONTEND_DIR/resources/rss-backend"
+        "$FRONTEND_DIR/resources/aurora-backend"
+    )
+    local binary_path=""
+    for candidate in "${binary_candidates[@]}"; do
+        if [ -f "$candidate" ]; then
+            binary_path="$candidate"
+            break
+        fi
+    done
 
-    if [ -f "$binary_path" ]; then
+    if [ -n "$binary_path" ]; then
         log "✅ 后端二进制文件存在: $binary_path"
 
         # 尝试显示版本信息（如果支持）

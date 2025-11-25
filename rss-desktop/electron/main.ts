@@ -3,6 +3,7 @@ import { spawn, ChildProcess } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -32,22 +33,21 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let win: BrowserWindow | null
 let backendProcess: ChildProcess | null = null
 let backendReady = false
+let backendExitReason = ''
+let logFilePath = path.join(os.tmpdir(), 'aurora-app.log') // 初始化为临时目录，待 app ready 后切换到用户数据目录
 
 const PRELOAD_PATH = resolvePreloadPath()
-const isDev = VITE_DEV_SERVER_URL !== undefined
 const projectRoot = path.join(process.env.APP_ROOT, '..')
-const backendDir = path.join(projectRoot, 'backend')
+const backendDir = path.join(projectRoot, 'rust-backend')
 let devtoolsOpened = false
 
 // 后端配置
 const BACKEND_HOST = '127.0.0.1'
-const BACKEND_PORT = 15432
-const HEALTH_CHECK_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/health`
-// Windows 下首次启动可能需要较长时间初始化，适当放宽超时时间
-const HEALTH_CHECK_TIMEOUT =
-  process.platform === 'win32'
-    ? 3 * 60 * 1000 // Windows: 最长约 3 分钟
-    : 60 * 1000 // 其他平台: 60 秒
+const BACKEND_PORT = 27495
+// 后端健康检查实际暴露在 /api/health，直接使用该路径避免 404
+const HEALTH_CHECK_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`
+// 统一延长到 5 分钟，便于慢盘/首次安装完成数据库初始化
+const HEALTH_CHECK_TIMEOUT = 5 * 60 * 1000
 const HEALTH_CHECK_INTERVAL = 500 // 每500ms检查一次
 
 function resolvePreloadPath(): string {
@@ -65,15 +65,40 @@ function resolvePreloadPath(): string {
   return fallback
 }
 
+function logLine(message: string) {
+  const line = `[${new Date().toISOString()}] ${message}`
+  console.log(line)
+  if (!logFilePath) return
+  try {
+    fs.appendFileSync(logFilePath, line + '\n')
+  } catch (err) {
+    // 如果写日志失败，至少不影响主流程
+  }
+}
+
+function updateLogPathToUserData() {
+  try {
+    const logsDir = path.join(app.getPath('userData'), 'logs')
+    fs.mkdirSync(logsDir, { recursive: true })
+    logFilePath = path.join(logsDir, 'aurora-app.log')
+    logLine(`📄 日志文件: ${logFilePath}`)
+  } catch (err) {
+    console.error('⚠️ 无法创建日志目录，继续使用临时目录', err)
+  }
+}
+
 /**
  * 健康检查：等待后端服务就绪
  */
 async function waitForBackendReady(): Promise<boolean> {
   const startTime = Date.now()
 
-  console.log(`⏳ 等待后端服务就绪... (${HEALTH_CHECK_URL})`)
+  logLine(`⏳ 等待后端服务就绪... (${HEALTH_CHECK_URL})`)
 
   while (Date.now() - startTime < HEALTH_CHECK_TIMEOUT) {
+    // 如果我们在开发模式下且后端由外部管理，跳过进程检查
+    const isExternalBackend = VITE_DEV_SERVER_URL && backendProcess === null
+
     try {
       const response = await fetch(HEALTH_CHECK_URL, {
         method: 'GET',
@@ -82,19 +107,27 @@ async function waitForBackendReady(): Promise<boolean> {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('✅ 后端服务已就绪:', data)
+        logLine(`✅ 后端服务已就绪: ${JSON.stringify(data)}`)
         backendReady = true
         return true
+      } else {
+        logLine(`⚠️ 健康检查返回非 2xx: ${response.status}`)
       }
     } catch (error) {
-      // 忽略连接错误，继续重试
+      logLine(`⚠️ 健康检查请求异常: ${String(error)}`)
+    }
+
+    // 如果不是外部管理的后端且进程已退出，则不再等待
+    if (!isExternalBackend && backendProcess === null) {
+      logLine('❌ 后端进程已退出，停止等待')
+      return false
     }
 
     // 等待一段时间后重试
     await new Promise(resolve => setTimeout(resolve, HEALTH_CHECK_INTERVAL))
   }
 
-  console.error('❌ 后端服务启动超时')
+  logLine('❌ 后端服务启动超时')
   return false
 }
 
@@ -102,68 +135,64 @@ async function waitForBackendReady(): Promise<boolean> {
  * 获取后端可执行文件路径
  */
 function getBackendExecutable(): { exec: string; args: string[]; cwd: string } {
-  if (isDev) {
-    // 开发环境：使用Python虚拟环境
-    const venvPath = process.platform === 'win32'
-      ? path.join(backendDir, '.venv', 'Scripts', 'python.exe')
-      : path.join(backendDir, '.venv', 'bin', 'python3')
-
-    const pythonExec = fs.existsSync(venvPath)
-      ? venvPath
-      : (process.platform === 'win32' ? 'python' : 'python3')
-
-    console.log('🔧 开发环境，使用Python:', pythonExec)
-
+  // 优先尝试运行中的 Rust 后端服务（如果由 start.sh 启动）
+  if (VITE_DEV_SERVER_URL) {
+    logLine('🔧 检测到开发服务器，假设后端已由 start.sh 启动')
     return {
-      exec: pythonExec,
-      args: ['-m', 'scripts.serve'],
+      exec: 'echo',
+      args: ['Backend already running'],
       cwd: backendDir
     }
-  } else {
-    // 生产环境：使用打包好的后端可执行文件
-    // 尝试多个可能的路径
-    const possiblePaths = [
-      // 方式1: 在 app.asar 同级的 resources 目录
-      path.join(process.resourcesPath, 'backend', 'aurora-backend'),
-      // 方式2: 在 APP_ROOT 的 backend 目录
-      path.join(process.env.APP_ROOT || '', 'backend', 'aurora-backend'),
-      // 方式3: 在应用目录
-      path.join(path.dirname(app.getPath('exe')), 'backend', 'aurora-backend'),
-    ]
+  }
 
-    // Windows 添加 .exe 后缀
-    if (process.platform === 'win32') {
-      possiblePaths.forEach((p, i) => {
-        possiblePaths[i] = p + '.exe'
-      })
-    }
+  // 生产环境：使用打包好的后端可执行文件
+  // 尝试多个可能的路径
+  const possiblePaths = [
+    // 方式1: 在 app.asar 同级的 resources 目录
+    path.join(process.resourcesPath, 'resources', 'aurora-backend'),
+    path.join(process.resourcesPath, 'backend', 'aurora-backend'),
+    path.join(process.resourcesPath, 'resources', 'rss-backend'),
+    path.join(process.resourcesPath, 'backend', 'rss-backend'),
+    // 方式2: 在 APP_ROOT 的 rust-backend 目录
+    path.join(process.env.APP_ROOT || '', 'rust-backend', 'target', 'release', 'aurora-backend'),
+    path.join(process.env.APP_ROOT || '', 'rust-backend', 'target', 'release', 'rss-backend'),
+    // 方式3: 在应用目录
+    path.join(path.dirname(app.getPath('exe')), 'rust-backend', 'target', 'release', 'aurora-backend'),
+    path.join(path.dirname(app.getPath('exe')), 'rust-backend', 'target', 'release', 'rss-backend'),
+  ]
 
-    console.log('🔍 搜索后端可执行文件...')
-    for (const backendPath of possiblePaths) {
-      console.log(`   检查: ${backendPath}`)
-      if (fs.existsSync(backendPath)) {
-        console.log(`✅ 找到后端: ${backendPath}`)
+  // Windows 添加 .exe 后缀
+  if (process.platform === 'win32') {
+    possiblePaths.forEach((p, i) => {
+      possiblePaths[i] = p + '.exe'
+    })
+  }
 
-        // 确保文件有执行权限 (Unix系统)
-        if (process.platform !== 'win32') {
-          try {
-            fs.chmodSync(backendPath, 0o755)
-          } catch (err) {
-            console.warn('⚠️  无法设置执行权限:', err)
-          }
-        }
+  logLine('🔍 搜索后端可执行文件...')
+  for (const backendPath of possiblePaths) {
+    logLine(`   检查: ${backendPath}`)
+    if (fs.existsSync(backendPath)) {
+      logLine(`✅ 找到后端: ${backendPath}`)
 
-        return {
-          exec: backendPath,
-          args: [],
-          cwd: path.dirname(backendPath)
+      // 确保文件有执行权限 (Unix系统)
+      if (process.platform !== 'win32') {
+        try {
+          fs.chmodSync(backendPath, 0o755)
+        } catch (err) {
+          logLine(`⚠️  无法设置执行权限: ${String(err)}`)
         }
       }
-    }
 
-    console.error('❌ 找不到后端可执行文件，搜索路径:', possiblePaths)
-    throw new Error('Backend executable not found in any expected location')
+      return {
+        exec: backendPath,
+        args: [],
+        cwd: path.dirname(backendPath)
+      }
+    }
   }
+
+  logLine(`❌ 找不到后端可执行文件，搜索路径: ${JSON.stringify(possiblePaths)}`)
+  throw new Error('Backend executable not found in any expected location')
 }
 
 /**
@@ -178,58 +207,61 @@ async function startBackend(): Promise<boolean> {
   try {
     const { exec, args, cwd } = getBackendExecutable()
 
-    console.log('🚀 启动后端服务...')
-    console.log(`   可执行文件: ${exec}`)
-    console.log(`   参数: ${args.join(' ')}`)
-    console.log(`   工作目录: ${cwd}`)
+    logLine('🚀 启动后端服务...')
+    logLine(`   可执行文件: ${exec}`)
+    logLine(`   参数: ${args.join(' ')}`)
+    logLine(`   工作目录: ${cwd}`)
+
+    // 如果是开发模式且后端已运行，直接返回
+    if (VITE_DEV_SERVER_URL && exec === 'echo') {
+      logLine('✅ 开发模式：后端已由 start.sh 启动')
+      return true
+    }
 
     const spawnOptions: any = {
       cwd,
       env: {
         ...process.env,
-        PYTHONUNBUFFERED: '1',
-        APP_ENV: isDev ? 'development' : 'production',
-        // 设置数据目录（可选，后端会自动处理）
-        AURORA_DATA_DIR: app.getPath('userData')
+        // 不设置 AURORA_DATA_DIR，让后端使用项目内的统一数据目录
       },
-      stdio: isDev ? 'inherit' : ['pipe', 'pipe', 'pipe'] as const
+      stdio: ['pipe', 'pipe', 'pipe'] as const
     }
 
     const spawnedProcess = spawn(exec, args, spawnOptions)
     backendProcess = spawnedProcess
 
     // 记录后端输出
-    if (!isDev) {
-      spawnedProcess.stdout?.on('data', (data) => {
+    spawnedProcess.stdout?.on('data', (data) => {
         const output = data.toString().trim()
-        if (output) console.log('[Backend]', output)
-      })
+        if (output) logLine(`[Backend] ${output}`)
+    })
 
-      spawnedProcess.stderr?.on('data', (data) => {
-        const output = data.toString().trim()
-        if (output) console.error('[Backend Error]', output)
-      })
-    }
+    spawnedProcess.stderr?.on('data', (data) => {
+      const output = data.toString().trim()
+      if (output) logLine(`[Backend Error] ${output}`)
+    })
 
     spawnedProcess.on('error', (error) => {
-      console.error('❌ 后端进程错误:', error)
+      logLine(`❌ 后端进程错误: ${String(error)}`)
       backendProcess = null
       backendReady = false
     })
 
     spawnedProcess.on('exit', (code, signal) => {
-      console.log(`[Backend] 进程退出 - 代码: ${code}, 信号: ${signal}`)
+      const msg = `[Backend] 进程退出 - 代码: ${code}, 信号: ${signal}`
+      logLine(msg)
+      backendExitReason = `后端进程意外退出 (Code: ${code}, Signal: ${signal})`
       backendProcess = null
       backendReady = false
     })
 
-    console.log('✅ 后端进程已启动，等待服务就绪...')
+    logLine('✅ 后端进程已启动，等待服务就绪...')
 
     // 等待后端服务就绪
     const ready = await waitForBackendReady()
 
     if (!ready) {
-      console.error('❌ 后端服务未能在规定时间内就绪')
+      logLine('❌ 后端服务未能在规定时间内就绪')
       stopBackend()
       return false
     }
@@ -237,7 +269,7 @@ async function startBackend(): Promise<boolean> {
     return true
 
   } catch (error) {
-    console.error('❌ 启动后端时发生错误:', error)
+    logLine(`❌ 启动后端时发生错误: ${String(error)}`)
     backendProcess = null
     backendReady = false
     return false
@@ -294,10 +326,9 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webviewTag: true, // Enable <webview> tag for in-app reading mode
-      // 在开发模式下禁用 webSecurity 以支持阅读模式跨域请求
-      // 生产环境中建议使用后端代理服务
-      webSecurity: !isDev,
-      allowRunningInsecureContent: isDev
+      // 统一使用较宽松的安全设置以支持阅读模式跨域请求
+      webSecurity: false,
+      allowRunningInsecureContent: true
     },
   })
 
@@ -322,7 +353,8 @@ function createWindow() {
 
     win?.webContents.send('main-process-message', new Date().toLocaleString())
 
-    if (isDev && !devtoolsOpened) {
+    // 在开发模式下自动打开开发者工具
+    if (VITE_DEV_SERVER_URL && !devtoolsOpened) {
       win?.webContents.openDevTools()
       devtoolsOpened = true
     }
@@ -430,23 +462,25 @@ app.whenReady().then(async () => {
     }
   })
 
+  updateLogPathToUserData()
+
   console.log('🎯 Aurora RSS Reader 启动中...')
-  console.log(`   开发模式: ${isDev}`)
-  console.log(`   用户数据目录: ${app.getPath('userData')}`)
-  console.log(`   资源路径: ${process.resourcesPath}`)
+  logFilePath = path.join(app.getPath('userData'), 'aurora-app.log')
+  logLine(`   用户数据目录: ${app.getPath('userData')}`)
+  logLine(`   资源路径: ${process.resourcesPath}`)
 
   createWindow()
 
-  if (isDev) {
-    console.log('⚠️  开发模式：假设后端已由 pnpm dev 启动')
+  // 统一的启动逻辑：检测是否有开发服务器，否则启动内置后端
+  if (VITE_DEV_SERVER_URL) {
+    console.log('⚠️  检测到开发服务器，假设后端已由 start.sh 启动')
     console.log('   等待后端就绪...')
     showStartupStatus('等待开发后端服务就绪...')
 
     const backendReady = await waitForBackendReady()
 
     if (!backendReady) {
-      console.error('❌ 后端未就绪，请确保运行了 pnpm dev')
-      console.error('   或者单独启动后端: cd backend && source .venv/bin/activate && python -m scripts.serve')
+      console.error('❌ 后端未就绪，请确保运行了 ./start.sh')
       showStartupStatus('后端未就绪，请检查终端中的启动命令')
       app.quit()
       return
@@ -464,8 +498,10 @@ app.whenReady().then(async () => {
 
     if (!backendStarted) {
       console.error('❌ 后端启动失败，应用无法继续')
-      showStartupStatus('后端启动失败，请查看日志或重启应用')
-      app.quit()
+      const errorMsg = backendExitReason || '后端启动失败，请查看日志或重启应用'
+      showStartupStatus(errorMsg)
+      // 延迟退出以便用户能看到错误信息
+      setTimeout(() => app.quit(), 5000)
       return
     }
 
@@ -505,15 +541,11 @@ app.on('activate', () => {
 })
 
 app.on('before-quit', () => {
-  // 只在生产模式下停止后端（开发模式下后端由 pnpm dev 管理）
-  if (!isDev) {
-    stopBackend()
-  }
+  // 统一停止后端服务（除了开发模式下由 start.sh 管理的后端）
+  stopBackend()
 })
 
 app.on('quit', () => {
-  // 只在生产模式下停止后端
-  if (!isDev) {
-    stopBackend()
-  }
+  // 统一停止后端服务
+  stopBackend()
 })

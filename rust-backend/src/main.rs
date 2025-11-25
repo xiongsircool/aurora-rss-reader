@@ -25,9 +25,7 @@ pub struct AppState {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     // Load configuration
     let config = config::Config::from_env()?;
@@ -59,7 +57,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Build the application router: health check + REST API compatible with the existing frontend
     let app = Router::new()
+        // 兼容性健康检查：`/` 返回文本，`/health` 返回 JSON
         .route("/", get(health_check))
+        .route("/health", get(handlers::tasks::get_health_status))
         .nest(
             "/api",
             Router::new()
@@ -72,57 +72,67 @@ async fn main() -> anyhow::Result<()> {
                     "/feeds/:id",
                     get(handlers::feeds::get_feed)
                         .put(handlers::feeds::update_feed)
+                        .patch(handlers::feeds::update_feed)
                         .delete(handlers::feeds::delete_feed),
                 )
-                .route(
-                    "/feeds/:id/refresh",
-                    post(handlers::feeds::refresh_feed),
-                )
+                .route("/feeds/:id/refresh", post(handlers::feeds::refresh_feed))
                 // Entries
-                .route(
-                    "/entries",
-                    get(handlers::entries::list_entries),
-                )
+                .route("/entries", get(handlers::entries::list_entries))
                 .route(
                     "/entries/:id",
-                    get(handlers::entries::get_entry).put(handlers::entries::update_entry),
+                    get(handlers::entries::get_entry)
+                        .put(handlers::entries::update_entry)
+                        .patch(handlers::entries::update_entry),
                 )
                 .route(
-                    "/entries/:id/read",
-                    post(handlers::entries::mark_as_read),
+                    "/entries/starred",
+                    get(handlers::entries::list_starred_entries),
                 )
+                .route(
+                    "/entries/starred/stats",
+                    get(handlers::entries::get_starred_stats),
+                )
+                .route("/entries/:id/read", post(handlers::entries::mark_as_read))
                 .route(
                     "/entries/:id/unread",
                     post(handlers::entries::mark_as_unread),
                 )
                 .route(
                     "/entries/:id/star",
-                    post(handlers::entries::star_entry),
+                    post(handlers::entries::star_entry).delete(handlers::entries::unstar_entry),
+                )
+                .route("/entries/:id/unstar", post(handlers::entries::unstar_entry))
+                .route(
+                    "/entries/bulk-star",
+                    post(handlers::entries::bulk_star_entries),
                 )
                 .route(
-                    "/entries/:id/unstar",
-                    post(handlers::entries::unstar_entry),
+                    "/entries/bulk-unstar",
+                    post(handlers::entries::bulk_unstar_entries),
                 )
                 // Settings
                 .route(
                     "/settings",
                     get(handlers::settings::get_settings)
-                        .put(handlers::settings::update_settings),
+                        .put(handlers::settings::update_settings)
+                        .patch(handlers::settings::update_settings),
+                )
+                .route(
+                    "/settings/rsshub-url",
+                    get(handlers::settings::get_rsshub_url)
+                        .post(handlers::settings::update_rsshub_url),
+                )
+                .route(
+                    "/settings/test-rsshub-quick",
+                    post(handlers::settings::test_rsshub_quick),
                 )
                 // OPML
-                .route(
-                    "/opml/import",
-                    post(handlers::opml::import_opml),
-                )
-                .route(
-                    "/opml/export",
-                    get(handlers::opml::export_opml),
-                )
+                .route("/opml/import", post(handlers::opml::import_opml))
+                .route("/opml/export", get(handlers::opml::export_opml))
                 // RSSHub configurations
                 .route(
                     "/rsshub",
-                    get(handlers::rsshub::list_configs)
-                        .post(handlers::rsshub::create_config),
+                    get(handlers::rsshub::list_configs).post(handlers::rsshub::create_config),
                 )
                 .route(
                     "/rsshub/:id",
@@ -130,60 +140,35 @@ async fn main() -> anyhow::Result<()> {
                         .put(handlers::rsshub::update_config)
                         .delete(handlers::rsshub::delete_config),
                 )
-                .route(
-                    "/rsshub/:id/test",
-                    post(handlers::rsshub::test_rsshub),
-                )
-                .route(
-                    "/rsshub/test-all",
-                    post(handlers::rsshub::test_all_mirrors),
-                )
-                .route(
-                    "/rsshub/best",
-                    get(handlers::rsshub::get_best_mirror),
-                )
+                .route("/rsshub/:id/test", post(handlers::rsshub::test_rsshub))
+                .route("/rsshub/test-all", post(handlers::rsshub::test_all_mirrors))
+                .route("/rsshub/best", get(handlers::rsshub::get_best_mirror))
                 // Icons
-                .route(
-                    "/icons/:domain",
-                    get(handlers::icons::get_icon),
-                )
-                .route(
-                    "/icons",
-                    get(handlers::icons::get_all_icons),
-                )
+                .route("/icons/:domain", get(handlers::icons::get_icon))
+                .route("/icons", get(handlers::icons::get_all_icons))
                 .route(
                     "/icons/:domain/refresh",
                     post(handlers::icons::refresh_icon),
                 )
-                .route(
-                    "/icons/cleanup",
-                    post(handlers::icons::cleanup_icons),
-                )
+                .route("/icons/cleanup", post(handlers::icons::cleanup_icons))
                 // Task management
-                .route(
-                    "/tasks",
-                    get(handlers::tasks::get_tasks),
-                )
-                .route(
-                    "/tasks/:id",
-                    post(handlers::tasks::execute_task),
-                )
-                .route(
-                    "/tasks/:id/toggle",
-                    post(handlers::tasks::toggle_task),
-                )
-                .route(
-                    "/tasks/:id/history",
-                    get(handlers::tasks::get_task_history),
-                )
-                .route(
-                    "/health",
-                    get(handlers::tasks::get_health_status),
-                )
+                .route("/tasks", get(handlers::tasks::get_tasks))
+                .route("/tasks/:id", post(handlers::tasks::execute_task))
+                .route("/tasks/:id/toggle", post(handlers::tasks::toggle_task))
+                .route("/tasks/:id/history", get(handlers::tasks::get_task_history))
+                .route("/health", get(handlers::tasks::get_health_status))
                 // AI routes
                 .nest(
                     "/ai",
                     Router::new()
+                        .route(
+                            "/config",
+                            get(handlers::ai::get_ai_config)
+                                .post(handlers::ai::update_ai_config)
+                                .patch(handlers::ai::update_ai_config),
+                        )
+                        .route("/test", post(handlers::ai::test_ai_connection))
+                        .route("/summary", post(handlers::ai::summarize_article))
                         .route("/summarize", post(handlers::ai::summarize_article))
                         .route("/translate", post(handlers::ai::translate_article))
                         .route("/translate-title", post(handlers::ai::translate_title)),
@@ -205,6 +190,7 @@ async fn main() -> anyhow::Result<()> {
 pub fn create_app(app_state: AppState) -> Router {
     Router::new()
         .route("/", get(health_check))
+        .route("/health", get(handlers::tasks::get_health_status))
         .nest(
             "/api",
             Router::new()
@@ -221,7 +207,10 @@ pub fn create_app(app_state: AppState) -> Router {
                 )
                 // Icons
                 .route("/icons", get(handlers::icons::get_all_icons))
-                .route("/icons/:domain/refresh", post(handlers::icons::refresh_icon))
+                .route(
+                    "/icons/:domain/refresh",
+                    post(handlers::icons::refresh_icon),
+                )
                 .route("/icons/cleanup", post(handlers::icons::cleanup_icons))
                 // Tasks
                 .route("/tasks", get(handlers::tasks::get_tasks))
@@ -230,16 +219,13 @@ pub fn create_app(app_state: AppState) -> Router {
                 // Settings
                 .route(
                     "/settings",
-                    get(handlers::settings::get_settings)
-                        .put(handlers::settings::update_settings),
+                    get(handlers::settings::get_settings).put(handlers::settings::update_settings),
                 ),
         )
         .with_state(app_state)
 }
 
-async fn health_check(
-    State(app_state): State<AppState>,
-) -> Result<&'static str, StatusCode> {
+async fn health_check(State(app_state): State<AppState>) -> Result<&'static str, StatusCode> {
     if let Err(err) = database::health_check(&app_state.db).await {
         tracing::error!("Database health check failed: {}", err);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);

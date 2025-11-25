@@ -1,10 +1,8 @@
-use sea_orm::{
-    ActiveModelTrait, DatabaseConnection, EntityTrait, Set,
-};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use tracing::info;
 
 use crate::models::user_settings::{
-    Entity as UserSettings, ActiveModel, Model, UpdateUserSettingsRequest,
+    ActiveModel, Entity as UserSettings, Model, UpdateUserSettingsRequest,
 };
 
 pub struct Service {
@@ -18,9 +16,7 @@ impl Service {
 
     /// Get user settings (always returns the first record, creating default if needed)
     pub async fn get_settings(&self) -> Result<Model, Box<dyn std::error::Error + Send + Sync>> {
-        let settings = UserSettings::find()
-            .one(&self.db)
-            .await?;
+        let settings = UserSettings::find().one(&self.db).await?;
 
         match settings {
             Some(settings) => Ok(settings),
@@ -70,6 +66,10 @@ impl Service {
             active_settings.max_auto_title_translations = Set(max_auto_title_translations);
         }
 
+        if let Some(mode) = request.translation_display_mode {
+            active_settings.translation_display_mode = Set(mode);
+        }
+
         if let Some(enable_date_filter) = request.enable_date_filter {
             active_settings.enable_date_filter = Set(enable_date_filter);
         }
@@ -109,7 +109,9 @@ impl Service {
     }
 
     /// Create default user settings
-    async fn create_default_settings(&self) -> Result<Model, Box<dyn std::error::Error + Send + Sync>> {
+    async fn create_default_settings(
+        &self,
+    ) -> Result<Model, Box<dyn std::error::Error + Send + Sync>> {
         let default_settings = ActiveModel {
             id: Set(1), // Always use ID 1 for single user settings
             rsshub_url: Set("https://rsshub.app".to_string()),

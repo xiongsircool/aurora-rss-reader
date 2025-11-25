@@ -1,4 +1,4 @@
-use sea_orm::{DbErr, Statement, DatabaseConnection, ConnectionTrait};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, Statement};
 
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     // Create feeds table
@@ -105,10 +105,13 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     ];
 
     for migration_sql in user_settings_migrations {
-        if let Err(_) = db.execute(Statement::from_string(
-            sea_orm::DatabaseBackend::Sqlite,
-            migration_sql.to_string(),
-        )).await {
+        if let Err(_) = db
+            .execute(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                migration_sql.to_string(),
+            ))
+            .await
+        {
             // Column probably already exists, which is fine
             tracing::info!("User settings column already exists or could not be added");
         } else {
@@ -149,7 +152,10 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     )
     "#;
 
-    let stmt = Statement::from_string(sea_orm::DatabaseBackend::Sqlite, translations_sql.to_string());
+    let stmt = Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        translations_sql.to_string(),
+    );
     db.execute(stmt).await?;
     tracing::info!("Created translations table");
 
@@ -173,10 +179,13 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     "#;
 
     // Try to add the column, but ignore if it already exists
-    if let Err(_) = db.execute(Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        readability_sql.to_string(),
-    )).await {
+    if let Err(_) = db
+        .execute(Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            readability_sql.to_string(),
+        ))
+        .await
+    {
         // Column probably already exists, which is fine
         tracing::info!("readability_content column already exists or could not be added");
     } else {
@@ -198,7 +207,10 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     )
     "#;
 
-    let stmt = Statement::from_string(sea_orm::DatabaseBackend::Sqlite, rsshub_configs_sql.to_string());
+    let stmt = Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        rsshub_configs_sql.to_string(),
+    );
     db.execute(stmt).await?;
     tracing::info!("Created rsshub_configs table");
 

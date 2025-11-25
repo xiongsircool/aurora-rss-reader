@@ -1,10 +1,12 @@
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set, QueryOrder,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 use tracing::{error, info, warn};
 
-use crate::models::rsshub_config_entity::{Entity as RSSHubConfig, ActiveModel as RSSHubConfigActiveModel};
-use crate::models::rsshub_config::{RSSHubConfig as RSSHubConfigResponse, CreateRSSHubConfigRequest, UpdateRSSHubConfigRequest};
+use crate::models::rsshub_config::{
+    ActiveModel as RSSHubConfigActiveModel, Column, CreateRSSHubConfigRequest, Entity as RSSHubConfig,
+    RSSHubConfigResponse, UpdateRSSHubConfigRequest,
+};
 
 pub struct Service {
     db: DatabaseConnection,
@@ -16,10 +18,12 @@ impl Service {
     }
 
     /// Get all RSSHub configurations ordered by priority and active status
-    pub async fn list_configs(&self) -> Result<Vec<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn list_configs(
+        &self,
+    ) -> Result<Vec<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
         let configs = RSSHubConfig::find()
-            .order_by_desc(crate::models::rsshub_config_entity::Column::IsActive)
-            .order_by_asc(crate::models::rsshub_config_entity::Column::Priority)
+            .order_by_desc(Column::IsActive)
+            .order_by_asc(Column::Priority)
             .all(&self.db)
             .await?;
 
@@ -42,7 +46,10 @@ impl Service {
     }
 
     /// Get a specific RSSHub configuration by ID
-    pub async fn get_config(&self, id: &str) -> Result<Option<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn get_config(
+        &self,
+        id: &str,
+    ) -> Result<Option<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
         let config = RSSHubConfig::find_by_id(id).one(&self.db).await?;
 
         match config {
@@ -62,10 +69,13 @@ impl Service {
     }
 
     /// Create a new RSSHub configuration
-    pub async fn create_config(&self, request: CreateRSSHubConfigRequest) -> Result<RSSHubConfigResponse, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn create_config(
+        &self,
+        request: CreateRSSHubConfigRequest,
+    ) -> Result<RSSHubConfigResponse, Box<dyn std::error::Error + Send + Sync>> {
         // Check if URL already exists
         let existing = RSSHubConfig::find()
-            .filter(crate::models::rsshub_config_entity::Column::Url.eq(&request.url))
+            .filter(Column::Url.eq(&request.url))
             .one(&self.db)
             .await?;
 
@@ -105,7 +115,11 @@ impl Service {
     }
 
     /// Update an existing RSSHub configuration
-    pub async fn update_config(&self, id: &str, request: UpdateRSSHubConfigRequest) -> Result<Option<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn update_config(
+        &self,
+        id: &str,
+        request: UpdateRSSHubConfigRequest,
+    ) -> Result<Option<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
         let existing_config = RSSHubConfig::find_by_id(id).one(&self.db).await?;
 
         match existing_config {
@@ -116,8 +130,8 @@ impl Service {
                 if let Some(url) = request.url {
                     // Check if new URL already exists for different config
                     let url_exists = RSSHubConfig::find()
-                        .filter(crate::models::rsshub_config_entity::Column::Url.eq(&url))
-                        .filter(crate::models::rsshub_config_entity::Column::Id.ne(id))
+                        .filter(Column::Url.eq(&url))
+                        .filter(Column::Id.ne(id))
                         .one(&self.db)
                         .await?;
 
@@ -158,7 +172,10 @@ impl Service {
     }
 
     /// Delete a RSSHub configuration
-    pub async fn delete_config(&self, id: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn delete_config(
+        &self,
+        id: &str,
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let config = RSSHubConfig::find_by_id(id).one(&self.db).await?;
 
         match config {
@@ -177,7 +194,10 @@ impl Service {
     }
 
     /// Test RSSHub mirror availability and update performance metrics
-    pub async fn test_rsshub(&self, id: &str) -> Result<Option<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn test_rsshub(
+        &self,
+        id: &str,
+    ) -> Result<Option<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
         let config = RSSHubConfig::find_by_id(id).one(&self.db).await?;
 
         match config {
@@ -218,7 +238,11 @@ impl Service {
                 let updated_config = active_config.update(&self.db).await?;
 
                 if is_active {
-                    info!("RSSHub mirror {} is healthy (response time: {}ms)", config_url, response_time.unwrap_or(0));
+                    info!(
+                        "RSSHub mirror {} is healthy (response time: {}ms)",
+                        config_url,
+                        response_time.unwrap_or(0)
+                    );
                 } else {
                     warn!("RSSHub mirror {} is not responding", config_url);
                 }
@@ -240,9 +264,11 @@ impl Service {
     }
 
     /// Test all active RSSHub mirrors
-    pub async fn test_all_active_mirrors(&self) -> Result<Vec<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn test_all_active_mirrors(
+        &self,
+    ) -> Result<Vec<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
         let configs = RSSHubConfig::find()
-            .filter(crate::models::rsshub_config_entity::Column::IsActive.eq(true))
+            .filter(Column::IsActive.eq(true))
             .all(&self.db)
             .await?;
 
@@ -262,11 +288,13 @@ impl Service {
     }
 
     /// Get the best available RSSHub mirror (highest priority, active, and most recently tested)
-    pub async fn get_best_mirror(&self) -> Result<Option<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn get_best_mirror(
+        &self,
+    ) -> Result<Option<RSSHubConfigResponse>, Box<dyn std::error::Error + Send + Sync>> {
         let config = RSSHubConfig::find()
-            .filter(crate::models::rsshub_config_entity::Column::IsActive.eq(true))
-            .order_by_desc(crate::models::rsshub_config_entity::Column::Priority)
-            .order_by_desc(crate::models::rsshub_config_entity::Column::LastTested)
+            .filter(Column::IsActive.eq(true))
+            .order_by_desc(Column::Priority)
+            .order_by_desc(Column::LastTested)
             .one(&self.db)
             .await?;
 

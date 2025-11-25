@@ -1,12 +1,13 @@
-use std::time::Duration;
+use crate::models::entry::{ActiveModel as EntryActiveModel, Entity as Entry};
+use crate::models::feed::{ActiveModel as FeedActiveModel, Entity as Feed};
+use crate::utils::validation::validate_rss_url;
 use chrono::{DateTime, Utc};
-use feed_rs::parser;
+use syndication::Feed as SyndicationFeed;
+
 use reqwest::Client;
 use scraper::{Html, Selector};
-use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryFilter, ColumnTrait};
-use crate::models::feed::{Entity as Feed, ActiveModel as FeedActiveModel};
-use crate::models::entry::{Entity as Entry, ActiveModel as EntryActiveModel};
-use crate::utils::validation::validate_rss_url;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use std::time::Duration;
 
 pub struct RSSFetcher {
     client: Client,
@@ -32,18 +33,79 @@ pub struct ParsedEntry {
     pub published_at: Option<DateTime<Utc>>,
 }
 
+// Enhanced time extraction function
+
+
+// Helper to parse date from RSS item
+fn parse_rss_date(date_str: &str) -> Option<DateTime<Utc>> {
+    // Try RFC2822 first
+    if let Ok(dt) = DateTime::parse_from_rfc2822(date_str) {
+        return Some(dt.with_timezone(&Utc));
+    }
+    // Try common patterns
+    parse_time_from_text(date_str)
+}
+
+// Parse time from text content using common patterns
+fn parse_time_from_text(text: &str) -> Option<DateTime<Utc>> {
+    use chrono::DateTime;
+    use regex::Regex;
+
+    // Common time patterns in RSS feeds
+    let patterns = vec![
+        // ISO 8601 formats
+        (r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", "%Y-%m-%dT%H:%M:%SZ"),
+        (r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z", "%Y-%m-%dT%H:%M:%S%.fZ"),
+        (r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}", "%Y-%m-%dT%H:%M:%S%z"),
+
+        // Chinese date formats
+        (r"(\d{4})年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}):(\d{2}):(\d{2})", "%Y年%m月%d日 %H:%M:%S"),
+        (r"(\d{4})年(\d{1,2})月(\d{1,2})日", "%Y年%m月%d日"),
+
+        // US date formats
+        (r"(\w{3})\s+(\d{1,2})\s+(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})", "%b %d %Y %H:%M:%S"),
+        (r"(\w{3})\s+(\d{1,2})\s+(\d{4})", "%b %d %Y"),
+
+        // RFC 2822 format
+        (r"\w{3},\s+\d{1,2}\s+\w{3}\s+\d{4}\s+\d{1,2}:\d{2}:\d{2}\s+\w{3}", "%a, %d %b %Y %H:%M:%S %Z"),
+
+        // Simple formats
+        (r"(\d{4})/(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{2}):(\d{2})", "%Y/%m/%d %H:%M:%S"),
+        (r"(\d{1,2})/(\d{1,2})/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})", "%m/%d/%Y %H:%M:%S"),
+    ];
+
+    for (pattern, format_str) in patterns {
+        if let Ok(re) = Regex::new(pattern) {
+            if let Some(captures) = re.captures(text) {
+                // Extract the matched text
+                let matched_text = captures.get(0).unwrap().as_str();
+
+                // Try to parse with the corresponding format
+                if let Ok(dt) = DateTime::parse_from_str(matched_text, format_str) {
+                    return Some(dt.with_timezone(&Utc));
+                }
+            }
+        }
+    }
+
+    None
+}
+
 impl RSSFetcher {
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: DatabaseConnection) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .user_agent("RSS-Reader/1.0 (https://github.com/aurora-rss-reader)")
             .build()
-            .expect("Failed to create HTTP client");
+            .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-        Self { client, db }
+        Ok(Self { client, db })
     }
 
-    pub async fn fetch_feed(&self, feed_id: &str) -> Result<FetchResult, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn fetch_feed(
+        &self,
+        feed_id: &str,
+    ) -> Result<FetchResult, Box<dyn std::error::Error + Send + Sync>> {
         let start_time = std::time::Instant::now();
 
         // Get feed from database
@@ -67,29 +129,72 @@ impl RSSFetcher {
 
         let content = response.text().await?;
 
-        // Parse RSS feed
-        let parsed_feed = parser::parse(content.as_bytes())
+        // Parse RSS feed using syndication
+        let feed_data = content.parse::<SyndicationFeed>()
             .map_err(|e| format!("Failed to parse RSS feed: {}", e))?;
 
-        tracing::info!("Parsed {} entries from feed: {}", parsed_feed.entries.len(), feed.title);
+        let (feed_title, entries) = match feed_data {
+            SyndicationFeed::Atom(atom_feed) => {
+                let title = atom_feed.title().to_string();
+                let entries = atom_feed.entries().iter().map(|entry| {
+                    let url = entry.links().first().map(|l| l.href().to_string()).unwrap_or_default();
+                    // Handle Atom date (parse from string)
+                    let published = entry.published().or(Some(entry.updated()))
+                        .and_then(|d| DateTime::parse_from_rfc3339(d).ok())
+                        .map(|dt| dt.with_timezone(&Utc));
+                    
+                    // Extract content
+                    let content = entry.content().and_then(|c| c.value().map(|v| v.to_string()))
+                        .or_else(|| entry.summary().map(|s| s.to_string()));
+
+                    ParsedEntry {
+                        title: entry.title().to_string(),
+                        url,
+                        author: entry.authors().first().map(|a| a.name().to_string()),
+                        summary: entry.summary().map(|s| s.to_string()),
+                        content,
+                        published_at: published,
+                    }
+                }).collect::<Vec<_>>();
+                (title, entries)
+            },
+            SyndicationFeed::RSS(rss_feed) => {
+                let title = rss_feed.title.clone();
+                let entries = rss_feed.items.iter().map(|item| {
+                    let published = item.pub_date.as_deref().and_then(parse_rss_date);
+                    
+                    // Extract content
+                    let content = item.content.clone()
+                        .or_else(|| item.description.clone());
+
+                    ParsedEntry {
+                        title: item.title.clone().unwrap_or_else(|| "Untitled".to_string()),
+                        url: item.link.clone().unwrap_or_default(),
+                        author: item.author.clone(), // Simple author string in RSS
+                        summary: item.description.clone(),
+                        content,
+                        published_at: published,
+                    }
+                }).collect::<Vec<_>>();
+                (title, entries)
+            }
+        };
+
+        tracing::info!(
+            "Parsed {} entries from feed: {}",
+            entries.len(),
+            feed_title
+        );
 
         // Store total entries count for result
-        let total_entries_count = parsed_feed.entries.len();
+        let total_entries_count = entries.len();
 
         // Process entries
         let mut new_entries_count = 0;
         let mut processed_entries = Vec::new();
 
-        for entry in &parsed_feed.entries {
-            if let Some(link) = entry.links.first() {
-                let parsed_entry = ParsedEntry {
-                    title: entry.title.as_ref().map(|t| t.content.clone()).unwrap_or_else(|| "Untitled".to_string()),
-                    url: link.href.clone(),
-                    author: entry.authors.first().map(|a| a.name.clone()),
-                    summary: entry.summary.as_ref().map(|s| s.content.clone()),
-                    content: entry.content.as_ref().and_then(|c| c.body.clone()),
-                    published_at: entry.published,
-                };
+        for parsed_entry in entries {
+            if !parsed_entry.url.is_empty() {
 
                 // Check if entry already exists
                 let exists = Entry::find()
@@ -106,8 +211,9 @@ impl RSSFetcher {
         }
 
         // Insert new entries into database
-        let mut inserted_entries = Vec::new();
+        let mut successfully_inserted = 0;
         for parsed_entry in processed_entries {
+            let entry_title = parsed_entry.title.clone();
             let new_entry = EntryActiveModel {
                 id: Set(uuid::Uuid::new_v4().to_string()),
                 feed_id: Set(feed_id.to_string()),
@@ -116,7 +222,7 @@ impl RSSFetcher {
                 author: Set(parsed_entry.author),
                 content: Set(parsed_entry.content),
                 summary: Set(parsed_entry.summary),
-                published_at: Set(parsed_entry.published_at.map(|dt| dt)),
+                published_at: Set(parsed_entry.published_at),
                 created_at: Set(Utc::now()),
                 updated_at: Set(Utc::now()),
                 is_read: Set(false),
@@ -125,8 +231,16 @@ impl RSSFetcher {
                 word_count: Set(None),
             };
 
-            let inserted = new_entry.insert(&self.db).await?;
-            inserted_entries.push(inserted);
+            match new_entry.insert(&self.db).await {
+                Ok(_) => {
+                    successfully_inserted += 1;
+                    tracing::debug!("Successfully inserted entry: {}", entry_title);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to insert entry '{}': {}", entry_title, e);
+                    // Continue with other entries instead of failing completely
+                }
+            }
         }
 
         // Store feed title for logging
@@ -140,9 +254,10 @@ impl RSSFetcher {
         active_feed.update(&self.db).await?;
 
         tracing::info!(
-            "Successfully fetched feed {} ({} new entries, {}ms)",
+            "Successfully fetched feed {} ({} processed, {} inserted, {}ms)",
             feed_title,
             new_entries_count,
+            successfully_inserted,
             response_time
         );
 
@@ -150,13 +265,16 @@ impl RSSFetcher {
             success: true,
             message: "Successfully fetched feed".to_string(),
             entries_count: total_entries_count,
-            new_entries_count,
+            new_entries_count: successfully_inserted,
             response_time_ms: response_time,
         })
     }
 
     #[allow(dead_code)]
-    pub async fn extract_content(&self, url: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn extract_content(
+        &self,
+        url: &str,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let response = self.client.get(url).send().await?;
 
         if !response.status().is_success() {
@@ -177,23 +295,30 @@ impl RSSFetcher {
         ];
 
         for selector in content_selectors {
-            let sel = Selector::parse(selector).unwrap();
-            if let Some(element) = document.select(&sel).next() {
-                let content = element.inner_html();
-                // Clean up HTML
-                let clean_content = self.clean_html_content(&content);
-                if clean_content.len() > 100 {
-                    return Ok(clean_content);
+            if let Ok(sel) = Selector::parse(selector) {
+                if let Some(element) = document.select(&sel).next() {
+                    let content = element.inner_html();
+                    // Clean up HTML
+                    let clean_content = self.clean_html_content(&content);
+                    if clean_content.len() > 100 {
+                        return Ok(clean_content);
+                    }
                 }
+            } else {
+                tracing::warn!("Invalid CSS selector: {}", selector);
             }
         }
 
         // Fallback to body content
-        if let Some(body) = document.select(&Selector::parse("body").unwrap()).next() {
-            let content = body.inner_html();
-            Ok(self.clean_html_content(&content))
+        if let Ok(body_selector) = Selector::parse("body") {
+            if let Some(body) = document.select(&body_selector).next() {
+                let content = body.inner_html();
+                Ok(self.clean_html_content(&content))
+            } else {
+                Err("Could not extract content from page".into())
+            }
         } else {
-            Err("Could not extract content from page".into())
+            Err("Could not parse body selector".into())
         }
     }
 
@@ -221,10 +346,7 @@ impl RSSFetcher {
         }
 
         // Clean up excessive whitespace
-        clean_html = clean_html
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ");
+        clean_html = clean_html.split_whitespace().collect::<Vec<_>>().join(" ");
 
         clean_html
     }
@@ -255,10 +377,7 @@ impl RSSFetcher {
         let document = Html::parse_document(&html);
 
         // Look for favicon link tags
-        let favicon_selectors = vec![
-            "link[rel*='icon']",
-            "link[rel*='shortcut icon']",
-        ];
+        let favicon_selectors = vec!["link[rel*='icon']", "link[rel*='shortcut icon']"];
 
         for selector in favicon_selectors {
             if let Ok(sel) = Selector::parse(selector) {
@@ -267,7 +386,11 @@ impl RSSFetcher {
                         let favicon_url = if href.starts_with("http") {
                             href.to_string()
                         } else {
-                            format!("{}{}", base_url.trim_end_matches('/'), href.trim_start_matches('/'))
+                            format!(
+                                "{}{}",
+                                base_url.trim_end_matches('/'),
+                                href.trim_start_matches('/')
+                            )
                         };
                         return Some(favicon_url);
                     }

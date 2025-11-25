@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::timeout;
 
-
 #[derive(Debug, Clone)]
 pub struct AIService {
     http_client: reqwest::Client,
@@ -37,16 +36,18 @@ pub struct GLMResponse {
 }
 
 impl AIService {
-    pub fn new(api_key: String, base_url: String, model: String) -> Self {
-        Self {
-            http_client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(90))
-                .build()
-                .unwrap(),
+    pub fn new(api_key: String, base_url: String, model: String) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let http_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(90))
+            .build()
+            .map_err(|e| format!("Failed to create AI HTTP client: {}", e))?;
+
+        Ok(Self {
+            http_client,
             api_key,
             base_url,
             model,
-        }
+        })
     }
 
     fn get_language_name(&self, language: &str) -> String {
@@ -160,4 +161,3 @@ impl AIService {
         self.translate(title, target_language).await
     }
 }
-

@@ -5,8 +5,8 @@ use axum::{
 };
 use tracing::{error, info};
 
-use crate::AppState;
 use crate::utils::response::{success_response, success_response_with_message};
+use crate::AppState;
 
 // 获取所有任务
 pub async fn get_tasks(
@@ -39,7 +39,10 @@ pub async fn execute_task(
     match scheduler_guard.execute_task_manually(&task_id).await {
         Ok(result) => {
             info!("Task {} executed successfully: {}", task_id, result.message);
-            Ok(success_response_with_message(result, &format!("Task {} executed", task_id)))
+            Ok(success_response_with_message(
+                result,
+                &format!("Task {} executed", task_id),
+            ))
         }
         Err(e) => {
             error!("Failed to execute task {}: {}", task_id, e);
@@ -62,10 +65,18 @@ pub async fn toggle_task(
     let scheduler_guard = app_state.task_scheduler.lock().await;
     match scheduler_guard.toggle_task(&task_id, enabled).await {
         Ok(()) => {
-            info!("Task {} {} successfully", task_id, if enabled { "enabled" } else { "disabled" });
+            info!(
+                "Task {} {} successfully",
+                task_id,
+                if enabled { "enabled" } else { "disabled" }
+            );
             Ok(success_response_with_message(
                 serde_json::json!({"task_id": task_id, "enabled": enabled}),
-                &format!("Task {} {}", task_id, if enabled { "enabled" } else { "disabled" }),
+                &format!(
+                    "Task {} {}",
+                    task_id,
+                    if enabled { "enabled" } else { "disabled" }
+                ),
             ))
         }
         Err(e) => {
@@ -95,6 +106,9 @@ pub async fn get_health_status(
         Ok(success_response(health_info))
     } else {
         error!("Database health check failed");
-        Ok(success_response_with_message(health_info, "Database connection failed"))
+        Ok(success_response_with_message(
+            health_info,
+            "Database connection failed",
+        ))
     }
 }

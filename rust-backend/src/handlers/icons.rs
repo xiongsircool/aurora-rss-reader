@@ -5,10 +5,10 @@ use axum::{
 };
 use tracing::{error, info};
 
-use crate::AppState;
 use crate::models::site_icon::{IconCacheRequest, SiteIconResponse};
 use crate::services::icon_service::IconService;
 use crate::utils::response::{success_response, success_response_with_message};
+use crate::AppState;
 
 // Get icon for a domain
 pub async fn get_icon(
@@ -80,7 +80,10 @@ pub async fn refresh_icon(
     match icon_service.get_icon(&domain, true).await {
         Ok(Some(icon_response)) => {
             info!("Force refreshed icon for domain: {}", domain);
-            Ok(success_response_with_message(icon_response, "Icon refreshed successfully"))
+            Ok(success_response_with_message(
+                icon_response,
+                "Icon refreshed successfully",
+            ))
         }
         Ok(None) => {
             info!("No icon found during refresh for domain: {}", domain);

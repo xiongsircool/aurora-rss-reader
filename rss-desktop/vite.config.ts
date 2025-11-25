@@ -27,7 +27,8 @@ export default defineConfig({
             rollupOptions: {
               external: ['electron'],
               output: {
-                format: 'cjs'
+                format: 'cjs',
+                entryFileNames: '[name].cjs'
               }
             }
           }
@@ -40,7 +41,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:15432',
+        target: 'http://localhost:27495',
         changeOrigin: true,
         secure: false,
       }

@@ -156,4 +156,68 @@ rust-backend/.cargo/
 **/target/
 *.pdb
 
+# CLAUDE.md (项目指导文档，不应提交)
 CLAUDE.md
+
+# Documentation and analysis files (临时分析文档)
+needupdate.md
+reading-mode-comparison.md
+rss-parse-analysis.md
+sidebar-issues-analysis.md
+ui-design-analysis.md
+ui-style-guide.md
+walkthrough.md
+
+# Additional markdown files to ignore (补充常见的临时文档)
+*.draft.md
+*.wip.md
+*.todo.md
+*.notes.md
+*.temp.md
+*.backup.md
+test-*.md
+debug-*.md
+analysis-*.md
+research-*.md
+design-*.md
+plan-*.md
+meeting-*.md
+review-*.md
+workflow-*.md
+guidelines-*.md
+README-*.md
+CHANGELOG-*.md
+CONTRIBUTING-*.md
+CODE_OF_CONDUCT-*.md
+SECURITY-*.md
+
+# Documentation directories (文档目录)
+docs/
+documentation/
+wiki/
+_notes/
+scratch/
+drafts/
+work-in-progress/
+
+# AI and analysis artifacts (AI 分析产物)
+.ai-analysis/
+.chat-history/
+.conversation-logs/
+.session-data/
+.llm-cache/
+
+# Spec workflow artifacts (规格工作流产物)
+.spec-workflow/
+requirements-docs/
+design-docs/
+technical-specs/
+
+# Development documentation (开发文档)
+dev-notes/
+dev-logs/
+architecture-docs/
+api-docs/
+user-stories/
+bug-reports/
+feature-requests/

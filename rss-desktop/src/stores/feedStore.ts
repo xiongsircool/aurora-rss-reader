@@ -12,6 +12,7 @@ export const useFeedStore = defineStore('feed', () => {
   const loadingFeeds = ref(false)
   const loadingEntries = ref(false)
   const addingFeed = ref(false)
+  const refreshingGroup = ref(false)
   const summaryCache = ref<Record<string, SummaryResult>>({})
   const translationCache = ref<Record<string, TranslationResult>>({})
   const titleTranslationCache = ref<Record<string, { title: string; language: string }>>({})
@@ -126,17 +127,45 @@ export const useFeedStore = defineStore('feed', () => {
     // 如果是分组模式，刷新该分组下的所有订阅源
     if (activeGroupName.value) {
       const groupFeeds = groupedFeeds.value[activeGroupName.value] || []
-      for (const feed of groupFeeds) {
-        await api.post(`/feeds/${feed.id}/refresh`)
+      if (groupFeeds.length === 0) {
+        console.log(`分组 "${activeGroupName.value}" 没有订阅源`)
+        return
       }
-      // 保留当前的过滤器状态
-      await fetchEntries({
-        groupName: activeGroupName.value,
-        unreadOnly: lastEntryFilters.value?.unreadOnly,
-        dateRange: lastEntryFilters.value?.dateRange,
-        timeField: lastEntryFilters.value?.timeField,
-      })
-      await fetchFeeds()
+
+      refreshingGroup.value = true
+      console.log(`开始刷新分组 "${activeGroupName.value}" 中的 ${groupFeeds.length} 个订阅源...`)
+
+      // 并行刷新所有订阅源，提高效率
+      const refreshPromises = groupFeeds.map(feed =>
+        api.post(`/feeds/${feed.id}/refresh`).catch(error => {
+          console.error(`Failed to refresh feed ${feed.title}:`, error)
+          return { feedId: feed.id, success: false, error }
+        })
+      )
+
+      try {
+        const results = await Promise.allSettled(refreshPromises)
+        const successCount = results.filter(result =>
+          result.status === 'fulfilled'
+        ).length
+
+        console.log(`分组 "${activeGroupName.value}" 刷新完成: ${successCount}/${groupFeeds.length} 个订阅源成功`)
+
+        // 保留当前的过滤器状态
+        await fetchEntries({
+          groupName: activeGroupName.value,
+          unreadOnly: lastEntryFilters.value?.unreadOnly,
+          dateRange: lastEntryFilters.value?.dateRange,
+          timeField: lastEntryFilters.value?.timeField,
+        })
+        await fetchFeeds()
+
+      } catch (error) {
+        console.error('分组刷新失败:', error)
+        errorMessage.value = `分组 "${activeGroupName.value}" 刷新失败`
+      } finally {
+        refreshingGroup.value = false
+      }
       return
     }
 
@@ -259,7 +288,7 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   function selectGroup(groupName: string) {
-    if (activeGroupName.value === groupName) return
+    // 总是更新分组选择，即使点击同一分组也重新加载数据
     activeGroupName.value = groupName
     activeFeedId.value = null  // 清除单个订阅源选择
   }
@@ -358,10 +387,7 @@ export const useFeedStore = defineStore('feed', () => {
       formData.append('file', file)
       const { data } = await api.post<{ imported: number; skipped: number; errors: string[] }>(
         '/opml/import',
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        }
+        formData
       )
       await fetchFeeds()
       return data
@@ -417,6 +443,7 @@ export const useFeedStore = defineStore('feed', () => {
     loadingFeeds,
     loadingEntries,
     addingFeed,
+    refreshingGroup,
     errorMessage,
     summaryCache,
     translationCache,

@@ -1,6 +1,6 @@
-use std::num::NonZeroUsize;
-use lru::LruCache;
 use dashmap::DashMap;
+use lru::LruCache;
+use std::num::NonZeroUsize;
 
 #[allow(dead_code)]
 pub struct MemoryCache<K, V> {
@@ -46,7 +46,7 @@ impl<K, V> Default for SharedCache<K, V>
 where
     K: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
     V: Clone + Send + Sync + 'static,
- {
+{
     fn default() -> Self {
         Self::new()
     }

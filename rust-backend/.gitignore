@@ -14,10 +14,11 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 
-# Environment variables
+# Environment variables and configuration
 .env
 .env.local
 .env.production
+config.toml
 
 # Database
 *.db

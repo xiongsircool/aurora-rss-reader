@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use sea_orm::entity::prelude::*;
 use sea_orm::DeriveEntityModel;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
 #[sea_orm(table_name = "user_settings")]
@@ -29,8 +29,7 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
 
-impl ActiveModelBehavior for ActiveModel {
-}
+impl ActiveModelBehavior for ActiveModel {}
 
 // Type aliases for convenience
 #[allow(dead_code)]
@@ -38,7 +37,7 @@ pub type UserSettings = Model;
 #[allow(dead_code)]
 pub type UserSettingsActiveModel = ActiveModel;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct UpdateUserSettingsRequest {
     pub rsshub_url: Option<String>,
     pub fetch_interval_minutes: Option<i32>,

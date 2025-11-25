@@ -1,12 +1,7 @@
-use chrono::{DateTime, Utc, Duration};
-use sea_orm::{
-    ColumnTrait, QueryFilter, DatabaseConnection, Select,
-};
+use chrono::{DateTime, Duration, Utc};
+use sea_orm::{ColumnTrait, Condition, DatabaseConnection, QueryFilter, Select};
 
-use crate::models::{
-    feed::Entity as Feed,
-    entry::Entity as Entry,
-};
+use crate::models::{entry::Entity as Entry, feed::Entity as Feed};
 
 /// 时间范围过滤器
 pub struct DateFilterer;
@@ -50,11 +45,24 @@ impl DateFilterer {
                 let field = Self::parse_time_field(time_field.unwrap_or("created_at"));
 
                 if field == "published_at" {
-                    query = query
-                        .filter(crate::models::entry::Column::PublishedAt.gte(start_time));
+                    // 如果选择按发布时间过滤：
+                    // 1. 如果有发布时间，则必须满足发布时间 >= start_time
+                    // 2. 如果没有发布时间(NULL)，则回退使用入库时间(created_at) >= start_time
+                    query = query.filter(
+                        Condition::any()
+                            .add(
+                                Condition::all()
+                                    .add(crate::models::entry::Column::PublishedAt.is_not_null())
+                                    .add(crate::models::entry::Column::PublishedAt.gte(start_time))
+                            )
+                            .add(
+                                Condition::all()
+                                    .add(crate::models::entry::Column::PublishedAt.is_null())
+                                    .add(crate::models::entry::Column::CreatedAt.gte(start_time))
+                            )
+                    );
                 } else {
-                    query = query
-                        .filter(crate::models::entry::Column::CreatedAt.gte(start_time));
+                    query = query.filter(crate::models::entry::Column::CreatedAt.gte(start_time));
                 }
             }
         }
@@ -71,8 +79,7 @@ impl DateFilterer {
         if let Some(range) = date_range {
             if let Some(start_time) = Self::parse_date_range(range) {
                 // 暂时按feed的创建时间过滤
-                query = query
-                    .filter(crate::models::feed::Column::CreatedAt.gte(start_time));
+                query = query.filter(crate::models::feed::Column::CreatedAt.gte(start_time));
             }
         }
         query
@@ -82,7 +89,10 @@ impl DateFilterer {
 /// 时间范围验证函数
 #[allow(dead_code)]
 pub fn validate_date_range(date_range: &str) -> bool {
-    matches!(date_range, "1d" | "2d" | "3d" | "7d" | "30d" | "90d" | "180d" | "365d" | "all")
+    matches!(
+        date_range,
+        "1d" | "2d" | "3d" | "7d" | "30d" | "90d" | "180d" | "365d" | "all"
+    )
 }
 
 /// 时间字段验证函数

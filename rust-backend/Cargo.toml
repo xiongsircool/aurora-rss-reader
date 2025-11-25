@@ -21,13 +21,16 @@ sea-orm-migration = "0.12"
 reqwest = { version = "0.11", features = ["json", "stream", "cookies"] }
 
 # RSS/Atom parsing
-feed-rs = "1.4"
+syndication = "0.5"
 
 # OPML parsing
 opml = "1.1"
 
 # HTML parsing
 scraper = "0.18"
+
+# Regular expressions
+regex = "1.10"
 
 # Base64 encoding
 base64 = "0.21"
@@ -47,6 +50,7 @@ thiserror = "1.0"
 
 # Configuration
 config = "0.14"
+toml = "0.8"
 
 # Logging
 tracing = "0.1"
@@ -64,6 +68,9 @@ dashmap = "5.5"
 
 # File system
 dirs = "5.0"
+
+# URL parsing
+url = "2.5"
 
 # Async traits
 async-trait = "0.1"

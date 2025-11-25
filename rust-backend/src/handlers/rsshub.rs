@@ -5,10 +5,10 @@ use axum::{
 };
 use tracing::error;
 
-use crate::AppState;
 use crate::models::rsshub_config::{CreateRSSHubConfigRequest, UpdateRSSHubConfigRequest};
 use crate::services::rsshub_manager::Service;
 use crate::utils::response::{success_response, success_response_with_message};
+use crate::AppState;
 
 // List all RSSHub configurations
 pub async fn list_configs(
@@ -50,9 +50,10 @@ pub async fn create_config(
     let rsshub_service = Service::new(app_state.db.clone());
 
     match rsshub_service.create_config(payload).await {
-        Ok(config) => {
-            Ok(success_response_with_message(config, "RSSHub configuration created successfully"))
-        }
+        Ok(config) => Ok(success_response_with_message(
+            config,
+            "RSSHub configuration created successfully",
+        )),
         Err(e) => {
             error!("Failed to create RSSHub config: {}", e);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
@@ -69,9 +70,10 @@ pub async fn update_config(
     let rsshub_service = Service::new(app_state.db.clone());
 
     match rsshub_service.update_config(&id, payload).await {
-        Ok(Some(config)) => {
-            Ok(success_response_with_message(config, "RSSHub configuration updated successfully"))
-        }
+        Ok(Some(config)) => Ok(success_response_with_message(
+            config,
+            "RSSHub configuration updated successfully",
+        )),
         Ok(None) => Err(StatusCode::NOT_FOUND),
         Err(e) => {
             error!("Failed to update RSSHub config {}: {}", id, e);
@@ -88,12 +90,10 @@ pub async fn delete_config(
     let rsshub_service = Service::new(app_state.db.clone());
 
     match rsshub_service.delete_config(&id).await {
-        Ok(true) => {
-            Ok(success_response_with_message(
-                serde_json::json!({"deleted": true}),
-                "RSSHub configuration deleted successfully",
-            ))
-        }
+        Ok(true) => Ok(success_response_with_message(
+            serde_json::json!({"deleted": true}),
+            "RSSHub configuration deleted successfully",
+        )),
         Ok(false) => Err(StatusCode::NOT_FOUND),
         Err(e) => {
             error!("Failed to delete RSSHub config {}: {}", id, e);
@@ -112,7 +112,10 @@ pub async fn test_rsshub(
     match rsshub_service.test_rsshub(&id).await {
         Ok(Some(config)) => {
             let message = if config.is_active {
-                format!("RSSHub mirror is healthy (response time: {}ms)", config.response_time.unwrap_or(0))
+                format!(
+                    "RSSHub mirror is healthy (response time: {}ms)",
+                    config.response_time.unwrap_or(0)
+                )
             } else {
                 "RSSHub mirror is not responding".to_string()
             };
@@ -152,12 +155,10 @@ pub async fn get_best_mirror(
 
     match rsshub_service.get_best_mirror().await {
         Ok(Some(config)) => Ok(success_response(config)),
-        Ok(None) => {
-            Ok(success_response_with_message(
-                serde_json::json!({"message": "No active RSSHub mirrors available"}),
-                "No active RSSHub mirrors available",
-            ))
-        }
+        Ok(None) => Ok(success_response_with_message(
+            serde_json::json!({"message": "No active RSSHub mirrors available"}),
+            "No active RSSHub mirrors available",
+        )),
         Err(e) => {
             error!("Failed to get best RSSHub mirror: {}", e);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
