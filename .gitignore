@@ -130,6 +130,11 @@ designs/
 backend/backend.spec
 build_signature.json
 
+# Personal OPML files (RSS subscription files)
+*.opml
+follow.opml
+*.rss
+
 # PNPM
 .pnpm-store/
 .pnpm-debug.log*
@@ -206,6 +211,15 @@ work-in-progress/
 .conversation-logs/
 .session-data/
 .llm-cache/
+
+# Serena MCP server configuration
+.serena/
+
+# Binary build artifacts
+**/aurora-backend
+**/rss-backend
+**/resources/aurora-backend
+**/resources/rss-backend
 
 # Spec workflow artifacts (规格工作流产物)
 .spec-workflow/
