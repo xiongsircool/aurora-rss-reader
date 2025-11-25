@@ -138,6 +138,7 @@ pub async fn summarize_article(
     let config = &app_state.config;
 
     // 创建 SQLite 连接池
+    // TODO: 重构为使用 app_state.db 统一连接，避免重复连接
     let sqlite_pool = SqlitePool::connect(&config.database_url)
         .await
         .map_err(|e| {
@@ -269,6 +270,7 @@ pub async fn translate_article(
     let config = &app_state.config;
 
     // 创建 SQLite 连接池
+    // TODO: 重构为使用 app_state.db 统一连接，避免重复连接
     let sqlite_pool = SqlitePool::connect(&config.database_url)
         .await
         .map_err(|e| {
@@ -427,6 +429,7 @@ pub async fn translate_title(
     let config = &app_state.config;
 
     // 创建 SQLite 连接池
+    // TODO: 重构为使用 app_state.db 统一连接，避免重复连接
     let sqlite_pool = SqlitePool::connect(&config.database_url)
         .await
         .map_err(|e| {
