@@ -62,4 +62,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.os }}
-          path: rss-desktop/release/**/*
+          overwrite: true
+          path: |
+            rss-desktop/release/*.exe
+            rss-desktop/release/*.dmg
+            rss-desktop/release/*.AppImage
+            rss-desktop/release/*.deb
+            rss-desktop/release/*.rpm
