@@ -13,7 +13,8 @@ from fastapi.responses import JSONResponse
 from app.api.routes import router as api_router
 from app.services.rsshub_manager import rsshub_manager
 from app.core.config import settings, APP_DATA_DIR
-from app.db.session import init_db
+# from app.db.session import init_db  # Deprecated in favor of Alembic
+from scripts.migrate import run_migrations
 from app.services.fetcher import refresh_all_feeds
 from app.services.user_settings_service import ensure_user_settings_schema
 
@@ -63,7 +64,15 @@ def build_allowed_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    init_db()
+    # init_db()
+    try:
+        run_migrations()
+    except Exception as e:
+        print(f"Startup migration failed: {e}")
+        # 这里可以选择是否继续运行，对于必须的数据库变更，失败应该退出
+        # 但为了用户体验，有时会选择记录日志继续
+        pass
+
     ensure_user_settings_schema()
     # 初始化RSSHub配置
     await rsshub_manager.initialize_default_mirrors()

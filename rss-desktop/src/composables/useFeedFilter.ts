@@ -2,8 +2,6 @@ import { ref, computed, watch } from 'vue'
 import { useFeedStore } from '../stores/feedStore'
 import { useFavoritesStore } from '../stores/favoritesStore'
 import { useSettingsStore } from '../stores/settingsStore'
-import { useI18n } from 'vue-i18n'
-import type { Entry } from '../types'
 import { getTimeRangeText } from '../utils/date'
 
 // Debounce helper
@@ -22,7 +20,6 @@ export function useFeedFilter() {
     const store = useFeedStore()
     const favoritesStore = useFavoritesStore()
     const settingsStore = useSettingsStore()
-    const { t } = useI18n()
 
     // State
     const searchQuery = ref('')

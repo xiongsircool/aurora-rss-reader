@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { useFeedStore } from '../stores/feedStore'
 import { useSettingsStore } from '../stores/settingsStore'
 

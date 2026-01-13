@@ -20,7 +20,7 @@ import SettingsModal from '../components/SettingsModal.vue'
 import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
 import DetailsPanel from '../components/details/DetailsPanel.vue'
-import type { Entry, Feed } from '../types'
+import type { Feed } from '../types'
 
 
 
@@ -33,7 +33,6 @@ const { t, locale } = useI18n()
 const { loadLanguage } = useLanguage()
 // Initialize Composables
 const {
-  titleTranslationLoadingMap,
   aiFeatures,
   titleTranslationLanguageLabel,
   bindConnectionListener,
@@ -54,7 +53,6 @@ const {
     filteredEntries,
     isDateFilterActive,
     timeFilterLabel,
-    lastActiveFeedId,
 
     debouncedApplyFilters,
     applyFilters,
@@ -89,7 +87,6 @@ const showSettings = ref(false)
 
 const { showToast, toastMessage, toastType, showNotification } = useNotification()
 const { darkMode, toggleTheme, loadTheme } = useTheme()
-const NO_SUMMARY_TEXT = computed(() => t('ai.noSummary'))
 
 // 使用布局管理 composable
 const {
@@ -138,8 +135,6 @@ const currentSelectedEntry = computed(() => {
   }
   return store.selectedEntry
 })
-
-const timelineLoading = computed(() => (showFavoritesOnly.value ? favoritesStore.loading : store.loadingEntries))
 
 const feedMap = computed<Record<string, Feed>>(() => {
   return store.feeds.reduce<Record<string, Feed>>((acc, feed) => {
@@ -216,10 +211,6 @@ function handleEntrySelect(entryId: string) {
   } else {
     store.selectEntry(entryId)
   }
-}
-
-function isEntryActive(entryId: string) {
-  return currentSelectedEntry.value?.id === entryId
 }
 
 
@@ -358,8 +349,6 @@ function collapseAllGroups() {
     collapsedGroups.value[name] = true
   })
 }
-
-const activeFeed = computed(() => store.feeds.find(f => f.id === store.activeFeedId) || null)
 
 async function handleFeedClick(feedId: string) {
   store.selectFeed(feedId)
