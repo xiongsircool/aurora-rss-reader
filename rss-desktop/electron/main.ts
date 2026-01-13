@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import { spawn, ChildProcess } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
@@ -16,6 +16,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // │ │ └── preload.mjs
 // │
 process.env.APP_ROOT = path.join(__dirname, '..')
+// 日志文件路径
+const logFile = path.join(app.getPath('userData'), 'desktop_startup.log')
 
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
@@ -56,13 +58,25 @@ function resolvePreloadPath(): string {
   return fallback
 }
 
+
+function logToFile(message: string) {
+  const time = new Date().toISOString()
+  const logMessage = `[${time}] ${message}`
+  console.log(logMessage)
+  try {
+    fs.appendFileSync(logFile, logMessage + '\n')
+  } catch (err) {
+    console.error('Failed to write log:', err)
+  }
+}
+
 /**
  * 健康检查：等待后端服务就绪
  */
 async function waitForBackendReady(): Promise<boolean> {
   const startTime = Date.now()
 
-  console.log(`⏳ 等待后端服务就绪... (${HEALTH_CHECK_URL})`)
+  logToFile(`⏳ 等待后端服务就绪... (${HEALTH_CHECK_URL})`)
 
   while (Date.now() - startTime < HEALTH_CHECK_TIMEOUT) {
     try {
@@ -73,7 +87,7 @@ async function waitForBackendReady(): Promise<boolean> {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('✅ 后端服务已就绪:', data)
+        logToFile(`✅ 后端服务已就绪: ${JSON.stringify(data)}`)
         backendReady = true
         return true
       }
@@ -85,7 +99,7 @@ async function waitForBackendReady(): Promise<boolean> {
     await new Promise(resolve => setTimeout(resolve, HEALTH_CHECK_INTERVAL))
   }
 
-  console.error('❌ 后端服务启动超时')
+  logToFile('❌ 后端服务启动超时')
   return false
 }
 
@@ -162,17 +176,18 @@ function getBackendExecutable(): { exec: string; args: string[]; cwd: string } {
  */
 async function startBackend(): Promise<boolean> {
   if (backendProcess) {
-    console.log('⚠️  后端已在运行')
+    logToFile('⚠️  后端已在运行')
     return backendReady
   }
 
   try {
+    logToFile('Finding backend executable...')
     const { exec, args, cwd } = getBackendExecutable()
 
-    console.log('🚀 启动后端服务...')
-    console.log(`   可执行文件: ${exec}`)
-    console.log(`   参数: ${args.join(' ')}`)
-    console.log(`   工作目录: ${cwd}`)
+    logToFile('🚀 启动后端服务...')
+    logToFile(`   可执行文件: ${exec}`)
+    logToFile(`   参数: ${args.join(' ')}`)
+    logToFile(`   工作目录: ${cwd}`)
 
     const spawnOptions: any = {
       cwd,
@@ -193,34 +208,34 @@ async function startBackend(): Promise<boolean> {
     if (!isDev) {
       spawnedProcess.stdout?.on('data', (data) => {
         const output = data.toString().trim()
-        if (output) console.log('[Backend]', output)
+        if (output) logToFile(`[Backend] ${output}`)
       })
 
       spawnedProcess.stderr?.on('data', (data) => {
         const output = data.toString().trim()
-        if (output) console.error('[Backend Error]', output)
+        if (output) logToFile(`[Backend Error] ${output}`)
       })
     }
 
     spawnedProcess.on('error', (error) => {
-      console.error('❌ 后端进程错误:', error)
+      logToFile(`❌ 后端进程错误: ${error}`)
       backendProcess = null
       backendReady = false
     })
 
     spawnedProcess.on('exit', (code, signal) => {
-      console.log(`[Backend] 进程退出 - 代码: ${code}, 信号: ${signal}`)
+      logToFile(`[Backend] 进程退出 - 代码: ${code}, 信号: ${signal}`)
       backendProcess = null
       backendReady = false
     })
 
-    console.log('✅ 后端进程已启动，等待服务就绪...')
+    logToFile('✅ 后端进程已启动，等待服务就绪...')
 
     // 等待后端服务就绪
     const ready = await waitForBackendReady()
 
     if (!ready) {
-      console.error('❌ 后端服务未能在规定时间内就绪')
+      logToFile('❌ 后端服务未能在规定时间内就绪')
       stopBackend()
       return false
     }
@@ -228,7 +243,7 @@ async function startBackend(): Promise<boolean> {
     return true
 
   } catch (error) {
-    console.error('❌ 启动后端时发生错误:', error)
+    logToFile(`❌ 启动后端时发生错误: ${error}`)
     backendProcess = null
     backendReady = false
     return false
@@ -405,23 +420,23 @@ function loadRendererContent() {
  * 应用启动
  */
 app.whenReady().then(async () => {
-  console.log('🎯 Aurora RSS Reader 启动中...')
-  console.log(`   开发模式: ${isDev}`)
-  console.log(`   用户数据目录: ${app.getPath('userData')}`)
-  console.log(`   资源路径: ${process.resourcesPath}`)
+  logToFile('🎯 Aurora RSS Reader 启动中...')
+  logToFile(`   开发模式: ${isDev}`)
+  logToFile(`   用户数据目录: ${app.getPath('userData')}`)
+  logToFile(`   资源路径: ${process.resourcesPath}`)
 
   createWindow()
 
   if (isDev) {
-    console.log('⚠️  开发模式：假设后端已由 pnpm dev 启动')
-    console.log('   等待后端就绪...')
+    logToFile('⚠️  开发模式：假设后端已由 pnpm dev 启动')
+    logToFile('   等待后端就绪...')
     showStartupStatus('等待开发后端服务就绪...')
 
     const backendReady = await waitForBackendReady()
 
     if (!backendReady) {
-      console.error('❌ 后端未就绪，请确保运行了 pnpm dev')
-      console.error('   或者单独启动后端: cd backend && source .venv/bin/activate && python -m scripts.serve')
+      logToFile('❌ 后端未就绪，请确保运行了 pnpm dev')
+      dialog.showErrorBox('启动失败', '开发模式后端未就绪，请确保运行了 pnpm dev')
       showStartupStatus('后端未就绪，请检查终端中的启动命令')
       app.quit()
       return
@@ -434,7 +449,8 @@ app.whenReady().then(async () => {
     const backendStarted = await startBackend()
 
     if (!backendStarted) {
-      console.error('❌ 后端启动失败，应用无法继续')
+      logToFile('❌ 后端启动失败，应用无法继续')
+      dialog.showErrorBox('启动失败', '后端服务启动失败，请检查日志文件: desktop_startup.log')
       showStartupStatus('后端启动失败，请查看日志或重启应用')
       app.quit()
       return
