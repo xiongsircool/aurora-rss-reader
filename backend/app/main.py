@@ -62,13 +62,25 @@ def build_allowed_origins() -> list[str]:
     return sorted(allowed)
 
 
+import logging
+import time
+
+# ... existing code ...
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # init_db()
+    
+    logger = logging.getLogger("backend.startup")
+    logger.info("Application starting up...")
+    
+    start_time = time.time()
     try:
+        logger.info("Running database migrations...")
         run_migrations()
+        logger.info(f"Database migrations completed in {time.time() - start_time:.2f}s")
     except Exception as e:
-        print(f"Startup migration failed: {e}")
+        logger.error(f"Startup migration failed: {e}", exc_info=True)
         # 这里可以选择是否继续运行，对于必须的数据库变更，失败应该退出
         # 但为了用户体验，有时会选择记录日志继续
         pass
@@ -76,6 +88,8 @@ async def lifespan(_: FastAPI):
     ensure_user_settings_schema()
     # 初始化RSSHub配置
     await rsshub_manager.initialize_default_mirrors()
+    
+    logger.info(f"Application fully initialized in {time.time() - start_time:.2f}s")
 
     scheduler = AsyncIOScheduler()
     scheduler.start()

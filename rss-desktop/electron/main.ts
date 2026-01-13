@@ -40,7 +40,7 @@ let devtoolsOpened = false
 const BACKEND_HOST = '127.0.0.1'
 const BACKEND_PORT = 15432
 const HEALTH_CHECK_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/health`
-const HEALTH_CHECK_TIMEOUT = 30000 // 30秒超时
+const HEALTH_CHECK_TIMEOUT = 300000 // 5分钟超时
 const HEALTH_CHECK_INTERVAL = 500 // 每500ms检查一次
 
 function resolvePreloadPath(): string {
