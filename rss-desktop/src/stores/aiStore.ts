@@ -15,6 +15,7 @@ export interface AIFeatureConfig {
   auto_summary: boolean
   auto_translation: boolean
   auto_title_translation: boolean
+  title_display_mode: 'replace' | 'translation-first' | 'original-first'
   translation_language: string
 }
 
@@ -44,6 +45,7 @@ const createDefaultConfig = (): AIConfig => ({
     auto_summary: false,
     auto_translation: false,
     auto_title_translation: false,
+    title_display_mode: 'original-first',
     translation_language: 'zh'
   }
 })

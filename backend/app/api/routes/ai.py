@@ -34,6 +34,7 @@ def _ensure_cache_initialized() -> None:
             "auto_summary": False,
             "auto_translation": False,
             "auto_title_translation": False,
+            "title_display_mode": "original-first",
             "translation_language": "zh",
         }
 
@@ -45,6 +46,7 @@ _ai_settings_cache: dict[str, dict[str, str | bool]] = {
         "auto_summary": False,
         "auto_translation": False,
         "auto_title_translation": False,
+        "title_display_mode": "original-first",
         "translation_language": "zh",
     },
 }
@@ -368,6 +370,7 @@ class AIFeatureConfig(BaseModel):
     auto_summary: bool = False
     auto_translation: bool = False
     auto_title_translation: bool = False
+    title_display_mode: str = "original-first"
     translation_language: str = "zh"
 
 
@@ -387,6 +390,7 @@ class AIFeatureConfigUpdate(BaseModel):
     auto_summary: bool | None = None
     auto_translation: bool | None = None
     auto_title_translation: bool | None = None
+    title_display_mode: str | None = None
     translation_language: str | None = None
 
 
@@ -458,6 +462,8 @@ async def update_ai_config(payload: AIConfigUpdate) -> dict:
                 features["auto_translation"] = payload.features.auto_translation
             if payload.features.auto_title_translation is not None:
                 features["auto_title_translation"] = payload.features.auto_title_translation
+            if payload.features.title_display_mode is not None:
+                features["title_display_mode"] = payload.features.title_display_mode
             if payload.features.translation_language is not None:
                 features["translation_language"] = payload.features.translation_language
 

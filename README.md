@@ -145,6 +145,61 @@ chmod +x start.sh
 ./start.sh
 ```
 
+### Development Setup (Manual)
+
+#### Windows
+
+1.  **Backend Setup**:
+    ```powershell
+    cd backend
+    copy .env.example .env
+    python -m venv .venv
+    .\.venv\Scripts\pip install -r requirements.txt
+    .\.venv\Scripts\pip install -e .
+    .\.venv\Scripts\python -m scripts.migrate
+    ```
+
+2.  **Frontend Setup**:
+    ```powershell
+    cd rss-desktop
+    copy .env.example .env
+    pnpm install
+    ```
+
+3.  **Run Application**:
+    ```powershell
+    cd rss-desktop
+    pnpm dev
+    ```
+
+#### Linux / macOS
+
+You can use the `start.sh` script or follow these manual steps:
+
+1.  **Backend Setup**:
+    ```bash
+    cd backend
+    cp .env.example .env
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    pip install -e .
+    python -m scripts.migrate
+    ```
+
+2.  **Frontend Setup**:
+    ```bash
+    cd rss-desktop
+    cp .env.example .env
+    pnpm install
+    ```
+
+3.  **Run Application**:
+    ```bash
+    cd rss-desktop
+    pnpm dev
+    ```
+
 The startup script will automatically:
 - Create Python virtual environment
 - Install frontend and backend dependencies

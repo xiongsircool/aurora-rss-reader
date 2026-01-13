@@ -8,6 +8,10 @@ from app.core.config import settings, APP_DATA_DIR
 
 def main() -> None:
     """启动后端服务"""
+    # 强制使用 UTF-8 输出，防止 Windows 下 UnicodeEncodeError
+    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     # 打印启动信息
     is_packaged = getattr(sys, 'frozen', False)
     print(f"🚀 Aurora RSS Backend Starting...")

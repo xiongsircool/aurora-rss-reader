@@ -20,7 +20,7 @@ export const useSettingsStore = defineStore('settings', () => {
     items_per_page: 50,
     enable_date_filter: true,
     default_date_range: '30d',
-    time_field: 'inserted_at',
+    time_field: 'published_at',
     show_entry_summary: true,
     max_auto_title_translations: getDefaultAutoTitleTranslationLimit()
   })

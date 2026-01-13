@@ -38,7 +38,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
   const error = ref<string | null>(null)
 
   // 获取收藏文章列表
-  async function fetchStarredEntries(feedId?: string, limit = 50, offset = 0) {
+  async function fetchStarredEntries(feedId?: string, limit = 50, offset = 0, options: { dateRange?: string; timeField?: string } = {}) {
     loading.value = true
     error.value = null
 
@@ -48,10 +48,17 @@ export const useFavoritesStore = defineStore('favorites', () => {
         params.feed_id = feedId
       }
 
+      if (options.dateRange && options.dateRange !== 'all') {
+        params.date_range = options.dateRange
+      }
+      if (options.timeField) {
+        params.time_field = options.timeField
+      }
+
       const { data } = await api.get<StarredEntry[]>('/entries/starred', { params })
       starredEntries.value = data
 
-      // 获取统计数据
+      // 获取统计数据 (Note: Stats API might not support filters, assuming global stats for now or update if needed)
       await fetchStarredStats()
 
       return data

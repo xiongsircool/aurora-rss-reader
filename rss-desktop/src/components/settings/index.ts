@@ -1,0 +1,7 @@
+export { default as SettingsLanguage } from './SettingsLanguage.vue'
+export { default as SettingsRSSHub } from './SettingsRSSHub.vue'
+export { default as SettingsAIConfig } from './SettingsAIConfig.vue'
+export { default as SettingsAIFeatures } from './SettingsAIFeatures.vue'
+export { default as SettingsRefresh } from './SettingsRefresh.vue'
+export { default as SettingsDisplay } from './SettingsDisplay.vue'
+export { default as SettingsAbout } from './SettingsAbout.vue'
