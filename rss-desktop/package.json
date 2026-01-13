@@ -38,6 +38,11 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  },
   "scripts": {
     "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\" --names \"UI,API\" --prefix-colors \"cyan,green\"",
     "dev:frontend": "vite --host",
