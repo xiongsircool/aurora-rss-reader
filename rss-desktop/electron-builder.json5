@@ -16,13 +16,13 @@
     "!dist-electron/**/*.map",
     "!dist/**/*.map"
   ],
-  "extraResources": [
-    {
-      "from": "../backend/dist/aurora-backend.exe",
-      "to": "backend/aurora-backend.exe"
-    }
-  ],
   "mac": {
+    "extraResources": [
+      {
+        "from": "../backend/dist/aurora-backend",
+        "to": "backend/aurora-backend"
+      }
+    ],
     "target": [
       {
         "target": "dmg",
@@ -37,6 +37,12 @@
     "entitlementsInherit": null
   },
   "win": {
+    "extraResources": [
+      {
+        "from": "../backend/dist/aurora-backend.exe",
+        "to": "backend/aurora-backend.exe"
+      }
+    ],
     "target": [
       {
         "target": "nsis",
@@ -62,6 +68,12 @@
     "artifactName": "AuroraRSSReader-Windows-${version}-${arch}-Portable.${ext}"
   },
   "linux": {
+    "extraResources": [
+      {
+        "from": "../backend/dist/aurora-backend",
+        "to": "backend/aurora-backend"
+      }
+    ],
     "target": [
       {
         "target": "AppImage",

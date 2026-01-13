@@ -53,7 +53,7 @@ jobs:
       - name: Build and Package
         run: |
           cd rss-desktop
-          pnpm pack
+          pnpm run pack
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
