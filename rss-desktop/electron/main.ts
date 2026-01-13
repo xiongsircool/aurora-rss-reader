@@ -174,79 +174,89 @@ function getBackendExecutable(): { exec: string; args: string[]; cwd: string } {
 /**
  * 启动后端服务
  */
-async function startBackend(): Promise<boolean> {
+/**
+ * 启动后端服务
+ */
+async function startBackend(): Promise<{ success: boolean; error?: string; path?: string }> {
   if (backendProcess) {
     logToFile('⚠️  后端已在运行')
-    return backendReady
+    return { success: backendReady }
   }
+
+  let execPath = ''
 
   try {
     logToFile('Finding backend executable...')
-    const { exec, args, cwd } = getBackendExecutable()
+    try {
+      const { exec, args, cwd } = getBackendExecutable()
+      execPath = exec
 
-    logToFile('🚀 启动后端服务...')
-    logToFile(`   可执行文件: ${exec}`)
-    logToFile(`   参数: ${args.join(' ')}`)
-    logToFile(`   工作目录: ${cwd}`)
+      logToFile('🚀 启动后端服务...')
+      logToFile(`   可执行文件: ${exec}`)
+      logToFile(`   参数: ${args.join(' ')}`)
+      logToFile(`   工作目录: ${cwd}`)
 
-    const spawnOptions: any = {
-      cwd,
-      env: {
-        ...process.env,
-        PYTHONUNBUFFERED: '1',
-        APP_ENV: isDev ? 'development' : 'production',
-        // 设置数据目录（可选，后端会自动处理）
-        AURORA_DATA_DIR: app.getPath('userData')
-      },
-      stdio: isDev ? 'inherit' : ['pipe', 'pipe', 'pipe'] as const
-    }
+      const spawnOptions: any = {
+        cwd,
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: '1',
+          APP_ENV: isDev ? 'development' : 'production',
+          AURORA_DATA_DIR: app.getPath('userData')
+        },
+        stdio: isDev ? 'inherit' : ['pipe', 'pipe', 'pipe'] as const
+      }
 
-    const spawnedProcess = spawn(exec, args, spawnOptions)
-    backendProcess = spawnedProcess
+      const spawnedProcess = spawn(exec, args, spawnOptions)
+      backendProcess = spawnedProcess
 
-    // 记录后端输出
-    if (!isDev) {
-      spawnedProcess.stdout?.on('data', (data) => {
-        const output = data.toString().trim()
-        if (output) logToFile(`[Backend] ${output}`)
+      // 记录后端输出
+      if (!isDev) {
+        spawnedProcess.stdout?.on('data', (data) => {
+          const output = data.toString().trim()
+          if (output) logToFile(`[Backend] ${output}`)
+        })
+
+        spawnedProcess.stderr?.on('data', (data) => {
+          const output = data.toString().trim()
+          if (output) logToFile(`[Backend Error] ${output}`)
+        })
+      }
+
+      spawnedProcess.on('error', (error) => {
+        logToFile(`❌ 后端进程错误: ${error}`)
+        backendProcess = null
+        backendReady = false
       })
 
-      spawnedProcess.stderr?.on('data', (data) => {
-        const output = data.toString().trim()
-        if (output) logToFile(`[Backend Error] ${output}`)
+      spawnedProcess.on('exit', (code, signal) => {
+        logToFile(`[Backend] 进程退出 - 代码: ${code}, 信号: ${signal}`)
+        backendProcess = null
+        backendReady = false
       })
+
+      logToFile('✅ 后端进程已启动，等待服务就绪...')
+
+      const ready = await waitForBackendReady()
+
+      if (!ready) {
+        logToFile('❌ 后端服务未能在规定时间内就绪')
+        stopBackend()
+        return { success: false, error: '后端服务启动超时（30s）', path: execPath }
+      }
+
+      return { success: true, path: execPath }
+
+    } catch (err: any) {
+      // getBackendExecutable throw error
+      return { success: false, error: err.message || String(err), path: '搜索失败' }
     }
 
-    spawnedProcess.on('error', (error) => {
-      logToFile(`❌ 后端进程错误: ${error}`)
-      backendProcess = null
-      backendReady = false
-    })
-
-    spawnedProcess.on('exit', (code, signal) => {
-      logToFile(`[Backend] 进程退出 - 代码: ${code}, 信号: ${signal}`)
-      backendProcess = null
-      backendReady = false
-    })
-
-    logToFile('✅ 后端进程已启动，等待服务就绪...')
-
-    // 等待后端服务就绪
-    const ready = await waitForBackendReady()
-
-    if (!ready) {
-      logToFile('❌ 后端服务未能在规定时间内就绪')
-      stopBackend()
-      return false
-    }
-
-    return true
-
-  } catch (error) {
+  } catch (error: any) {
     logToFile(`❌ 启动后端时发生错误: ${error}`)
     backendProcess = null
     backendReady = false
-    return false
+    return { success: false, error: error.message || String(error), path: execPath }
   }
 }
 
@@ -446,12 +456,16 @@ app.whenReady().then(async () => {
   } else {
     showStartupStatus('正在启动后端服务，请稍候...')
 
-    const backendStarted = await startBackend()
+    const backendResult = await startBackend()
 
-    if (!backendStarted) {
-      logToFile('❌ 后端启动失败，应用无法继续')
-      dialog.showErrorBox('启动失败', '后端服务启动失败，请检查日志文件: desktop_startup.log')
-      showStartupStatus('后端启动失败，请查看日志或重启应用')
+    if (!backendResult.success) {
+      logToFile(`❌ 后端启动失败: ${backendResult.error}`)
+      dialog.showErrorBox('后端启动失败',
+        `错误详情: ${backendResult.error}\n\n` +
+        `搜索路径: ${backendResult.path || '未知'}\n\n` +
+        `请截图反馈此问题。`
+      )
+      showStartupStatus(`后端启动失败: ${backendResult.error}`)
       app.quit()
       return
     }
