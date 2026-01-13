@@ -183,6 +183,7 @@ async function startBackend(): Promise<{ success: boolean; error?: string; path?
     return { success: backendReady }
   }
 
+  // [DEBUG] Ensure error dialog is active
   let execPath = ''
 
   try {
