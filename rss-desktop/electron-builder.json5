@@ -19,7 +19,7 @@
   "mac": {
     "extraResources": [
       {
-        "from": "../backend/dist/aurora-backend",
+        "from": "resources/backend/aurora-backend",
         "to": "backend/aurora-backend"
       }
     ],
@@ -39,7 +39,7 @@
   "win": {
     "extraResources": [
       {
-        "from": "../backend/dist/aurora-backend.exe",
+        "from": "resources/backend/aurora-backend.exe",
         "to": "backend/aurora-backend.exe"
       }
     ],
@@ -70,7 +70,7 @@
   "linux": {
     "extraResources": [
       {
-        "from": "../backend/dist/aurora-backend",
+        "from": "resources/backend/aurora-backend",
         "to": "backend/aurora-backend"
       }
     ],

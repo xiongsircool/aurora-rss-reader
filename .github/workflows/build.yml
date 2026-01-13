@@ -50,6 +50,17 @@ jobs:
           cd rss-desktop
           pnpm install
           
+      - name: Prepare Backend for Packaging
+        shell: bash
+        run: |
+          mkdir -p rss-desktop/resources/backend
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            cp backend/dist/aurora-backend.exe rss-desktop/resources/backend/
+          else
+            cp backend/dist/aurora-backend rss-desktop/resources/backend/
+          fi
+          ls -l rss-desktop/resources/backend/
+          
       - name: Build and Package
         run: |
           cd rss-desktop
