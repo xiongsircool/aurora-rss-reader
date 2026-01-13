@@ -5,11 +5,13 @@ defineProps<{
   title: string
   subtitle: string
   showFavoritesOnly: boolean
+  unreadCount?: number
 }>()
 
 const emit = defineEmits<{
   (e: 'refresh'): void
   (e: 'back-to-feeds'): void
+  (e: 'mark-all-read'): void
 }>()
 
 const { t } = useI18n()
@@ -22,6 +24,21 @@ const { t } = useI18n()
       <p class="muted">{{ subtitle }}</p>
     </div>
     <div class="timeline__actions">
+      <!-- Mark All as Read Button -->
+      <button 
+        v-if="!showFavoritesOnly"
+        class="timeline-action-btn timeline-action-btn--mark-read"
+        @click="emit('mark-all-read')"
+        :title="t('articles.markAllAsRead')"
+      >
+        <span class="timeline-action-btn__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor" />
+          </svg>
+        </span>
+        <span>{{ t('articles.markAllAsRead') }}</span>
+      </button>
+
       <button class="timeline-action-btn" @click="emit('refresh')">
         <span class="timeline-action-btn__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
@@ -148,8 +165,22 @@ const { t } = useI18n()
   box-shadow: 0 6px 18px rgba(15, 17, 21, 0.15);
 }
 
+/* Mark as read button - green accent */
+.timeline-action-btn--mark-read {
+  background: linear-gradient(120deg, #34c759, #30d158);
+  box-shadow: 0 6px 16px rgba(52, 199, 89, 0.3);
+}
+
+.timeline-action-btn--mark-read:hover {
+  box-shadow: 0 8px 20px rgba(52, 199, 89, 0.4);
+}
+
 :global(.dark) .timeline-action-btn {
   box-shadow: 0 8px 20px rgba(255, 122, 24, 0.25);
+}
+
+:global(.dark) .timeline-action-btn--mark-read {
+  box-shadow: 0 8px 20px rgba(52, 199, 89, 0.25);
 }
 
 :global(.dark) .timeline-action-btn--ghost {

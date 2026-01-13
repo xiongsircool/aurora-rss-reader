@@ -225,12 +225,6 @@ function isEntryActive(entryId: string) {
 
 
 
-function getEntryPreview(entry: Entry) {
-  const summary = entry.summary?.trim()
-  if (summary) return summary
-  const fallback = stripHtml(entry.content)
-  return fallback || NO_SUMMARY_TEXT
-}
 
 // Watch for AI store errors
 watch(() => aiStore.error, (error) => {
@@ -563,6 +557,99 @@ function reloadFeeds() {
       store.fetchFeeds() // fallback
    }
 }
+
+// 一键已读处理
+async function handleMarkAllAsRead() {
+  const markAsReadRange = settingsStore.settings.mark_as_read_range
+  const timeField = settingsStore.settings.time_field
+  
+  // 确认对话框
+  const confirmed = confirm(t('articles.markAsReadConfirmAll'))
+  if (!confirmed) return
+  
+  try {
+    // 根据设置确定时间范围
+    // 'all' 或 'current' 表示标记所有未读
+    // '3d', '7d', '30d' 表示标记 X 天之前的文章
+    const olderThan = (markAsReadRange === 'all' || markAsReadRange === 'current') 
+      ? undefined 
+      : markAsReadRange
+    
+    const result = await store.markAsRead({
+      feedId: store.activeFeedId ?? undefined,
+      groupName: store.activeGroupName ?? undefined,
+      olderThan,
+      timeField
+    })
+    
+    if (result.marked_count > 0) {
+      showNotification(t('articles.markAsReadSuccess', { count: result.marked_count }), 'success')
+      // 刷新列表
+      await applyFilters()
+    } else {
+      showNotification(t('articles.markAsReadEmpty'), 'info')
+    }
+  } catch (error) {
+    console.error('Mark as read failed:', error)
+    showNotification(t('articles.markAsReadFailed'), 'error')
+  }
+}
+
+// 分组级别一键已读
+async function handleMarkGroupAsRead(groupName: string) {
+  const markAsReadRange = settingsStore.settings.mark_as_read_range
+  const timeField = settingsStore.settings.time_field
+  
+  try {
+    const olderThan = (markAsReadRange === 'all' || markAsReadRange === 'current') 
+      ? undefined 
+      : markAsReadRange
+    
+    const result = await store.markAsRead({
+      groupName,
+      olderThan,
+      timeField
+    })
+    
+    if (result.marked_count > 0) {
+      showNotification(t('articles.markAsReadSuccess', { count: result.marked_count }), 'success')
+      await applyFilters()
+    } else {
+      showNotification(t('articles.markAsReadEmpty'), 'info')
+    }
+  } catch (error) {
+    console.error('Mark group as read failed:', error)
+    showNotification(t('articles.markAsReadFailed'), 'error')
+  }
+}
+
+// 订阅级别一键已读
+async function handleMarkFeedAsRead(feedId: string) {
+  const markAsReadRange = settingsStore.settings.mark_as_read_range
+  const timeField = settingsStore.settings.time_field
+  
+  try {
+    const olderThan = (markAsReadRange === 'all' || markAsReadRange === 'current') 
+      ? undefined 
+      : markAsReadRange
+    
+    const result = await store.markAsRead({
+      feedId,
+      olderThan,
+      timeField
+    })
+    
+    if (result.marked_count > 0) {
+      showNotification(t('articles.markAsReadSuccess', { count: result.marked_count }), 'success')
+      await applyFilters()
+    } else {
+      showNotification(t('articles.markAsReadEmpty'), 'info')
+    }
+  } catch (error) {
+    console.error('Mark feed as read failed:', error)
+    showNotification(t('articles.markAsReadFailed'), 'error')
+  }
+}
 </script>
 
 <template>
@@ -619,6 +706,8 @@ function reloadFeeds() {
       @cancel-edit="cancelEdit"
       @delete-feed="handleDeleteFeed"
       @update:editing-group-name="editingGroupName = $event"
+      @mark-group-read="handleMarkGroupAsRead"
+      @mark-feed-read="handleMarkFeedAsRead"
     />
 
     <div
@@ -638,8 +727,8 @@ function reloadFeeds() {
       :filter-loading="filterLoading"
       :enable-date-filter="settingsStore.settings.enable_date_filter"
       :entries="filteredEntries"
-      :loading="store.loading"
-      :show-summary="settingsStore.settings.show_summary_card || true"
+      :loading="store.loadingEntries"
+      :show-summary="settingsStore.settings.show_entry_summary"
       :auto-title-translation="aiFeatures?.auto_title_translation"
       :title-display-mode="aiFeatures?.title_display_mode"
       :translation-language-label="titleTranslationLanguageLabel"
@@ -653,6 +742,7 @@ function reloadFeeds() {
       @update:date-range-filter="dateRangeFilter = $event"
       @select-entry="handleEntrySelect"
       @toggle-star="toggleStarFromList"
+      @mark-all-read="handleMarkAllAsRead"
     />
 
     <div

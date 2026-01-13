@@ -199,10 +199,10 @@ export const useFeedStore = defineStore('feed', () => {
   }) {
     const targetFeed = options?.feedId ?? activeFeedId.value
     const targetGroup = options?.groupName ?? activeGroupName.value
-    
+
     // 如果既没有feed也没有group，则返回
     if (!targetFeed && !targetGroup) return
-    
+
     loadingEntries.value = true
     try {
       const hasUnreadOnly = options && Object.prototype.hasOwnProperty.call(options, 'unreadOnly')
@@ -408,6 +408,52 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
+  // 一键已读接口
+  interface MarkAsReadOptions {
+    feedId?: string
+    groupName?: string
+    olderThan?: string  // 标记多少天之前的文章为已读
+    timeField?: string
+  }
+
+  interface MarkAsReadResult {
+    success: boolean
+    message: string
+    marked_count: number
+    feed_counts: Record<string, number>
+  }
+
+  async function markAsRead(options: MarkAsReadOptions = {}): Promise<MarkAsReadResult> {
+    try {
+      const { data } = await api.post<MarkAsReadResult>('/entries/mark-read', {
+        feed_id: options.feedId ?? null,
+        group_name: options.groupName ?? null,
+        older_than: options.olderThan ?? null,
+        time_field: options.timeField ?? 'inserted_at'
+      })
+
+      // 更新本地的未读计数
+      if (data.feed_counts) {
+        Object.entries(data.feed_counts).forEach(([feedId, count]) => {
+          adjustFeedUnreadCount(feedId, -count)
+        })
+      }
+
+      // 更新本地 entries 的已读状态
+      entries.value.forEach(entry => {
+        if (data.feed_counts && data.feed_counts[entry.feed_id]) {
+          entry.read = true
+        }
+      })
+
+      return data
+    } catch (error) {
+      console.error('Mark as read failed:', error)
+      errorMessage.value = '标记已读失败'
+      throw error
+    }
+  }
+
   return {
     feeds,
     entries,
@@ -448,5 +494,7 @@ export const useFeedStore = defineStore('feed', () => {
     expandAllGroups,
     collapseAllGroups,
     loadCollapsedGroups,
+    // 一键已读方法
+    markAsRead,
   }
 })

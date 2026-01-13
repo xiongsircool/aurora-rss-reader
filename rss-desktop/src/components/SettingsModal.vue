@@ -68,6 +68,11 @@ const autoTitleTranslationLimit = computed({
   }
 })
 
+const markAsReadRange = computed({
+  get: () => settingsStore.settings.mark_as_read_range,
+  set: (value) => settingsStore.updateSettings({ mark_as_read_range: value })
+})
+
 // Watch modal visibility
 watch(() => props.show, async (show) => {
   if (show) {
@@ -155,6 +160,7 @@ async function saveSettings() {
             v-model:enableDateFilter="enableDateFilter"
             v-model:defaultDateRange="defaultDateRange"
             v-model:timeField="timeField"
+            v-model:markAsReadRange="markAsReadRange"
           />
 
           <SettingsAbout />

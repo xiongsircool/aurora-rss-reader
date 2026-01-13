@@ -12,6 +12,8 @@ export interface AppSettings {
   time_field: string
   show_entry_summary: boolean
   max_auto_title_translations: number
+  // 一键已读相关设置
+  mark_as_read_range: string // 'current' | '3d' | '7d' | '30d' | 'all'
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -22,7 +24,8 @@ export const useSettingsStore = defineStore('settings', () => {
     default_date_range: '30d',
     time_field: 'published_at',
     show_entry_summary: true,
-    max_auto_title_translations: getDefaultAutoTitleTranslationLimit()
+    max_auto_title_translations: getDefaultAutoTitleTranslationLimit(),
+    mark_as_read_range: 'current'
   })
 
   const loading = ref(false)

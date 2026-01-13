@@ -28,6 +28,8 @@ const emit = defineEmits<{
   (e: 'cancel-edit'): void
   (e: 'delete-feed', feedId: string): void
   (e: 'update:editingGroupName', value: string): void
+  (e: 'mark-group-read', groupName: string): void
+  (e: 'mark-feed-read', feedId: string): void
 }>()
 
 </script>
@@ -68,6 +70,17 @@ const emit = defineEmits<{
           </span>
         </span>
       </button>
+      <!-- Mark Group as Read Button -->
+      <button 
+        v-if="unreadCount > 0"
+        class="mark-read-btn"
+        @click.stop="emit('mark-group-read', groupName)"
+        :title="t('articles.markGroupAsRead')"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+        </svg>
+      </button>
     </div>
 
     <!-- Feeds List -->
@@ -87,6 +100,7 @@ const emit = defineEmits<{
         @cancel-edit="emit('cancel-edit')"
         @delete="emit('delete-feed', $event)"
         @update:editing-group-name="emit('update:editingGroupName', $event)"
+        @mark-feed-read="emit('mark-feed-read', $event)"
       />
     </div>
   </div>
@@ -107,11 +121,13 @@ const emit = defineEmits<{
 }
 
 .group-header-wrapper {
-  /* wrapper for potential future enhancements */
+  display: flex;
+  align-items: center;
+  position: relative;
 }
 
 .group-header {
-  width: 100%;
+  flex: 1;
   border: none;
   background: transparent;
   padding: 12px 16px;
@@ -181,6 +197,38 @@ const emit = defineEmits<{
   margin-left: 4px;
 }
 
+/* Mark as Read Button */
+.mark-read-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(52, 199, 89, 0.15);
+  color: #34c759;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  margin-right: 8px;
+  opacity: 0;
+}
+
+.group-header-wrapper:hover .mark-read-btn {
+  opacity: 1;
+}
+
+.mark-read-btn:hover {
+  background: #34c759;
+  color: white;
+  transform: scale(1.05);
+}
+
+.mark-read-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .group-feeds {
   background: rgba(255, 255, 255, 0.2);
   border-top: 1px solid rgba(15, 17, 21, 0.05);
@@ -202,5 +250,9 @@ const emit = defineEmits<{
 :global(.dark) .group-feeds {
   background: rgba(15, 17, 21, 0.3);
   border-top-color: rgba(255, 255, 255, 0.05);
+}
+
+:global(.dark) .mark-read-btn {
+  background: rgba(52, 199, 89, 0.2);
 }
 </style>

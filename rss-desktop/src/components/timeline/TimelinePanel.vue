@@ -45,6 +45,7 @@ const emit = defineEmits<{
   (e: 'update:dateRangeFilter', value: string): void
   (e: 'select-entry', entryId: string): void
   (e: 'toggle-star', entry: Entry): void
+  (e: 'mark-all-read'): void
 }>()
 
 const { t } = useI18n()
@@ -58,6 +59,7 @@ const { t } = useI18n()
       :show-favorites-only="showFavoritesOnly"
       @refresh="emit('refresh')"
       @back-to-feeds="emit('back-to-feeds')"
+      @mark-all-read="emit('mark-all-read')"
     />
     
     <TimelineFilters

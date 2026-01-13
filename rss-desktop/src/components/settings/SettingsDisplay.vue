@@ -5,6 +5,7 @@ const showEntrySummary = defineModel<boolean>('showEntrySummary', { required: tr
 const enableDateFilter = defineModel<boolean>('enableDateFilter', { required: true })
 const defaultDateRange = defineModel<string>('defaultDateRange', { required: true })
 const timeField = defineModel<string>('timeField', { required: true })
+const markAsReadRange = defineModel<string>('markAsReadRange', { required: true })
 
 const { t } = useI18n()
 </script>
@@ -62,6 +63,23 @@ const { t } = useI18n()
         </label>
       </div>
       <p class="form-hint">{{ t('settings.timeBaseDescription') }}</p>
+    </div>
+  </section>
+
+  <!-- Mark as Read Settings -->
+  <section class="settings-section">
+    <h3>{{ t('settings.markAsReadSettings') }}</h3>
+    
+    <div class="form-group">
+      <label>{{ t('settings.markAsReadRange') }}</label>
+      <select v-model="markAsReadRange" class="form-select">
+        <option value="current">{{ t('settings.markAsReadRangeCurrent') }}</option>
+        <option value="3d">{{ t('settings.markAsReadRange3d') }}</option>
+        <option value="7d">{{ t('settings.markAsReadRange7d') }}</option>
+        <option value="30d">{{ t('settings.markAsReadRange30d') }}</option>
+        <option value="all">{{ t('settings.markAsReadRangeAll') }}</option>
+      </select>
+      <p class="form-hint">{{ t('settings.markAsReadRangeDescription') }}</p>
     </div>
   </section>
 </template>

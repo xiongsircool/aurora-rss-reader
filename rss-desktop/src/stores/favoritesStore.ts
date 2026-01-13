@@ -230,6 +230,9 @@ export const useFavoritesStore = defineStore('favorites', () => {
     return groups
   })
 
+  // 计算属性：总收藏数
+  const totalStarred = computed(() => starredStats.value.total_starred)
+
   // 计算属性：是否已收藏
   function isEntryStarred(entryId: string): boolean {
     return starredEntries.value.some(entry => entry.id === entryId)
@@ -257,6 +260,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
     starredEntries,
     starredStats,
     groupedStats,
+    totalStarred,
     loading,
     error,
 

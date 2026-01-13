@@ -80,6 +80,10 @@ const emit = defineEmits<{
   (e: 'cancel-edit'): void
   (e: 'delete-feed', feedId: string): void
   (e: 'update:editingGroupName', value: string): void
+  
+  // Mark as read
+  (e: 'mark-group-read', groupName: string): void
+  (e: 'mark-feed-read', feedId: string): void
 }>()
 
 const { t } = useI18n()
@@ -154,6 +158,8 @@ function isGroupCollapsed(groupName: string): boolean {
         @cancel-edit="emit('cancel-edit')"
         @delete-feed="emit('delete-feed', $event)"
         @update:editing-group-name="emit('update:editingGroupName', $event)"
+        @mark-group-read="emit('mark-group-read', $event)"
+        @mark-feed-read="emit('mark-feed-read', $event)"
       />
     </div>
   </aside>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { Feed } from '../../types'
 import { useFeedIcons } from '../../composables/useFeedIcons'
 
@@ -18,7 +19,10 @@ const emit = defineEmits<{
   (e: 'cancel-edit'): void
   (e: 'delete', feedId: string): void
   (e: 'update:editingGroupName', value: string): void
+  (e: 'mark-feed-read', feedId: string): void
 }>()
+
+const { t } = useI18n()
 
 const { iconSrcFor, handleFeedIconLoad, handleFeedIconError, isFeedIconBroken, isFeedIconLoaded, getFeedColor, getFeedInitial } = useFeedIcons()
 
@@ -90,6 +94,17 @@ function getFeedRefreshTooltip(_feed: Feed): string {
       </span>
     </button>
     <div class="feed-item__actions" @click.stop>
+      <!-- Mark as Read Button -->
+      <button
+        v-if="!isEditing && feed.unread_count"
+        @click="emit('mark-feed-read', feed.id)"
+        class="action-btn mark-read"
+        :title="t('articles.markFeedAsRead')"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+        </svg>
+      </button>
       <button
         v-if="isEditing"
         @click="emit('save-edit', feed.id, editingGroupName)"
@@ -307,4 +322,11 @@ function getFeedRefreshTooltip(_feed: Feed): string {
 .action-btn.edit:hover { background: #007aff; color: white; }
 .action-btn.save:hover { background: #34c759; color: white; }
 .action-btn.cancel:hover { background: #8e8e93; color: white; }
+.action-btn.mark-read { 
+  color: #34c759; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.action-btn.mark-read:hover { background: #34c759; color: white; border-color: #34c759; }
 </style>

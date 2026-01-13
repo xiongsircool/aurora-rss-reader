@@ -302,3 +302,90 @@ async def bulk_unstar_entries(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"批量取消收藏失败: {str(e)}")
+
+
+from pydantic import BaseModel
+
+class MarkReadRequest(BaseModel):
+    """批量标记已读的请求体"""
+    feed_id: Optional[str] = None
+    group_name: Optional[str] = None
+    older_than: Optional[str] = None  # 标记多少天之前的文章为已读
+    time_field: str = "inserted_at"
+
+
+@router.post("/mark-read")
+async def mark_entries_as_read(
+    request: MarkReadRequest,
+    session: Session = Depends(get_session)
+) -> dict:
+    """批量标记文章为已读
+    
+    支持按订阅源、分组、时间范围进行过滤：
+    - feed_id: 标记指定订阅源的所有文章为已读
+    - group_name: 标记指定分组下所有订阅源的文章为已读
+    - older_than: 标记多少天之前的文章为已读 (3d, 7d, 30d 等)
+    - time_field: 时间字段 (published_at 或 inserted_at)
+    
+    如果都不指定，则标记所有未读文章为已读
+    """
+    try:
+        # 构建查询
+        stmt = select(Entry).where(Entry.read.is_(False))
+        
+        # 按订阅源过滤
+        if request.feed_id:
+            stmt = stmt.where(Entry.feed_id == request.feed_id)
+        # 按分组过滤
+        elif request.group_name:
+            stmt = stmt.join(Feed, Feed.id == Entry.feed_id).where(Feed.group_name == request.group_name)
+        
+        # 时间范围过滤 - 标记 X 天之前的文章为已读
+        if request.older_than and request.older_than != "all":
+            if request.older_than.endswith('h'):
+                hours = int(request.older_than.replace('h', ''))
+                cutoff_date = datetime.utcnow() - timedelta(hours=hours)
+            elif request.older_than.endswith('d'):
+                days = int(request.older_than.replace('d', ''))
+                cutoff_date = datetime.utcnow() - timedelta(days=days)
+            elif request.older_than.endswith('m'):
+                months = int(request.older_than.replace('m', ''))
+                cutoff_date = datetime.utcnow() - timedelta(days=months * 30)
+            elif request.older_than.endswith('y'):
+                years = int(request.older_than.replace('y', ''))
+                cutoff_date = datetime.utcnow() - timedelta(days=years * 365)
+            else:
+                try:
+                    days = int(request.older_than)
+                    cutoff_date = datetime.utcnow() - timedelta(days=days)
+                except ValueError:
+                    cutoff_date = datetime.utcnow() - timedelta(days=30)
+            
+            # 注意：这里改为 <= cutoff_date，表示"之前"的文章
+            if request.time_field == "published_at":
+                stmt = stmt.where(
+                    (Entry.published_at <= cutoff_date) |
+                    (Entry.published_at.is_(None) & (Entry.inserted_at <= cutoff_date))
+                )
+            else:
+                stmt = stmt.where(Entry.inserted_at <= cutoff_date)
+        
+        # 获取并更新文章
+        entries = session.exec(stmt).all()
+        
+        # 统计每个订阅源的已读数量，用于更新未读计数
+        feed_read_counts: dict[str, int] = {}
+        for entry in entries:
+            entry.read = True
+            feed_read_counts[entry.feed_id] = feed_read_counts.get(entry.feed_id, 0) + 1
+        
+        session.commit()
+        
+        return {
+            "success": True,
+            "message": f"成功标记 {len(entries)} 篇文章为已读",
+            "marked_count": len(entries),
+            "feed_counts": feed_read_counts
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"批量标记已读失败: {str(e)}")
