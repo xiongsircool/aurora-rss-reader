@@ -8,6 +8,35 @@ import traceback
 from pathlib import Path
 import uvicorn
 
+# PyInstaller: 显式导入关键模块，确保打包时能正确发现依赖
+# noinspection PyUnresolvedReferences
+import fastapi  # noqa: F401
+# noinspection PyUnresolvedReferences
+import pydantic_settings  # noqa: F401
+# noinspection PyUnresolvedReferences
+import pydantic  # noqa: F401
+# noinspection PyUnresolvedReferences
+import apscheduler  # noqa: F401
+# noinspection PyUnresolvedReferences
+import sqlmodel  # noqa: F401
+# noinspection PyUnresolvedReferences
+import sqlalchemy  # noqa: F401
+# noinspection PyUnresolvedReferences
+import httpx  # noqa: F401
+# noinspection PyUnresolvedReferences
+import feedparser  # noqa: F401
+# noinspection PyUnresolvedReferences
+import bs4  # noqa: F401
+# noinspection PyUnresolvedReferences
+import lxml  # noqa: F401
+# noinspection PyUnresolvedReferences
+import readability  # noqa: F401
+# noinspection PyUnresolvedReferences
+import loguru  # noqa: F401
+# 显式导入 app 模块，触发其依赖链
+# noinspection PyUnresolvedReferences
+import app.main  # noqa: F401
+
 from app.core.config import settings, APP_DATA_DIR
 
 # DEBUG: 极其原始的启动标记，用于确证 Python 进程是否启动

@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes import router as api_router
 from app.services.rsshub_manager import rsshub_manager
 from app.core.config import settings, APP_DATA_DIR
-# from app.db.session import init_db  # Deprecated in favor of Alembic
+from app.db.session import init_db  # Also call this to ensure tables exist
 from scripts.migrate import run_migrations
 from app.services.fetcher import refresh_all_feeds
 from app.services.user_settings_service import ensure_user_settings_schema
@@ -69,7 +69,8 @@ import time
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # init_db()
+    # 先确保表存在，再运行迁移
+    init_db()
     
     logger = logging.getLogger("backend.startup")
     logger.info("Application starting up...")
