@@ -39,7 +39,14 @@ jobs:
         run: |
           cd backend
           pyinstaller aurora-backend.spec
+
       
+      - name: Install Linux Dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
