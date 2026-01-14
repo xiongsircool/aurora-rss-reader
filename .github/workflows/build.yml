@@ -76,6 +76,11 @@ jobs:
           fi
           ls -l rss-desktop/resources/backend/
           
+      - name: Build Frontend
+        run: |
+          cd rss-desktop
+          pnpm run build
+
       - name: Build and Package
         run: |
           cd rss-desktop
