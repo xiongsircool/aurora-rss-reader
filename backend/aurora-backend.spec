@@ -33,7 +33,7 @@ datas = [('app', 'app'), ('migrations', 'migrations'), ('alembic.ini', '.'), ('s
 datas += collect_data_files('alembic')
 
 a = Analysis(
-    ['scripts\\serve.py'],
+    ['scripts/serve.py'],
     pathex=[],
     binaries=[],
     datas=datas,
