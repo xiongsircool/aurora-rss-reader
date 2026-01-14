@@ -243,7 +243,7 @@ async function startBackend(): Promise<{ success: boolean; error?: string; path?
       if (!ready) {
         logToFile('❌ 后端服务未能在规定时间内就绪')
         stopBackend()
-        return { success: false, error: '后端服务启动超时（30s）', path: execPath }
+        return { success: false, error: `后端服务启动超时（${Math.round(HEALTH_CHECK_TIMEOUT / 1000)}s）`, path: execPath }
       }
 
       return { success: true, path: execPath }

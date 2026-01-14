@@ -1,13 +1,32 @@
 from __future__ import annotations
 
+import os
 import sys
+import logging
+import multiprocessing
+import traceback
+from pathlib import Path
 import uvicorn
 
 from app.core.config import settings, APP_DATA_DIR
 
+# DEBUG: 极其原始的启动标记，用于确证 Python 进程是否启动
+try:
+    # 尝试写入 APPDATA，如果失败则尝试 TEMP
+    debug_dir = os.path.join(os.getenv('APPDATA', ''), 'Aurora RSS Reader')
+    if not os.path.exists(debug_dir):
+        os.makedirs(debug_dir, exist_ok=True)
+    
+    debug_path = os.path.join(debug_dir, 'python_alive.txt')
+    with open(debug_path, 'a') as f:
+        import datetime
+        f.write(f"\n[{datetime.datetime.now()}] Python process started.\n")
+        f.write(f"CWD: {os.getcwd()}\n")
+        f.write(f"Executable: {sys.executable}\n")
+        f.write(f"Path: {sys.path}\n")
+except Exception as e:
+    pass
 
-import logging
-import traceback
 
 def setup_logging():
     """Setup file logging for debugging packaged app."""
