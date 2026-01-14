@@ -23,21 +23,23 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.2 最新版本 | Latest Version
+### 🎉 v0.1.3 最新版本 | Latest Version
 
-**重要Bug修复版本 | Critical Bug Fix Release**
+**打包修复与平台支持 | Packaging Fix & Platform Support**
 
-- 🐛 **修复时间过滤问题** - 解决了"最近一天"不过滤的关键问题
-- 🐛 **修复分类显示Bug** - 点击分类后订阅列表现在可以正常显示
-- ⚡ **RSS解析增强** - 解析成功率提升到83.3%+，支持更多学术期刊
-- 🌐 **RSSHub镜像支持** - 提高网络访问稳定性和可用性
-- 🔧 **依赖更新** - 新增python-dateutil库支持
+- 🔧 **修复Windows打包** - 解决 PyInstaller 依赖问题，后端现在可以正确启动
+- 🍎 **macOS Intel 支持** - 新增对老款 Intel Mac (x64) 的支持
+- 📦 **构建系统优化** - 确保所有模块依赖正确包含在打包应用中
+- 🗄️ **数据库初始化** - 修复首次启动时数据库表创建问题
+- ⚡ **启动优化** - 延长后端启动超时时间，适配性能较慢的系统
+- ✅ **一键已读** - 新增批量标记所有文章为已读功能
+- 🌙 **深色模式修复** - 修复设置页面在深色模式下的显示异常
 
 ---
 
 Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + FastAPI stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.2**
+**Current Version: v0.1.3**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -48,7 +50,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.2**
+**Current Version: v0.1.3**
 
 ### Features | 功能特色
 
@@ -242,9 +244,9 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `Aurora RSS Reader-Mac-0.1.2-{x64,arm64}.dmg`
-- Windows: `Aurora RSS Reader-Setup-0.1.2.exe`
-- Linux: `aurora-rss-reader-0.1.2.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.3-{x64,arm64}.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.3-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.3-x64.AppImage`
 
 ## 技术栈
 
@@ -269,7 +271,21 @@ aurora-rss-reader/
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.2 (当前版本 | Current Version) 🎉
+### v0.1.3 (当前版本 | Current Version) 🎉
+**打包修复与平台支持 | Packaging Fix & Platform Support**
+
+#### 🔧 核心修复 | Core Fixes
+- **Windows打包修复** - 彻底解决 PyInstaller 模块丢失问题 (pydantic, fastapi, etc.)
+- **数据库初始化** - 修复首次运行时数据库表未创建导致的崩溃问题
+- **依赖管理优化** - 自动收集所有 Python 子模块，确保打包完整性
+- **启动流程优化** - 增加健康检查超时时间至 5 分钟，防止慢速系统误报超时
+
+#### ✨ 新增功能 | New Features
+- **一键已读** - 侧边栏新增"全部已读"按钮，快速清理未读消息
+- **macOS Intel支持** - 新增对 x64 架构 Mac 的构建支持
+- **深色模式优化** - 修复设置页面在深色模式下的文字颜色和背景显示问题
+
+### v0.1.2 (历史版本 | Previous Version)
 **重要Bug修复版本 | Critical Bug Fix Release**
 
 #### 🐛 Bug修复 | Bug Fixes
@@ -307,7 +323,7 @@ aurora-rss-reader/
 
 ## 📚 文档 | Documentation
 
-- **[更新说明](UPDATE_README.md)** - v0.1.2详细更新内容
+- **[更新说明](UPDATE_README.md)** - v0.1.3详细更新内容
 - **完整项目文档** - 旧版本文档已归档至 `docs_archive/` 目录
 
 ## ❓ 常见问题

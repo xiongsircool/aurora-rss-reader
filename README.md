@@ -25,15 +25,17 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.1.2 Latest Release | 最新版本
+## 🎉 v0.1.3 Latest Release | 最新版本
 
-**Critical Bug Fix Version | 重要Bug修复版本**
+**Packaging Fix & Platform Support | 打包修复与平台支持**
 
-- 🐛 **Fixed Time Filtering Issue** - Resolved critical problem with "recent 1 day" filter not working
-- 🐛 **Fixed Category Display Bug** - Categories now show subscriptions correctly when clicked
-- ⚡ **Enhanced RSS Parsing** - Parser success rate improved from ~60% to 83.3%+ with academic journal support
-- 🌐 **RSSHub Mirror Support** - Custom mirror service support for better network stability
-- 🔧 **Updated Dependencies** - Added python-dateutil library support
+- 🔧 **Fixed Windows Packaging** - Resolved PyInstaller dependency issues, backend now starts correctly
+- 🍎 **macOS Intel Support** - Added support for older Intel-based Macs (x64)
+- 📦 **Improved Build System** - All module dependencies now correctly included in packaged app
+- 🗄️ **Database Initialization** - Fixed database table creation on first launch
+- ⚡ **Startup Optimization** - Extended backend startup timeout for slower systems
+- ✅ **One-Click Mark All Read** - Added batch mark all articles as read feature
+- 🌙 **Dark Mode Fix** - Fixed settings page display issues in dark mode
 
 ---
 
@@ -41,7 +43,7 @@
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.2**
+**Current Version: v0.1.3**
 
 ## Key Features
 
@@ -233,13 +235,13 @@ chmod +x build-release-app.sh
 ```
 
 Generated files:
-- macOS: `Aurora RSS Reader-Mac-0.1.2-{x64,arm64}.dmg`
-- Windows: `Aurora RSS Reader-Setup-0.1.2.exe`
-- Linux: `aurora-rss-reader-0.1.2.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.3-{x64,arm64}.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.3-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.3-x64.AppImage`
 
 ## 📋 Documentation | 文档
 
-- **[Update Details](UPDATE_README.md)** - Detailed v0.1.2 update content | v0.1.2详细更新内容
+- **[Update Details](UPDATE_README.md)** - Detailed v0.1.3 update content | v0.1.3详细更新内容
 - **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
 ## Tech Stack
@@ -265,7 +267,7 @@ aurora-rss-reader/
 
 ## 📋 Documentation | 文档
 
-- **[Update Details](UPDATE_README.md)** - Detailed v0.1.2 update content | v0.1.2详细更新内容
+- **[Update Details](UPDATE_README.md)** - Detailed v0.1.3 update content | v0.1.3详细更新内容
 - **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
 ## Support
