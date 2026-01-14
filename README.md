@@ -210,7 +210,7 @@ The startup script will automatically:
    - This is normal for unsigned open-source apps on macOS.
    - Open Terminal and run:
      ```bash
-     sudo xattr -rd com.apple.quarantine /Applications/Aurora\ RSS\ Reader.app
+     sudo xattr -rd com.apple.quarantine /Applications/AuroraRSSReader.app
      ```
    - Then open the app again.
 
