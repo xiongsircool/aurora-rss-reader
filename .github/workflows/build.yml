@@ -17,7 +17,7 @@ jobs:
             args: --win --x64
           - os: macos-latest
             args: --mac --arm64
-          - os: macos-13
+          - os: macos-15-intel
             args: --mac --x64
           - os: ubuntu-latest
             args: --linux --x64
