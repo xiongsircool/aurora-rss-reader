@@ -353,7 +353,7 @@ A: 数据默认存储在系统应用数据目录：
    - 这是因为应用没有购买苹果开发者证书（每年$99），被 Gatekeeper 拦截。
    - 解决方法：打开终端（Terminal），输入以下命令并回车（需要输入密码）：
      ```bash
-     sudo xattr -rd com.apple.quarantine /Applications/Aurora\ RSS\ Reader.app
+     sudo xattr -rd com.apple.quarantine /Applications/AuroraRSSReader.app
      ```
    - 再次点击应用即可正常打开。
 
