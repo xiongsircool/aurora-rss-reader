@@ -12,7 +12,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            args: --win --x64
+          - os: macos-latest
+            args: --mac --arm64
+          - os: macos-13
+            args: --mac --x64
+          - os: ubuntu-latest
+            args: --linux --x64
       fail-fast: false
     
     steps:
@@ -71,7 +79,7 @@ jobs:
       - name: Build and Package
         run: |
           cd rss-desktop
-          pnpm run pack
+          pnpm exec electron-builder ${{ matrix.args }} --publish=never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
