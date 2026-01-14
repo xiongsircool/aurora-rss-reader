@@ -198,13 +198,25 @@ You can use the `start.sh` script or follow these manual steps:
 
 3.  **Run Application**:
     ```bash
-    cd rss-desktop
-    pnpm dev
-    ```
-
 The startup script will automatically:
 - Create Python virtual environment
 - Install frontend and backend dependencies
+### Troubleshooting
+### macOS Compatibility
+**Initial Setup:**
+1. **Download the `.zip` version** if the `.dmg` fails to mount (common on some systems for unsigned apps).
+2. Unzip and drag `Aurora RSS Reader.app` to your Applications folder.
+3. If you see **"App is damaged and can't be opened"** (or "cannot open"):
+   - This is normal for unsigned open-source apps on macOS.
+   - Open Terminal and run:
+     ```bash
+     sudo xattr -rd com.apple.quarantine /Applications/Aurora\ RSS\ Reader.app
+     ```
+   - Then open the app again.
+
+### Performance
+**Q: The app is slow to start?**
+A: Check the backend service logs if possible. First launch may take longer to initialize the database.
 - Initialize database
 - Launch Electron application
 

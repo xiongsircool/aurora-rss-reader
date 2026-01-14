@@ -345,6 +345,18 @@ A: 数据默认存储在系统应用数据目录：
 - Windows: `%APPDATA%/Aurora RSS Reader/rss.sqlite`
 - Linux: `~/.config/aurora-rss-reader/rss.sqlite`
 
+### macOS 常见问题
+**安装问题：**
+1. **优先下载 `.zip` 版本**：如果 `.dmg` 提示"无法打开磁盘"或"无法连接"（Unsigned App 常见问题），请使用 ZIP 版本。
+2. 解压后将 `Aurora RSS Reader.app` 拖入应用程序文件夹。
+3. 如果提示 **"应用已损坏"** 或 **"无法打开"**：
+   - 这是因为应用没有购买苹果开发者证书（每年$99），被 Gatekeeper 拦截。
+   - 解决方法：打开终端（Terminal），输入以下命令并回车（需要输入密码）：
+     ```bash
+     sudo xattr -rd com.apple.quarantine /Applications/Aurora\ RSS\ Reader.app
+     ```
+   - 再次点击应用即可正常打开。
+
 ### 性能相关
 **Q: 应用启动慢怎么办？**
 A: 检查后端服务是否正常启动，可以查看终端输出的启动日志。

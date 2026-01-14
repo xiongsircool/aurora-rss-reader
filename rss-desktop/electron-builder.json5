@@ -27,11 +27,15 @@
       {
         "target": "dmg",
         "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64", "arm64"]
       }
     ],
     "artifactName": "AuroraRSSReader-Mac-${version}-${arch}.${ext}",
     "category": "public.app-category.news",
-    "hardenedRuntime": true,
+    "hardenedRuntime": false,
     "gatekeeperAssess": false,
     "entitlements": null,
     "entitlementsInherit": null

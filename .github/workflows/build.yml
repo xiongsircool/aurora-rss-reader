@@ -98,6 +98,7 @@ jobs:
           path: |
             rss-desktop/release/**/*.exe
             rss-desktop/release/**/*.dmg
+            rss-desktop/release/**/*.zip
             rss-desktop/release/**/*.AppImage
             rss-desktop/release/**/*.deb
             rss-desktop/release/**/*.rpm
@@ -127,7 +128,7 @@ jobs:
           echo "" >> release_notes.md
           echo "### 📦 Downloads" >> release_notes.md
           echo "- **Windows**: \`.exe\` installer" >> release_notes.md
-          echo "- **macOS**: \`.dmg\` (Universal/x64)" >> release_notes.md
+          echo "- **macOS**: \`.dmg\` / \`.zip\` (Universal/x64)" >> release_notes.md
           echo "- **Linux**: \`.AppImage\`" >> release_notes.md
 
       - name: Create Release

@@ -134,7 +134,7 @@ show_results() {
 
     # 显示生成的文件
     if [ -d "$FRONTEND_DIR/release" ]; then
-        find "$FRONTEND_DIR/release" -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" \) 2>/dev/null | while read file; do
+        find "$FRONTEND_DIR/release" -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" \) 2>/dev/null | while read file; do
             log "📱 生成: $(basename "$file") ($(du -h "$file" | cut -f1))"
         done
     fi
