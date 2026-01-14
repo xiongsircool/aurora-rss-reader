@@ -10,7 +10,7 @@ const { t } = useI18n()
     <div class="about-content">
       <div class="about-header">
         <h4 class="app-title">{{ t('settings.appName', { name: 'Aurora Feeds' }) }}</h4>
-        <span class="app-version">{{ t('settings.appVersion', { version: '0.1.2' }) }}</span>
+        <span class="app-version">{{ t('settings.appVersion', { version: '0.1.3' }) }}</span>
       </div>
       <p class="app-name-note">{{ t('settings.appNameDescription', { name: 'Aurora Feeds' }) }}</p>
       <p class="app-description">{{ t('settings.aboutDescription') }}</p>

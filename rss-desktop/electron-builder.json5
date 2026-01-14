@@ -77,11 +77,11 @@
     "target": [
       {
         "target": "AppImage",
-        "arch": ["x64", "arm64"]
+        "arch": ["x64"]
       },
       {
         "target": "deb",
-        "arch": ["x64", "arm64"]
+        "arch": ["x64"]
       }
     ],
     // Use a square PNG for Linux icon to avoid 0x0 icon path issues

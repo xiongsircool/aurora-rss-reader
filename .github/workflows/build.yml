@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-latest, macos-latest, macos-13, ubuntu-latest]
       fail-fast: false
     
     steps:
@@ -74,9 +74,10 @@ jobs:
         with:
           name: release-${{ matrix.os }}
           overwrite: true
+          if-no-files-found: ignore
           path: |
-            rss-desktop/release/*.exe
-            rss-desktop/release/*.dmg
-            rss-desktop/release/*.AppImage
-            rss-desktop/release/*.deb
-            rss-desktop/release/*.rpm
+            rss-desktop/release/**/*.exe
+            rss-desktop/release/**/*.dmg
+            rss-desktop/release/**/*.AppImage
+            rss-desktop/release/**/*.deb
+            rss-desktop/release/**/*.rpm
