@@ -11,6 +11,9 @@ from html.parser import HTMLParser
 import hashlib
 
 from app.services.ai import GLMClient
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class HTMLSegmentParser(HTMLParser):
@@ -186,6 +189,79 @@ class IncrementalTranslator:
         self.client = client
         self.cache: Dict[str, str] = {}  # 段落级缓存
     
+    async def translate_segments_stream(
+        self,
+        segments: List[Dict[str, any]],
+        target_language: str = "zh",
+        max_concurrent: int = 3,
+        context_window: int = 1
+    ):
+        """
+        流式翻译多个段落，yield每个完成的段落
+        """
+        total = len(segments)
+        translated_contexts = [""] * total
+        
+        # 使用队列来收集完成的任务
+        queue = asyncio.Queue()
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        async def translate_one(segment: Dict[str, any]) -> None:
+            async with semaphore:
+                idx = segment['index']
+                content = segment['content']
+                result = None
+                
+                try:
+                    # 代码块不翻译
+                    if segment['is_code']:
+                        result = {**segment, 'translated': content, 'from_cache': False}
+                    else:
+                        # 检查缓存
+                        cache_key = f"{segment['hash']}_{target_language}"
+                        if cache_key in self.cache:
+                            translated = self.cache[cache_key]
+                            translated_contexts[idx] = translated
+                            result = {**segment, 'translated': translated, 'from_cache': True}
+                        else:
+                            # 构建上下文
+                            context_parts = []
+                            if context_window > 0:
+                                for i in range(max(0, idx - context_window), idx):
+                                    if translated_contexts[i]:
+                                        context_parts.append(f"[前文]: {translated_contexts[i][:200]}...")
+                            context_info = "\n".join(context_parts) if context_parts else None
+                            
+                            translated = await self._translate_with_context(
+                                content, target_language, context_info
+                            )
+                            
+                            self.cache[cache_key] = translated
+                            translated_contexts[idx] = translated
+                            result = {**segment, 'translated': translated, 'from_cache': False}
+                except Exception as e:
+                    logger.error(f"段落 {idx} 翻译失败: {str(e)}")
+                    # 翻译失败，使用原文
+                    result = {
+                        **segment, 
+                        'translated': content, 
+                        'error': str(e), 
+                        'from_cache': False
+                    }
+                
+                await queue.put(result)
+
+        # 启动所有任务
+        tasks = [asyncio.create_task(translate_one(seg)) for seg in segments]
+        
+        # 收集结果
+        for _ in range(total):
+            result = await queue.get()
+            yield result
+            
+        # 确保所有任务结束
+        await asyncio.gather(*tasks)
+
     async def translate_segments(
         self,
         segments: List[Dict[str, any]],
@@ -287,7 +363,7 @@ class IncrementalTranslator:
                     
                 except Exception as e:
                     # 翻译失败，使用原文
-                    print(f"段落 {idx} 翻译失败: {str(e)}")
+                    logger.error(f"段落 {idx} 翻译失败: {str(e)}")
                     results[idx] = {
                         **segment,
                         'translated': content,
@@ -434,6 +510,82 @@ class IncrementalTranslator:
         
         return result
     
+    def _clean_html_for_display(self, html_content: str) -> str:
+        """
+        清洗翻译后的HTML，移除媒体元素以避免双语对照时出现重复图像
+        只保留文本相关的格式标签
+        """
+        if not html_content:
+            return ""
+            
+        # 移除 img, video, audio, iframe, object, embed
+        # 使用非贪婪匹配移除标签及其属性
+        patterns = [
+            r'<img[^>]*>',
+            r'<video[^>]*>.*?</video>',
+            r'<audio[^>]*>.*?</audio>',
+            r'<iframe[^>]*>.*?</iframe>',
+            r'<object[^>]*>.*?</object>',
+            r'<embed[^>]*>',
+            # 移除 figure 容器但保留其中的 figcaption 内容 (如果有)
+            r'<figure[^>]*>',
+            r'</figure>'
+        ]
+        
+        cleaned = html_content
+        for pattern in patterns:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE | re.DOTALL)
+            
+        # 清理可能产生的空标签 (如 <p></p>)
+        cleaned = re.sub(r'<p>\s*</p>', '', cleaned)
+        
+        return cleaned.strip()
+
+    def merge_bilingual_segments(self, segments: List[Dict[str, any]]) -> str:
+        """
+        合并为双语对照格式
+        
+        结构:
+        <div class="segment-wrapper">
+            <div class="original">{content}</div>
+            <div class="translated">{translated}</div>
+        </div>
+        """
+        # 按索引排序
+        sorted_segments = sorted(segments, key=lambda x: x['index'])
+        
+        result = []
+        for seg in sorted_segments:
+            original = seg['content']
+            translated_raw = seg.get('translated', '')
+            
+            # 代码块特殊处理：只显示原文，或者特殊标记
+            if seg.get('is_code'):
+                result.append(original)
+                continue
+                
+            # 清洗译文中的媒体标签，防止双图
+            translated_clean = self._clean_html_for_display(translated_raw)
+            
+            # 如果译文清洗后为空（例如纯图片段落），只保留原文
+            if not translated_clean:
+                result.append(original)
+                continue
+
+            # 构建双语块
+            # 使用特定 class 方便前端定制样式
+            block = (
+                f'<div class="bilingual-segment" style="position: relative; margin-bottom: 1.5em;">'
+                f'<div class="original" style="margin-bottom: 0.5em;">{original}</div>'
+                f'<div class="translated" style="color: #5F6368; font-size: 0.95em; padding-left: 12px; border-left: 3px solid #4C74FF; background: rgba(76, 116, 255, 0.05); padding: 8px 12px; border-radius: 4px;">'
+                f'{translated_clean}'
+                f'</div>'
+                f'</div>'
+            )
+            result.append(block)
+            
+        return '\n'.join(result)
+
     def clear_cache(self):
         """清空缓存"""
         self.cache.clear()

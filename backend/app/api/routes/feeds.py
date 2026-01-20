@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 import asyncio
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from app.db.deps import get_session
 from app.db.models import Entry, Feed
@@ -37,16 +38,17 @@ def _calculate_cutoff(date_range: str | None) -> datetime | None:
     except ValueError:
         days = 30
 
-    return datetime.utcnow() - timedelta(days=days)
+    return datetime.now(timezone.utc) - timedelta(days=days)
 
 
 @router.get("", response_model=list[FeedRead])
 async def list_feeds(
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
     date_range: str | None = Query(default=None, description="时间范围: '1d', '2d', '3d', '7d', '30d', '90d', '180d', '365d', 'all'"),
     time_field: str = Query(default="inserted_at", description="时间字段: 'published_at' 或 'inserted_at'"),
 ) -> list[FeedRead]:
-    feeds = session.exec(select(Feed).order_by(Feed.created_at.desc())).all()
+    result = await session.exec(select(Feed).order_by(Feed.created_at.desc()))
+    feeds = result.all()
 
     normalized_time_field = _normalize_time_field(time_field)
     cutoff_date = _calculate_cutoff(date_range)
@@ -55,7 +57,7 @@ async def list_feeds(
 
     if cutoff_date:
         if normalized_time_field == "published_at":
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             unread_stmt = unread_stmt.where(
                 ((Entry.published_at <= now) & (Entry.published_at >= cutoff_date)) |
                 (Entry.published_at.is_(None) & (Entry.inserted_at >= cutoff_date))
@@ -63,7 +65,8 @@ async def list_feeds(
         else:
             unread_stmt = unread_stmt.where(Entry.inserted_at >= cutoff_date)
 
-    unread_counts = dict(session.exec(unread_stmt.group_by(Entry.feed_id)).all())
+    result = await session.exec(unread_stmt.group_by(Entry.feed_id))
+    unread_counts = dict(result.all())
 
     return [
         FeedRead(
@@ -81,15 +84,16 @@ async def list_feeds(
 
 
 @router.post("", response_model=FeedRead)
-async def add_feed(payload: FeedCreate, session: Session = Depends(get_session)) -> FeedRead:
-    existing = session.exec(select(Feed).where(Feed.url == payload.url.strip())).first()
+async def add_feed(payload: FeedCreate, session: AsyncSession = Depends(get_session)) -> FeedRead:
+    result = await session.exec(select(Feed).where(Feed.url == payload.url.strip()))
+    existing = result.first()
     if existing:
         raise HTTPException(status_code=400, detail="Feed already exists")
 
     feed = Feed(url=payload.url.strip(), group_name=payload.group_name or "default")
     session.add(feed)
-    session.commit()
-    session.refresh(feed)
+    await session.commit()
+    await session.refresh(feed)
 
     asyncio.create_task(refresh_feed(feed.id))
 
@@ -137,9 +141,10 @@ class RefreshGroupRequest(BaseModel):
 
 
 @router.post("/refresh-group", status_code=202)
-async def manual_refresh_group(req: RefreshGroupRequest, session: Session = Depends(get_session)) -> dict:
+async def manual_refresh_group(req: RefreshGroupRequest, session: AsyncSession = Depends(get_session)) -> dict:
     """Schedule refresh for all feeds under a group."""
-    feeds = session.exec(select(Feed).where(Feed.group_name == req.group_name)).all()
+    result = await session.exec(select(Feed).where(Feed.group_name == req.group_name))
+    feeds = result.all()
     ids = [f.id for f in feeds]
     scheduled = 0
     for fid in ids:
@@ -152,9 +157,10 @@ async def manual_refresh_group(req: RefreshGroupRequest, session: Session = Depe
 
 
 @router.post("/refresh-all", status_code=202)
-async def manual_refresh_all(session: Session = Depends(get_session)) -> dict:
+async def manual_refresh_all(session: AsyncSession = Depends(get_session)) -> dict:
     """Schedule refresh for all feeds immediately."""
-    feeds = session.exec(select(Feed)).all()
+    result = await session.exec(select(Feed))
+    feeds = result.all()
     scheduled = 0
     for f in feeds:
         try:
@@ -165,23 +171,24 @@ async def manual_refresh_all(session: Session = Depends(get_session)) -> dict:
     return {"status": "scheduled", "scheduled": scheduled, "total": len(feeds)}
 
 
-@router.delete("/{feed_id}", status_code=204)
-async def delete_feed(feed_id: str, session: Session = Depends(get_session)) -> None:
-    feed = session.get(Feed, feed_id)
+@router.delete("/{feed_id}")
+async def delete_feed(feed_id: str, session: AsyncSession = Depends(get_session)) -> dict:
+    feed = await session.get(Feed, feed_id)
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
     
-    session.delete(feed)
-    session.commit()
+    await session.delete(feed)
+    await session.commit()
+    return {"success": True, "message": "Feed deleted"}
 
 
 @router.patch("/{feed_id}", response_model=FeedRead)
 async def update_feed(
     feed_id: str, 
     payload: dict[str, str | int], 
-    session: Session = Depends(get_session)
+    session: AsyncSession = Depends(get_session)
 ) -> FeedRead:
-    feed = session.get(Feed, feed_id)
+    feed = await session.get(Feed, feed_id)
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
     
@@ -191,13 +198,14 @@ async def update_feed(
         feed.update_interval_minutes = int(payload["update_interval_minutes"])
     
     session.add(feed)
-    session.commit()
-    session.refresh(feed)
+    await session.commit()
+    await session.refresh(feed)
     
-    unread_count = session.exec(
+    result = await session.exec(
         select(func.count(Entry.id))
         .where(Entry.feed_id == feed_id, Entry.read.is_(False))
-    ).one()
+    )
+    unread_count = result.one()
     
     return FeedRead(
         id=feed.id,

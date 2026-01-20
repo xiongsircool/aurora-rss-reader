@@ -43,7 +43,8 @@
     "smart": "Smart",
     "reading": "Reading",
     "platform": "Platform",
-    "private": "Private"
+    "private": "Private",
+    "appName": "Aurora Feeds"
   },
   "navigation": {
     "all": "All",
@@ -336,7 +337,11 @@
     "exporting": "Exporting...",
     "operationFailed": "Operation failed, please try again",
     "languageChanged": "Language switched to {language}",
-    "languageChangeFailed": "Language switch failed, please try again"
+    "languageChangeFailed": "Language switch failed, please try again",
+    "summarySuccess": "Summary generated successfully",
+    "summaryFailed": "Summary generation failed, please check API config",
+    "translationSuccess": "Translation successful",
+    "translationFailed": "Translation failed, please check API config"
   },
   "errors": {
     "network": "Network connection failed",
@@ -370,7 +375,11 @@
   },
   "opml": {
     "export": "Export OPML",
-    "import": "Import OPML"
+    "import": "Import OPML",
+    "exportSuccess": "OPML exported successfully",
+    "exportFailed": "Export failed, please retry",
+    "importSuccess": "Imported {imported}, skipped {skipped}",
+    "importFailed": "Import failed, please check file format"
   },
   "languages": {
     "zh": "中文",

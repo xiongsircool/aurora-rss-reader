@@ -43,7 +43,8 @@
     "smart": "스마트",
     "reading": "읽기",
     "platform": "플랫폼",
-    "private": "비공개"
+    "private": "비공개",
+    "appName": "Aurora Feeds"
   },
   "opml": {
     "export": "OPML 내보내기",

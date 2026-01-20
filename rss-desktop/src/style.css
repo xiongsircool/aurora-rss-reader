@@ -72,3 +72,41 @@ input::placeholder,
 textarea::placeholder {
   color: var(--text-secondary);
 }
+
+/* 全局滚动条样式 - 纤细优雅 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 17, 21, 0.15);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 17, 21, 0.25);
+}
+
+/* 暗色模式滚动条 */
+:root.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+:root.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Firefox 滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 17, 21, 0.15) transparent;
+}
+
+:root.dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}

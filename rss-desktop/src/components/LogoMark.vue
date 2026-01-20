@@ -7,7 +7,7 @@ const logoSrc = new URL('/icons/glow-no-bg.png', import.meta.url).href
 
 <template>
   <img
-    class="logo-mark"
+    class="block object-contain"
     :src="logoSrc"
     :width="props.size"
     :height="props.size"
@@ -16,8 +16,5 @@ const logoSrc = new URL('/icons/glow-no-bg.png', import.meta.url).href
 </template>
 
 <style scoped>
-.logo-mark {
-  display: block;
-  object-fit: contain;
-}
+/* Migrated to UnoCSS */
 </style>

@@ -64,7 +64,6 @@ export const useFavoritesStore = defineStore('favorites', () => {
       return data
     } catch (err) {
       console.error('Failed to fetch starred entries:', err)
-      error.value = '获取收藏列表失败'
       throw err
     } finally {
       loading.value = false
@@ -105,7 +104,6 @@ export const useFavoritesStore = defineStore('favorites', () => {
       return data
     } catch (err) {
       console.error('Failed to star entry:', err)
-      error.value = '收藏失败'
       throw err
     } finally {
       loading.value = false
@@ -132,7 +130,6 @@ export const useFavoritesStore = defineStore('favorites', () => {
       return data
     } catch (err) {
       console.error('Failed to unstar entry:', err)
-      error.value = '取消收藏失败'
       throw err
     } finally {
       loading.value = false

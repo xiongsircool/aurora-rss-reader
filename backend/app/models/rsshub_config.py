@@ -3,7 +3,7 @@ RSSHub镜像配置模型
 """
 from typing import Optional
 from sqlmodel import SQLModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.services.rsshub_defaults import get_default_rsshub_mirrors
 
@@ -20,8 +20,8 @@ class RSSHubConfig(SQLModel, table=True):
     timeout: int = Field(default=30, description="超时时间（秒）")
     is_default: bool = Field(default=False, description="是否为默认镜像")
     description: Optional[str] = Field(None, description="描述信息")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Config:
         """SQLModel配置"""
@@ -37,7 +37,7 @@ class RSSHubURLMapping(SQLModel, table=True):
     alternative_url: str = Field(description="替代URL（非RSSHub）")
     enabled: bool = Field(default=True, description="是否启用")
     description: Optional[str] = Field(None, description="描述")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Config:
         table_name = "rsshub_url_mapping"

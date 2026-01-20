@@ -3,7 +3,7 @@ RSSHub连通性测试服务
 """
 import asyncio
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from feedparser import parse
@@ -77,7 +77,7 @@ class RSSHubTestService:
         if rsshub_url is None:
             rsshub_url = user_settings_service.get_rsshub_url()
 
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
 
         # 清理URL格式
         rsshub_url = rsshub_url.rstrip('/')
@@ -92,13 +92,13 @@ class RSSHubTestService:
         async with httpx.AsyncClient(timeout=self.timeout, headers=self.headers) as client:
             for route in self.TEST_ROUTES:
                 test_url = f"{rsshub_url}{route['path']}"
-                route_start_time = datetime.now()
+                route_start_time = datetime.now(timezone.utc)
 
                 try:
                     response = await client.get(test_url, follow_redirects=True)
 
                     # 计算响应时间
-                    response_time = (datetime.now() - route_start_time).total_seconds()
+                    response_time = (datetime.now(timezone.utc) - route_start_time).total_seconds()
                     response_times.append(response_time)
 
                     # 检查响应状态
@@ -220,7 +220,7 @@ class RSSHubTestService:
                         "error": f"未知错误: {str(e)}"
                     })
 
-        test_duration = (datetime.now() - start_time).total_seconds()
+        test_duration = (datetime.now(timezone.utc) - start_time).total_seconds()
         total_tests = len(self.TEST_ROUTES)
 
         return RSSHubTestResult(
@@ -245,13 +245,13 @@ class RSSHubTestService:
         quick_route = self.TEST_ROUTES[0]  # Nature Genetics
         test_url = f"{rsshub_url.rstrip('/')}{quick_route['path']}"
 
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout, headers=self.headers) as client:
                 response = await client.get(test_url, follow_redirects=True)
 
-                test_duration = (datetime.now() - start_time).total_seconds()
+                test_duration = (datetime.now(timezone.utc) - start_time).total_seconds()
 
                 if response.status_code == 200:
                     content_type = response.headers.get('content-type', '').lower()
@@ -317,7 +317,7 @@ class RSSHubTestService:
                 "message": "无法连接到RSSHub实例",
                 "rsshub_url": rsshub_url,
                 "test_url": test_url,
-                "response_time": (datetime.now() - start_time).total_seconds(),
+                "response_time": (datetime.now(timezone.utc) - start_time).total_seconds(),
                 "tested_at": start_time.isoformat()
             }
 
@@ -327,7 +327,7 @@ class RSSHubTestService:
                 "message": f"RSSHub测试失败: {str(e)}",
                 "rsshub_url": rsshub_url,
                 "test_url": test_url,
-                "response_time": (datetime.now() - start_time).total_seconds(),
+                "response_time": (datetime.now(timezone.utc) - start_time).total_seconds(),
                 "tested_at": start_time.isoformat()
             }
 

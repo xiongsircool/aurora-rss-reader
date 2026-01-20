@@ -16,33 +16,15 @@ function handleMouseDown(event: MouseEvent) {
 
 <template>
   <div
-    class="resizer"
-    :class="[`resizer-${direction}`, { active }]"
+    class="resizer relative shrink-0 w-[3px] cursor-col-resize transition-all duration-200 bg-[rgba(15,17,21,0.1)] dark:bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,122,24,0.35)] dark:hover:bg-[rgba(255,122,24,0.4)] hover:shadow-[inset_0_0_0_1px_rgba(255,122,24,0.25)]"
+    :class="[`resizer-${direction}`, { 'active bg-[rgba(255,122,24,0.55)]! dark:bg-[rgba(255,122,24,0.7)]! shadow-[inset_0_0_0_1px_rgba(255,122,24,0.35)]!': active }]"
     @mousedown="handleMouseDown"
     :title="title"
   ></div>
 </template>
 
 <style scoped>
-.resizer {
-  width: 3px;
-  background: rgba(15, 17, 21, 0.1);
-  cursor: col-resize;
-  transition: background-color 0.2s, box-shadow 0.2s;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.resizer:hover {
-  background: rgba(255, 122, 24, 0.35);
-  box-shadow: inset 0 0 0 1px rgba(255, 122, 24, 0.25);
-}
-
-.resizer.active {
-  background: rgba(255, 122, 24, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(255, 122, 24, 0.35);
-}
-
+/* Migrated to UnoCSS - only pseudo-elements remain */
 .resizer::before {
   content: '';
   position: absolute;
@@ -81,17 +63,5 @@ function handleMouseDown(event: MouseEvent) {
 .resizer:hover::after,
 .resizer.active::after {
   opacity: 0.35;
-}
-
-:global(.dark) .resizer {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-:global(.dark) .resizer:hover {
-  background: rgba(255, 122, 24, 0.4);
-}
-
-:global(.dark) .resizer.active {
-  background: rgba(255, 122, 24, 0.7);
 }
 </style>

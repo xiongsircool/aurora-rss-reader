@@ -16,11 +16,13 @@ import { useAppSync } from '../composables/useAppSync'
 import { useFeedActions } from '../composables/useFeedActions'
 
 import Toast from '../components/Toast.vue'
-import SettingsModal from '../components/SettingsModal.vue'
 import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
 import DetailsPanel from '../components/details/DetailsPanel.vue'
 import type { Feed } from '../types'
+
+import { defineAsyncComponent } from 'vue'
+const SettingsModal = defineAsyncComponent(() => import('../components/SettingsModal.vue'))
 
 
 
@@ -288,6 +290,8 @@ watch(
     if (!entry) {
       summaryText.value = ''
       showTranslation.value = false
+      translationLoading.value = false
+      translationProgress.value = 0
       translatedContent.value = { title: null, content: null }
       return
     }
@@ -312,8 +316,15 @@ watch(
     }
 
     // Check if translation exists
-    const cacheKey = `${entry.id}_${translationLanguage.value}`
+  const displayMode = aiFeatures.value?.content_display_mode ?? 'replace'
+    const cacheKey = `${entry.id}_${translationLanguage.value}_${displayMode}`
     const cachedTranslation = store.translationCache[cacheKey]
+    
+    // Reset translation state for new entry
+    translationLoading.value = false
+    translationProgress.value = 0
+    showTranslation.value = false
+    
     if (cachedTranslation) {
       translatedContent.value = {
         title: cachedTranslation.title,
@@ -404,15 +415,17 @@ async function handleSummary() {
   try {
     const summary = await store.requestSummary(currentSelectedEntry.value.id)
     summaryText.value = summary.summary
-    showNotification('摘要生成成功', 'success')
+    showNotification(t('toast.summarySuccess'), 'success')
   } catch (error) {
-    showNotification('摘要生成失败，请检查 API 配置', 'error')
+    showNotification(t('toast.summaryFailed'), 'error')
   } finally {
     summaryLoading.value = false
   }
 }
 
-async function handleTranslation() {
+  const translationProgress = ref(0)
+
+  async function handleTranslation() {
   if (!currentSelectedEntry.value) return
   
   // If already showing translation, toggle back to original
@@ -421,8 +434,9 @@ async function handleTranslation() {
     return
   }
   
+  const displayMode = aiFeatures.value?.content_display_mode ?? 'replace'
   // If translation already cached, just show it
-  const cacheKey = `${currentSelectedEntry.value.id}_${translationLanguage.value}`
+  const cacheKey = `${currentSelectedEntry.value.id}_${translationLanguage.value}_${displayMode}`
   if (store.translationCache[cacheKey]) {
     const cached = store.translationCache[cacheKey]
     translatedContent.value = {
@@ -434,23 +448,55 @@ async function handleTranslation() {
   }
   
   // Otherwise, request translation
+  const currentEntryId = currentSelectedEntry.value.id
   translationLoading.value = true
+  translationProgress.value = 0
   try {
-    const translation = await store.requestTranslation(
-      currentSelectedEntry.value.id,
-      translationLanguage.value
-    )
-    translatedContent.value = {
-      title: translation.title,
-      content: translation.content,
+    // Use streaming if available in store
+    if (store.requestTranslationStream) {
+        const translation = await store.requestTranslationStream(
+          currentSelectedEntry.value.id,
+          translationLanguage.value,
+          displayMode,
+          (percent, _message) => {
+            translationProgress.value = percent
+          }
+        )
+        if (currentSelectedEntry.value?.id === currentEntryId) {
+          translatedContent.value = {
+            title: translation.title,
+            content: translation.content,
+          }
+        }
+    } else {
+        // Fallback
+        const translation = await store.requestTranslation(
+          currentEntryId,
+          translationLanguage.value,
+          displayMode
+        )
+        if (currentSelectedEntry.value?.id === currentEntryId) {
+          translatedContent.value = {
+            title: translation.title,
+            content: translation.content,
+          }
+        }
     }
-    showTranslation.value = true
-    showNotification('翻译成功', 'success')
+    
+    if (currentSelectedEntry.value?.id === currentEntryId) {
+      showTranslation.value = true
+      showNotification(t('toast.translationSuccess'), 'success')
+    }
   } catch (error) {
-    console.error('Translation failed:', error)
-    showNotification('翻译失败，请检查 API 配置', 'error')
+    if (currentSelectedEntry.value?.id === currentEntryId) {
+      console.error('Translation failed:', error)
+      showNotification(t('toast.translationFailed'), 'error')
+    }
   } finally {
-    translationLoading.value = false
+    if (currentSelectedEntry.value?.id === currentEntryId) {
+      translationLoading.value = false
+      translationProgress.value = 0
+    }
   }
 }
 
@@ -479,12 +525,12 @@ async function handleGroupClick(groupName: string) {
 }
 
 async function handleDeleteFeed(feedId: string) {
-  if (confirm('确定要删除这个订阅吗？')) {
+  if (confirm(t('feeds.deleteConfirm'))) {
     try {
       await store.deleteFeed(feedId)
-      showNotification('订阅已删除', 'success')
+      showNotification(t('feeds.deleteSuccess'), 'success')
     } catch (error) {
-      showNotification('删除失败', 'error')
+      showNotification(t('feeds.deleteFailed'), 'error')
     }
   }
 }
@@ -498,9 +544,9 @@ async function saveEditFeed(feedId: string) {
   try {
     await store.updateFeed(feedId, { group_name: editingGroupName.value })
     editingFeedId.value = null
-    showNotification('订阅已更新', 'success')
+    showNotification(t('feeds.updateSuccess'), 'success')
   } catch (error) {
-    showNotification('更新失败', 'error')
+    showNotification(t('feeds.updateFailed'), 'error')
   }
 }
 
@@ -511,9 +557,9 @@ function cancelEdit() {
 async function handleExportOpml() {
   try {
     await store.exportOpml()
-    showNotification('OPML 导出成功', 'success')
+    showNotification(t('opml.exportSuccess'), 'success')
   } catch (error) {
-    showNotification('导出失败，请重试', 'error')
+    showNotification(t('opml.exportFailed'), 'error')
   }
 }
 
@@ -526,11 +572,11 @@ async function handleImportOpml(file: File) {
   try {
     const result = await store.importOpml(file)
     showNotification(
-      `导入成功 ${result.imported} 个，跳过 ${result.skipped} 个`,
+      t('opml.importSuccess', { imported: result.imported, skipped: result.skipped }),
       'success'
     )
   } catch (error) {
-    showNotification('导入失败，请检查文件格式', 'error')
+    showNotification(t('opml.importFailed'), 'error')
   } finally {
     importLoading.value = false
   }
@@ -662,17 +708,12 @@ async function handleMarkFeedAsRead(feedId: string) {
       :dark-mode="darkMode"
       :adding-feed="store.addingFeed"
       :import-loading="importLoading"
-      :total-starred="favoritesStore.totalStarred"
-      :grouped-stats="favoritesStore.groupedStats"
+
       :show-favorites-only="showFavoritesOnly"
       :selected-favorite-feed="selectedFavoriteFeed"
-      :feed-map="feedMap"
-      :sorted-group-names="store.sortedGroupNames"
-      :grouped-feeds="store.groupedFeeds"
-      :group-stats="store.groupStats"
+
       :collapsed-groups="collapsedGroups"
-      :active-feed-id="store.activeFeedId"
-      :active-group-name="store.activeGroupName"
+
       :editing-feed-id="editingFeedId"
       :editing-group-name="editingGroupName"
       :is-date-filter-active="isDateFilterActive"
@@ -747,6 +788,7 @@ async function handleMarkFeedAsRead(feedId: string) {
       :translated-title="translatedContent.title"
       :translated-content="translatedContent.content"
       :translation-loading="translationLoading"
+      :translation-progress="translationProgress"
       :translation-language="translationLanguage"
       :summary-text="summaryText"
       :summary-loading="summaryLoading"

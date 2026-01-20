@@ -22,96 +22,98 @@ const translationConfig = defineModel<LocalServiceConfig>('translationConfig', {
 </script>
 
 <template>
-  <section class="settings-section">
-    <h3>{{ t('settings.aiConfig') }}</h3>
-    <div class="ai-config-grid">
+  <section class="mb-6 p-[18px_20px] rounded-xl bg-[#f8faff] border border-[rgba(76,116,255,0.08)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)] last:mb-0 dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(255,255,255,0.1)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+    <h3 class="m-[0_0_16px_0] text-base font-semibold c-[var(--text-primary)]">{{ t('settings.aiConfig') }}</h3>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
       <!-- Summary Config Card -->
-      <div class="ai-config-card">
-        <div class="ai-config-card__content">
-          <div class="ai-config-card__header">
+      <div class="border border-[rgba(15,17,21,0.12)] rounded-xl p-4 bg-[var(--bg-surface)] dark:bg-black/25 dark:border-white/10 flex flex-col justify-between h-full">
+        <div class="flex-1">
+          <div class="flex justify-between items-center gap-3 mb-3 flex-wrap min-h-[52px]">
             <div>
-              <p class="ai-config-card__title">{{ t('settings.summaryGeneration') }}</p>
-              <p class="ai-config-card__subtitle">{{ t('settings.summarySubtitle') }}</p>
+              <p class="m-0 text-[15px] font-semibold c-[var(--text-primary)]">{{ t('settings.summaryGeneration') }}</p>
+              <p class="m-[4px_0_0_0] text-[13px] c-[var(--text-secondary)]">{{ t('settings.summarySubtitle') }}</p>
             </div>
             <button
               @click="emit('testConnection', 'summary')"
               :disabled="serviceTesting.summary || !summaryConfig.api_key || !summaryConfig.base_url || !summaryConfig.model_name"
-              class="test-btn"
+              class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-[#4c74ff] to-[#2f54ff] c-white shadow-[0_10px_20px_rgba(76,116,255,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
               :class="{
-                loading: serviceTesting.summary,
-                success: serviceTestResult.summary?.success,
-                error: serviceTestResult.summary?.success === false
+                'op-70 transform-none': serviceTesting.summary,
+                'bg-[#34c759]! shadow-none!': serviceTestResult.summary?.success,
+                'bg-[#ff4d4f]! shadow-none!': serviceTestResult.summary?.success === false
               }"
             >
               {{ serviceTesting.summary ? t('common.testing') : t('settings.testConnection') }}
             </button>
           </div>
 
-          <div class="form-group">
-            <label>{{ t('settings.apiKey') }}</label>
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.apiKey') }}</label>
             <input
               v-model="summaryConfig.api_key"
               type="password"
               :placeholder="t('settings.apiKeyPlaceholder')"
-              class="form-input"
+              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
             />
-            <p class="form-hint">
+            <p class="mt-1.5 text-xs c-[var(--text-secondary)]">
               {{ t('settings.getApiKey') }}
-              <a href="https://open.bigmodel.cn" target="_blank">https://open.bigmodel.cn</a>
+              <a href="https://open.bigmodel.cn" target="_blank" class="c-[var(--accent)] no-underline hover:underline">{{
+                'https://open.bigmodel.cn'
+              }}</a>
             </p>
           </div>
 
-          <div class="form-group">
-            <label>{{ t('settings.apiUrl') }}</label>
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.apiUrl') }}</label>
             <input
               v-model="summaryConfig.base_url"
               type="text"
               :placeholder="t('settings.apiUrlPlaceholder')"
-              class="form-input"
+              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
             />
           </div>
 
-          <div class="form-group">
-            <label>{{ t('settings.modelName') }}</label>
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.modelName') }}</label>
             <input
               v-model="summaryConfig.model_name"
               type="text"
               :placeholder="t('settings.modelPlaceholder')"
-              class="form-input"
+              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
             />
-            <p class="form-hint">{{ t('settings.supportedModels') }}</p>
+            <p class="mt-1.5 text-xs c-[var(--text-secondary)]">{{ t('settings.supportedModels') }}</p>
           </div>
         </div>
 
         <div
           v-if="serviceTestResult.summary"
-          class="test-result"
-          :class="{ success: serviceTestResult.summary.success, error: !serviceTestResult.summary.success }"
+          class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-white shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:bg-white/4 dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+          :class="{ 'c-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.summary.success, 'c-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.summary.success }"
         >
           {{ serviceTestResult.summary.message }}
         </div>
       </div>
 
       <!-- Translation Config Card -->
-      <div class="ai-config-card">
-        <div class="ai-config-card__content">
-          <div class="ai-config-card__header">
+      <div class="border border-[rgba(15,17,21,0.12)] rounded-xl p-4 bg-[var(--bg-surface)] dark:bg-black/25 dark:border-white/10 flex flex-col justify-between h-full">
+        <div class="flex-1">
+          <div class="flex justify-between items-center gap-3 mb-3 flex-wrap min-h-[52px]">
             <div>
-              <p class="ai-config-card__title">{{ t('settings.contentTranslation') }}</p>
-              <p class="ai-config-card__subtitle">{{ t('settings.translationSubtitle') }}</p>
+              <p class="m-0 text-[15px] font-semibold c-[var(--text-primary)]">{{ t('settings.contentTranslation') }}</p>
+              <p class="m-[4px_0_0_0] text-[13px] c-[var(--text-secondary)]">{{ t('settings.translationSubtitle') }}</p>
             </div>
-            <div class="ai-config-card__actions">
-              <button class="ghost-btn" type="button" @click="emit('copySummaryToTranslation')">
+            <div class="flex gap-2 items-center flex-wrap justify-end">
+              <button class="border border-dashed border-[rgba(76,116,255,0.4)] bg-[rgba(76,116,255,0.08)] c-[#4c74ff] p-[7px_12px] rounded-lg text-[13px] cursor-pointer transition-all hover:bg-[rgba(76,116,255,0.15)] hover:border-[#2f54ff] hover:c-[#2f54ff] dark:border-white/25 dark:bg-white/6 dark:c-[var(--text-primary)] dark:hover:bg-white/10 dark:hover:border-[var(--accent)] dark:hover:c-[var(--accent)]" type="button" @click="emit('copySummaryToTranslation')">
                 {{ t('settings.useSummaryConfig') }}
               </button>
               <button
                 @click="emit('testConnection', 'translation')"
                 :disabled="serviceTesting.translation || !translationConfig.api_key || !translationConfig.base_url || !translationConfig.model_name"
-                class="test-btn"
+                class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-[#4c74ff] to-[#2f54ff] c-white shadow-[0_10px_20px_rgba(76,116,255,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
                 :class="{
-                  loading: serviceTesting.translation,
-                  success: serviceTestResult.translation?.success,
-                  error: serviceTestResult.translation?.success === false
+                  'op-70 transform-none': serviceTesting.translation,
+                  'bg-[#34c759]! shadow-none!': serviceTestResult.translation?.success,
+                  'bg-[#ff4d4f]! shadow-none!': serviceTestResult.translation?.success === false
                 }"
               >
                 {{ serviceTesting.translation ? t('common.testing') : t('settings.testConnection') }}
@@ -119,41 +121,41 @@ const translationConfig = defineModel<LocalServiceConfig>('translationConfig', {
             </div>
           </div>
 
-          <div class="form-group">
-            <label>{{ t('settings.apiKey') }}</label>
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.apiKey') }}</label>
             <input
               v-model="translationConfig.api_key"
               type="password"
               :placeholder="t('settings.translationApiKeyPlaceholder')"
-              class="form-input"
+              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
             />
           </div>
 
-          <div class="form-group">
-            <label>{{ t('settings.apiUrl') }}</label>
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.apiUrl') }}</label>
             <input
               v-model="translationConfig.base_url"
               type="text"
               :placeholder="t('settings.apiUrlPlaceholder')"
-              class="form-input"
+              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
             />
           </div>
 
-          <div class="form-group">
-            <label>{{ t('settings.modelName') }}</label>
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.modelName') }}</label>
             <input
               v-model="translationConfig.model_name"
               type="text"
               :placeholder="t('settings.translationModelPlaceholder')"
-              class="form-input"
+              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
             />
           </div>
         </div>
 
         <div
           v-if="serviceTestResult.translation"
-          class="test-result"
-          :class="{ success: serviceTestResult.translation.success, error: !serviceTestResult.translation.success }"
+          class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-white shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:bg-white/4 dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+          :class="{ 'c-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.translation.success, 'c-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.translation.success }"
         >
           {{ serviceTestResult.translation.message }}
         </div>
@@ -163,19 +165,6 @@ const translationConfig = defineModel<LocalServiceConfig>('translationConfig', {
 </template>
 
 <style scoped>
-.ai-config-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: 100%;
-}
-
-.ai-config-card__content {
-  flex: 1;
-}
-
-.ai-config-card__header {
-  min-height: 52px; /* Ensure alignment despite text diff */
-}
+/* Migrated to UnoCSS */
 </style>
 

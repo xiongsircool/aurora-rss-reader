@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { useSanitize } from '../../composables/useSanitize'
 import type { Entry } from '../../types'
 
 defineProps<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { sanitize } = useSanitize()
 
 function formatDate(date?: string | null) {
   if (!date) return '未知时间'
@@ -37,37 +39,49 @@ function getEntryPreview(entry: Entry): string {
   const summary = entry.summary?.trim()
   if (summary) return summary
   const content = entry.content || ''
+  
+  // Sanitize content before creating DOM element to avoid XSS during preview generation
+  // Although creating an element and not appending it is generally safe-ish, 
+  // explicitly sanitizing is better practice.
+  const sanitized = sanitize(content)
+  
   const temp = document.createElement('div')
-  temp.innerHTML = content
+  temp.innerHTML = sanitized
   const text = temp.textContent || temp.innerText || ''
   return text.replace(/\s+/g, ' ').trim() || t('ai.noSummary')
 }
 </script>
 
 <template>
-  <div :class="['entry-card', { active, unread: !entry.read }]">
-    <button class="entry-card__main" @click="emit('select', entry.id)">
+  <div 
+    class="border border-[var(--border-color)] text-left p-[clamp(12px,1.5vw,16px)] rounded-2xl bg-[var(--bg-surface)] flex items-start gap-[clamp(10px,0.8vw,14px)] c-[var(--text-primary)] shadow-[0_4px_14px_rgba(15,17,21,0.05)] transition-all duration-200 ease min-w-0 hover:border-[rgba(255,122,24,0.4)] hover:shadow-[0_8px_20px_rgba(15,17,21,0.1)] hover:-translate-y-0.5 relative group"
+    :class="{ 
+      'border-[var(--accent)]! border-2! shadow-[0_4px_20px_rgba(255,122,24,0.25)]!': active,
+      'border-l-[var(--accent)] border-l-3': !active && !entry.read
+    }"
+  >
+    <button class="flex-1 flex flex-col gap-1.5 cursor-pointer bg-transparent border-none p-0 text-left c-inherit font-inherit min-w-0" @click="emit('select', entry.id)">
       <!-- Title display area -->
       <template v-if="showTranslation && translatedTitle">
         <!-- Mode 1: Replace - show translation only -->
-        <div v-if="titleDisplayMode === 'replace'" class="entry-card__title">
+        <div v-if="titleDisplayMode === 'replace'" class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]">
           {{ translatedTitle }}
         </div>
         
         <!-- Mode 2: Translation first -->
         <template v-else-if="titleDisplayMode === 'translation-first'">
-          <div class="entry-card__title">{{ translatedTitle }}</div>
-          <div class="entry-card__original-title">
-            <span class="original-icon">🌐</span>
+          <div class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]">{{ translatedTitle }}</div>
+          <div class="mt-1.5 flex items-center gap-1.5 text-[0.85rem] c-[var(--text-secondary)] italic dark:c-white/60">
+            <span class="text-[0.75rem] op-70">🌐</span>
             {{ entry.title || '未命名文章' }}
           </div>
         </template>
         
         <!-- Mode 3: Original first (default) -->
         <template v-else>
-          <div class="entry-card__title">{{ entry.title || '未命名文章' }}</div>
-          <div class="entry-card__translated-title">
-            <span class="translation-label">{{ t('articles.translationLabel', { language: translationLanguageLabel }) }}</span>
+          <div class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]">{{ entry.title || '未命名文章' }}</div>
+          <div class="mt-1.5 flex items-center gap-1.5 text-[0.85rem] c-[var(--text-secondary)] dark:c-white/75">
+            <span class="inline-flex items-center h-[1.35rem] px-[0.45rem] rounded-full text-[0.72rem] tracking-wider font-semibold uppercase border border-[rgba(255,122,24,0.35)] bg-[rgba(255,122,24,0.14)] c-[#ff7a18] shadow-[inset_0_1px_1px_rgba(255,255,255,0.45)] dark:bg-white/10 dark:border-white/25 dark:c-[#ffe4d3]">{{ t('articles.translationLabel', { language: translationLanguageLabel }) }}</span>
             {{ translatedTitle }}
           </div>
         </template>
@@ -75,23 +89,23 @@ function getEntryPreview(entry: Entry): string {
       
       <!-- No translation or loading -->
       <template v-else>
-        <div class="entry-card__title">{{ entry.title || '未命名文章' }}</div>
-        <div v-if="showTranslation && isTranslationLoading" class="entry-card__translated-title">
-          <span class="loading-indicator">{{ t('articles.translatingTitle') }}</span>
+        <div class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]">{{ entry.title || '未命名文章' }}</div>
+        <div v-if="showTranslation && isTranslationLoading" class="mt-1.5 flex items-center gap-1.5 text-[0.85rem] c-[var(--text-secondary)]">
+          <span class="inline-block c-[var(--text-secondary)] italic animate-pulse">{{ t('articles.translatingTitle') }}</span>
         </div>
       </template>
       
-      <div class="entry-card__meta">
+      <div class="text-xs c-[var(--text-secondary)] flex gap-1.5 items-center flex-wrap gap-y-0.5 min-w-0">
         <span>{{ entry.feed_title }}</span>
         <span>{{ t('articles.timeSeparator') }}</span>
         <span>{{ formatDate(entry.published_at) }}</span>
       </div>
-      <p v-if="showSummary" class="entry-card__summary">
+      <p v-if="showSummary" class="c-[var(--text-secondary)] text-sm leading-relaxed line-clamp-3 break-words [overflow-wrap:anywhere] max-h-[clamp(4.2em,6vw,6.3em)] m-0">
         {{ getEntryPreview(entry) }}
       </p>
     </button>
     <button
-      class="entry-card__star"
+      class="bg-transparent border-none p-1 rounded-md cursor-pointer text-lg c-[#ffbe30] transition-all shrink-0 mt-0.5 hover:bg-[rgba(255,190,48,0.1)] hover:scale-110"
       @click.stop="emit('toggle-star', entry)"
       :title="entry.starred ? '取消收藏' : '收藏'"
     >
@@ -101,165 +115,5 @@ function getEntryPreview(entry: Entry): string {
 </template>
 
 <style scoped>
-.entry-card {
-  border: 1px solid var(--border-color);
-  text-align: left;
-  padding: clamp(12px, 1.5vw, 16px);
-  border-radius: 16px;
-  background: var(--bg-surface);
-  display: flex;
-  align-items: flex-start;
-  gap: clamp(10px, 0.8vw, 14px);
-  color: var(--text-primary);
-  box-shadow: 0 4px 14px rgba(15, 17, 21, 0.05);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
-  min-width: 0;
-}
-
-.entry-card:hover {
-  border-color: rgba(255, 122, 24, 0.4);
-  box-shadow: 0 14px 28px rgba(15, 17, 21, 0.12);
-  transform: translateY(-2px);
-}
-
-.entry-card__main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  padding: 0;
-  text-align: left;
-  color: inherit;
-  font: inherit;
-  min-width: 0;
-}
-
-.entry-card__star {
-  background: transparent;
-  border: none;
-  padding: 4px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 18px;
-  color: #ffbe30;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.entry-card__star:hover {
-  background: rgba(255, 190, 48, 0.1);
-  transform: scale(1.1);
-}
-
-.entry-card.unread {
-  border-color: var(--accent);
-}
-
-.entry-card.active {
-  border-color: var(--accent);
-  box-shadow: 0 14px 32px rgba(255, 122, 24, 0.2);
-  background: rgba(255, 122, 24, 0.06);
-}
-
-.entry-card__title {
-  font-weight: 600;
-  line-height: 1.4;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.entry-card__meta {
-  font-size: 12px;
-  color: var(--text-secondary);
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-wrap: wrap;
-  row-gap: 2px;
-  min-width: 0;
-}
-
-.entry-card__summary {
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-height: clamp(4.2em, 6vw, 6.3em);
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.entry-card__translated-title {
-  margin-top: 0.35rem;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.translation-label {
-  display: inline-flex;
-  align-items: center;
-  height: 1.35rem;
-  padding: 0 0.45rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  font-weight: 600;
-  text-transform: uppercase;
-  border: 1px solid rgba(255, 122, 24, 0.35);
-  background: rgba(255, 122, 24, 0.14);
-  color: #ff7a18;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45);
-}
-
-.loading-indicator {
-  display: inline-block;
-  color: var(--text-secondary);
-  font-style: italic;
-  animation: pulse 1.5s ease-in-out infinite alternate;
-}
-
-@keyframes pulse {
-  from { opacity: 0.6; }
-  to { opacity: 1; }
-}
-
-.entry-card__original-title {
-  margin-top: 0.35rem;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-.original-icon {
-  font-size: 0.75rem;
-  opacity: 0.7;
-}
-
-:global(.dark) .entry-card__translated-title {
-  color: rgba(255, 255, 255, 0.75);
-}
-
-:global(.dark) .translation-label {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.25);
-  color: #ffe4d3;
-}
-
-:global(.dark) .entry-card__original-title {
-  color: rgba(255, 255, 255, 0.6);
-}
+/* Migrated to UnoCSS */
 </style>

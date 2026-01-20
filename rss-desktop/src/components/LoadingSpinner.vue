@@ -6,56 +6,20 @@ defineProps<{
 </script>
 
 <template>
-  <div class="spinner-container">
-    <div :class="['spinner', `spinner--${size || 'medium'}`]"></div>
-    <p v-if="message" class="spinner-message">{{ message }}</p>
+  <div class="flex flex-col items-center justify-center gap-3 p-6">
+    <div
+      class="animate-spin rounded-full border-solid border-[rgba(255,122,24,0.2)] border-t-[#ff7a18]"
+      :class="{
+        'w-5 h-5 border-2': size === 'small',
+        'w-10 h-10 border-3': !size || size === 'medium',
+        'w-15 h-15 border-4': size === 'large',
+      }"
+    ></div>
+    <p v-if="message" class="text-sm c-[var(--text-secondary)]">{{ message }}</p>
   </div>
 </template>
 
 <style scoped>
-.spinner-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 24px;
-}
-
-.spinner {
-  border: 3px solid rgba(255, 122, 24, 0.2);
-  border-top-color: #ff7a18;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.spinner--small {
-  width: 20px;
-  height: 20px;
-  border-width: 2px;
-}
-
-.spinner--medium {
-  width: 40px;
-  height: 40px;
-  border-width: 3px;
-}
-
-.spinner--large {
-  width: 60px;
-  height: 60px;
-  border-width: 4px;
-}
-
-.spinner-message {
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* Scoped styles removed in favor of UnoCSS utility classes */
 </style>
 

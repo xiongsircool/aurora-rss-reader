@@ -3,7 +3,7 @@
 """
 from typing import Optional
 from sqlmodel import SQLModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class UserSettings(SQLModel, table=True):
@@ -23,8 +23,8 @@ class UserSettings(SQLModel, table=True):
     default_date_range: str = Field(default="30d", description="默认时间范围: '1d', '2d', '3d', '7d', '30d', '90d', '180d', '365d', 'all'")
     time_field: str = Field(default="inserted_at", description="时间字段: 'published_at' 或 'inserted_at'")
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Config:
         """SQLModel配置"""

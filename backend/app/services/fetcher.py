@@ -28,7 +28,7 @@ else:
     logger.info("dateutil库未安装，将使用基础时间解析功能")
 
 from app.db.models import Entry, Feed, FetchLog
-from app.db.session import SessionLocal
+from app.db.session import async_session_maker
 from app.services.feed_config import (
     DEFAULT_RSSHUB_MIRRORS, SPECIAL_USER_AGENTS, KNOWN_ALTERNATIVES,
     TIMEOUT_CONFIG, RETRY_CONFIG, get_rsshub_mirrors
@@ -40,8 +40,8 @@ async def refresh_feed(feed_id: str) -> None:
     """Fetch a single feed and store new entries."""
 
     # 首先获取feed信息以确定特殊配置
-    with SessionLocal() as session:
-        feed = session.get(Feed, feed_id)
+    async with async_session_maker() as session:
+        feed = await session.get(Feed, feed_id)
         if not feed:
             logger.warning("Feed %s not found", feed_id)
             return
@@ -87,27 +87,28 @@ async def refresh_all_feeds() -> None:
     )
 
     async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
-        with SessionLocal() as session:
-            feeds = session.exec(select(Feed)).all()
+        async with async_session_maker() as session:
+            result = await session.exec(select(Feed))
+            feeds = result.all()
 
         for feed in feeds:
             await _refresh_feed_with_client(feed.id, client)
 
 
 async def _refresh_feed_with_client(feed_id: str, client: httpx.AsyncClient) -> None:
-    with SessionLocal() as session:
-        feed = session.get(Feed, feed_id)
+    async with async_session_maker() as session:
+        feed = await session.get(Feed, feed_id)
         if not feed:
             logger.warning("Feed %s not found", feed_id)
             return
 
     # 创建日志记录并获取log_id
     log_id = None
-    with SessionLocal() as session:
+    async with async_session_maker() as session:
         log = FetchLog(feed_id=feed_id, status="running")
         session.add(log)
-        session.commit()
-        session.refresh(log)  # 确保获取生成的ID
+        await session.commit()
+        await session.refresh(log)  # 确保获取生成的ID
         log_id = log.id
 
     start = perf_counter()
@@ -156,8 +157,8 @@ async def _refresh_feed_with_client(feed_id: str, client: httpx.AsyncClient) -> 
         new_items = await _persist_entries(feed_id, parsed)
 
         duration = int((perf_counter() - start) * 1000)
-        with SessionLocal() as session:
-            feed_db = session.get(Feed, feed_id)
+        async with async_session_maker() as session:
+            feed_db = await session.get(Feed, feed_id)
             if feed_db:
                 feed_db.title = parsed.feed.get("title") or feed_db.title or feed_db.url
                 feed_db.site_url = parsed.feed.get("link")
@@ -172,14 +173,14 @@ async def _refresh_feed_with_client(feed_id: str, client: httpx.AsyncClient) -> 
                 session.add(feed_db)
 
             # 使用log_id查找日志记录
-            log_db = session.get(FetchLog, log_id) if log_id else None
+            log_db = await session.get(FetchLog, log_id) if log_id else None
             if log_db:
                 log_db.status = "success"
                 log_db.finished_at = datetime.now(timezone.utc)
                 log_db.duration_ms = duration
                 log_db.item_count = new_items
                 session.add(log_db)
-            session.commit()
+            await session.commit()
     except httpx.TimeoutException as exc:
         error_msg = f"请求超时: {str(exc)}"
         logger.error("RSS feed %s 请求超时: %s", feed.url, exc)
@@ -202,21 +203,24 @@ async def _refresh_feed_with_client(feed_id: str, client: httpx.AsyncClient) -> 
 
 
 def _log_error(feed_id: str, log_id: str | None, error_type: str, error_msg: str) -> None:
-    """统一的错误记录函数"""
-    with SessionLocal() as session:
-        feed_db = session.get(Feed, feed_id)
+    """统一的错误记录函数 - Async Wrapper Helper"""
+    asyncio.create_task(_log_error_async(feed_id, log_id, error_type, error_msg))
+
+async def _log_error_async(feed_id: str, log_id: str | None, error_type: str, error_msg: str) -> None:
+    async with async_session_maker() as session:
+        feed_db = await session.get(Feed, feed_id)
         if feed_db:
             feed_db.last_error = f"[{error_type}] {error_msg}"
             feed_db.last_checked_at = datetime.now(timezone.utc)
             session.add(feed_db)
 
-        log_db = session.get(FetchLog, log_id) if log_id else None
+        log_db = await session.get(FetchLog, log_id) if log_id else None
         if log_db:
             log_db.status = "failed"
             log_db.message = f"[{error_type}] {error_msg}"
             log_db.finished_at = datetime.now(timezone.utc)
             session.add(log_db)
-        session.commit()
+        await session.commit()
 
 
 async def _persist_entries(feed_id: str, parsed: Any) -> int:
@@ -224,15 +228,17 @@ async def _persist_entries(feed_id: str, parsed: Any) -> int:
         return 0
 
     new_items = 0
-    with SessionLocal() as session:
+    new_items = 0
+    async with async_session_maker() as session:
         for item in parsed.entries:
             guid = _extract_guid(item)
             if not guid:
                 continue
 
-            exists = session.exec(
+            result = await session.exec(
                 select(Entry).where(Entry.feed_id == feed_id, Entry.guid == guid)
-            ).first()
+            )
+            exists = result.first()
             if exists:
                 continue
 
@@ -259,7 +265,7 @@ async def _persist_entries(feed_id: str, parsed: Any) -> int:
             session.add(entry)
             new_items += 1
 
-        session.commit()
+        await session.commit()
 
     if new_items:
         logger.info("Feed %s stored %s new entries", feed_id, new_items)
@@ -277,8 +283,35 @@ def _extract_guid(item: Any) -> str | None:
 
 
 def _extract_content(item: Any) -> str | None:
+    """
+    智能提取内容：
+    1. 优先查找 content列表
+    2. 优先匹配 text/html 或 application/xhtml+xml
+    3. 如果有多个匹配，选择最长的一个 (通常是正文)
+    4. 降级策略：使用 summary
+    """
     if "content" in item and item["content"]:
-        return item["content"][0].get("value")
+        candidates = item["content"]
+        html_candidates = []
+        
+        for c in candidates:
+            # 检查 type 是否为 html 类型
+            ctype = c.get("type", "").lower()
+            value = c.get("value", "")
+            if not value:
+                continue
+                
+            if "html" in ctype or "xhtml" in ctype:
+                html_candidates.append(value)
+        
+        # 如果找到了 HTML 候选，返回最长的那个
+        if html_candidates:
+            return max(html_candidates, key=len)
+            
+        # 如果没有 HTML 候选，但有 content，返回第一个的 value
+        if candidates and candidates[0].get("value"):
+            return candidates[0].get("value")
+
     return item.get("summary")
 
 

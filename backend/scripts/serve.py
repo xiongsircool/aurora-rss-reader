@@ -108,6 +108,7 @@ def main() -> None:
             port=settings.api_port,
             reload=not is_packaged and settings.app_env == "development",
             log_level="info",
+            reload_excludes=["data/*", "*.sqlite", "*.db", "*.log"],
         )
     except Exception as e:
         logging.critical(f"Fatal error during startup: {e}")

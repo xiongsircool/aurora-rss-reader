@@ -2,7 +2,7 @@
 用户设置API
 """
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -48,7 +48,7 @@ class RSSHubURLUpdate(BaseModel):
 @router.get("", response_model=UserSettingsResponse)
 async def get_settings():
     """获取用户设置"""
-    settings = user_settings_service.get_settings()
+    settings = await user_settings_service.get_settings()
     return UserSettingsResponse(
         rsshub_url=settings.rsshub_url,
         fetch_interval_minutes=settings.fetch_interval_minutes,
@@ -68,7 +68,7 @@ async def update_settings(update_data: UserSettingsUpdate):
     try:
         # 过滤None值
         update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
-        settings = user_settings_service.update_settings(**update_dict)
+        settings = await user_settings_service.update_settings(**update_dict)
 
         return UserSettingsResponse(
             rsshub_url=settings.rsshub_url,
@@ -89,7 +89,7 @@ async def update_settings(update_data: UserSettingsUpdate):
 async def update_rsshub_url(update_data: RSSHubURLUpdate):
     """更新RSSHub URL"""
     try:
-        settings = user_settings_service.update_rsshub_url(update_data.rsshub_url)
+        settings = await user_settings_service.update_rsshub_url(update_data.rsshub_url)
 
         return UserSettingsResponse(
             rsshub_url=settings.rsshub_url,
@@ -109,7 +109,7 @@ async def update_rsshub_url(update_data: RSSHubURLUpdate):
 @router.get("/rsshub-url")
 async def get_rsshub_url():
     """获取当前RSSHub URL"""
-    url = user_settings_service.get_rsshub_url()
+    url = await user_settings_service.get_rsshub_url()
     return {"rsshub_url": url}
 
 
@@ -125,7 +125,7 @@ async def test_rsshub_quick():
         return {
             "success": False,
             "message": f"RSSHub测试失败: {str(e)}",
-            "tested_at": datetime.utcnow().isoformat()
+            "tested_at": datetime.now(timezone.utc).isoformat()
         }
 
 
@@ -157,5 +157,5 @@ async def test_rsshub_full():
         return {
             "success": False,
             "message": f"RSSHub完整测试失败: {str(e)}",
-            "tested_at": datetime.utcnow().isoformat()
+            "tested_at": datetime.now(timezone.utc).isoformat()
         }

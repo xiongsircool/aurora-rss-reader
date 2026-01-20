@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
-
-from sqlmodel import Session
-
-from app.db.session import SessionLocal
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.session import async_session_maker
 
 
-def get_session() -> Iterator[Session]:
-    with SessionLocal() as session:
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
         yield session

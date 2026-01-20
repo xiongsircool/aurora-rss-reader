@@ -17,6 +17,7 @@ class SummaryResponse(SQLModel):
 class TranslationRequest(SQLModel):
     entry_id: str
     language: str = "zh"
+    display_mode: str = "replace"  # replace | bilingual
 
 
 class TranslationResponse(SQLModel):

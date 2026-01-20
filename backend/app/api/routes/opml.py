@@ -6,7 +6,8 @@ from io import StringIO
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 import asyncio
-from sqlmodel import Session, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from app.db.deps import get_session
 from app.db.models import Feed
@@ -16,9 +17,10 @@ router = APIRouter(prefix="/opml", tags=["opml"])
 
 
 @router.get("/export")
-async def export_opml(session: Session = Depends(get_session)) -> Response:
+async def export_opml(session: AsyncSession = Depends(get_session)) -> Response:
     """Export all feeds as OPML."""
-    feeds = session.exec(select(Feed)).all()
+    result = await session.exec(select(Feed))
+    feeds = result.all()
     
     # Create OPML XML structure
     opml = ET.Element("opml", version="2.0")
@@ -82,7 +84,7 @@ async def export_opml(session: Session = Depends(get_session)) -> Response:
 
 @router.post("/import")
 async def import_opml(
-    file: UploadFile = File(...), session: Session = Depends(get_session)
+    file: UploadFile = File(...), session: AsyncSession = Depends(get_session)
 ) -> dict[str, int | list[str]]:
     """Import feeds from OPML file."""
     if not file.filename or not file.filename.endswith((".opml", ".xml")):
@@ -101,7 +103,7 @@ async def import_opml(
     errors: list[str] = []
     created_feed_ids: list[str] = []
     
-    def process_outline(outline: ET.Element, parent_title: str | None = None) -> None:
+    async def process_outline(outline: ET.Element, parent_title: str | None = None) -> None:
         nonlocal imported, skipped
         
         xml_url = outline.get("xmlUrl")
@@ -112,7 +114,8 @@ async def import_opml(
             
             # Check if feed already exists
             try:
-                existing = session.exec(select(Feed).where(Feed.url == xml_url)).first()
+                result = await session.exec(select(Feed).where(Feed.url == xml_url))
+                existing = result.first()
                 if existing:
                     skipped += 1
                     return
@@ -136,18 +139,18 @@ async def import_opml(
         if children:
             current_title = outline.get("title") or outline.get("text") or parent_title
             for child in children:
-                process_outline(child, current_title)
+                await process_outline(child, current_title) # Recursive call to async function
     
     # Process body
     body = root.find("body")
     if body is not None:
         for outline in body.findall("outline"):
             try:
-                process_outline(outline)
+                await process_outline(outline)
             except Exception as e:
                 errors.append(f"Error processing outline: {str(e)}")
     
-    session.commit()
+    await session.commit()
 
     # 提交后批量安排异步刷新，尽快获取条目
     for feed_id in created_feed_ids:

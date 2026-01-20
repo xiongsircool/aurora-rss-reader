@@ -17,23 +17,23 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <header class="sidebar__header">
-    <div class="brand">
-      <LogoMark class="brand__icon" :size="logoSize" />
+  <header class="flex justify-between items-center mb-3 gap-3">
+    <div class="flex items-start gap-[clamp(8px,1vw,14px)] flex-1">
+      <LogoMark class="shrink-0" :size="logoSize" />
       <div>
-        <h1>Aurora Feeds</h1>
-        <p class="muted">{{ t('common.local') }} {{ t('common.private') }} · {{ t('common.ai') }} {{ t('common.smart') }} {{ t('common.reading') }} {{ t('common.platform') }}</p>
+        <h1 class="text-[clamp(16px,1.6vw,20px)] mb-1 leading-tight">{{ t('common.appName') }}</h1>
+        <p class="c-[var(--text-secondary)] text-xs text-[clamp(11px,1.2vw,13px)] leading-snug m-0">{{ t('common.local') }} {{ t('common.private') }} · {{ t('common.ai') }} {{ t('common.smart') }} {{ t('common.reading') }} {{ t('common.platform') }}</p>
       </div>
     </div>
-    <div class="header-actions">
+    <div class="flex gap-2 self-start -mt-1">
       <button 
         @click="emit('toggle-theme')" 
-        class="theme-toggle" 
+        class="border-none bg-transparent text-xl cursor-pointer py-1 px-2 rounded-md transition-colors c-[var(--text-primary)] hover:bg-[rgba(255,122,24,0.1)] hover:c-[var(--accent)] dark:c-[rgba(255,255,255,0.9)] dark:hover:bg-[rgba(255,255,255,0.12)] dark:hover:c-[#ffe5d0]" 
         :title="darkMode ? t('layout.themeToggleTitle') : t('layout.themeToggleTitleDark')"
       >
         <svg
           v-if="darkMode"
-          class="icon icon-20"
+          class="w-5 h-5 block"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -53,7 +53,7 @@ const { t } = useI18n()
         </svg>
         <svg
           v-else
-          class="icon icon-20"
+          class="w-5 h-5 block"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -64,9 +64,9 @@ const { t } = useI18n()
           <path d="M21 12.8A9 9 0 0 1 11.2 3 7 7 0 1 0 21 12.8z" />
         </svg>
       </button>
-      <button @click="emit('open-settings')" class="settings-btn" :title="t('layout.settingsTitle')">
+      <button @click="emit('open-settings')" class="border-none bg-transparent text-xl cursor-pointer py-1 px-2 rounded-md transition-colors c-[var(--text-primary)] hover:bg-[rgba(255,122,24,0.1)] hover:c-[var(--accent)] dark:c-[rgba(255,255,255,0.9)] dark:hover:bg-[rgba(255,255,255,0.12)] dark:hover:c-[#ffe5d0]" :title="t('layout.settingsTitle')">
         <svg
-          class="icon icon-20"
+          class="w-5 h-5 block"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -80,9 +80,9 @@ const { t } = useI18n()
           />
         </svg>
       </button>
-      <button @click="emit('reset-layout')" class="layout-reset-btn" :title="t('layout.resetLayoutTitle')">
+      <button @click="emit('reset-layout')" class="border-none bg-transparent text-xl cursor-pointer py-1 px-2 rounded-md transition-colors c-[var(--text-primary)] hover:bg-[rgba(255,122,24,0.1)] hover:c-[var(--accent)] dark:c-[rgba(255,255,255,0.9)] dark:hover:bg-[rgba(255,255,255,0.12)] dark:hover:c-[#ffe5d0]" :title="t('layout.resetLayoutTitle')">
         <svg
-          class="icon icon-20"
+          class="w-5 h-5 block"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -99,90 +99,5 @@ const { t } = useI18n()
 </template>
 
 <style scoped>
-.sidebar__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  gap: 12px;
-}
-
-.brand {
-  display: flex;
-  align-items: flex-start;
-  gap: clamp(8px, 1vw, 14px);
-  flex: 1;
-}
-
-.brand__icon {
-  flex-shrink: 0;
-}
-
-.sidebar__header h1 {
-  font-size: clamp(16px, 1.6vw, 20px);
-  margin-bottom: 4px;
-  line-height: 1.2;
-}
-
-.brand p {
-  font-size: clamp(11px, 1.2vw, 13px);
-  line-height: 1.4;
-  margin: 0;
-}
-
-.muted {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-  align-self: flex-start;
-  margin-top: -4px;
-}
-
-.icon {
-  width: 16px;
-  height: 16px;
-  display: block;
-}
-
-.icon-20 {
-  width: 20px;
-  height: 20px;
-}
-
-.theme-toggle,
-.settings-btn,
-.layout-reset-btn {
-  border: none;
-  background: transparent;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.2s, color 0.2s;
-  color: var(--text-primary);
-}
-
-.theme-toggle:hover,
-.settings-btn:hover,
-.layout-reset-btn:hover {
-  background: rgba(255, 122, 24, 0.1);
-  color: var(--accent);
-}
-
-:global(.dark) .theme-toggle,
-:global(.dark) .settings-btn,
-:global(.dark) .layout-reset-btn {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-:global(.dark) .theme-toggle:hover,
-:global(.dark) .settings-btn:hover,
-:global(.dark) .layout-reset-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffe5d0;
-}
+/* Migrated to UnoCSS */
 </style>

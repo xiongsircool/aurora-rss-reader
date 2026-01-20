@@ -1,27 +1,14 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useFeedStore } from '../../stores/feedStore'
+import { useFavoritesStore } from '../../stores/favoritesStore'
 import type { Feed } from '../../types'
 import SidebarHeader from './SidebarHeader.vue'
 import AddFeedForm from './AddFeedForm.vue'
 import OpmlActions from './OpmlActions.vue'
 import FavoritesSection from './FavoritesSection.vue'
 import FeedGroup from './FeedGroup.vue'
-
-interface FeedStat {
-  id: string
-  title: string
-  count: number
-}
-
-interface GroupStat {
-  total: number
-  feeds: FeedStat[]
-}
-
-interface FeedGroupStats {
-  feedCount: number
-  unreadCount: number
-}
 
 const props = defineProps<{
   // Header props
@@ -33,19 +20,11 @@ const props = defineProps<{
   importLoading: boolean
   
   // Favorites
-  totalStarred: number
-  groupedStats: Record<string, GroupStat>
   showFavoritesOnly: boolean
   selectedFavoriteFeed: string | null
-  feedMap: Record<string, Feed>
   
   // Feed list
-  sortedGroupNames: string[]
-  groupedFeeds: Record<string, Feed[]>
-  groupStats: Record<string, FeedGroupStats>
   collapsedGroups: Record<string, boolean>
-  activeFeedId: string | null
-  activeGroupName: string | null
   editingFeedId: string | null
   editingGroupName: string
   isDateFilterActive: boolean
@@ -87,6 +66,15 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const feedStore = useFeedStore()
+const favoritesStore = useFavoritesStore()
+
+const feedMap = computed<Record<string, Feed>>(() => {
+  return feedStore.feeds.reduce<Record<string, Feed>>((acc, feed) => {
+    acc[feed.id] = feed
+    return acc
+  }, {})
+})
 
 function isGroupCollapsed(groupName: string): boolean {
   return !!props.collapsedGroups[groupName]
@@ -94,7 +82,7 @@ function isGroupCollapsed(groupName: string): boolean {
 </script>
 
 <template>
-  <aside class="sidebar">
+  <aside class="flex flex-col border-r border-[var(--border-color)] p-[24px_16px] bg-[var(--bg-surface)] shrink-0 min-w-180px box-border max-h-screen overflow-y-auto min-h-0 w-[var(--sidebar-width,280px)] transition-[width] duration-160 ease-out sidebar lt-md:w-full! lt-md:h-auto lt-md:max-h-none lt-md:border-r-0 lt-md:border-b lt-md:overflow-visible">
     <SidebarHeader
       :logo-size="logoSize"
       :dark-mode="darkMode"
@@ -115,8 +103,8 @@ function isGroupCollapsed(groupName: string): boolean {
     />
     
     <FavoritesSection
-      :total-starred="totalStarred"
-      :grouped-stats="groupedStats"
+      :total-starred="favoritesStore.totalStarred"
+      :grouped-stats="favoritesStore.groupedStats"
       :show-favorites-only="showFavoritesOnly"
       :selected-favorite-feed="selectedFavoriteFeed"
       :feed-map="feedMap"
@@ -124,28 +112,28 @@ function isGroupCollapsed(groupName: string): boolean {
       @select-feed="emit('select-favorite-feed', $event)"
     />
     
-    <div class="feed-list" v-show="!showFavoritesOnly">
+    <div class="flex-1" v-show="!showFavoritesOnly">
       <!-- Group controls -->
-      <div class="group-controls" v-if="sortedGroupNames.length > 1">
-        <button @click="emit('expand-all')" class="group-control-btn" :title="t('feeds.groupControlTitle')">
+      <div class="flex gap-2 mb-3 px-1" v-if="feedStore.sortedGroupNames.length > 1">
+        <button @click="emit('expand-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlTitle')">
           {{ t('common.expandAll') }}
         </button>
-        <button @click="emit('collapse-all')" class="group-control-btn" :title="t('feeds.groupControlCollapseTitle')">
+        <button @click="emit('collapse-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlCollapseTitle')">
           {{ t('common.collapseAll') }}
         </button>
       </div>
 
       <!-- Feed groups -->
       <FeedGroup
-        v-for="groupName in sortedGroupNames"
+        v-for="groupName in feedStore.sortedGroupNames"
         :key="groupName"
         :group-name="groupName"
-        :feeds="groupedFeeds[groupName] || []"
-        :is-active="activeGroupName === groupName"
+        :feeds="feedStore.groupedFeeds[groupName] || []"
+        :is-active="feedStore.activeGroupName === groupName"
         :is-collapsed="isGroupCollapsed(groupName)"
-        :feed-count="groupStats[groupName]?.feedCount || 0"
-        :unread-count="groupStats[groupName]?.unreadCount || 0"
-        :active-feed-id="activeFeedId"
+        :feed-count="feedStore.groupStats[groupName]?.feedCount || 0"
+        :unread-count="feedStore.groupStats[groupName]?.unreadCount || 0"
+        :active-feed-id="feedStore.activeFeedId"
         :editing-feed-id="editingFeedId"
         :editing-group-name="editingGroupName"
         :is-date-filter-active="isDateFilterActive"
@@ -166,74 +154,11 @@ function isGroupCollapsed(groupName: string): boolean {
 </template>
 
 <style scoped>
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--border-color);
-  padding: 24px 16px;
-  background: var(--bg-surface);
-  flex-shrink: 0;
-  min-width: 180px;
-  box-sizing: border-box;
-  max-height: 100vh;
-  overflow-y: auto;
-  min-height: 0;
-  width: var(--sidebar-width, 280px);
-  transition: width 160ms ease;
-}
-
-.feed-list {
-  flex: 1;
-}
-
-.group-controls {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 0 4px;
-}
-
-.group-control-btn {
-  border: 1px solid rgba(15, 17, 21, 0.1);
-  background: transparent;
-  color: var(--text-secondary);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.group-control-btn:hover {
-  background: rgba(255, 122, 24, 0.08);
-  color: var(--text-primary);
-  border-color: rgba(255, 122, 24, 0.2);
-}
-
+/* Migrated to UnoCSS - Scrollbar styles remain */
 .sidebar::-webkit-scrollbar { width: 8px; }
 .sidebar::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.18); border-radius: 8px; }
 .sidebar:hover::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.28); }
 
 :global(.dark) .sidebar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
 :global(.dark) .sidebar:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
-
-:global(.dark) .group-control-btn {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-:global(.dark) .group-control-btn:hover {
-  background: rgba(255, 122, 24, 0.15);
-  border-color: rgba(255, 122, 24, 0.3);
-}
-
-@media (max-width: 960px) {
-  .sidebar {
-    width: 100% !important;
-    height: auto;
-    max-height: none;
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    overflow: visible;
-  }
-}
 </style>

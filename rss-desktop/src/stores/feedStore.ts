@@ -127,29 +127,62 @@ export const useFeedStore = defineStore('feed', () => {
     if (activeGroupName.value) {
       const groupFeeds = groupedFeeds.value[activeGroupName.value] || []
       for (const feed of groupFeeds) {
-        await api.post(`/feeds/${feed.id}/refresh`)
+        // 并行触发刷新，不等待逐个完成
+        api.post(`/feeds/${feed.id}/refresh`).catch(err => {
+          console.error(err)
+          // 不中断其他刷新，但记录错误
+          // errorMessage.value = `刷新 ${feed.title} 失败` // 可选：太频繁的报错可能不好
+        })
       }
-      // 保留当前的过滤器状态
-      await fetchEntries({
-        groupName: activeGroupName.value,
-        unreadOnly: lastEntryFilters.value?.unreadOnly,
-        dateRange: lastEntryFilters.value?.dateRange,
-        timeField: lastEntryFilters.value?.timeField,
-      })
-      await fetchFeeds()
+
+      // 分组刷新可能耗时较长，这里给一个简单的延迟反馈
+      setTimeout(() => {
+        fetchFeeds()
+        fetchEntries({
+          groupName: activeGroupName.value!,
+          unreadOnly: lastEntryFilters.value?.unreadOnly,
+          dateRange: lastEntryFilters.value?.dateRange,
+          timeField: lastEntryFilters.value?.timeField,
+        })
+      }, 2000)
       return
     }
 
     // 单个订阅源模式
-    if (!activeFeedId.value) return
-    await api.post(`/feeds/${activeFeedId.value}/refresh`)
-    // 保留当前的过滤器状态
-    await fetchEntries({
-      unreadOnly: lastEntryFilters.value?.unreadOnly,
-      dateRange: lastEntryFilters.value?.dateRange,
-      timeField: lastEntryFilters.value?.timeField,
-    })
-    await fetchFeeds()
+    const feedId = activeFeedId.value
+    if (!feedId) return
+
+    // 获取刷新前的状态，用于对比
+    const oldFeed = feeds.value.find(f => f.id === feedId)
+    const oldTime = oldFeed?.last_checked_at
+
+    try {
+      await api.post(`/feeds/${feedId}/refresh`)
+
+      // 轮询检查状态更新（最多尝试 5 次，每次 1 秒）
+      let attempts = 0
+      const checkInterval = setInterval(async () => {
+        attempts++
+
+        // 仅重新获取订阅列表来检查时间戳（轻量）
+        await fetchFeeds()
+        const newFeed = feeds.value.find(f => f.id === feedId)
+
+        // 如果时间变了，或者超过最大尝试次数，停止轮询
+        if (newFeed?.last_checked_at !== oldTime || attempts >= 5) {
+          clearInterval(checkInterval)
+          // 刷新完成后，同时更新文章列表
+          await fetchEntries({
+            unreadOnly: lastEntryFilters.value?.unreadOnly,
+            dateRange: lastEntryFilters.value?.dateRange,
+            timeField: lastEntryFilters.value?.timeField,
+          })
+        }
+      }, 1000)
+    } catch (err) {
+      console.error(err)
+      errorMessage.value = '刷新失败'
+    }
   }
 
   async function deleteFeed(feedId: string) {
@@ -278,12 +311,18 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function toggleEntryState(entry: Entry, state: Partial<Pick<Entry, 'read' | 'starred'>>) {
     const previousRead = entry.read
-    await api.patch<Entry>(`/entries/${entry.id}`, state)
-    entry.read = state.read ?? entry.read
-    entry.starred = state.starred ?? entry.starred
+    try {
+      await api.patch<Entry>(`/entries/${entry.id}`, state)
+      entry.read = state.read ?? entry.read
+      entry.starred = state.starred ?? entry.starred
 
-    if (state.read !== undefined && previousRead !== entry.read) {
-      adjustFeedUnreadCount(entry.feed_id, entry.read ? -1 : 1)
+      if (state.read !== undefined && previousRead !== entry.read) {
+        adjustFeedUnreadCount(entry.feed_id, entry.read ? -1 : 1)
+      }
+    } catch (error) {
+      console.error('Failed to toggle entry state:', error)
+      errorMessage.value = '更新文章状态失败'
+      throw error
     }
   }
 
@@ -301,19 +340,88 @@ export const useFeedStore = defineStore('feed', () => {
     return data
   }
 
-  async function requestTranslation(entryId: string, language = 'zh') {
-    const cacheKey = `${entryId}_${language}`
+  async function requestTranslation(entryId: string, language = 'zh', displayMode = 'replace') {
+    const cacheKey = `${entryId}_${language}_${displayMode}`
     if (translationCache.value[cacheKey]) {
       return translationCache.value[cacheKey]
     }
     const { data } = await api.post<TranslationResult>('/ai/translate', {
       entry_id: entryId,
       language,
+      display_mode: displayMode,
     }, {
-      timeout: 120000, // 2 minutes for translation (multiple AI API calls)
+      timeout: 120000, // 2 minutes for translation
     })
     translationCache.value[cacheKey] = data
     return data
+  }
+
+  async function requestTranslationStream(
+    entryId: string,
+    language = 'zh',
+    displayMode = 'replace',
+    onProgress?: (percent: number, message: string) => void,
+    onSegment?: (index: number, content: string) => void
+  ) {
+    const cacheKey = `${entryId}_${language}_${displayMode}`
+    if (translationCache.value[cacheKey]) {
+      return translationCache.value[cacheKey]
+    }
+
+    // Use fetch for SSE
+    const response = await fetch(`${api.defaults.baseURL}/ai/translate-stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        entry_id: entryId,
+        language,
+        display_mode: displayMode,
+      }),
+    })
+
+    if (!response.body) throw new Error('No response body')
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let finalResult: TranslationResult | null = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = JSON.parse(line.slice(6))
+
+          if (data.type === 'progress') {
+            onProgress?.(data.percent, data.message)
+          } else if (data.type === 'segment_completed') {
+            onSegment?.(data.index, data.translated)
+          } else if (data.type === 'complete') {
+            finalResult = {
+              entry_id: entryId,
+              language,
+              ...data.result
+            }
+          } else if (data.type === 'error') {
+            throw new Error(data.message)
+          }
+        }
+      }
+    }
+
+    if (finalResult) {
+      translationCache.value[cacheKey] = finalResult
+      return finalResult
+    }
+    throw new Error('Translation stream ended without result')
   }
 
   async function requestTitleTranslation(entryId: string, language = 'zh') {
@@ -449,7 +557,6 @@ export const useFeedStore = defineStore('feed', () => {
       return data
     } catch (error) {
       console.error('Mark as read failed:', error)
-      errorMessage.value = '标记已读失败'
       throw error
     }
   }
@@ -485,6 +592,7 @@ export const useFeedStore = defineStore('feed', () => {
     toggleEntryState,
     requestSummary,
     requestTranslation,
+    requestTranslationStream,
     requestTitleTranslation,
     exportOpml,
     importOpml,

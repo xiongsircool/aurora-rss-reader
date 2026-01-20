@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSettingsModal } from '../composables/useSettingsModal'
@@ -18,9 +18,6 @@ import {
   SettingsDisplay,
   SettingsAbout
 } from './settings'
-
-// Import shared styles
-import './settings/settings.css'
 
 const props = defineProps<{
   show: boolean
@@ -60,13 +57,7 @@ const timeField = computed({
   set: (value) => settingsStore.updateSettings({ time_field: value })
 })
 
-const autoTitleTranslationLimit = computed({
-  get: () => settingsStore.settings.max_auto_title_translations,
-  set: (value: number) => {
-    const clamped = clampAutoTitleTranslationLimit(value)
-    settingsStore.updateSettings({ max_auto_title_translations: clamped })
-  }
-})
+const autoTitleTranslationLimit = ref(settingsStore.settings.max_auto_title_translations)
 
 const markAsReadRange = computed({
   get: () => settingsStore.settings.mark_as_read_range,
@@ -84,6 +75,8 @@ watch(() => props.show, async (show) => {
       }
     )
     refresh.syncFromStore()
+    // Sync the local autoTitleTranslationLimit with store value
+    autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
   }
 })
 
@@ -108,6 +101,11 @@ async function saveSettings() {
     }
 
     await saveAIConfig()
+    
+    // Save autoTitleTranslationLimit to store
+    const clampedLimit = clampAutoTitleTranslationLimit(autoTitleTranslationLimit.value)
+    await settingsStore.updateSettings({ max_auto_title_translations: clampedLimit })
+    
     emit('close')
   } catch (error) {
     console.error('保存设置失败:', error)
@@ -117,14 +115,14 @@ async function saveSettings() {
 
 <template>
   <Transition name="modal">
-    <div v-if="show" class="modal-backdrop" @click="handleBackdropClick">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>{{ t('settings.title') }}</h2>
-          <button @click="handleClose" class="close-btn">✕</button>
+    <div v-if="show" class="fixed inset-0 bg-black/50 flex items-center justify-center z-1000 backdrop-blur-[4px] dark:bg-black/60" @click="handleBackdropClick">
+      <div class="w-[92%] max-w-[640px] max-h-[82vh] overflow-hidden flex flex-col rounded-[18px] border border-[rgba(15,20,25,0.08)] bg-gradient-to-b from-white to-[#f5f7fc] shadow-[0_20px_60px_rgba(15,20,25,0.25),0_2px_8px_rgba(15,20,25,0.08)] dark:bg-[linear-gradient(180deg,#1c1f26_0%,#12151a_100%)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)] modal-content">
+        <div class="flex justify-between items-center p-6 border-b border-[var(--border-color)] dark:border-[rgba(255,255,255,0.1)] dark:bg-black/20">
+          <h2 class="m-0 text-xl c-[var(--text-primary)]">{{ t('settings.title') }}</h2>
+          <button @click="handleClose" class="border-none bg-transparent text-2xl cursor-pointer c-[var(--text-secondary)] p-1 rounded transition-colors hover:bg-black/5 dark:hover:bg-white/8 dark:hover:c-[var(--text-primary)]">✕</button>
         </div>
 
-        <div class="modal-body">
+        <div class="flex-1 overflow-y-auto p-6 bg-[rgba(255,255,255,0.7)] dark:bg-[rgba(18,21,26,0.95)] modal-body">
           <SettingsLanguage />
 
           <SettingsRSSHub
@@ -145,8 +143,7 @@ async function saveSettings() {
 
           <SettingsAIFeatures
             v-model:features="localConfig.features"
-            :autoTitleTranslationLimit="autoTitleTranslationLimit"
-            @update:autoTitleTranslationLimit="autoTitleTranslationLimit = $event"
+            v-model:autoTitleTranslationLimit="autoTitleTranslationLimit"
           />
 
           <SettingsRefresh
@@ -166,9 +163,9 @@ async function saveSettings() {
           <SettingsAbout />
         </div>
 
-        <div class="modal-footer">
-          <button @click="handleClose" class="btn btn-secondary">{{ t('settings.cancel') }}</button>
-          <button @click="saveSettings" class="btn btn-primary">{{ t('settings.save') }}</button>
+        <div class="flex justify-end gap-3 p-[16px_24px] border-t border-[var(--border-color)] dark:border-[var(--border-color)]">
+          <button @click="handleClose" class="px-5 py-2.5 rounded-lg border-none text-sm font-medium cursor-pointer transition-all bg-[#f2f4fb] c-[#5a6276] border border-[rgba(92,106,138,0.2)] hover:bg-[#e4e8f4] dark:bg-white/6 dark:c-[var(--text-primary)] dark:border-white/16 dark:hover:bg-white/10">{{ t('settings.cancel') }}</button>
+          <button @click="saveSettings" class="px-5 py-2.5 rounded-lg border-none text-sm font-medium cursor-pointer transition-all bg-gradient-to-br from-[#4c74ff] to-[#2f54ff] c-white shadow-[0_12px_24px_rgba(76,116,255,0.25)] hover:-translate-y-0.5 hover:shadow-[0_18px_30px_rgba(76,116,255,0.3)]">{{ t('settings.save') }}</button>
         </div>
       </div>
     </div>
@@ -176,115 +173,6 @@ async function saveSettings() {
 </template>
 
 <style scoped>
-.modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(4px);
-}
-
-.modal-content {
-  --settings-accent: #4c74ff;
-  --settings-accent-strong: #2f54ff;
-  --settings-muted: #5a6276;
-  background: var(--settings-modal-bg, linear-gradient(180deg, #ffffff 0%, #f5f7fc 100%));
-  color: var(--text-primary, #0f1419);
-  border-radius: 18px;
-  width: 92%;
-  max-width: 640px;
-  max-height: 82vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--settings-modal-border, rgba(15, 20, 25, 0.08));
-  box-shadow:
-    0 20px 60px rgba(15, 20, 25, 0.25),
-    0 2px 8px rgba(15, 20, 25, 0.08);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 20px;
-  color: var(--text-primary);
-}
-
-.close-btn {
-  border: none;
-  background: transparent;
-  font-size: 24px;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 4px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.close-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.modal-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-  background: var(--settings-modal-body-bg, rgba(255, 255, 255, 0.7));
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 24px;
-  border-top: 1px solid var(--border-color);
-}
-
-.btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-secondary {
-  background: #f2f4fb;
-  color: var(--settings-muted, #5a6276);
-  border: 1px solid rgba(92, 106, 138, 0.2);
-}
-
-.btn-secondary:hover {
-  background: #e4e8f4;
-}
-
-.btn-primary {
-  background: linear-gradient(130deg, var(--settings-accent, #4c74ff), var(--settings-accent-strong, #2f54ff));
-  color: white;
-  box-shadow: 0 12px 24px rgba(76, 116, 255, 0.25);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 30px rgba(76, 116, 255, 0.3);
-}
-
 /* Modal transition */
 .modal-enter-active,
 .modal-leave-active {
@@ -311,59 +199,6 @@ async function saveSettings() {
 .modal-body::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.18); border-radius: 8px; }
 .modal-body:hover::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.28); }
 .modal-body { scrollbar-width: thin; scrollbar-color: rgba(15, 17, 21, 0.28) transparent; }
-
-/* Dark mode */
-:global(.dark) .modal-backdrop {
-  background: rgba(0, 0, 0, 0.6);
-}
-
-:global(.dark) .modal-content {
-  --settings-modal-bg: linear-gradient(180deg, #1c1f26 0%, #12151a 100%);
-  --settings-modal-border: rgba(255, 255, 255, 0.12);
-  --settings-modal-body-bg: rgba(18, 21, 26, 0.95);
-  --settings-muted: #9ba1b3;
-  background: var(--settings-modal-bg);
-  border-color: var(--settings-modal-border);
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.6),
-    0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-:global(.dark) .modal-header {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark) .modal-header h2 {
-  color: var(--text-primary);
-}
-
-:global(.dark) .close-btn {
-  color: var(--text-secondary);
-}
-
-:global(.dark) .close-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary);
-}
-
-:global(.dark) .modal-body {
-  background: var(--settings-modal-body-bg);
-}
-
-:global(.dark) .modal-footer {
-  border-color: var(--border-color);
-}
-
-:global(.dark) .btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-}
-
-:global(.dark) .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
 
 :global(.dark) .modal-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
 :global(.dark) .modal-body:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }

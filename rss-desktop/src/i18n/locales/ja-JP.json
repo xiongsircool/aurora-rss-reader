@@ -43,7 +43,8 @@
     "smart": "スマート",
     "reading": "読書",
     "platform": "プラットフォーム",
-    "private": "プライベート"
+    "private": "プライベート",
+    "appName": "Aurora Feeds"
   },
   "navigation": {
     "all": "すべて",

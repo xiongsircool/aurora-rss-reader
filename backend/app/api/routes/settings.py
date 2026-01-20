@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings, get_settings
 from app.db.deps import get_session
@@ -20,7 +20,7 @@ async def get_app_settings() -> dict:
 @router.patch("")
 async def update_app_settings(
     payload: dict,
-    session: Session = Depends(get_session)
+    session: AsyncSession = Depends(get_session)
 ) -> dict:
     """更新应用设置
 

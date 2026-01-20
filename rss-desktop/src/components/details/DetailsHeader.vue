@@ -21,30 +21,15 @@ function formatDate(date?: string | null) {
 </script>
 
 <template>
-  <div class="details__header">
-    <p class="muted">{{ entry.feed_title }}</p>
-    <h2>{{ showTranslatedTitle && translatedTitle ? translatedTitle : entry.title }}</h2>
-    <p class="muted">
+  <div class="mb-3">
+    <p class="c-[var(--text-secondary)] text-xs m-0">{{ entry.feed_title }}</p>
+    <h2 class="my-2 text-2xl leading-tight break-words">{{ showTranslatedTitle && translatedTitle ? translatedTitle : entry.title }}</h2>
+    <p class="c-[var(--text-secondary)] text-xs m-0">
       {{ entry.author || '未知作者' }} · {{ formatDate(entry.published_at) }}
     </p>
   </div>
 </template>
 
 <style scoped>
-.details__header {
-  margin-bottom: 12px;
-}
-
-.details__header h2 {
-  margin: 8px 0;
-  font-size: 1.5rem;
-  line-height: 1.3;
-  word-break: break-word;
-}
-
-.muted {
-  color: var(--text-secondary);
-  font-size: 12px;
-  margin: 0;
-}
+/* Migrated to UnoCSS */
 </style>

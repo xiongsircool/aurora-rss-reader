@@ -52,7 +52,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <main class="timeline">
+  <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden lt-md:w-full! lt-md:border-r-0 lt-md:border-b lt-md:min-w-auto lt-md:h-auto lt-md:max-h-none lt-md:overflow-visible">
     <TimelineHeader
       :title="title"
       :subtitle="subtitle"
@@ -73,26 +73,48 @@ const { t } = useI18n()
       @update:date-range-filter="emit('update:dateRangeFilter', $event)"
     />
     
-    <section class="timeline__list">
+    <section class="timeline__list flex-1 p-[clamp(12px,1.5vw,16px)] flex flex-col gap-[clamp(10px,1vw,14px)] overflow-y-auto overflow-x-hidden min-h-0">
       <LoadingSpinner v-if="loading" message="加载中..." />
       
       <template v-else>
-        <EntryCard
-          v-for="entry in entries"
-          :key="entry.id"
-          :entry="entry"
-          :active="selectedEntryId === entry.id"
-          :show-translation="autoTitleTranslation"
-          :translated-title="getTranslatedTitle(entry.id)"
-          :is-translation-loading="isTranslationLoading(entry.id)"
-          :title-display-mode="titleDisplayMode"
-          :translation-language-label="translationLanguageLabel"
-          :show-summary="showSummary"
-          @select="emit('select-entry', $event)"
-          @toggle-star="emit('toggle-star', $event)"
-        />
+        <!-- Custom scrollbar style is applied to the scroller -->
+        <DynamicScroller
+          class="h-full"
+          :items="entries"
+          :min-item-size="100"
+          key-field="id"
+          v-if="entries.length"
+        >
+          <template v-slot="{ item, index, active }">
+            <DynamicScrollerItem
+              :item="item"
+              :active="active"
+              :size-dependencies="[
+                item.summary,
+                item.title,
+                getTranslatedTitle(item.id),
+                showSummary
+              ]"
+              :data-index="index"
+              class="pb-5"
+            >
+              <EntryCard
+                :entry="item"
+                :active="selectedEntryId === item.id"
+                :show-translation="autoTitleTranslation"
+                :translated-title="getTranslatedTitle(item.id)"
+                :is-translation-loading="isTranslationLoading(item.id)"
+                :title-display-mode="titleDisplayMode"
+                :translation-language-label="translationLanguageLabel"
+                :show-summary="showSummary"
+                @select="emit('select-entry', $event)"
+                @toggle-star="emit('toggle-star', $event)"
+              />
+            </DynamicScrollerItem>
+          </template>
+        </DynamicScroller>
 
-        <div class="empty" v-if="!entries.length">
+        <div class="grid place-items-center c-[var(--text-secondary)] text-center p-6" v-if="!entries.length">
           {{ searchQuery ? t('feeds.noArticlesSearch') : t('feeds.noArticlesAdd') }}
         </div>
       </template>
@@ -101,54 +123,11 @@ const { t } = useI18n()
 </template>
 
 <style scoped>
-.timeline {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--border-color);
-  background: var(--bg-base);
-  flex: 1 1 auto;
-  min-width: 260px;
-  width: auto;
-  box-sizing: border-box;
-  max-height: 100vh;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.timeline__list {
-  flex: 1 1 auto;
-  padding: clamp(12px, 1.5vw, 16px);
-  display: flex;
-  flex-direction: column;
-  gap: clamp(10px, 1vw, 14px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-}
-
-.empty {
-  display: grid;
-  place-items: center;
-  color: var(--text-secondary);
-  text-align: center;
-  padding: 24px;
-}
-
+/* Migrated to UnoCSS - Scrollbar styles remain */
 .timeline__list::-webkit-scrollbar { width: 8px; height: 8px; }
 .timeline__list::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.18); border-radius: 8px; }
 .timeline__list:hover::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.28); }
 
 :global(.dark) .timeline__list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
 :global(.dark) .timeline__list:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
-
-@media (max-width: 960px) {
-  .timeline {
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    min-width: auto;
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
-}
 </style>

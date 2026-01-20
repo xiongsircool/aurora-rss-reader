@@ -43,7 +43,8 @@
     "smart": "智能",
     "reading": "阅读",
     "platform": "平台",
-    "private": "私享"
+    "private": "私享",
+    "appName": "Aurora Feeds"
   },
   "navigation": {
     "all": "全部",
@@ -258,6 +259,9 @@
     "displayModeTranslationFirstHint": "翻译标题在上，原标题在下方显示",
     "displayModeOriginalFirst": "原标题优先",
     "displayModeOriginalFirstHint": "原标题在上，翻译在下方显示（推荐）",
+    "contentDisplayMode": "正文显示模式",
+    "displayModeBilingual": "双语对照 (沉浸式)",
+    "displayModeBilingualHint": "原文与译文逐段对照显示（自动去重图片）",
     "translationTargetLanguage": "翻译目标语言",
     "subscriptionUpdate": "订阅更新",
     "autoRefresh": "自动刷新订阅",
@@ -336,7 +340,11 @@
     "exporting": "导出中...",
     "operationFailed": "操作失败，请重试",
     "languageChanged": "语言已切换到 {language}",
-    "languageChangeFailed": "语言切换失败，请重试"
+    "languageChangeFailed": "语言切换失败，请重试",
+    "summarySuccess": "摘要生成成功",
+    "summaryFailed": "摘要生成失败，请检查 API 配置",
+    "translationSuccess": "翻译成功",
+    "translationFailed": "翻译失败，请检查 API 配置"
   },
   "errors": {
     "network": "网络连接失败",
@@ -370,7 +378,11 @@
   },
   "opml": {
     "export": "导出 OPML",
-    "import": "导入 OPML"
+    "import": "导入 OPML",
+    "exportSuccess": "OPML 导出成功",
+    "exportFailed": "导出失败，请重试",
+    "importSuccess": "导入成功 {imported} 个，跳过 {skipped} 个",
+    "importFailed": "导入失败，请检查文件格式"
   },
   "languages": {
     "zh": "中文",

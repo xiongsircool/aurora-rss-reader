@@ -35,22 +35,22 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="feed-group">
+  <div class="mb-2 rounded-xl overflow-hidden bg-[rgba(255,255,255,0.3)] border border-[rgba(15,17,21,0.08)] transition-all duration-200 hover:bg-[rgba(255,255,255,0.5)] dark:bg-[rgba(15,17,21,0.4)] dark:border-[rgba(255,255,255,0.08)] dark:hover:bg-[rgba(15,17,21,0.6)]">
     <!-- Group Header -->
-    <div class="group-header-wrapper">
+    <div class="flex items-center relative group">
       <button
-        class="group-header"
-        :class="{ active: isActive }"
+        class="flex-1 border-none bg-transparent px-4 py-3 flex items-center gap-2 cursor-pointer transition-colors duration-200 font-semibold c-[var(--text-primary)] hover:bg-[rgba(255,122,24,0.1)] dark:hover:bg-[rgba(255,122,24,0.15)] outline-none group/header"
+        :class="{ 'bg-[rgba(255,122,24,0.15)]! c-[var(--accent)]! shadow-[inset_0_0_0_1px_rgba(255,122,24,0.3)]': isActive }"
         @click="emit('group-click', groupName)"
       >
         <span
-          class="group-toggle"
-          :class="{ collapsed: isCollapsed }"
+          class="w-5 h-5 flex items-center justify-center c-[var(--text-secondary)] transition-colors duration-200 group-hover/header:c-[var(--accent)]"
           aria-hidden="true"
           @click.stop="emit('toggle-collapse', groupName)"
         >
           <svg
-            class="chevron-icon"
+            class="w-3.5 h-3.5 transition-transform duration-200"
+            :class="{ '-rotate-90': isCollapsed }"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -61,30 +61,30 @@ const emit = defineEmits<{
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </span>
-        <span class="group-name">{{ groupName }}</span>
-        <span class="group-stats">
+        <span class="flex-1 text-left text-sm">{{ groupName }}</span>
+        <span class="text-xs c-[var(--text-secondary)] font-normal">
           {{ t('feeds.feedCount', { count: feedCount }) }}
-          <span v-if="unreadCount" class="unread-count">
+          <span v-if="unreadCount" class="font-semibold c-[#ff8a3d]">
             • {{ t('feeds.unreadCount', { count: unreadCount }) }}
-            <span v-if="isDateFilterActive" class="time-filter-hint">({{ timeFilterLabel }})</span>
+            <span v-if="isDateFilterActive" class="text-xs c-[var(--text-secondary)] ml-1 font-normal">({{ timeFilterLabel }})</span>
           </span>
         </span>
       </button>
       <!-- Mark Group as Read Button -->
       <button 
         v-if="unreadCount > 0"
-        class="mark-read-btn"
+        class="w-7 h-7 border-none bg-[rgba(52,199,89,0.15)] c-[#34c759] rounded-md cursor-pointer flex items-center justify-center transition-all duration-200 mr-2 opacity-0 hover:bg-[#34c759] hover:c-white hover:scale-105 group-hover:opacity-100 dark:bg-[rgba(52,199,89,0.2)]"
         @click.stop="emit('mark-group-read', groupName)"
         :title="t('articles.markGroupAsRead')"
       >
-        <svg viewBox="0 0 24 24" fill="currentColor">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
           <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
         </svg>
       </button>
     </div>
 
     <!-- Feeds List -->
-    <div v-show="!isCollapsed" class="group-feeds">
+    <div v-show="!isCollapsed" class="bg-[rgba(255,255,255,0.2)] border-t border-[rgba(15,17,21,0.05)] dark:bg-[rgba(15,17,21,0.3)] dark:border-current dark:border-op-5">
       <FeedItem
         v-for="feed in feeds"
         :key="feed.id"
@@ -107,152 +107,5 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-.feed-group {
-  margin-bottom: 8px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(15, 17, 21, 0.08);
-  transition: all 0.2s;
-}
-
-.feed-group:hover {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.group-header-wrapper {
-  display: flex;
-  align-items: center;
-  position: relative;
-}
-
-.group-header {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.group-header:hover {
-  background: rgba(255, 122, 24, 0.1);
-}
-
-.group-header.active {
-  background: rgba(255, 122, 24, 0.15);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px rgba(255, 122, 24, 0.3);
-}
-
-.group-toggle {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  transition: color 0.2s ease;
-}
-
-.chevron-icon {
-  width: 14px;
-  height: 14px;
-  transition: transform 0.2s ease;
-}
-
-.group-toggle.collapsed .chevron-icon {
-  transform: rotate(-90deg);
-}
-
-.group-header:hover .group-toggle {
-  color: var(--accent);
-}
-
-.group-name {
-  flex: 1;
-  text-align: left;
-  font-size: 14px;
-}
-
-.group-stats {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: normal;
-}
-
-.unread-count {
-  color: #ff8a3d;
-  font-weight: 600;
-}
-
-.time-filter-hint {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-left: 4px;
-}
-
-/* Mark as Read Button */
-.mark-read-btn {
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: rgba(52, 199, 89, 0.15);
-  color: #34c759;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  margin-right: 8px;
-  opacity: 0;
-}
-
-.group-header-wrapper:hover .mark-read-btn {
-  opacity: 1;
-}
-
-.mark-read-btn:hover {
-  background: #34c759;
-  color: white;
-  transform: scale(1.05);
-}
-
-.mark-read-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.group-feeds {
-  background: rgba(255, 255, 255, 0.2);
-  border-top: 1px solid rgba(15, 17, 21, 0.05);
-}
-
-:global(.dark) .feed-group {
-  background: rgba(15, 17, 21, 0.4);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-:global(.dark) .feed-group:hover {
-  background: rgba(15, 17, 21, 0.6);
-}
-
-:global(.dark) .group-header:hover {
-  background: rgba(255, 122, 24, 0.15);
-}
-
-:global(.dark) .group-feeds {
-  background: rgba(15, 17, 21, 0.3);
-  border-top-color: rgba(255, 255, 255, 0.05);
-}
-
-:global(.dark) .mark-read-btn {
-  background: rgba(52, 199, 89, 0.2);
-}
+/* Migrated to UnoCSS */
 </style>

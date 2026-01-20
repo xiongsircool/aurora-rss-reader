@@ -138,15 +138,32 @@ export function useTitleTranslation() {
             return
         }
         titleTranslationLoadingMap.value[cacheKey] = true
-        try {
-            await withTitleTranslationSemaphore(() =>
-                store.requestTitleTranslation(entry.id, aiFeatures.value?.translation_language || 'zh')
-            )
-        } catch (error) {
-            console.error('Title translation failed:', error)
-        } finally {
-            delete titleTranslationLoadingMap.value[cacheKey]
+
+        let attempts = 0
+        const maxAttempts = 3
+
+        const tryRequest = async () => {
+            try {
+                attempts++
+                await withTitleTranslationSemaphore(() =>
+                    store.requestTitleTranslation(entry.id, aiFeatures.value?.translation_language || 'zh')
+                )
+                delete titleTranslationLoadingMap.value[cacheKey]
+            } catch (error) {
+                if (attempts < maxAttempts) {
+                    console.warn(`Title translation failed for ${entry.id} (attempt ${attempts}/${maxAttempts}), retrying...`, error)
+                    // Exponential backoff: 500ms, 1000ms, 2000ms
+                    setTimeout(tryRequest, 500 * Math.pow(2, attempts - 1))
+                } else {
+                    console.error('Title translation failed after max retries:', error)
+                    delete titleTranslationLoadingMap.value[cacheKey]
+                    // Optional: Mark as failed in store to prevent endless retries in this session if needed
+                    // But for now, we just let it fail. User might scroll away and back, triggering again, which is acceptable.
+                }
+            }
         }
+
+        tryRequest()
     }
 
     /**

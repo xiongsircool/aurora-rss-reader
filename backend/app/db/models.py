@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, JSON
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 
@@ -25,9 +25,9 @@ class Feed(SQLModel, table=True):
     last_checked_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
     last_error: Optional[str] = None
     update_interval_minutes: int = Field(default=60)
-    created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), sa_column=Column(DateTime(timezone=True)))
-    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow(), sa_column=Column(DateTime(timezone=True)))
-
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True)))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True)))
+    
 
 class Entry(SQLModel, table=True):
     __tablename__ = "entries"
@@ -38,13 +38,15 @@ class Entry(SQLModel, table=True):
     guid: str
     title: Optional[str] = None
     url: Optional[str] = None
+    # TODO:将标题翻译存储在标题翻译{语言:标题}dict中,不同语言的标题翻译存储在不同的字段中，调用翻译api时候先访问这个看是否有对应的翻译没有则更新字典再写入数据库
+    title_translations: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     author: Optional[str] = None
     summary: Optional[str] = None
     content: Optional[str] = None
     readability_content: Optional[str] = None
     categories_json: Optional[str] = None
     published_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
-    inserted_at: datetime = Field(default_factory=lambda: datetime.utcnow(), sa_column=Column(DateTime(timezone=True)))
+    inserted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True)))
     read: bool = Field(default=False, index=True)
     starred: bool = Field(default=False, index=True)
 
@@ -59,7 +61,7 @@ class Translation(SQLModel, table=True):
     title: Optional[str] = None
     summary: Optional[str] = None
     content: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), sa_column=Column(DateTime(timezone=True)))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True)))
 
 
 class Summary(SQLModel, table=True):
@@ -70,7 +72,7 @@ class Summary(SQLModel, table=True):
     entry_id: str = Field(foreign_key="entries.id", index=True)
     language: str = Field(default="zh", index=True)
     summary: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), sa_column=Column(DateTime(timezone=True)))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True)))
 
 
 class FetchLog(SQLModel, table=True):
@@ -80,7 +82,7 @@ class FetchLog(SQLModel, table=True):
     feed_id: Optional[str] = Field(default=None, foreign_key="feeds.id", index=True)
     status: str = Field(default="pending", index=True)
     message: Optional[str] = None
-    started_at: datetime = Field(default_factory=lambda: datetime.utcnow(), sa_column=Column(DateTime(timezone=True)))
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True)))
     finished_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
     duration_ms: Optional[int] = None
     item_count: int = Field(default=0)

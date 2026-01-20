@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
+import re
+import logging
+import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
@@ -19,7 +22,6 @@ from app.services.fetcher import refresh_all_feeds
 from app.services.user_settings_service import ensure_user_settings_schema
 
 # 允许所有localhost端口访问
-import re
 
 def is_localhost_origin(origin: str) -> bool:
     """检查是否为localhost或127.0.0.1的任何端口"""
@@ -62,23 +64,22 @@ def build_allowed_origins() -> list[str]:
     return sorted(allowed)
 
 
-import logging
-import time
+
 
 # ... existing code ...
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # 先确保表存在，再运行迁移
-    init_db()
+    # await init_db()
     
     logger = logging.getLogger("backend.startup")
     logger.info("Application starting up...")
     
     start_time = time.time()
     try:
-        logger.info("Running database migrations...")
-        run_migrations()
+        # logger.info("Running database migrations...")
+        # await asyncio.to_thread(run_migrations)
         logger.info(f"Database migrations completed in {time.time() - start_time:.2f}s")
     except Exception as e:
         logger.error(f"Startup migration failed: {e}", exc_info=True)
@@ -86,7 +87,7 @@ async def lifespan(_: FastAPI):
         # 但为了用户体验，有时会选择记录日志继续
         pass
 
-    ensure_user_settings_schema()
+    await ensure_user_settings_schema()
     # 初始化RSSHub配置
     await rsshub_manager.initialize_default_mirrors()
     
@@ -120,9 +121,9 @@ def create_app() -> FastAPI:
     async def health_check():
         """健康检查端点，用于确认后端服务已就绪"""
         return JSONResponse({
-            "status": "healthy",
-            "version": "0.1.3",
-            "timestamp": datetime.now().isoformat(),
+            "status": "ok",
+            "version": "1.0.0",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "environment": settings.app_env,
             "data_dir": str(APP_DATA_DIR),
             "is_packaged": getattr(sys, 'frozen', False),

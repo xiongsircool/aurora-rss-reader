@@ -19,44 +19,38 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="timeline__controls">
-    <div class="timeline__controls-row timeline__controls-main">
+  <div class="px-4 py-2.5 border-b border-[var(--border-color)] flex flex-col gap-2.5 flex-none">
+    <div class="flex items-center gap-2.5 flex-wrap w-full justify-between">
       <input
         :value="searchQuery"
         @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
         type="search"
         :placeholder="t('articles.searchPlaceholder')"
-        class="search-input"
+        class="px-3.5 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-surface)] c-[var(--text-primary)] transition-colors duration-200 transition-shadow duration-200 flex-[2_1_240px] min-w-200px focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_rgba(255,122,24,0.18)]"
       />
-      <div class="filter-buttons">
+      <div class="flex gap-2 flex-[1_1_220px] justify-end mb-0">
         <button
-          :class="['filter-btn', { active: filterMode === 'all' }]"
-          @click="emit('update:filterMode', 'all')"
+          v-for="mode in ['all', 'unread', 'starred'] as const"
+          :key="mode"
+          :class="['flex-1 px-3 py-2 border rounded-lg cursor-pointer text-[13px] transition-all duration-200', 
+            filterMode === mode 
+              ? 'bg-[linear-gradient(120deg,#ff7a18,#ffbe30)] c-white border-transparent shadow-[0_8px_18px_rgba(255,122,24,0.25)]' 
+              : 'border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-primary)] hover:bg-[rgba(255,122,24,0.08)] hover:border-[var(--accent)] hover:c-[var(--accent)]'
+          ]"
+          @click="emit('update:filterMode', mode)"
         >
-          {{ t('navigation.all') }}
-        </button>
-        <button
-          :class="['filter-btn', { active: filterMode === 'unread' }]"
-          @click="emit('update:filterMode', 'unread')"
-        >
-          {{ t('navigation.unread') }}
-        </button>
-        <button
-          :class="['filter-btn', { active: filterMode === 'starred' }]"
-          @click="emit('update:filterMode', 'starred')"
-        >
-          {{ t('navigation.favorites') }}
+          {{ mode === 'all' ? t('navigation.all') : mode === 'unread' ? t('navigation.unread') : t('navigation.favorites') }}
         </button>
       </div>
     </div>
     
-    <div class="timeline__controls-row timeline__controls-meta">
-      <div class="date-filter" v-if="enableDateFilter">
-        <label>{{ t('common.timeRange') }}</label>
+    <div class="flex items-center gap-2.5 flex-wrap w-full justify-between">
+      <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(135deg,rgba(255,122,24,0.06),rgba(0,122,255,0.06))] shadow-[0_4px_12px_rgba(15,17,21,0.08)] min-w-160px" v-if="enableDateFilter">
+        <label class="text-xs c-[var(--text-secondary)] font-semibold whitespace-nowrap">{{ t('common.timeRange') }}</label>
         <select
           :value="dateRangeFilter"
           @change="emit('update:dateRangeFilter', ($event.target as HTMLSelectElement).value)"
-          class="date-select"
+          class="px-2 py-1.5 border border-[var(--border-color)] rounded-md bg-[var(--bg-surface)] c-[var(--text-primary)] text-[13px] cursor-pointer transition-all duration-200 min-w-120px hover:border-[var(--accent)] focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_rgba(255,122,24,0.18)] disabled:op-60 disabled:cursor-not-allowed disabled:bg-[var(--bg-secondary)]"
           :disabled="filterLoading"
         >
           <option value="1d">{{ t('time.last1Day') }}</option>
@@ -75,126 +69,5 @@ const { t } = useI18n()
 </template>
 
 <style scoped>
-.timeline__controls {
-  padding: 10px 16px 12px;
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 0 0 auto;
-}
-
-.timeline__controls-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  width: 100%;
-}
-
-.timeline__controls-main {
-  justify-content: space-between;
-}
-
-.timeline__controls-meta {
-  justify-content: space-between;
-}
-
-.search-input {
-  padding: 10px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  transition: border-color 0.2s, box-shadow 0.2s;
-  flex: 2 1 240px;
-  min-width: 200px;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(255, 122, 24, 0.18);
-}
-
-.filter-buttons {
-  display: flex;
-  gap: 8px;
-  flex: 1 1 220px;
-  justify-content: flex-end;
-  margin-bottom: 0;
-}
-
-.filter-btn {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-  color: var(--text-primary);
-}
-
-.filter-btn:hover {
-  background: rgba(255, 122, 24, 0.08);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.filter-btn.active {
-  background: linear-gradient(120deg, #ff7a18, #ffbe30);
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 8px 18px rgba(255, 122, 24, 0.25);
-}
-
-.date-filter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(135deg, rgba(255, 122, 24, 0.06), rgba(0, 122, 255, 0.06));
-  box-shadow: 0 4px 12px rgba(15, 17, 21, 0.08);
-  min-width: 160px;
-}
-
-.date-filter label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.date-select {
-  padding: 6px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 120px;
-}
-
-.date-select:hover {
-  border-color: var(--accent);
-}
-
-.date-select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(255, 122, 24, 0.18);
-}
-
-.date-select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  background: var(--bg-secondary);
-}
+/* Migrated to UnoCSS */
 </style>

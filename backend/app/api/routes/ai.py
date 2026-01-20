@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from fastapi.responses import StreamingResponse
-from sqlmodel import Session, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 from pydantic import BaseModel
 
 from app.db.deps import get_session
@@ -13,6 +15,9 @@ from app.schemas.ai import SummaryRequest, SummaryResponse, TranslationRequest, 
 from app.services.ai import GLMClient, ai_client_manager, ServiceKey
 from app.services.translation_engine import IncrementalTranslator, SmartSegmenter
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _default_service_config() -> dict[str, str]:
@@ -56,17 +61,18 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 @router.post("/summary", response_model=SummaryResponse)
 async def generate_summary(
-    payload: SummaryRequest, session: Session = Depends(get_session)
+    payload: SummaryRequest, session: AsyncSession = Depends(get_session)
 ) -> SummaryResponse:
-    entry = session.get(Entry, payload.entry_id)
+    entry = await session.get(Entry, payload.entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
-    existing = session.exec(
+    result = await session.exec(
         select(Summary).where(
             Summary.entry_id == payload.entry_id, Summary.language == payload.language
         )
-    ).first()
+    )
+    existing = result.first()
     if existing:
         return SummaryResponse(entry_id=entry.id, language=existing.language, summary=existing.summary or "")
 
@@ -94,57 +100,150 @@ async def generate_summary(
     client = ai_client_manager.get_client("summary")
     summary_text = await client.summarize(combined_content, language=payload.language)
 
-    summary = Summary(entry_id=entry.id, language=payload.language, summary=summary_text)
-    session.add(summary)
-    session.commit()
-    session.refresh(summary)
+    try:
+        summary = Summary(entry_id=entry.id, language=payload.language, summary=summary_text)
+        session.add(summary)
+        await session.commit()
+        await session.refresh(summary)
+    except IntegrityError:
+        # 捕获并发写入导致的唯一键冲突
+        await session.rollback()
+        # 重新查询已存在的记录
+        result = await session.exec(
+            select(Summary).where(
+                Summary.entry_id == payload.entry_id, Summary.language == payload.language
+            )
+        )
+        existing = result.first()
+        if existing:
+             return SummaryResponse(entry_id=entry.id, language=existing.language, summary=existing.summary or "")
+        # 如果还是没有，可能是其他错误，这里抛出异常或重试
+        raise HTTPException(status_code=500, detail="Summary generation conflict")
 
     return SummaryResponse(entry_id=entry.id, language=payload.language, summary=summary.summary or "")
 
 
 @router.post("/translate-title")
 async def translate_entry_title(
-    payload: dict, session: Session = Depends(get_session)
+    payload: dict, session: AsyncSession = Depends(get_session)
 ) -> dict:
-    """专门翻译文章标题"""
-    entry = session.get(Entry, payload["entry_id"])
+    """专门翻译文章标题，支持数据库缓存"""
+    entry = await session.get(Entry, payload["entry_id"])
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
-    if not entry.title:
-        return {"entry_id": entry.id, "title": "", "language": payload["language"]}
+    target_language = payload.get("language", "zh")
 
+    if not entry.title:
+        return {"entry_id": entry.id, "title": "", "language": target_language}
+
+    # 检查数据库缓存
+    result = await session.exec(
+        select(Translation).where(
+            Translation.entry_id == payload["entry_id"],
+            Translation.language == target_language
+        )
+    )
+    existing = result.first()
+
+    # 如果已有缓存且包含标题翻译，直接返回
+    if existing and existing.title:
+        return {
+            "entry_id": entry.id,
+            "title": existing.title,
+            "language": target_language,
+            "from_cache": True
+        }
+
+    # 调用 AI 翻译
     client = ai_client_manager.get_client("translation")
 
     try:
-        translated_title = await client.translate(entry.title, target_language=payload["language"])
-        return {
-            "entry_id": entry.id,
-            "title": translated_title,
-            "language": payload["language"]
-        }
+        translated_title = await client.translate(entry.title, target_language=target_language)
+
+        try:
+            # 重新检查一次，减少可预见的冲突（Double Checked Locking pattern logic in DB）
+            result = await session.exec(
+                select(Translation).where(
+                    Translation.entry_id == payload["entry_id"],
+                    Translation.language == target_language
+                )
+            )
+            existing = result.first()
+
+            if existing:
+                # 更新现有记录的标题 (如果之前只有内容翻译)
+                existing.title = translated_title
+                session.add(existing)
+            else:
+                # 创建新记录（只包含标题）
+                translation = Translation(
+                    entry_id=entry.id,
+                    language=target_language,
+                    title=translated_title,
+                )
+                session.add(translation)
+
+            await session.commit()
+            
+            return {
+                "entry_id": entry.id,
+                "title": translated_title,
+                "language": target_language,
+                "from_cache": False
+            }
+
+        except IntegrityError:
+            # 并发冲突处理
+            await session.rollback()
+            # 重新获取已存在的记录
+            result = await session.exec(
+                select(Translation).where(
+                    Translation.entry_id == payload["entry_id"],
+                    Translation.language == target_language
+                )
+            )
+            existing = result.first()
+            if existing and existing.title:
+                 return {
+                    "entry_id": entry.id,
+                    "title": existing.title,
+                    "language": target_language,
+                    "from_cache": True
+                }
+            # 如果有了记录但没有title（理论上update不会触发IntegrityError除非entry_id变了），或者其他异常情况
+            # 简单起见，如果还是没拿到，直接返回刚才翻译的结果（虽然没存进去，但前端能用）
+            return {
+                "entry_id": entry.id,
+                "title": translated_title,
+                "language": target_language,
+                "from_cache": False
+            }
+
     except Exception as e:
+        logger.error(f"Title translation error: {e}")
         raise HTTPException(status_code=500, detail=f"翻译失败: {str(e)}")
 
 
 @router.post("/translate", response_model=TranslationResponse)
 async def translate_entry(
-    payload: TranslationRequest, session: Session = Depends(get_session)
+    payload: TranslationRequest, session: AsyncSession = Depends(get_session)
 ) -> TranslationResponse:
     """
     翻译文章（使用增量段落翻译）
     支持长文章，按段落进行翻译以突破长度限制
     """
-    entry = session.get(Entry, payload.entry_id)
+    entry = await session.get(Entry, payload.entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
     # 检查缓存
-    existing = session.exec(
+    result = await session.exec(
         select(Translation).where(
             Translation.entry_id == payload.entry_id, Translation.language == payload.language
         )
-    ).first()
+    )
+    existing = result.first()
     if existing:
         return TranslationResponse(
             entry_id=entry.id,
@@ -177,31 +276,132 @@ async def translate_entry(
         content_length = len(content_to_translate)
         
         if content_length > 2000:  # 长文章使用段落翻译
-            print(f"使用段落翻译模式，内容长度: {content_length}")
+            logger.info(f"使用段落翻译模式，内容长度: {content_length}")
             translated_content = await translator.translate_long_text(
                 content_to_translate,
                 target_language=payload.language,
                 max_segment_length=1000,  # 每段最大1000字符
                 max_concurrent=3,  # 最多3个并发请求
             )
+            # 注意：上面的 translate_long_text 默认是普通合并。
+            # 为了支持双语，我们需要拆开调用或者修改 translate_long_text
+            # 鉴于代码复用，我们这里改为手动拆解调用
+            pass
         else:  # 短文章直接翻译
-            print(f"使用直接翻译模式，内容长度: {content_length}")
+            logger.info(f"使用直接翻译模式，内容长度: {content_length}")
             translated_content = await client.translate(
                 content_to_translate, 
                 target_language=payload.language
             )
+    
+    # 根据显示模式处理内容
+    if payload.display_mode == "bilingual" and translated_content:
+        # 如果是短文章直接翻译的，我们也尝试构造简单的双语结构
+        # 但通常长文章才会进段落清洗。
+        # 为了统一，如果是短文直接翻译，我们简单包装一下
+        # 注意：这里的 translated_content 是全文。
+        # 如果是长文段落翻译，translated_content 已经在上面被 merge_segments 处理了(还没改)
+        pass 
+        # 修正逻辑：上面的 translate_long_text 默认调用的 merge_segments 是普通合并
+        # 我们需要修改 translate_long_text 让它支持传入 merge_function 或者我们在外面自己处理
+        
+        # 更好的做法：不要在 routes 里改太深，而是让 IncrementalTranslator 支持模式
+        
+    # 等等，我们需要重构下上面的调用逻辑
+    # 实际上 translate_long_text 内部调用了 merge_segments。
+    # 我们应该在 routes 里调用 translate_segments (获取 raw segments)，然后自己在 routes 里决定怎么 merge
+    # 或者给 translate_long_text 传参。
+    
+    # 让我们修改 routes 里的逻辑：
+    
+    if content_to_translate:
+        content_length = len(content_to_translate)
+        
+        if content_length > 2000:  # 长文章使用段落翻译
+            logger.info(f"使用段落翻译模式，内容长度: {content_length}")
+            
+            # 手动执行步骤以控制 merge 方式
+            segments = SmartSegmenter.split_by_paragraphs(content_to_translate, max_length=1000)
+            translated_segments = await translator.translate_segments(
+                segments, 
+                target_language=payload.language,
+                max_concurrent=3
+            )
+            
+            if payload.display_mode == "bilingual":
+                translated_content = translator.merge_bilingual_segments(translated_segments)
+            else:
+                translated_content = translator.merge_segments(translated_segments)
+                
+        else:  # 短文章直接翻译
+            logger.info(f"使用直接翻译模式，内容长度: {content_length}")
+            raw_translation = await client.translate(
+                content_to_translate, 
+                target_language=payload.language
+            )
+            
+            if payload.display_mode == "bilingual":
+                # 短文也支持双语：清洗+包装
+                clean_translation = translator._clean_html_for_display(raw_translation)
+                if clean_translation:
+                     translated_content = (
+                        f'<div class="bilingual-segment" style="position: relative; margin-bottom: 1.5em;">'
+                        f'<div class="original" style="margin-bottom: 0.5em;">{content_to_translate}</div>'
+                        f'<div class="translated" style="color: #5F6368; font-size: 0.95em; padding-left: 12px; border-left: 3px solid #4C74FF; background: rgba(76, 116, 255, 0.05); padding: 8px 12px; border-radius: 4px;">'
+                        f'{clean_translation}'
+                        f'</div>'
+                        f'</div>'
+                    )
+                else:
+                    translated_content = content_to_translate
+            else:
+                translated_content = raw_translation
 
     # 保存到数据库
-    translation = Translation(
-        entry_id=entry.id,
-        language=payload.language,
-        title=translated_title,
-        summary=translated_summary,
-        content=translated_content,
-    )
-    session.add(translation)
-    session.commit()
-    session.refresh(translation)
+    # 保存到数据库
+    try:
+        # Re-check to avoid race condition on insert
+        result = await session.exec(
+            select(Translation).where(
+                Translation.entry_id == entry.id,
+                Translation.language == payload.language
+            )
+        )
+        existing = result.first()
+        
+        if existing:
+            existing.title = translated_title or existing.title
+            existing.summary = translated_summary or existing.summary
+            existing.content = translated_content or existing.content
+            session.add(existing)
+            await session.commit()
+            await session.refresh(existing)
+            translation = existing
+        else:
+            translation = Translation(
+                entry_id=entry.id,
+                language=payload.language,
+                title=translated_title,
+                summary=translated_summary,
+                content=translated_content,
+            )
+            session.add(translation)
+            await session.commit()
+            await session.refresh(translation)
+    except IntegrityError:
+        await session.rollback()
+        # Race condition hit, fetch the existing one
+        result = await session.exec(
+            select(Translation).where(
+                Translation.entry_id == payload.entry_id, Translation.language == payload.language
+            )
+        )
+        existing = result.first()
+        if existing:
+            translation = existing
+        else:
+            # Should not happen typically
+            raise HTTPException(status_code=500, detail="Translation save conflict")
 
     return TranslationResponse(
         entry_id=entry.id,
@@ -214,22 +414,23 @@ async def translate_entry(
 
 @router.post("/translate-stream")
 async def translate_entry_stream(
-    payload: TranslationRequest, session: Session = Depends(get_session)
+    payload: TranslationRequest, session: AsyncSession = Depends(get_session)
 ):
     """
     流式翻译API - 支持实时进度更新
     使用Server-Sent Events (SSE)返回翻译进度
     """
-    entry = session.get(Entry, payload.entry_id)
+    entry = await session.get(Entry, payload.entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
     # 检查缓存
-    existing = session.exec(
+    result = await session.exec(
         select(Translation).where(
             Translation.entry_id == payload.entry_id, Translation.language == payload.language
         )
-    ).first()
+    )
+    existing = result.first()
     
     async def generate_events():
         """生成SSE事件流"""
@@ -287,60 +488,110 @@ async def translate_entry_stream(
                         max_length=1000
                     )
                     
-                    yield f"data: {json.dumps({'type': 'progress', 'percent': 20, 'message': f'开始翻译 {len(segments)} 个段落...'})}\n\n"
-                    
-                    # 翻译每个段落时发送进度
                     total_segments = len(segments)
-                    completed_segments = 0
+                    yield f"data: {json.dumps({'type': 'progress', 'percent': 20, 'message': f'开始翻译 {total_segments} 个段落...'})}\n\n"
                     
-                    def sync_progress_callback(current: int, total: int, message: str):
-                        """同步进度回调"""
-                        percent = 20 + int((current / total) * 70)  # 20% - 90%
-                        return {'type': 'progress', 'percent': percent, 'message': message}
-                    
-                    # 由于不能在回调中yield，我们手动处理段落翻译
+                    # 流式处理每个段落
                     translated_segments = []
-                    for i, segment in enumerate(segments):
-                        progress_percent = 20 + int(((i + 1) / total_segments) * 70)
-                        yield f"data: {json.dumps({'type': 'progress', 'percent': progress_percent, 'message': f'翻译段落 {i+1}/{total_segments}'})}\n\n"
-                        
-                        # 翻译段落
-                        if segment['is_code']:
-                            translated_segments.append({**segment, 'translated': segment['content']})
-                        else:
-                            try:
-                                translated_text = await client.translate(
-                                    segment['content'],
-                                    target_language=payload.language
-                                )
-                                translated_segments.append({**segment, 'translated': translated_text})
-                            except Exception as e:
-                                # 翻译失败，使用原文
-                                translated_segments.append({**segment, 'translated': segment['content']})
+                    completed_count = 0
                     
-                    # 合并段落
+                    async for result_seg in translator.translate_segments_stream(
+                        segments, 
+                        target_language=payload.language,
+                        max_concurrent=3
+                    ):
+                        translated_segments.append(result_seg)
+                        completed_count += 1
+                        
+                        # 计算进度
+                        progress_percent = 20 + int((completed_count / total_segments) * 70)
+                        
+                        # 发送进度事件
+                        yield f"data: {json.dumps({'type': 'progress', 'percent': progress_percent, 'message': f'翻译段落 {completed_count}/{total_segments}'})}\n\n"
+                        
+                        # 发送段落完成事件 (支持前端增量渲染)
+                        yield f"data: {json.dumps({'type': 'segment_completed', 'index': result_seg['index'], 'translated': result_seg['translated'], 'is_code': result_seg['is_code']})}\n\n"
+                    
+                    # 合并结果
                     yield f"data: {json.dumps({'type': 'progress', 'percent': 95, 'message': '正在合并翻译结果...'})}\n\n"
-                    translated_content = translator.merge_segments(translated_segments)
+                    
+                    # 确保按顺序合并
+                    translated_segments.sort(key=lambda x: x['index'])
+                    
+                    if payload.display_mode == "bilingual":
+                        translated_content = translator.merge_bilingual_segments(translated_segments)
+                    else:
+                        translated_content = translator.merge_segments(translated_segments)
                 else:
                     # 短文章：直接翻译
                     yield f"data: {json.dumps({'type': 'progress', 'percent': 50, 'message': '正在翻译内容...'})}\n\n"
-                    translated_content = await client.translate(
+                    raw_translation = await client.translate(
                         content_to_translate,
                         target_language=payload.language
                     )
+                    
+                    if payload.display_mode == "bilingual":
+                        clean_translation = translator._clean_html_for_display(raw_translation)
+                        if clean_translation:
+                             translated_content = (
+                                f'<div class="bilingual-segment" style="position: relative; margin-bottom: 1.5em;">'
+                                f'<div class="original" style="margin-bottom: 0.5em;">{content_to_translate}</div>'
+                                f'<div class="translated" style="color: #5F6368; font-size: 0.95em; padding-left: 12px; border-left: 3px solid #4C74FF; background: rgba(76, 116, 255, 0.05); padding: 8px 12px; border-radius: 4px;">'
+                                f'{clean_translation}'
+                                f'</div>'
+                                f'</div>'
+                            )
+                        else:
+                            translated_content = content_to_translate
+                    else:
+                        translated_content = raw_translation
 
             # 保存到数据库
             yield f"data: {json.dumps({'type': 'progress', 'percent': 98, 'message': '正在保存翻译...'})}\n\n"
-            translation = Translation(
-                entry_id=entry.id,
-                language=payload.language,
-                title=translated_title,
-                summary=translated_summary,
-                content=translated_content,
-            )
-            session.add(translation)
-            session.commit()
-            session.refresh(translation)
+            try:
+                # Re-check for existing
+                result = await session.exec(
+                    select(Translation).where(
+                        Translation.entry_id == entry.id,
+                        Translation.language == payload.language
+                    )
+                )
+                existing = result.first()
+                if existing:
+                    existing.title = translated_title or existing.title
+                    existing.summary = translated_summary or existing.summary
+                    existing.content = translated_content or existing.content
+                    session.add(existing)
+                    await session.commit()
+                    await session.refresh(existing)
+                    translation = existing
+                else:
+                    translation = Translation(
+                        entry_id=entry.id,
+                        language=payload.language,
+                        title=translated_title,
+                        summary=translated_summary,
+                        content=translated_content,
+                    )
+                    session.add(translation)
+                    await session.commit()
+                    await session.refresh(translation)
+            except IntegrityError:
+                await session.rollback()
+                result = await session.exec(
+                    select(Translation).where(
+                        Translation.entry_id == payload.entry_id, Translation.language == payload.language
+                    )
+                )
+                translation = result.first()
+                # If still None, we just don't return the ID, but we have the content so it's fine for the user
+                if not translation:
+                    # Fallback object just for response
+                    translation = Translation(
+                        title=translated_title,
+                        summary=translated_summary,
+                        content=translated_content
+                    )
 
             # 发送完成事件
             yield f"data: {json.dumps({'type': 'complete', 'result': {'title': translation.title, 'summary': translation.summary, 'content': translation.content}})}\n\n"

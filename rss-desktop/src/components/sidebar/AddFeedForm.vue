@@ -21,48 +21,22 @@ function handleSubmit() {
 </script>
 
 <template>
-  <form class="add-feed" @submit.prevent="handleSubmit">
-    <input v-model.trim="newFeedUrl" :placeholder="t('feeds.addPlaceholder')" />
-    <button type="submit" :disabled="addingFeed">
+  <form class="flex gap-2 my-4" @submit.prevent="handleSubmit">
+    <input
+      v-model.trim="newFeedUrl"
+      :placeholder="t('feeds.addPlaceholder')"
+      class="flex-1 border border-[var(--border-color)] rounded-lg px-3 py-2 bg-[var(--bg-surface)] c-[var(--text-primary)] transition-all duration-200 focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(255,122,24,0.18)]"
+    />
+    <button
+      type="submit"
+      :disabled="addingFeed"
+      class="border-none bg-gradient-to-r from-[#ff7a18] to-[#ffbe30] c-white px-3 rounded-lg cursor-pointer disabled:op-60 disabled:cursor-not-allowed"
+    >
       {{ addingFeed ? t('feeds.adding') : t('feeds.addFeed') }}
     </button>
   </form>
 </template>
 
 <style scoped>
-.add-feed {
-  display: flex;
-  gap: 8px;
-  margin: 16px 0;
-}
-
-.add-feed input {
-  flex: 1;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.add-feed input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(255, 122, 24, 0.18);
-}
-
-.add-feed button {
-  border: none;
-  background: linear-gradient(120deg, #ff7a18, #ffbe30);
-  color: #fff;
-  padding: 0 12px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.add-feed button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+/* Migrated to UnoCSS */
 </style>

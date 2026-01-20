@@ -3,13 +3,13 @@
 """
 from typing import Optional
 from sqlalchemy import text
-from app.db.session import SessionLocal, engine
+from app.db.session import async_session_maker, engine
 from app.models.user_settings import UserSettings
 
 _schema_checked = False
 
 
-def ensure_user_settings_schema():
+async def ensure_user_settings_schema():
     """Ensure new columns exist for user settings table."""
     global _schema_checked
     if _schema_checked:
@@ -22,16 +22,17 @@ def ensure_user_settings_schema():
         "time_field": "ALTER TABLE user_settings ADD COLUMN time_field TEXT NOT NULL DEFAULT 'inserted_at'",
     }
 
-    with engine.connect() as connection:
-        columns = {row[1] for row in connection.execute(text("PRAGMA table_info('user_settings')"))}
+    async with engine.connect() as connection:
+        result = await connection.execute(text("PRAGMA table_info('user_settings')"))
+        columns = {row[1] for row in result}
         new_columns_added = False
         for column_name, statement in required_columns.items():
             if column_name not in columns:
-                connection.execute(text(statement))
+                await connection.execute(text(statement))
                 new_columns_added = True
 
         if new_columns_added:
-            connection.commit()
+            await connection.commit()
 
     _schema_checked = True
 
@@ -40,24 +41,24 @@ class UserSettingsService:
     """用户设置管理服务"""
 
     @staticmethod
-    def get_settings() -> UserSettings:
+    async def get_settings() -> UserSettings:
         """获取用户设置，如果不存在则创建默认设置"""
-        ensure_user_settings_schema()
-        with SessionLocal() as session:
-            settings = session.get(UserSettings, 1)
+        await ensure_user_settings_schema()
+        async with async_session_maker() as session:
+            settings = await session.get(UserSettings, 1)
             if not settings:
                 settings = UserSettings(id=1)
                 session.add(settings)
-                session.commit()
-                session.refresh(settings)
+                await session.commit()
+                await session.refresh(settings)
             return settings
 
     @staticmethod
-    def update_settings(**kwargs) -> UserSettings:
+    async def update_settings(**kwargs) -> UserSettings:
         """更新用户设置"""
-        ensure_user_settings_schema()
-        with SessionLocal() as session:
-            settings = session.get(UserSettings, 1)
+        await ensure_user_settings_schema()
+        async with async_session_maker() as session:
+            settings = await session.get(UserSettings, 1)
             if not settings:
                 settings = UserSettings(id=1)
                 session.add(settings)
@@ -68,24 +69,24 @@ class UserSettingsService:
                     setattr(settings, key, value)
 
             session.add(settings)
-            session.commit()
-            session.refresh(settings)
+            await session.commit()
+            await session.refresh(settings)
             return settings
 
     @staticmethod
-    def get_rsshub_url() -> str:
+    async def get_rsshub_url() -> str:
         """获取配置的RSSHub URL"""
-        settings = UserSettingsService.get_settings()
+        settings = await UserSettingsService.get_settings()
         return settings.rsshub_url.rstrip('/')  # 移除末尾斜杠
 
     @staticmethod
-    def update_rsshub_url(url: str) -> UserSettings:
+    async def update_rsshub_url(url: str) -> UserSettings:
         """更新RSSHub URL"""
         # 确保URL格式正确
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
 
-        return UserSettingsService.update_settings(rsshub_url=url)
+        return await UserSettingsService.update_settings(rsshub_url=url)
 
 
 # 全局实例
