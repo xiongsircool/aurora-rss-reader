@@ -75,6 +75,7 @@ const summaryText = ref('')
 const summaryLoading = ref(false)
 const translationLanguage = ref('zh')
 const translationLoading = ref(false)
+const translationProgress = ref(0)
 const showTranslation = ref(false)
 const translatedContent = ref<{
   title: string | null
@@ -423,7 +424,7 @@ async function handleSummary() {
   }
 }
 
-  const translationProgress = ref(0)
+
 
   async function handleTranslation() {
   if (!currentSelectedEntry.value) return
@@ -434,68 +435,32 @@ async function handleSummary() {
     return
   }
   
-  const displayMode = aiFeatures.value?.content_display_mode ?? 'replace'
-  // If translation already cached, just show it
-  const cacheKey = `${currentSelectedEntry.value.id}_${translationLanguage.value}_${displayMode}`
-  if (store.translationCache[cacheKey]) {
-    const cached = store.translationCache[cacheKey]
-    translatedContent.value = {
-      title: cached.title,
-      content: cached.content,
-    }
-    showTranslation.value = true
+  // Toggle on immediately
+  showTranslation.value = true
+  
+  // Request Title Translation for the header (independent of content)
+  const currentEntryId = currentSelectedEntry.value.id
+  
+  // Check header cache first
+  if (translatedContent.value.title) {
     return
   }
-  
-  // Otherwise, request translation
-  const currentEntryId = currentSelectedEntry.value.id
+
   translationLoading.value = true
-  translationProgress.value = 0
   try {
-    // Use streaming if available in store
-    if (store.requestTranslationStream) {
-        const translation = await store.requestTranslationStream(
-          currentSelectedEntry.value.id,
-          translationLanguage.value,
-          displayMode,
-          (percent, _message) => {
-            translationProgress.value = percent
-          }
-        )
-        if (currentSelectedEntry.value?.id === currentEntryId) {
-          translatedContent.value = {
-            title: translation.title,
-            content: translation.content,
-          }
-        }
-    } else {
-        // Fallback
-        const translation = await store.requestTranslation(
-          currentEntryId,
-          translationLanguage.value,
-          displayMode
-        )
-        if (currentSelectedEntry.value?.id === currentEntryId) {
-          translatedContent.value = {
-            title: translation.title,
-            content: translation.content,
-          }
-        }
-    }
+    const translation = await store.requestTitleTranslation(
+      currentEntryId,
+      translationLanguage.value
+    )
     
     if (currentSelectedEntry.value?.id === currentEntryId) {
-      showTranslation.value = true
-      showNotification(t('toast.translationSuccess'), 'success')
+      translatedContent.value.title = translation.title
     }
   } catch (error) {
-    if (currentSelectedEntry.value?.id === currentEntryId) {
-      console.error('Translation failed:', error)
-      showNotification(t('toast.translationFailed'), 'error')
-    }
+    console.warn('Title translation failed:', error)
   } finally {
     if (currentSelectedEntry.value?.id === currentEntryId) {
       translationLoading.value = false
-      translationProgress.value = 0
     }
   }
 }

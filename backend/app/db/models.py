@@ -60,7 +60,10 @@ class Translation(SQLModel, table=True):
     language: str = Field(default="zh", index=True)
     title: Optional[str] = None
     summary: Optional[str] = None
-    content: Optional[str] = None
+    content: Optional[str] = None  # Legacy: full HTML translation
+    # New: Block-level translations for immersive mode
+    # Format: {"block_hash_1": "translated_text_1", "block_hash_2": "..."}
+    paragraph_map: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True)))
 
 

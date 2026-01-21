@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Entry } from '../../types'
 import DetailsHeader from './DetailsHeader.vue'
 import DetailsActions from './DetailsActions.vue'
 import AISummaryCard from './AISummaryCard.vue'
+import ArticleBlock from './ArticleBlock.vue'
+import { useArticleParser } from '../../composables/useArticleParser'
+import { useTranslationQueue } from '../../composables/useTranslationQueue'
 
-defineProps<{
+const props = defineProps<{
   entry: Entry | null
   
   // Translation state
@@ -30,9 +34,70 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-import { useSanitize } from '../../composables/useSanitize'
 
-const { sanitize } = useSanitize()
+// Immersive Translation Logic
+const { 
+  blocks, 
+  loadContent, 
+  applyCachedTranslations, 
+  updateBlockTranslation,
+  resetTranslations 
+} = useArticleParser()
+
+const { 
+  processQueue, 
+  retrySingle, 
+  fetchCache, 
+  isProcessing,
+  progress: queueProgress 
+} = useTranslationQueue()
+
+// Watch entry changes to parse content
+watch(() => props.entry, (newEntry) => {
+  if (newEntry?.content) {
+    loadContent(newEntry.content)
+    // If translation is already on, trigger translation logic
+    if (props.showTranslation) {
+      handleImmersiveTranslation(newEntry.id, props.translationLanguage)
+    }
+  } else {
+    // Clear blocks if no content
+    loadContent('')
+  }
+}, { immediate: true })
+
+// Watch translation toggle
+watch(() => props.showTranslation, (show) => {
+  if (show && props.entry) {
+    handleImmersiveTranslation(props.entry.id, props.translationLanguage)
+  }
+})
+
+// Watch translation language change
+watch(() => props.translationLanguage, (newLang) => {
+  if (props.showTranslation && props.entry) {
+    // Determine if we need to reset and re-translate
+    // For now, simpler to just trigger translation (it handles cache check)
+    handleImmersiveTranslation(props.entry.id, newLang)
+  }
+})
+
+async function handleImmersiveTranslation(entryId: string, language: string) {
+  // 1. Fetch any existing cache first
+  const cache = await fetchCache(entryId, language)
+  applyCachedTranslations(cache)
+  
+  // 2. Queue remaining blocks for translation
+  processQueue(entryId, blocks.value, language, updateBlockTranslation)
+}
+
+function handleRetry(blockId: string) {
+  if (!props.entry) return
+  const block = blocks.value.find(b => b.id === blockId)
+  if (block) {
+    retrySingle(props.entry.id, block, props.translationLanguage, updateBlockTranslation)
+  }
+}
 </script>
 
 <template>
@@ -46,10 +111,10 @@ const { sanitize } = useSanitize()
       
       <DetailsActions
         :is-starred="entry.starred"
-        :is-translating="translationLoading"
+        :is-translating="translationLoading || isProcessing"
         :show-translation="showTranslation"
         :translation-language="translationLanguage"
-        :translation-progress="translationProgress"
+        :translation-progress="translationLoading ? translationProgress : (isProcessing ? queueProgress : undefined)"
         @open-external="emit('open-external')"
         @toggle-star="emit('toggle-star')"
         @toggle-translation="emit('toggle-translation')"
@@ -62,10 +127,18 @@ const { sanitize } = useSanitize()
         @generate-summary="emit('generate-summary')"
       />
       
+      <!-- Immersive Reader Body -->
       <article 
-        class="details__body text-base leading-relaxed c-[var(--text-primary)] break-words flex-initial overflow-visible min-h-auto" 
-        v-html="sanitize(showTranslation && translatedContent ? translatedContent : entry.content)"
-      ></article>
+        class="details__body text-base leading-relaxed c-[var(--text-primary)] break-words flex-initial overflow-visible min-h-auto"
+      >
+        <ArticleBlock
+          v-for="block in blocks"
+          :key="block.id"
+          :block="block"
+          :show-translation="showTranslation"
+          @retry="handleRetry"
+        />
+      </article>
     </div>
     <div v-else class="grid place-items-center c-[var(--text-secondary)] text-center p-6 h-full">
       {{ t('articles.selectArticle') }}
@@ -74,31 +147,10 @@ const { sanitize } = useSanitize()
 </template>
 
 <style scoped>
-/* Deep selectors for article content styling */
-.details__body :deep(p) {
-  margin-bottom: 1em;
-}
-
-.details__body :deep(img) {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 12px auto;
-  border-radius: 10px;
-}
-
-.details__body :deep(table) {
-  width: 100%;
-  overflow-x: auto;
-  display: block;
-}
-
-.details__body :deep(pre),
-.details__body :deep(code) {
-  max-width: 100%;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
+/* Scoped styles for the container */
+.details__body {
+  /* Ensure container has some spacing */
+  padding-bottom: 2em;
 }
 
 /* Custom scrollbar */
@@ -108,27 +160,4 @@ const { sanitize } = useSanitize()
 
 :global(.dark) .details::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
 :global(.dark) .details:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
-
-/* Bilingual Translation Styles */
-.details__body :deep(.bilingual-segment) {
-  margin-bottom: 1.5em;
-  position: relative;
-}
-
-.details__body :deep(.translated) {
-  margin-top: 0.5em;
-  padding: 10px 14px;
-  background: rgba(76, 116, 255, 0.04);
-  border-radius: 6px;
-  border-left: 3px solid #4c74ff;
-  color: var(--text-secondary);
-  font-size: 0.95em;
-  line-height: 1.6;
-}
-
-:global(.dark) .details__body :deep(.translated) {
-  background: rgba(76, 116, 255, 0.08);
-  color: rgba(255, 255, 255, 0.8);
-  border-left-color: #5c80ff;
-}
 </style>

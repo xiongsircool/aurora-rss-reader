@@ -40,6 +40,7 @@ def _ensure_cache_initialized() -> None:
             "auto_translation": False,
             "auto_title_translation": False,
             "title_display_mode": "original-first",
+            "content_display_mode": "replace",
             "translation_language": "zh",
         }
 
@@ -52,6 +53,7 @@ _ai_settings_cache: dict[str, dict[str, str | bool]] = {
         "auto_translation": False,
         "auto_title_translation": False,
         "title_display_mode": "original-first",
+        "content_display_mode": "replace",
         "translation_language": "zh",
     },
 }
@@ -424,21 +426,30 @@ async def translate_entry_stream(
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
-    # 检查缓存
+    # 检查缓存 - 在外部获取并存储结果以便传递给生成器
     result = await session.exec(
         select(Translation).where(
             Translation.entry_id == payload.entry_id, Translation.language == payload.language
         )
     )
-    existing = result.first()
+    cached_translation = result.first()
+    
+    # 预先获取需要的 entry 数据，避免在生成器中访问可能已关闭的 session
+    entry_id = entry.id
+    entry_title = entry.title
+    entry_summary = entry.summary
+    entry_content = entry.readability_content or entry.content
+    target_language = payload.language
+    display_mode = payload.display_mode
     
     async def generate_events():
         """生成SSE事件流"""
+        nonlocal cached_translation
         try:
             # 如果有缓存，直接返回
-            if existing:
+            if cached_translation:
                 yield f"data: {json.dumps({'type': 'progress', 'percent': 100, 'message': '从缓存加载'})}\n\n"
-                yield f"data: {json.dumps({'type': 'complete', 'result': {'title': existing.title, 'summary': existing.summary, 'content': existing.content}})}\n\n"
+                yield f"data: {json.dumps({'type': 'complete', 'result': {'title': cached_translation.title, 'summary': cached_translation.summary, 'content': cached_translation.content}})}\n\n"
                 return
 
             # 初始化翻译器
@@ -465,16 +476,16 @@ async def translate_entry_stream(
 
             # 翻译标题
             yield f"data: {json.dumps({'type': 'progress', 'percent': 5, 'message': '正在翻译标题...'})}\n\n"
-            if entry.title:
-                translated_title = await client.translate(entry.title, target_language=payload.language)
+            if entry_title:
+                translated_title = await client.translate(entry_title, target_language=target_language)
 
             # 翻译摘要
             yield f"data: {json.dumps({'type': 'progress', 'percent': 10, 'message': '正在翻译摘要...'})}\n\n"
-            if entry.summary:
-                translated_summary = await client.translate(entry.summary, target_language=payload.language)
+            if entry_summary:
+                translated_summary = await client.translate(entry_summary, target_language=target_language)
 
             # 翻译正文
-            content_to_translate = entry.readability_content or entry.content
+            content_to_translate = entry_content
             if content_to_translate:
                 content_length = len(content_to_translate)
                 
@@ -497,7 +508,7 @@ async def translate_entry_stream(
                     
                     async for result_seg in translator.translate_segments_stream(
                         segments, 
-                        target_language=payload.language,
+                        target_language=target_language,
                         max_concurrent=3
                     ):
                         translated_segments.append(result_seg)
@@ -518,7 +529,7 @@ async def translate_entry_stream(
                     # 确保按顺序合并
                     translated_segments.sort(key=lambda x: x['index'])
                     
-                    if payload.display_mode == "bilingual":
+                    if display_mode == "bilingual":
                         translated_content = translator.merge_bilingual_segments(translated_segments)
                     else:
                         translated_content = translator.merge_segments(translated_segments)
@@ -527,10 +538,10 @@ async def translate_entry_stream(
                     yield f"data: {json.dumps({'type': 'progress', 'percent': 50, 'message': '正在翻译内容...'})}\n\n"
                     raw_translation = await client.translate(
                         content_to_translate,
-                        target_language=payload.language
+                        target_language=target_language
                     )
                     
-                    if payload.display_mode == "bilingual":
+                    if display_mode == "bilingual":
                         clean_translation = translator._clean_html_for_display(raw_translation)
                         if clean_translation:
                              translated_content = (
@@ -552,8 +563,8 @@ async def translate_entry_stream(
                 # Re-check for existing
                 result = await session.exec(
                     select(Translation).where(
-                        Translation.entry_id == entry.id,
-                        Translation.language == payload.language
+                        Translation.entry_id == entry_id,
+                        Translation.language == target_language
                     )
                 )
                 existing = result.first()
@@ -567,8 +578,8 @@ async def translate_entry_stream(
                     translation = existing
                 else:
                     translation = Translation(
-                        entry_id=entry.id,
-                        language=payload.language,
+                        entry_id=entry_id,
+                        language=target_language,
                         title=translated_title,
                         summary=translated_summary,
                         content=translated_content,
@@ -580,7 +591,7 @@ async def translate_entry_stream(
                 await session.rollback()
                 result = await session.exec(
                     select(Translation).where(
-                        Translation.entry_id == payload.entry_id, Translation.language == payload.language
+                        Translation.entry_id == entry_id, Translation.language == target_language
                     )
                 )
                 translation = result.first()
@@ -622,6 +633,7 @@ class AIFeatureConfig(BaseModel):
     auto_translation: bool = False
     auto_title_translation: bool = False
     title_display_mode: str = "original-first"
+    content_display_mode: str = "replace"
     translation_language: str = "zh"
 
 
@@ -642,6 +654,7 @@ class AIFeatureConfigUpdate(BaseModel):
     auto_translation: bool | None = None
     auto_title_translation: bool | None = None
     title_display_mode: str | None = None
+    content_display_mode: str | None = None
     translation_language: str | None = None
 
 
@@ -715,6 +728,8 @@ async def update_ai_config(payload: AIConfigUpdate) -> dict:
                 features["auto_title_translation"] = payload.features.auto_title_translation
             if payload.features.title_display_mode is not None:
                 features["title_display_mode"] = payload.features.title_display_mode
+            if payload.features.content_display_mode is not None:
+                features["content_display_mode"] = payload.features.content_display_mode
             if payload.features.translation_language is not None:
                 features["translation_language"] = payload.features.translation_language
 

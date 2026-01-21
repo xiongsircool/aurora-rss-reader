@@ -1,10 +1,16 @@
 import { defineConfig } from 'vite'
+import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import electron from 'vite-plugin-electron'
 import UnoCSS from 'unocss/vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  },
   plugins: [
     vue(),
     UnoCSS(),
@@ -19,6 +25,8 @@ export default defineConfig({
         },
         vite: {
           build: {
+            outDir: 'dist-electron',
+            minify: false,
             lib: {
               entry: 'electron/preload.ts',
               formats: ['cjs'],
@@ -26,6 +34,9 @@ export default defineConfig({
             },
             rollupOptions: {
               external: ['electron'],
+              output: {
+                format: 'cjs',
+              },
             },
           },
         },

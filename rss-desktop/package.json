@@ -73,7 +73,7 @@
     "electron": "39.1.2",
     "electron-builder": "^24.13.3",
     "typescript": "^5.2.2",
-    "unocss": "^66.6.0",
+    "unocss": "^0.65.1",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5",
