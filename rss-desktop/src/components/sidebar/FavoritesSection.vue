@@ -32,7 +32,7 @@ const { iconSrcFor, handleFeedIconLoad, handleFeedIconError, isFeedIconBroken, i
 </script>
 
 <template>
-  <div class="my-4 border-y border-[var(--border-color)] py-3 dark:border-[rgba(255,255,255,0.08)]" v-if="totalStarred > 0">
+  <div class="my-4 rounded-xl border border-[rgba(255,122,24,0.22)] bg-[linear-gradient(180deg,#fff6ee,rgba(255,243,230,0.92))] shadow-[0_10px_22px_rgba(255,122,24,0.12),0_6px_16px_rgba(15,17,21,0.08)] py-3 px-2 dark:bg-[linear-gradient(180deg,rgba(32,22,16,0.92),rgba(18,14,12,0.92))] dark:border-[rgba(255,122,24,0.38)] dark:shadow-[0_12px_26px_rgba(0,0,0,0.55),0_0_0_1px_rgba(255,138,61,0.22)]" v-if="totalStarred > 0">
     <div class="mb-2">
       <button
         class="w-full flex items-center gap-2 px-3 py-2.5 bg-transparent border border-transparent rounded-lg text-left cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.1)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.2)] dark:hover:border-[rgba(255,122,24,0.4)]"

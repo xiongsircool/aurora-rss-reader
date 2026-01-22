@@ -57,7 +57,7 @@ function getEntryPreview(entry: Entry): string {
     class="border border-[var(--border-color)] text-left p-[clamp(12px,1.5vw,16px)] rounded-2xl bg-[var(--bg-surface)] flex items-start gap-[clamp(10px,0.8vw,14px)] c-[var(--text-primary)] shadow-[0_4px_14px_rgba(15,17,21,0.05)] transition-all duration-200 ease min-w-0 hover:border-[rgba(255,122,24,0.4)] hover:shadow-[0_8px_20px_rgba(15,17,21,0.1)] hover:-translate-y-0.5 relative group"
     :class="{ 
       'border-[var(--accent)]! border-2! shadow-[0_4px_20px_rgba(255,122,24,0.25)]!': active,
-      'border-l-[var(--accent)] border-l-3': !active && !entry.read
+      'border-l-[var(--accent)] border-l-3 border-[rgba(255,122,24,0.25)] bg-[linear-gradient(90deg,rgba(255,122,24,0.08),rgba(255,255,255,0.98))] shadow-[0_6px_18px_rgba(255,122,24,0.08)] dark:bg-[linear-gradient(90deg,rgba(255,122,24,0.16),rgba(24,27,34,0.96))] dark:border-[rgba(255,122,24,0.35)]': !active && !entry.read
     }"
   >
     <button class="flex-1 flex flex-col gap-1.5 cursor-pointer bg-transparent border-none p-0 text-left c-inherit font-inherit min-w-0" @click="emit('select', entry.id)">
@@ -96,6 +96,13 @@ function getEntryPreview(entry: Entry): string {
       </template>
       
       <div class="text-xs c-[var(--text-secondary)] flex gap-1.5 items-center flex-wrap gap-y-0.5 min-w-0">
+        <span
+          v-if="!entry.read"
+          class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide border border-[rgba(255,122,24,0.45)] bg-[rgba(255,122,24,0.14)] c-[#ff7a18] shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] dark:bg-[rgba(255,122,24,0.2)] dark:border-[rgba(255,138,61,0.55)] dark:c-[#ffd9bf] shrink-0"
+        >
+          <span class="w-1.5 h-1.5 rounded-full bg-[#ff7a18] dark:bg-[#ffb37a]"></span>
+          {{ t('navigation.unread') }}
+        </span>
         <span>{{ entry.feed_title }}</span>
         <span>{{ t('articles.timeSeparator') }}</span>
         <span>{{ formatDate(entry.published_at) }}</span>
