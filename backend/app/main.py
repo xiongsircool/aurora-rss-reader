@@ -19,7 +19,7 @@ from app.core.config import settings, APP_DATA_DIR
 from app.db.session import init_db  # Also call this to ensure tables exist
 from scripts.migrate import run_migrations
 from app.services.fetcher import refresh_all_feeds
-from app.services.user_settings_service import ensure_user_settings_schema
+from app.services.user_settings_service import ensure_user_settings_schema, user_settings_service
 
 # 允许所有localhost端口访问
 
@@ -68,23 +68,21 @@ def build_allowed_origins() -> list[str]:
 
 # ... existing code ...
 
+REFRESH_JOB_ID = "refresh_all_feeds"
+
+
 @asynccontextmanager
-async def lifespan(_: FastAPI):
-    # 先确保表存在，再运行迁移
-    # await init_db()
-    
+async def lifespan(app: FastAPI):
     logger = logging.getLogger("backend.startup")
     logger.info("Application starting up...")
-    
+
     start_time = time.time()
     try:
-        # logger.info("Running database migrations...")
-        # await asyncio.to_thread(run_migrations)
+        await init_db()
+        await asyncio.to_thread(run_migrations)
         logger.info(f"Database migrations completed in {time.time() - start_time:.2f}s")
     except Exception as e:
         logger.error(f"Startup migration failed: {e}", exc_info=True)
-        # 这里可以选择是否继续运行，对于必须的数据库变更，失败应该退出
-        # 但为了用户体验，有时会选择记录日志继续
         pass
 
     await ensure_user_settings_schema()
@@ -95,8 +93,19 @@ async def lifespan(_: FastAPI):
 
     scheduler = AsyncIOScheduler()
     scheduler.start()
-    scheduler.add_job(refresh_all_feeds, "interval", minutes=settings.fetch_interval_minutes)
-    asyncio.create_task(refresh_all_feeds())
+    app.state.scheduler = scheduler
+    app.state.refresh_job_id = REFRESH_JOB_ID
+
+    user_settings = await user_settings_service.get_settings()
+    if user_settings.auto_refresh:
+        scheduler.add_job(
+            refresh_all_feeds,
+            "interval",
+            minutes=user_settings.fetch_interval_minutes,
+            id=REFRESH_JOB_ID,
+            replace_existing=True,
+        )
+        asyncio.create_task(refresh_all_feeds())
     try:
         yield
     finally:

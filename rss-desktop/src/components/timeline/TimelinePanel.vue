@@ -6,7 +6,7 @@ import TimelineFilters from './TimelineFilters.vue'
 import EntryCard from './EntryCard.vue'
 import LoadingSpinner from '../LoadingSpinner.vue'
 
-defineProps<{
+const props = defineProps<{
   // Header props
   title: string
   subtitle: string
@@ -22,6 +22,8 @@ defineProps<{
   // List props
   entries: Entry[]
   loading: boolean
+  hasMore: boolean
+  loadingMore: boolean
   showSummary: boolean
   
   // Translation props
@@ -46,9 +48,39 @@ const emit = defineEmits<{
   (e: 'select-entry', entryId: string): void
   (e: 'toggle-star', entry: Entry): void
   (e: 'mark-all-read'): void
+  (e: 'entries-visible', entries: Entry[]): void
+  (e: 'load-more'): void
 }>()
 
 const { t } = useI18n()
+const loadMoreThreshold = 8
+let lastLoadMoreLength = 0
+
+function handleVisibleUpdate(
+  startIndex: number,
+  endIndex: number,
+  visibleStartIndex?: number,
+  visibleEndIndex?: number
+) {
+  const start = Number.isFinite(visibleStartIndex) ? (visibleStartIndex as number) : startIndex
+  const end = Number.isFinite(visibleEndIndex) ? (visibleEndIndex as number) : endIndex
+  const safeStart = Math.max(0, start)
+  const safeEnd = Math.min(props.entries.length - 1, end)
+  if (safeEnd < safeStart) return
+  emit('entries-visible', props.entries.slice(safeStart, safeEnd + 1))
+
+  if (props.entries.length < lastLoadMoreLength) {
+    lastLoadMoreLength = 0
+  }
+
+  if (!props.loading && !props.loadingMore && props.hasMore) {
+    const triggerIndex = Math.max(0, props.entries.length - 1 - loadMoreThreshold)
+    if (safeEnd >= triggerIndex && props.entries.length !== lastLoadMoreLength) {
+      lastLoadMoreLength = props.entries.length
+      emit('load-more')
+    }
+  }
+}
 </script>
 
 <template>
@@ -73,51 +105,63 @@ const { t } = useI18n()
       @update:date-range-filter="emit('update:dateRangeFilter', $event)"
     />
     
-    <section class="timeline__list flex-1 p-[clamp(12px,1.5vw,16px)] flex flex-col gap-[clamp(10px,1vw,14px)] overflow-y-auto overflow-x-hidden min-h-0">
-      <LoadingSpinner v-if="loading" message="加载中..." />
-      
-      <template v-else>
-        <!-- Custom scrollbar style is applied to the scroller -->
-        <DynamicScroller
-          class="h-full"
-          :items="entries"
-          :min-item-size="100"
-          key-field="id"
-          v-if="entries.length"
-        >
-          <template v-slot="{ item, index, active }">
-            <DynamicScrollerItem
-              :item="item"
-              :active="active"
-              :size-dependencies="[
-                item.summary,
-                item.title,
-                getTranslatedTitle(item.id),
-                showSummary
-              ]"
-              :data-index="index"
-              class="pb-5"
-            >
-              <EntryCard
-                :entry="item"
-                :active="selectedEntryId === item.id"
-                :show-translation="autoTitleTranslation"
-                :translated-title="getTranslatedTitle(item.id)"
-                :is-translation-loading="isTranslationLoading(item.id)"
-                :title-display-mode="titleDisplayMode"
-                :translation-language-label="translationLanguageLabel"
-                :show-summary="showSummary"
-                @select="emit('select-entry', $event)"
-                @toggle-star="emit('toggle-star', $event)"
-              />
-            </DynamicScrollerItem>
-          </template>
-        </DynamicScroller>
+    <section class="timeline__list relative flex-1 p-[clamp(12px,1.5vw,16px)] flex flex-col gap-[clamp(10px,1vw,14px)] overflow-y-auto overflow-x-hidden min-h-0">
+      <div
+        v-if="loading"
+        class="absolute inset-0 z-10 grid place-items-center bg-[rgba(255,255,255,0.65)] dark:bg-[rgba(15,17,21,0.65)] pointer-events-none"
+      >
+        <LoadingSpinner message="加载中..." />
+      </div>
 
-        <div class="grid place-items-center c-[var(--text-secondary)] text-center p-6" v-if="!entries.length">
-          {{ searchQuery ? t('feeds.noArticlesSearch') : t('feeds.noArticlesAdd') }}
-        </div>
-      </template>
+      <!-- Custom scrollbar style is applied to the scroller -->
+      <DynamicScroller
+        class="h-full"
+        :items="entries"
+        :min-item-size="100"
+        :emit-update="true"
+        key-field="id"
+        @update="handleVisibleUpdate"
+        v-if="entries.length"
+      >
+        <template v-slot="{ item, index, active }">
+          <DynamicScrollerItem
+            :item="item"
+            :active="active"
+            :size-dependencies="[
+              item.summary,
+              item.title,
+              getTranslatedTitle(item.id),
+              showSummary
+            ]"
+            :data-index="index"
+            class="pb-5"
+          >
+            <EntryCard
+              :entry="item"
+              :active="selectedEntryId === item.id"
+              :show-translation="autoTitleTranslation"
+              :translated-title="getTranslatedTitle(item.id)"
+              :is-translation-loading="isTranslationLoading(item.id)"
+              :title-display-mode="titleDisplayMode"
+              :translation-language-label="translationLanguageLabel"
+              :show-summary="showSummary"
+              @select="emit('select-entry', $event)"
+              @toggle-star="emit('toggle-star', $event)"
+            />
+          </DynamicScrollerItem>
+        </template>
+      </DynamicScroller>
+
+      <div class="grid place-items-center c-[var(--text-secondary)] text-center p-6" v-if="!entries.length && !loading">
+        {{ searchQuery ? t('feeds.noArticlesSearch') : t('feeds.noArticlesAdd') }}
+      </div>
+
+      <div
+        v-if="loadingMore"
+        class="absolute bottom-0 left-0 right-0 h-[3px] overflow-hidden pointer-events-none"
+      >
+        <div class="loading-bar h-full w-full"></div>
+      </div>
     </section>
   </main>
 </template>
@@ -130,4 +174,16 @@ const { t } = useI18n()
 
 :global(.dark) .timeline__list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
 :global(.dark) .timeline__list:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
+
+.loading-bar {
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 35%, #34c759 65%, transparent 100%);
+  background-size: 200% 100%;
+  animation: loadingBar 1.1s ease-in-out infinite;
+  opacity: 0.7;
+}
+
+@keyframes loadingBar {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 </style>

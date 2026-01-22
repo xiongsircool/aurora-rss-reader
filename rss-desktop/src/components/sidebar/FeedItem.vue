@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Feed } from '../../types'
 import { useFeedIcons } from '../../composables/useFeedIcons'
+import { useSettingsStore } from '../../stores/settingsStore'
 
 defineProps<{
   feed: Feed
@@ -23,6 +25,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const settingsStore = useSettingsStore()
 
 const { iconSrcFor, handleFeedIconLoad, handleFeedIconError, isFeedIconBroken, isFeedIconLoaded, getFeedColor, getFeedInitial } = useFeedIcons()
 
@@ -31,6 +34,11 @@ import 'dayjs/locale/zh-cn'
 
 dayjs.locale('zh-cn')
 
+const refreshIntervalMinutes = computed(() => {
+  if (!settingsStore.settings.auto_refresh) return null
+  return settingsStore.settings.fetch_interval_minutes
+})
+
 function formatLastChecked(date?: string | null) {
   if (!date) return '未刷新'
   return dayjs(date).format('MM-DD HH:mm')
@@ -38,12 +46,26 @@ function formatLastChecked(date?: string | null) {
 
 function getFeedRefreshStatus(_feed: Feed): 'ok' | 'due' | 'never' {
   if (!_feed.last_checked_at) return 'never'
-  return 'ok'
+  if (!refreshIntervalMinutes.value) return 'ok'
+  const minutes = dayjs().diff(dayjs(_feed.last_checked_at), 'minute')
+  return minutes > refreshIntervalMinutes.value ? 'due' : 'ok'
 }
 
 function getFeedRefreshTooltip(_feed: Feed): string {
-  if (!_feed.last_checked_at) return '从未刷新'
-  return `最后刷新: ${dayjs(_feed.last_checked_at).format('YYYY-MM-DD HH:mm:ss')}`
+  if (!_feed.last_checked_at) {
+    if (!refreshIntervalMinutes.value) return '从未刷新'
+    return `从未刷新\n抓取间隔: ${refreshIntervalMinutes.value} 分钟`
+  }
+
+  const lastChecked = dayjs(_feed.last_checked_at).format('YYYY-MM-DD HH:mm:ss')
+  if (!refreshIntervalMinutes.value) {
+    return `最后刷新: ${lastChecked}\n自动刷新已关闭`
+  }
+
+  const minutes = dayjs().diff(dayjs(_feed.last_checked_at), 'minute')
+  const overdue = Math.max(0, minutes - refreshIntervalMinutes.value)
+  const statusText = minutes > refreshIntervalMinutes.value ? `已超时 ${overdue} 分钟` : '正常'
+  return `最后刷新: ${lastChecked}\n抓取间隔: ${refreshIntervalMinutes.value} 分钟\n状态: ${statusText}`
 }
 </script>
 
@@ -103,17 +125,6 @@ function getFeedRefreshTooltip(_feed: Feed): string {
       </span>
     </button>
     <div class="flex gap-1.5 shrink-0" @click.stop>
-      <!-- Mark as Read Button -->
-      <button
-        v-if="!isEditing && feed.unread_count"
-        @click="emit('mark-feed-read', feed.id)"
-        class="border border-[var(--border-color)] bg-[var(--bg-surface)] w-[26px] h-[26px] p-0 flex items-center justify-center rounded-lg cursor-pointer text-[13px] transition-all c-[#34c759] hover:bg-[#34c759] hover:c-white hover:border-[#34c759] hover:-translate-y-px"
-        :title="t('articles.markFeedAsRead')"
-      >
-        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-        </svg>
-      </button>
       <button
         v-if="isEditing"
         @click="emit('save-edit', feed.id, editingGroupName)"

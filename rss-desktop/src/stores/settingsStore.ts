@@ -5,12 +5,14 @@ import { clampAutoTitleTranslationLimit, getDefaultAutoTitleTranslationLimit } f
 
 export interface AppSettings {
   fetch_interval_minutes: number
+  auto_refresh: boolean
   items_per_page: number
   // 时间过滤相关设置
   enable_date_filter: boolean
   default_date_range: string
   time_field: string
   show_entry_summary: boolean
+  open_original_mode: 'system' | 'window'
   max_auto_title_translations: number
   // 一键已读相关设置
   mark_as_read_range: string // 'current' | '3d' | '7d' | '30d' | 'all'
@@ -18,12 +20,14 @@ export interface AppSettings {
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<AppSettings>({
-    fetch_interval_minutes: 15,
+    fetch_interval_minutes: 720,
+    auto_refresh: true,
     items_per_page: 50,
     enable_date_filter: true,
     default_date_range: '30d',
     time_field: 'published_at',
     show_entry_summary: true,
+    open_original_mode: 'system',
     max_auto_title_translations: getDefaultAutoTitleTranslationLimit(),
     mark_as_read_range: 'current'
   })

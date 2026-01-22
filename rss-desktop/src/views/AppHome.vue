@@ -19,7 +19,7 @@ import Toast from '../components/Toast.vue'
 import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
 import DetailsPanel from '../components/details/DetailsPanel.vue'
-import type { Feed } from '../types'
+import type { Entry, Feed } from '../types'
 
 import { defineAsyncComponent } from 'vue'
 const SettingsModal = defineAsyncComponent(() => import('../components/SettingsModal.vue'))
@@ -37,10 +37,10 @@ const { loadLanguage } = useLanguage()
 const {
   aiFeatures,
   titleTranslationLanguageLabel,
-  bindConnectionListener,
-  cleanupConnectionListener,
   getTranslatedTitle,
   isTitleTranslationLoading,
+  queueAutoTitleTranslation,
+  requestTitleTranslation,
   setupAutoTranslationWatcher
 } = useTitleTranslation()
 
@@ -74,13 +74,8 @@ setupFilterWatchers()
 const summaryText = ref('')
 const summaryLoading = ref(false)
 const translationLanguage = ref('zh')
-const translationLoading = ref(false)
-const translationProgress = ref(0)
 const showTranslation = ref(false)
-const translatedContent = ref<{
-  title: string | null
-  content: string | null
-}>({ title: null, content: null })
+const lastVisibleEntries = ref<Entry[]>([])
 
 const editingFeedId = ref<string | null>(null)
 const editingGroupName = ref('')
@@ -103,6 +98,26 @@ const {
   cleanupLayout,
   resetLayout
 } = useLayoutManager()
+
+const collapsedGroups = computed<Record<string, boolean>>(() => {
+  const result: Record<string, boolean> = {}
+  store.collapsedGroups.forEach((groupName) => {
+    result[groupName] = true
+  })
+  return result
+})
+
+function toggleGroupCollapse(groupName: string) {
+  store.toggleGroupCollapse(groupName)
+}
+
+function expandAllGroups() {
+  store.expandAllGroups()
+}
+
+function collapseAllGroups() {
+  store.collapseAllGroups()
+}
 
 
 
@@ -137,6 +152,14 @@ const currentSelectedEntry = computed(() => {
     return favoritesStore.starredEntries.find((entry) => entry.id === selectedFavoriteEntryId.value) ?? null
   }
   return store.selectedEntry
+})
+const translationLoading = computed(() => {
+  if (!currentSelectedEntry.value) return false
+  return isTitleTranslationLoading(currentSelectedEntry.value.id, translationLanguage.value)
+})
+const translatedTitle = computed(() => {
+  if (!currentSelectedEntry.value) return null
+  return getTranslatedTitle(currentSelectedEntry.value.id, translationLanguage.value)
 })
 
 const feedMap = computed<Record<string, Feed>>(() => {
@@ -216,19 +239,31 @@ function handleEntrySelect(entryId: string) {
   }
 }
 
+function handleEntriesVisible(entries: Entry[]) {
+  lastVisibleEntries.value = entries
+  entries.forEach((entry) => {
+    queueAutoTitleTranslation(entry)
+  })
+}
 
-
-
-
-// Watch for AI store errors
-watch(() => aiStore.error, (error) => {
-  if (error) {
-    showNotification(error, 'error')
-    setTimeout(() => {
-      aiStore.clearError()
-    }, 100)
+async function handleLoadMoreEntries() {
+  if (showFavoritesOnly.value) {
+    return
   }
-})
+  await store.loadMoreEntries()
+}
+
+watch(
+  () => [aiFeatures.value?.auto_title_translation, aiFeatures.value?.translation_language],
+  ([autoEnabled]) => {
+    if (!autoEnabled || !lastVisibleEntries.value.length) {
+      return
+    }
+    lastVisibleEntries.value.forEach((entry) => {
+      queueAutoTitleTranslation(entry)
+    })
+  }
+)
 
 // Watch for favorites store errors
 watch(() => favoritesStore.error, (error) => {
@@ -246,15 +281,13 @@ watch(() => favoritesStore.error, (error) => {
 const { initSync, cleanupSync } = useAppSync(
     showFavoritesOnly,
     async () => { await loadFavoritesData() },
-    applyFilters,
     dateRangeFilter
 )
 
 // Setup Auto Translation Watcher
-setupAutoTranslationWatcher(() => filteredEntries.value) // Pass a getter for entries
+setupAutoTranslationWatcher()
 
 onMounted(async () => {
-  bindConnectionListener()
   initLayout()
   loadTheme()
   store.loadCollapsedGroups()
@@ -280,7 +313,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  cleanupConnectionListener()
   cleanupLayout()
   cleanupSync()
 })
@@ -291,9 +323,6 @@ watch(
     if (!entry) {
       summaryText.value = ''
       showTranslation.value = false
-      translationLoading.value = false
-      translationProgress.value = 0
-      translatedContent.value = { title: null, content: null }
       return
     }
     const cached = store.summaryCache[entry.id]
@@ -306,34 +335,15 @@ watch(
         summaryLoading.value = true
         const summary = await store.requestSummary(entry.id)
         summaryText.value = summary.summary
-        // 可选：显示通知让用户知道摘要已自动生成
-        // showNotification('摘要已自动生成', 'success')
       } catch (error) {
         console.error('自动生成摘要失败:', error)
-        // 不显示错误通知，避免干扰用户体验
       } finally {
         summaryLoading.value = false
       }
     }
 
-    // Check if translation exists
-  const displayMode = aiFeatures.value?.content_display_mode ?? 'replace'
-    const cacheKey = `${entry.id}_${translationLanguage.value}_${displayMode}`
-    const cachedTranslation = store.translationCache[cacheKey]
-    
     // Reset translation state for new entry
-    translationLoading.value = false
-    translationProgress.value = 0
     showTranslation.value = false
-    
-    if (cachedTranslation) {
-      translatedContent.value = {
-        title: cachedTranslation.title,
-        content: cachedTranslation.content,
-      }
-    } else {
-      translatedContent.value = { title: null, content: null }
-    }
 
     if (!entry.read) {
       await store.toggleEntryState(entry, { read: true })
@@ -342,34 +352,31 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => translationLanguage.value,
+  async (newLanguage, oldLanguage) => {
+    if (newLanguage === oldLanguage) {
+      return
+    }
+
+    if (!showTranslation.value || !currentSelectedEntry.value) {
+      return
+    }
+
+    try {
+      await requestTitleTranslation(currentSelectedEntry.value.id, newLanguage)
+    } catch (error) {
+      console.warn('Title translation failed:', error)
+    }
+  }
+)
 
 
 
 
-const collapsedGroups = ref<Record<string, boolean>>({})
-
-function toggleGroupCollapse(group: string) {
-  collapsedGroups.value[group] = !collapsedGroups.value[group]
-}
-
-function expandAllGroups() {
-  collapsedGroups.value = {}
-}
-
-function collapseAllGroups() {
-  store.sortedGroupNames.forEach(name => {
-    collapsedGroups.value[name] = true
-  })
-}
 
 async function handleFeedClick(feedId: string) {
   store.selectFeed(feedId)
-  // fetchEntries is handled by store store.selectFeed?
-  // Usually selectFeed sets the active ID, and we might need to fetch entries.
-  // In the original AppHome logic (if I could see it), it likely calls fetchEntries.
-  // store.activeFeedId watcher might handle it?
-  // Let's explicitly fetch to be sure, or check store logic.
-  // Assuming explicit fetch for now as per handleGroupClick example.
   await store.fetchEntries({ feedId })
 }
 
@@ -395,6 +402,9 @@ const timelineTitle = computed(() => {
   return t('navigation.allFeeds')
 })
 
+const timelineHasMore = computed(() => !showFavoritesOnly.value && store.entriesHasMore)
+const timelineLoadingMore = computed(() => !showFavoritesOnly.value && store.entriesLoadingMore)
+
 const timelineSubtitle = computed(() => {
   // Simple subtitle logic, can be enhanced
   return `${filteredEntries.value.length} Articles`
@@ -403,7 +413,15 @@ const timelineSubtitle = computed(() => {
 async function handleAddFeed(url: string) {
   if (!url) return
   try {
-    await store.addFeed(url)
+    let targetGroupName: string | null | undefined
+    if (!showFavoritesOnly.value) {
+      targetGroupName = store.activeGroupName
+      if (!targetGroupName && store.activeFeedId) {
+        const activeFeed = store.feeds.find((feed) => feed.id === store.activeFeedId)
+        targetGroupName = activeFeed?.group_name
+      }
+    }
+    await store.addFeed(url, { groupName: targetGroupName })
     showNotification(t('feeds.addSuccess'), 'success')
   } catch (error) {
     showNotification(t('feeds.addFailed'), 'error')
@@ -426,42 +444,24 @@ async function handleSummary() {
 
 
 
-  async function handleTranslation() {
+async function handleTranslation() {
   if (!currentSelectedEntry.value) return
-  
+
   // If already showing translation, toggle back to original
   if (showTranslation.value) {
     showTranslation.value = false
     return
   }
-  
+
   // Toggle on immediately
   showTranslation.value = true
-  
-  // Request Title Translation for the header (independent of content)
-  const currentEntryId = currentSelectedEntry.value.id
-  
-  // Check header cache first
-  if (translatedContent.value.title) {
-    return
-  }
 
-  translationLoading.value = true
+  // Request Title Translation for the header
+  const currentEntryId = currentSelectedEntry.value.id
   try {
-    const translation = await store.requestTitleTranslation(
-      currentEntryId,
-      translationLanguage.value
-    )
-    
-    if (currentSelectedEntry.value?.id === currentEntryId) {
-      translatedContent.value.title = translation.title
-    }
+    await requestTitleTranslation(currentEntryId, translationLanguage.value)
   } catch (error) {
     console.warn('Title translation failed:', error)
-  } finally {
-    if (currentSelectedEntry.value?.id === currentEntryId) {
-      translationLoading.value = false
-    }
   }
 }
 
@@ -477,10 +477,21 @@ async function toggleStarFromList(entry: any) {
   })
 }
 
-function openExternal(url?: string | null) {
-  if (url) {
-    window.open(url, '_blank')
+async function openExternal(url?: string | null) {
+  if (!url) return
+
+  const mode = settingsStore.settings.open_original_mode ?? 'system'
+  const ipc = window.ipcRenderer
+  if (ipc?.invoke) {
+    try {
+      await ipc.invoke('open-external', { url, mode })
+      return
+    } catch (error) {
+      console.warn('Failed to open external URL via main process:', error)
+    }
   }
+
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 async function handleGroupClick(groupName: string) {
@@ -723,6 +734,8 @@ async function handleMarkFeedAsRead(feedId: string) {
       :enable-date-filter="settingsStore.settings.enable_date_filter"
       :entries="filteredEntries"
       :loading="store.loadingEntries"
+      :has-more="timelineHasMore"
+      :loading-more="timelineLoadingMore"
       :show-summary="settingsStore.settings.show_entry_summary"
       :auto-title-translation="aiFeatures?.auto_title_translation"
       :title-display-mode="aiFeatures?.title_display_mode"
@@ -736,6 +749,8 @@ async function handleMarkFeedAsRead(feedId: string) {
       @update:filter-mode="filterMode = $event"
       @update:date-range-filter="dateRangeFilter = $event"
       @select-entry="handleEntrySelect"
+      @entries-visible="handleEntriesVisible"
+      @load-more="handleLoadMoreEntries"
       @toggle-star="toggleStarFromList"
       @mark-all-read="handleMarkAllAsRead"
     />
@@ -750,10 +765,8 @@ async function handleMarkFeedAsRead(feedId: string) {
     <DetailsPanel
       :entry="currentSelectedEntry"
       :show-translation="showTranslation"
-      :translated-title="translatedContent.title"
-      :translated-content="translatedContent.content"
+      :translated-title="translatedTitle"
       :translation-loading="translationLoading"
-      :translation-progress="translationProgress"
       :translation-language="translationLanguage"
       :summary-text="summaryText"
       :summary-loading="summaryLoading"

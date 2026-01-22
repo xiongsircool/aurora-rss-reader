@@ -6,7 +6,6 @@ defineProps<{
   isTranslating: boolean
   showTranslation: boolean
   translationLanguage: string
-  translationProgress?: number
 }>()
 
 const emit = defineEmits<{
@@ -36,10 +35,7 @@ const { t } = useI18n()
       :disabled="isTranslating"
       class="action-btn h-[clamp(28px,3.2vw,34px)] px-[clamp(10px,1.3vw,14px)] rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-primary)] font-medium text-[clamp(0.72rem,1vw,0.8rem)] tracking-tight cursor-pointer transition-all duration-200 min-w-17 whitespace-nowrap shadow-sm hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:c-white hover:shadow-lg disabled:op-60 disabled:cursor-not-allowed disabled:c-[var(--text-secondary)] disabled:bg-[var(--bg-surface)] disabled:border-[var(--border-color)] disabled:shadow-none"
     >
-      {{ isTranslating 
-        ? (translationProgress && translationProgress > 0 ? `${t('ai.translating')} ${translationProgress}%` : t('ai.translating')) 
-        : (showTranslation ? t('articles.showOriginal') : t('ai.translate')) 
-      }}
+      {{ isTranslating ? t('ai.translating') : (showTranslation ? t('articles.showOriginal') : t('ai.translate')) }}
     </button>
     <select 
       :value="translationLanguage" 

@@ -3,11 +3,46 @@
 """
 from typing import Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from apscheduler.jobstores.base import JobLookupError
 from pydantic import BaseModel
 
-from app.models.user_settings import UserSettings
-from app.services.user_settings_service import user_settings_service
+from app.services.user_settings_service import (
+    user_settings_service,
+    FETCH_INTERVAL_MIN,
+    FETCH_INTERVAL_MAX,
+)
+from app.services.fetcher import refresh_all_feeds
+
+
+def _sync_refresh_job(request: Request, fetch_interval_minutes: int, auto_refresh: bool) -> None:
+    scheduler = getattr(request.app.state, "scheduler", None)
+    job_id = getattr(request.app.state, "refresh_job_id", "refresh_all_feeds")
+    if scheduler is None:
+        return
+
+    if not auto_refresh:
+        try:
+            scheduler.remove_job(job_id)
+        except JobLookupError:
+            pass
+        return
+
+    scheduler.add_job(
+        refresh_all_feeds,
+        "interval",
+        minutes=fetch_interval_minutes,
+        id=job_id,
+        replace_existing=True,
+    )
+
+
+def _validate_fetch_interval(value: int) -> None:
+    if value < FETCH_INTERVAL_MIN or value > FETCH_INTERVAL_MAX:
+        raise HTTPException(
+            status_code=400,
+            detail=f"刷新间隔必须在 {FETCH_INTERVAL_MIN}-{FETCH_INTERVAL_MAX} 分钟之间",
+        )
 
 router = APIRouter(prefix="/settings", tags=["用户设置"])
 
@@ -20,10 +55,13 @@ class UserSettingsResponse(BaseModel):
     show_description: bool
     items_per_page: int
     show_entry_summary: bool
+    open_original_mode: str
     # 时间过滤相关设置
     enable_date_filter: bool
     default_date_range: str
     time_field: str
+    max_auto_title_translations: int
+    mark_as_read_range: str
 
 
 class UserSettingsUpdate(BaseModel):
@@ -34,10 +72,13 @@ class UserSettingsUpdate(BaseModel):
     show_description: Optional[bool] = None
     items_per_page: Optional[int] = None
     show_entry_summary: Optional[bool] = None
+    open_original_mode: Optional[str] = None
     # 时间过滤相关设置
     enable_date_filter: Optional[bool] = None
     default_date_range: Optional[str] = None
     time_field: Optional[str] = None
+    max_auto_title_translations: Optional[int] = None
+    mark_as_read_range: Optional[str] = None
 
 
 class RSSHubURLUpdate(BaseModel):
@@ -56,19 +97,25 @@ async def get_settings():
         show_description=settings.show_description,
         items_per_page=settings.items_per_page,
         show_entry_summary=settings.show_entry_summary,
+        open_original_mode=settings.open_original_mode,
         enable_date_filter=settings.enable_date_filter,
         default_date_range=settings.default_date_range,
-        time_field=settings.time_field
+        time_field=settings.time_field,
+        max_auto_title_translations=settings.max_auto_title_translations,
+        mark_as_read_range=settings.mark_as_read_range
     )
 
 
 @router.patch("", response_model=UserSettingsResponse)
-async def update_settings(update_data: UserSettingsUpdate):
+async def update_settings(update_data: UserSettingsUpdate, request: Request):
     """更新用户设置"""
     try:
         # 过滤None值
         update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
+        if "fetch_interval_minutes" in update_dict:
+            _validate_fetch_interval(int(update_dict["fetch_interval_minutes"]))
         settings = await user_settings_service.update_settings(**update_dict)
+        _sync_refresh_job(request, settings.fetch_interval_minutes, settings.auto_refresh)
 
         return UserSettingsResponse(
             rsshub_url=settings.rsshub_url,
@@ -77,9 +124,12 @@ async def update_settings(update_data: UserSettingsUpdate):
             show_description=settings.show_description,
             items_per_page=settings.items_per_page,
             show_entry_summary=settings.show_entry_summary,
+            open_original_mode=settings.open_original_mode,
             enable_date_filter=settings.enable_date_filter,
             default_date_range=settings.default_date_range,
-            time_field=settings.time_field
+            time_field=settings.time_field,
+            max_auto_title_translations=settings.max_auto_title_translations,
+            mark_as_read_range=settings.mark_as_read_range
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"更新设置失败: {str(e)}")
@@ -98,9 +148,12 @@ async def update_rsshub_url(update_data: RSSHubURLUpdate):
             show_description=settings.show_description,
             items_per_page=settings.items_per_page,
             show_entry_summary=settings.show_entry_summary,
+            open_original_mode=settings.open_original_mode,
             enable_date_filter=settings.enable_date_filter,
             default_date_range=settings.default_date_range,
-            time_field=settings.time_field
+            time_field=settings.time_field,
+            max_auto_title_translations=settings.max_auto_title_translations,
+            mark_as_read_range=settings.mark_as_read_range
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"更新RSSHub URL失败: {str(e)}")

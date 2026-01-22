@@ -228,7 +228,6 @@ async def _persist_entries(feed_id: str, parsed: Any) -> int:
         return 0
 
     new_items = 0
-    new_items = 0
     async with async_session_maker() as session:
         for item in parsed.entries:
             guid = _extract_guid(item)
@@ -654,7 +653,7 @@ async def _get_urls_to_try(original_url: str) -> list[str]:
     urls: list[str] = [original_url]
 
     try:
-        user_rsshub_base = user_settings_service.get_rsshub_url().rstrip('/')
+        user_rsshub_base = (await user_settings_service.get_rsshub_url()).rstrip('/')
     except Exception as e:  # 容错：设置读取失败时保持原行为
         user_rsshub_base = None
         logger.warning("获取用户RSSHub配置失败，使用原始URL: %s", e)
@@ -702,10 +701,6 @@ async def _get_urls_to_try(original_url: str) -> list[str]:
         urls.extend(KNOWN_ALTERNATIVES[original_url])
 
     return urls
-
-
-def schedule_refresh(feed_id: str) -> None:
-    asyncio.create_task(refresh_feed(feed_id))
 
 
 def schedule_refresh_all() -> None:

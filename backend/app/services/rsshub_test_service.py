@@ -75,7 +75,7 @@ class RSSHubTestService:
     async def test_rsshub_connectivity(self, rsshub_url: str = None) -> RSSHubTestResult:
         """测试RSSHub连通性"""
         if rsshub_url is None:
-            rsshub_url = user_settings_service.get_rsshub_url()
+            rsshub_url = await user_settings_service.get_rsshub_url()
 
         start_time = datetime.now(timezone.utc)
 
@@ -239,7 +239,7 @@ class RSSHubTestService:
     async def quick_test(self, rsshub_url: str = None) -> Dict:
         """快速测试RSSHub连通性（只测试一个路由）"""
         if rsshub_url is None:
-            rsshub_url = user_settings_service.get_rsshub_url()
+            rsshub_url = await user_settings_service.get_rsshub_url()
 
         # 选择最稳定的路由进行快速测试
         quick_route = self.TEST_ROUTES[0]  # Nature Genetics

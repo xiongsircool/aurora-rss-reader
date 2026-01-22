@@ -3,8 +3,7 @@ import { useI18n } from 'vue-i18n'
 import type { LocalFeatureConfig } from '../../composables/useSettingsModal'
 import {
   MIN_AUTO_TITLE_TRANSLATIONS,
-  MAX_AUTO_TITLE_TRANSLATIONS,
-  TITLE_TRANSLATION_CONCURRENCY_FALLBACK
+  MAX_AUTO_TITLE_TRANSLATIONS
 } from '../../constants/translation'
 
 const features = defineModel<LocalFeatureConfig>('features', { required: true })
@@ -17,7 +16,6 @@ const limitBounds = {
   max: MAX_AUTO_TITLE_TRANSLATIONS
 }
 
-const concurrencyHint = Math.max(1, TITLE_TRANSLATION_CONCURRENCY_FALLBACK)
 </script>
 
 <template>
@@ -33,42 +31,6 @@ const concurrencyHint = Math.max(1, TITLE_TRANSLATION_CONCURRENCY_FALLBACK)
           <span class="text-xs c-[var(--text-secondary)] block mt-0.5 leading-snug">{{ t('settings.autoSummaryHint') }}</span>
         </div>
       </label>
-    </div>
-
-    <!-- Auto Translation -->
-    <div class="mb-4">
-      <label class="flex items-start gap-2 cursor-pointer py-1 c-[var(--text-primary)]">
-        <input v-model="features.auto_translation" type="checkbox" class="mr-2 accent-[var(--settings-accent)]" />
-        <div>
-          {{ t('settings.autoTranslation') }}
-          <span class="text-xs c-[var(--text-secondary)] block mt-0.5 leading-snug">{{ t('settings.autoTranslationHint') }}</span>
-        </div>
-      </label>
-    </div>
-
-    <!-- Content Display Mode -->
-    <div class="mb-4">
-      <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.contentDisplayMode') }}</label>
-      <div class="flex gap-2 mt-2">
-        <button
-          type="button"
-          class="flex-1 p-[10px_12px] border border-[var(--border-color)] rounded-lg bg-[var(--bg-surface)] c-[var(--text-primary)] text-[13px] font-medium cursor-pointer transition-all ease text-center whitespace-nowrap hover:bg-[rgba(76,116,255,0.08)] hover:border-[rgba(76,116,255,0.3)] hover:c-[#4c74ff] dark:bg-white/6 dark:border-white/12 dark:c-[var(--text-primary)] dark:hover:bg-[rgba(76,116,255,0.15)] dark:hover:border-[rgba(76,116,255,0.4)]"
-          :class="{ 'bg-gradient-to-br from-[#4c74ff] to-[#2f54ff] border-transparent! c-white! shadow-[0_4px_12px_rgba(76,116,255,0.3)] hover:bg-gradient-to-br hover:from-[#2f54ff] hover:to-[#4c74ff] hover:c-white dark:bg-gradient-to-br dark:from-[#4c74ff] dark:to-[#2f54ff] dark:c-white dark:shadow-[0_4px_12px_rgba(76,116,255,0.4)]': features.content_display_mode === 'replace' }"
-          @click="features.content_display_mode = 'replace'"
-          :title="t('settings.displayModeReplaceHint')"
-        >
-          {{ t('settings.displayModeReplace') }}
-        </button>
-        <button
-          type="button"
-          class="flex-1 p-[10px_12px] border border-[var(--border-color)] rounded-lg bg-[var(--bg-surface)] c-[var(--text-primary)] text-[13px] font-medium cursor-pointer transition-all ease text-center whitespace-nowrap hover:bg-[rgba(76,116,255,0.08)] hover:border-[rgba(76,116,255,0.3)] hover:c-[#4c74ff] dark:bg-white/6 dark:border-white/12 dark:c-[var(--text-primary)] dark:hover:bg-[rgba(76,116,255,0.15)] dark:hover:border-[rgba(76,116,255,0.4)]"
-          :class="{ 'bg-gradient-to-br from-[#4c74ff] to-[#2f54ff] border-transparent! c-white! shadow-[0_4px_12px_rgba(76,116,255,0.3)] hover:bg-gradient-to-br hover:from-[#2f54ff] hover:to-[#4c74ff] hover:c-white dark:bg-gradient-to-br dark:from-[#4c74ff] dark:to-[#2f54ff] dark:c-white dark:shadow-[0_4px_12px_rgba(76,116,255,0.4)]': features.content_display_mode === 'bilingual' }"
-          @click="features.content_display_mode = 'bilingual'"
-          :title="t('settings.displayModeBilingualHint')"
-        >
-          {{ t('settings.displayModeBilingual') }}
-        </button>
-      </div>
     </div>
 
     <!-- Auto Title Translation -->
@@ -117,7 +79,7 @@ const concurrencyHint = Math.max(1, TITLE_TRANSLATION_CONCURRENCY_FALLBACK)
     </div>
 
     <!-- Translation Target Language -->
-    <div class="mb-4" v-if="features.auto_translation || features.auto_title_translation">
+    <div class="mb-4" v-if="features.auto_title_translation">
       <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.translationTargetLanguage') }}</label>
       <select v-model="features.translation_language" class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-lg text-sm bg-[#fefefe] c-[var(--text-primary)] transition-all shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none">
         <option value="zh">{{ t('languages.zh') }}</option>
@@ -149,7 +111,7 @@ const concurrencyHint = Math.max(1, TITLE_TRANSLATION_CONCURRENCY_FALLBACK)
         <span>{{ limitBounds.min }}</span>
         <span>{{ limitBounds.max }}</span>
       </div>
-      <p class="mt-1.5 text-xs c-[var(--text-secondary)]">{{ t('settings.autoTitleTranslationLimitHint', { concurrency: concurrencyHint }) }}</p>
+      <p class="mt-1.5 text-xs c-[var(--text-secondary)]">{{ t('settings.autoTitleTranslationLimitHint', { count: autoTitleTranslationLimit }) }}</p>
     </div>
   </section>
 </template>

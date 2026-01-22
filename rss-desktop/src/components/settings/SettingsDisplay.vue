@@ -2,6 +2,7 @@
 import { useI18n } from 'vue-i18n'
 
 const showEntrySummary = defineModel<boolean>('showEntrySummary', { required: true })
+const openOriginalMode = defineModel<'system' | 'window'>('openOriginalMode', { required: true })
 const enableDateFilter = defineModel<boolean>('enableDateFilter', { required: true })
 const defaultDateRange = defineModel<string>('defaultDateRange', { required: true })
 const timeField = defineModel<string>('timeField', { required: true })
@@ -21,6 +22,16 @@ const { t } = useI18n()
         {{ t('settings.showEntrySummary') }}
       </label>
       <p class="mt-1.5 text-xs c-[var(--text-secondary)]">{{ t('settings.showEntrySummaryDescription') }}</p>
+    </div>
+
+    <!-- Open Original Mode -->
+    <div class="mb-4">
+      <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.openOriginalMode') }}</label>
+      <select v-model="openOriginalMode" class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-lg text-sm bg-[#fefefe] c-[var(--text-primary)] transition-all shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none">
+        <option value="system">{{ t('settings.openOriginalModeSystem') }}</option>
+        <option value="window">{{ t('settings.openOriginalModeWindow') }}</option>
+      </select>
+      <p class="mt-1.5 text-xs c-[var(--text-secondary)]">{{ t('settings.openOriginalModeDescription') }}</p>
     </div>
 
     <!-- Enable Date Filter -->

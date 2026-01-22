@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,7 +10,7 @@ from sqlmodel import select
 
 from app.db.deps import get_session
 from app.db.models import Entry, Feed
-from app.schemas.entry import EntryRead, EntryStateUpdate
+from app.schemas.entry import EntryPage, EntryRead, EntryStateUpdate
 from app.utils.text import clean_html_text
 from sqlalchemy import func
 from typing import Optional
@@ -23,8 +25,29 @@ def _entry_preview_summary(entry: Entry) -> str | None:
     """Return a plain-text summary for list/favorite views."""
     return clean_html_text(entry.summary) or clean_html_text(entry.content)
 
+def _encode_cursor(cursor_time: datetime, cursor_id: str) -> str:
+    payload = {"t": cursor_time.isoformat(), "id": cursor_id}
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("utf-8")
 
-@router.get("", response_model=list[EntryRead])
+
+def _decode_cursor(cursor: str) -> tuple[datetime, str]:
+    try:
+        padding = "=" * (-len(cursor) % 4)
+        raw = base64.urlsafe_b64decode((cursor + padding).encode("utf-8")).decode("utf-8")
+        payload = json.loads(raw)
+        cursor_time = datetime.fromisoformat(payload["t"])
+        cursor_id = payload["id"]
+        if not cursor_id:
+            raise ValueError("cursor id is missing")
+        if cursor_time.tzinfo is None:
+            cursor_time = cursor_time.replace(tzinfo=timezone.utc)
+        return cursor_time, cursor_id
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid cursor") from exc
+
+
+@router.get("", response_model=EntryPage)
 async def list_entries(
     session: AsyncSession = Depends(get_session),
     feed_id: str | None = None,
@@ -32,19 +55,21 @@ async def list_entries(
     unread_only: bool = Query(default=False),
     limit: int | None = Query(default=None, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    cursor: str | None = Query(default=None, description="分页游标"),
     date_range: str | None = Query(default=None, description="时间范围: '1d', '2d', '3d', '7d', '30d', '90d', '180d', '365d'"),
     time_field: str = Query(default="inserted_at", description="时间字段: 'published_at' 或 'inserted_at'"),
-) -> list[EntryRead]:
+) -> EntryPage:
     if limit is None:
-        user_limit = user_settings_service.get_settings().items_per_page
+        settings = await user_settings_service.get_settings()
+        user_limit = settings.items_per_page
         limit = max(1, min(user_limit, 200))
+    limit = max(1, min(limit, 200))
 
+    sort_time = func.coalesce(Entry.published_at, Entry.inserted_at)
     stmt = (
         select(Entry, Feed.title)
         .join(Feed, Feed.id == Entry.feed_id)
-        .order_by(Entry.published_at.desc().nullslast(), Entry.inserted_at.desc())
-        .offset(offset)
-        .limit(limit)
+        .order_by(sort_time.desc(), Entry.id.desc())
     )
 
     # 现有过滤条件
@@ -92,10 +117,22 @@ async def list_entries(
             # 使用 inserted_at
             stmt = stmt.where(Entry.inserted_at >= cutoff_date)
 
-    result = await session.exec(stmt)
-    rows = result.all()
+    if cursor:
+        cursor_time, cursor_id = _decode_cursor(cursor)
+        stmt = stmt.where(
+            (sort_time < cursor_time) |
+            ((sort_time == cursor_time) & (Entry.id < cursor_id))
+        )
+    else:
+        stmt = stmt.offset(offset)
 
-    return [
+    fetch_limit = limit + 1
+    result = await session.exec(stmt.limit(fetch_limit))
+    rows = result.all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+
+    items = [
         EntryRead(
             id=entry.id,
             feed_id=entry.feed_id,
@@ -112,6 +149,13 @@ async def list_entries(
         )
         for entry, feed_title in rows
     ]
+    next_cursor = None
+    if has_more and rows:
+        last_entry = rows[-1][0]
+        cursor_time = last_entry.published_at or last_entry.inserted_at
+        next_cursor = _encode_cursor(cursor_time, last_entry.id)
+
+    return EntryPage(items=items, next_cursor=next_cursor, has_more=has_more)
 
 
 @router.patch("/{entry_id}", response_model=EntryRead)
@@ -156,6 +200,8 @@ async def list_starred_entries(
     feed_id: str | None = Query(default=None),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
+    date_range: str | None = Query(default=None, description="时间范围: '1d', '2d', '3d', '7d', '30d', '90d', '180d', '365d'"),
+    time_field: str = Query(default="inserted_at", description="时间字段: 'published_at' 或 'inserted_at'"),
 ) -> list[EntryRead]:
     """获取收藏的文章列表"""
     stmt = (
@@ -169,6 +215,35 @@ async def list_starred_entries(
 
     if feed_id:
         stmt = stmt.where(Entry.feed_id == feed_id)
+
+    if date_range and date_range != "all":
+        if date_range.endswith('h'):
+            hours = int(date_range.replace('h', ''))
+            cutoff_date = datetime.now(timezone.utc) - timedelta(hours=hours)
+        elif date_range.endswith('d'):
+            days = int(date_range.replace('d', ''))
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+        elif date_range.endswith('m'):
+            months = int(date_range.replace('m', ''))
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=months * 30)
+        elif date_range.endswith('y'):
+            years = int(date_range.replace('y', ''))
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=years * 365)
+        else:
+            try:
+                days = int(date_range)
+                cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+            except ValueError:
+                cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+
+        if time_field == "published_at":
+            now = datetime.now(timezone.utc)
+            stmt = stmt.where(
+                ((Entry.published_at <= now) & (Entry.published_at >= cutoff_date)) |
+                (Entry.published_at.is_(None) & (Entry.inserted_at >= cutoff_date))
+            )
+        else:
+            stmt = stmt.where(Entry.inserted_at >= cutoff_date)
 
     result = await session.exec(stmt)
     rows = result.all()

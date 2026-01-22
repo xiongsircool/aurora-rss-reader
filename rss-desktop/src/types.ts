@@ -24,16 +24,14 @@ export interface Entry {
   starred: boolean
 }
 
+export interface EntryPage {
+  items: Entry[]
+  next_cursor: string | null
+  has_more: boolean
+}
+
 export interface SummaryResult {
   entry_id: string
   language: string
   summary: string
-}
-
-export interface TranslationResult {
-  entry_id: string
-  language: string
-  title: string | null
-  summary: string | null
-  content: string | null
 }

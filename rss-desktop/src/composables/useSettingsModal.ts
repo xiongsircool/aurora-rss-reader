@@ -10,10 +10,8 @@ export interface LocalServiceConfig {
 
 export interface LocalFeatureConfig {
     auto_summary: boolean
-    auto_translation: boolean
     auto_title_translation: boolean
     title_display_mode: 'replace' | 'translation-first' | 'original-first'
-    content_display_mode: 'replace' | 'bilingual'
     translation_language: string
 }
 
@@ -31,10 +29,8 @@ const createLocalServiceConfig = (): LocalServiceConfig => ({
 
 const createLocalFeatureConfig = (): LocalFeatureConfig => ({
     auto_summary: false,
-    auto_translation: false,
     auto_title_translation: false,
     title_display_mode: 'original-first',
-    content_display_mode: 'replace',
     translation_language: 'zh'
 })
 
@@ -68,10 +64,8 @@ export function useSettingsModal() {
         localConfig.value.features = {
             ...localConfig.value.features,
             auto_summary: features.auto_summary ?? localConfig.value.features.auto_summary,
-            auto_translation: features.auto_translation ?? localConfig.value.features.auto_translation,
             auto_title_translation: features.auto_title_translation ?? localConfig.value.features.auto_title_translation,
             title_display_mode: features.title_display_mode ?? localConfig.value.features.title_display_mode,
-            content_display_mode: features.content_display_mode ?? localConfig.value.features.content_display_mode,
             translation_language: features.translation_language ?? localConfig.value.features.translation_language
         }
     }

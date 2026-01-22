@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { spawn, ChildProcess } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
@@ -42,6 +42,39 @@ const BACKEND_PORT = 15432
 const HEALTH_CHECK_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/health`
 const HEALTH_CHECK_TIMEOUT = 300000 // 5分钟超时
 const HEALTH_CHECK_INTERVAL = 500 // 每500ms检查一次
+const externalWindows = new Set<BrowserWindow>()
+
+type OpenExternalMode = 'system' | 'window'
+type OpenExternalPayload = {
+  url?: string
+  mode?: string
+}
+
+function normalizeOpenMode(mode?: string): OpenExternalMode {
+  return mode === 'window' ? 'window' : 'system'
+}
+
+function openExternalInWindow(url: string) {
+  const child = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 480,
+    minHeight: 360,
+    show: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  })
+
+  externalWindows.add(child)
+  child.on('closed', () => {
+    externalWindows.delete(child)
+  })
+
+  child.loadURL(url)
+}
 
 function resolvePreloadPath(): string {
   const candidates = ['preload.mjs', 'preload.js', 'preload.cjs']
@@ -426,6 +459,27 @@ function loadRendererContent() {
     win = null
   }
 }
+
+ipcMain.handle('open-external', async (_event, payload: OpenExternalPayload) => {
+  const url = typeof payload?.url === 'string' ? payload.url : ''
+  if (!url) {
+    return { success: false, error: 'invalid_url' }
+  }
+
+  const mode = normalizeOpenMode(payload?.mode)
+  try {
+    if (mode === 'system') {
+      await shell.openExternal(url)
+      return { success: true, mode }
+    }
+
+    openExternalInWindow(url)
+    return { success: true, mode }
+  } catch (error) {
+    console.error('Failed to open external URL:', error)
+    return { success: false, error: String(error) }
+  }
+})
 
 /**
  * 应用启动

@@ -21,6 +21,12 @@ class EntryRead(SQLModel):
     starred: bool
 
 
+class EntryPage(SQLModel):
+    items: list[EntryRead]
+    next_cursor: Optional[str] = None
+    has_more: bool
+
+
 class EntryStateUpdate(SQLModel):
     read: Optional[bool] = None
     starred: Optional[bool] = None

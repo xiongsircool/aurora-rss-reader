@@ -58,10 +58,10 @@ class Translation(SQLModel, table=True):
     id: str = Field(default_factory=generate_id, primary_key=True)
     entry_id: str = Field(foreign_key="entries.id", index=True)
     language: str = Field(default="zh", index=True)
-    title: Optional[str] = None
-    summary: Optional[str] = None
-    content: Optional[str] = None  # Legacy: full HTML translation
-    # New: Block-level translations for immersive mode
+    title: Optional[str] = None  # Active: title translation
+    summary: Optional[str] = None  # Active: summary
+    content: Optional[str] = None  # DEPRECATED: old full HTML translation, no longer used
+    # DEPRECATED: Block-level translations for immersive mode (feature removed)
     # Format: {"block_hash_1": "translated_text_1", "block_hash_2": "..."}
     paragraph_map: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True)))

@@ -57,6 +57,11 @@ const timeField = computed({
   set: (value) => settingsStore.updateSettings({ time_field: value })
 })
 
+const openOriginalMode = computed({
+  get: () => settingsStore.settings.open_original_mode,
+  set: (value) => settingsStore.updateSettings({ open_original_mode: value })
+})
+
 const autoTitleTranslationLimit = ref(settingsStore.settings.max_auto_title_translations)
 
 const markAsReadRange = computed({
@@ -93,6 +98,9 @@ function handleBackdropClick(event: MouseEvent) {
 
 async function saveSettings() {
   try {
+    const autoRefreshValid = await refresh.commitAutoRefresh()
+    if (!autoRefreshValid) return
+
     const fetchIntervalValid = await refresh.commitFetchInterval()
     if (!fetchIntervalValid) return
 
@@ -147,9 +155,11 @@ async function saveSettings() {
           />
 
           <SettingsRefresh
+            v-model:autoRefresh="refresh.autoRefresh.value"
             v-model:fetchIntervalInput="refresh.fetchIntervalInput.value"
             :fetchIntervalError="refresh.fetchIntervalError.value"
             @change="refresh.handleFetchIntervalChange"
+            @auto-refresh-change="refresh.handleAutoRefreshChange"
           />
 
           <SettingsDisplay
@@ -157,6 +167,7 @@ async function saveSettings() {
             v-model:enableDateFilter="enableDateFilter"
             v-model:defaultDateRange="defaultDateRange"
             v-model:timeField="timeField"
+            v-model:openOriginalMode="openOriginalMode"
             v-model:markAsReadRange="markAsReadRange"
           />
 

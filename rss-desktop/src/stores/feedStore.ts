@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import api from '../api/client'
-import type { Entry, Feed, SummaryResult, TranslationResult } from '../types'
+import type { Entry, EntryPage, Feed, SummaryResult } from '../types'
 
 export const useFeedStore = defineStore('feed', () => {
   const feeds = ref<Feed[]>([])
@@ -13,12 +13,14 @@ export const useFeedStore = defineStore('feed', () => {
   const loadingEntries = ref(false)
   const addingFeed = ref(false)
   const summaryCache = ref<Record<string, SummaryResult>>({})
-  const translationCache = ref<Record<string, TranslationResult>>({})
-  const titleTranslationCache = ref<Record<string, { title: string; language: string }>>({})
   const errorMessage = ref<string | null>(null)
   const collapsedGroups = ref<Set<string>>(new Set())
   const lastFeedFilters = ref<{ dateRange?: string; timeField?: string } | null>(null)
   const lastEntryFilters = ref<{ unreadOnly?: boolean; dateRange?: string; timeField?: string } | null>(null)
+  const entriesCursor = ref<string | null>(null)
+  const entriesHasMore = ref(true)
+  const entriesLoadingMore = ref(false)
+  const entriesQueryKey = ref('')
 
   const selectedEntry = computed(() =>
     entries.value.find((entry) => entry.id === selectedEntryId.value) ?? null
@@ -67,6 +69,35 @@ export const useFeedStore = defineStore('feed', () => {
     })
   })
 
+  function buildEntriesQueryKey(params: {
+    feedId: string | null
+    groupName: string | null
+    unreadOnly: boolean
+    dateRange?: string
+    timeField?: string
+  }) {
+    return JSON.stringify({
+      feedId: params.feedId,
+      groupName: params.groupName,
+      unreadOnly: params.unreadOnly,
+      dateRange: params.dateRange ?? null,
+      timeField: params.timeField ?? null,
+    })
+  }
+
+  function mergeEntries(existing: Entry[], incoming: Entry[]) {
+    if (!incoming.length) return existing
+    const seen = new Set(existing.map((entry) => entry.id))
+    const merged = existing.slice()
+    for (const entry of incoming) {
+      if (!seen.has(entry.id)) {
+        seen.add(entry.id)
+        merged.push(entry)
+      }
+    }
+    return merged
+  }
+
   async function fetchFeeds(options?: { dateRange?: string; timeField?: string }) {
     loadingFeeds.value = true
     try {
@@ -101,13 +132,20 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  async function addFeed(url: string) {
+  async function addFeed(url: string, options?: { groupName?: string | null }) {
     if (!url) return
     addingFeed.value = true
     try {
-      const { data } = await api.post<Feed>('/feeds', { url })
+      const payload: { url: string; group_name?: string } = { url }
+      if (options?.groupName) {
+        payload.group_name = options.groupName
+      }
+      const { data } = await api.post<Feed>('/feeds', payload)
       feeds.value = [data, ...feeds.value]
-      activeFeedId.value = data.id
+      const hasSelection = !!activeFeedId.value || !!activeGroupName.value
+      if (!hasSelection) {
+        activeFeedId.value = data.id
+      }
       // 保留当前的过滤器状态
       await fetchEntries({
         unreadOnly: lastEntryFilters.value?.unreadOnly,
@@ -130,8 +168,6 @@ export const useFeedStore = defineStore('feed', () => {
         // 并行触发刷新，不等待逐个完成
         api.post(`/feeds/${feed.id}/refresh`).catch(err => {
           console.error(err)
-          // 不中断其他刷新，但记录错误
-          // errorMessage.value = `刷新 ${feed.title} 失败` // 可选：太频繁的报错可能不好
         })
       }
 
@@ -229,26 +265,51 @@ export const useFeedStore = defineStore('feed', () => {
     unreadOnly?: boolean
     dateRange?: string
     timeField?: string
+    append?: boolean
   }) {
+    const append = !!options?.append
     const targetFeed = options?.feedId ?? activeFeedId.value
     const targetGroup = options?.groupName ?? activeGroupName.value
 
     // 如果既没有feed也没有group，则返回
     if (!targetFeed && !targetGroup) return
 
-    loadingEntries.value = true
-    try {
-      const hasUnreadOnly = options && Object.prototype.hasOwnProperty.call(options, 'unreadOnly')
-      const hasDateRange = options && Object.prototype.hasOwnProperty.call(options, 'dateRange')
-      const hasTimeField = options && Object.prototype.hasOwnProperty.call(options, 'timeField')
-      const mergedFilters = {
-        unreadOnly: hasUnreadOnly ? (options?.unreadOnly as boolean) : (lastEntryFilters.value?.unreadOnly ?? false),
-        dateRange: hasDateRange ? options?.dateRange : lastEntryFilters.value?.dateRange,
-        timeField: hasTimeField ? options?.timeField : lastEntryFilters.value?.timeField,
-      }
-      lastEntryFilters.value = mergedFilters
+    const hasUnreadOnly = options && Object.prototype.hasOwnProperty.call(options, 'unreadOnly')
+    const hasDateRange = options && Object.prototype.hasOwnProperty.call(options, 'dateRange')
+    const hasTimeField = options && Object.prototype.hasOwnProperty.call(options, 'timeField')
+    const mergedFilters = {
+      unreadOnly: hasUnreadOnly ? (options?.unreadOnly as boolean) : (lastEntryFilters.value?.unreadOnly ?? false),
+      dateRange: hasDateRange ? options?.dateRange : lastEntryFilters.value?.dateRange,
+      timeField: hasTimeField ? options?.timeField : lastEntryFilters.value?.timeField,
+    }
+    lastEntryFilters.value = mergedFilters
 
-      const params: Record<string, string | number | boolean> = { limit: 100 }
+    const queryKey = buildEntriesQueryKey({
+      feedId: targetFeed,
+      groupName: targetGroup,
+      unreadOnly: mergedFilters.unreadOnly,
+      dateRange: mergedFilters.dateRange,
+      timeField: mergedFilters.timeField,
+    })
+    const queryChanged = queryKey !== entriesQueryKey.value
+    const resetPagination = !append || queryChanged
+    const shouldAppend = append && !resetPagination
+
+    if (resetPagination) {
+      entriesQueryKey.value = queryKey
+      entriesCursor.value = null
+      entriesHasMore.value = true
+    }
+
+    if (shouldAppend) {
+      if (entriesLoadingMore.value || loadingEntries.value || !entriesHasMore.value) return
+      entriesLoadingMore.value = true
+    } else {
+      loadingEntries.value = true
+    }
+
+    try {
+      const params: Record<string, string | number | boolean> = {}
 
       // 优先使用 feedId，其次使用 groupName
       if (targetFeed) {
@@ -269,20 +330,38 @@ export const useFeedStore = defineStore('feed', () => {
         params.time_field = mergedFilters.timeField
       }
 
-      const { data } = await api.get<Entry[]>('/entries', { params })
-      entries.value = data
-      if (data.length > 0) {
-        const defaultEntry = data.find((entry) => entry.id === selectedEntryId.value) ?? data[0]
-        selectedEntryId.value = defaultEntry.id
-      } else {
-        selectedEntryId.value = null
+      if (shouldAppend && entriesCursor.value) {
+        params.cursor = entriesCursor.value
+      }
+
+      const { data } = await api.get<EntryPage>('/entries', { params })
+      const pageItems = data.items ?? []
+      entries.value = shouldAppend ? mergeEntries(entries.value, pageItems) : pageItems
+      entriesCursor.value = data.next_cursor
+      entriesHasMore.value = data.has_more
+
+      if (!shouldAppend) {
+        if (entries.value.length > 0) {
+          const defaultEntry = entries.value.find((entry) => entry.id === selectedEntryId.value) ?? entries.value[0]
+          selectedEntryId.value = defaultEntry.id
+        } else {
+          selectedEntryId.value = null
+        }
       }
     } catch (error) {
       console.error(error)
       errorMessage.value = '加载文章失败'
     } finally {
-      loadingEntries.value = false
+      if (shouldAppend) {
+        entriesLoadingMore.value = false
+      } else {
+        loadingEntries.value = false
+      }
     }
+  }
+
+  async function loadMoreEntries() {
+    return fetchEntries({ append: true })
   }
 
   function selectFeed(id: string) {
@@ -340,106 +419,17 @@ export const useFeedStore = defineStore('feed', () => {
     return data
   }
 
-  async function requestTranslation(entryId: string, language = 'zh', displayMode = 'replace') {
-    const cacheKey = `${entryId}_${language}_${displayMode}`
-    if (translationCache.value[cacheKey]) {
-      return translationCache.value[cacheKey]
-    }
-    const { data } = await api.post<TranslationResult>('/ai/translate', {
-      entry_id: entryId,
-      language,
-      display_mode: displayMode,
-    }, {
-      timeout: 120000, // 2 minutes for translation
-    })
-    translationCache.value[cacheKey] = data
-    return data
-  }
-
-  async function requestTranslationStream(
-    entryId: string,
-    language = 'zh',
-    displayMode = 'replace',
-    onProgress?: (percent: number, message: string) => void,
-    onSegment?: (index: number, content: string) => void
-  ) {
-    const cacheKey = `${entryId}_${language}_${displayMode}`
-    if (translationCache.value[cacheKey]) {
-      return translationCache.value[cacheKey]
-    }
-
-    // Use fetch for SSE
-    const response = await fetch(`${api.defaults.baseURL}/ai/translate-stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        entry_id: entryId,
-        language,
-        display_mode: displayMode,
-      }),
-    })
-
-    if (!response.body) throw new Error('No response body')
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let finalResult: TranslationResult | null = null
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = JSON.parse(line.slice(6))
-
-          if (data.type === 'progress') {
-            onProgress?.(data.percent, data.message)
-          } else if (data.type === 'segment_completed') {
-            onSegment?.(data.index, data.translated)
-          } else if (data.type === 'complete') {
-            finalResult = {
-              entry_id: entryId,
-              language,
-              ...data.result
-            }
-          } else if (data.type === 'error') {
-            throw new Error(data.message)
-          }
-        }
-      }
-    }
-
-    if (finalResult) {
-      translationCache.value[cacheKey] = finalResult
-      return finalResult
-    }
-    throw new Error('Translation stream ended without result')
-  }
-
   async function requestTitleTranslation(entryId: string, language = 'zh') {
-    const cacheKey = `${entryId}_${language}_title`
-    if (titleTranslationCache.value[cacheKey]) {
-      return titleTranslationCache.value[cacheKey]
-    }
     const { data } = await api.post<{ entry_id: string; title: string; language: string }>('/ai/translate-title', {
       entry_id: entryId,
       language,
     }, {
       timeout: 30000, // 30 seconds for title translation
     })
-    titleTranslationCache.value[cacheKey] = {
+    return {
       title: data.title,
       language: data.language
     }
-    return titleTranslationCache.value[cacheKey]
   }
 
   async function exportOpml() {
@@ -569,11 +559,11 @@ export const useFeedStore = defineStore('feed', () => {
     activeGroupName,
     loadingFeeds,
     loadingEntries,
+    entriesHasMore,
+    entriesLoadingMore,
     addingFeed,
     errorMessage,
     summaryCache,
-    translationCache,
-    titleTranslationCache,
     // 分组相关属性
     groupedFeeds,
     groupStats,
@@ -582,6 +572,7 @@ export const useFeedStore = defineStore('feed', () => {
     // 方法
     fetchFeeds,
     fetchEntries,
+    loadMoreEntries,
     addFeed,
     selectFeed,
     selectGroup,
@@ -591,8 +582,6 @@ export const useFeedStore = defineStore('feed', () => {
     updateFeed,
     toggleEntryState,
     requestSummary,
-    requestTranslation,
-    requestTranslationStream,
     requestTitleTranslation,
     exportOpml,
     importOpml,
