@@ -108,10 +108,7 @@ export function useTitleTranslation() {
     titleTranslationLoadingMap.value[cacheKey] = true
     const requestPromise = store.requestTitleTranslation(entryId, language)
       .then((result) => {
-        const currentLanguage = aiFeatures.value?.translation_language || 'zh'
-        if (currentLanguage === language) {
-          titleTranslationResults.value[cacheKey] = result.title
-        }
+        titleTranslationResults.value[cacheKey] = result.title
         return result
       })
       .finally(() => {

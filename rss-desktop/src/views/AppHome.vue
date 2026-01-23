@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { useFeedStore } from '../stores/feedStore'
 import { useAIStore } from '../stores/aiStore'
@@ -14,6 +14,7 @@ import { useTitleTranslation } from '../composables/useTitleTranslation'
 import { useFeedFilter } from '../composables/useFeedFilter'
 import { useAppSync } from '../composables/useAppSync'
 import { useFeedActions } from '../composables/useFeedActions'
+import { useArticleTranslation } from '../composables/useArticleTranslation'
 
 import Toast from '../components/Toast.vue'
 import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
@@ -74,7 +75,6 @@ setupFilterWatchers()
 const summaryText = ref('')
 const summaryLoading = ref(false)
 const translationLanguage = ref('zh')
-const showTranslation = ref(false)
 const lastVisibleEntries = ref<Entry[]>([])
 
 const editingFeedId = ref<string | null>(null)
@@ -91,6 +91,8 @@ const {
   isDraggingLeft,
   isDraggingRight,
   logoSize,
+  detailsWidth,
+  viewportWidth,
   layoutStyle,
   handleMouseDownLeft,
   handleMouseDownRight,
@@ -98,6 +100,37 @@ const {
   cleanupLayout,
   resetLayout
 } = useLayoutManager()
+
+type DetailsPanelMode = 'docked' | 'click'
+type DetailsPresentation = 'docked' | 'drawer' | 'fullscreen'
+
+const DETAILS_FULLSCREEN_BREAKPOINT = 960
+const DETAILS_DRAWER_BREAKPOINT = 1200
+
+const detailsPanelMode = computed<DetailsPanelMode>(() => {
+  return settingsStore.settings.details_panel_mode === 'click' ? 'click' : 'docked'
+})
+
+const detailsPresentation = computed<DetailsPresentation>(() => {
+  const width = viewportWidth.value
+  if (width <= DETAILS_FULLSCREEN_BREAKPOINT) {
+    return 'fullscreen'
+  }
+  if (width <= DETAILS_DRAWER_BREAKPOINT) {
+    return 'drawer'
+  }
+  return detailsPanelMode.value === 'click' ? 'drawer' : 'docked'
+})
+
+const isDetailsOpen = ref(false)
+const timelineScroller = ref<HTMLElement | null>(null)
+const showBackToTop = ref(false)
+
+const isSingleColumn = computed(() => viewportWidth.value <= DETAILS_FULLSCREEN_BREAKPOINT)
+
+let previousBodyOverflow = ''
+let previousBodyPaddingRight = ''
+let bodyScrollLocked = false
 
 const collapsedGroups = computed<Record<string, boolean>>(() => {
   const result: Record<string, boolean> = {}
@@ -153,14 +186,92 @@ const currentSelectedEntry = computed(() => {
   }
   return store.selectedEntry
 })
-const translationLoading = computed(() => {
-  if (!currentSelectedEntry.value) return false
-  return isTitleTranslationLoading(currentSelectedEntry.value.id, translationLanguage.value)
+
+const showDetailsOverlay = computed(() => {
+  if (detailsPresentation.value === 'docked') {
+    return false
+  }
+  return isDetailsOpen.value && !!currentSelectedEntry.value
 })
+
+const showBackToTopButton = computed(() => {
+  return isSingleColumn.value && showBackToTop.value && !showDetailsOverlay.value
+})
+
+const detailsOverlayWidth = computed(() => {
+  if (detailsPresentation.value === 'fullscreen') {
+    return '100vw'
+  }
+  const maxWidth = Math.min(detailsWidth.value, Math.round(viewportWidth.value * 0.92))
+  return `${maxWidth}px`
+})
+
+const detailsOverlayStyle = computed(() => ({
+  width: detailsOverlayWidth.value,
+  '--details-width': detailsOverlayWidth.value,
+}))
+
+// 全文翻译相关状态
+const currentEntryId = computed(() => currentSelectedEntry.value?.id ?? null)
+const currentEntryContent = computed(() => currentSelectedEntry.value?.content ?? null)
+
+const {
+  progress: fullTextTranslationProgress,
+  blocks: fullTextTranslationBlocks,
+  isTranslating: isFullTextTranslating,
+  showTranslation: showFullTextTranslation,
+  getTranslation: getFullTextTranslation,
+  isBlockLoading: isFullTextBlockLoading,
+  isBlockFailed: isFullTextBlockFailed,
+  toggleTranslation: toggleFullTextTranslationRaw,
+} = useArticleTranslation(currentEntryId, currentEntryContent, translationLanguage)
+
+// 翻译后的标题
 const translatedTitle = computed(() => {
   if (!currentSelectedEntry.value) return null
   return getTranslatedTitle(currentSelectedEntry.value.id, translationLanguage.value)
 })
+
+const showTitleTranslationRaw = ref(false)
+const showTitleTranslation = computed(
+  () => showFullTextTranslation.value || showTitleTranslationRaw.value
+)
+
+const isTitleTranslating = computed(() => {
+  if (!currentSelectedEntry.value) return false
+  return isTitleTranslationLoading(currentSelectedEntry.value.id, translationLanguage.value)
+})
+
+async function handleTitleTranslation() {
+  if (!currentSelectedEntry.value) return
+  const nextShow = !showTitleTranslationRaw.value
+  showTitleTranslationRaw.value = nextShow
+
+  if (!nextShow) {
+    return
+  }
+
+  try {
+    await requestTitleTranslation(currentSelectedEntry.value.id, translationLanguage.value)
+  } catch (error) {
+    console.warn('Title translation failed:', error)
+  }
+}
+
+// 全文翻译（包含标题翻译）
+async function handleFullTextTranslation() {
+  const wasShowing = showFullTextTranslation.value
+  toggleFullTextTranslationRaw()
+
+  // 如果是开启翻译，同时翻译标题
+  if (!wasShowing && currentSelectedEntry.value) {
+    try {
+      await requestTitleTranslation(currentSelectedEntry.value.id, translationLanguage.value)
+    } catch (error) {
+      console.warn('Title translation failed:', error)
+    }
+  }
+}
 
 const feedMap = computed<Record<string, Feed>>(() => {
   return store.feeds.reduce<Record<string, Feed>>((acc, feed) => {
@@ -231,12 +342,62 @@ function ensureFavoriteSelection() {
   }
 }
 
+function openDetails() {
+  if (detailsPresentation.value === 'docked') {
+    return
+  }
+  isDetailsOpen.value = true
+}
+
+function closeDetails() {
+  isDetailsOpen.value = false
+}
+
+function lockBodyScroll() {
+  if (bodyScrollLocked || typeof document === 'undefined') return
+  const body = document.body
+  const root = document.documentElement
+  if (!body || !root) return
+  previousBodyOverflow = body.style.overflow
+  previousBodyPaddingRight = body.style.paddingRight
+  const scrollbarWidth = window.innerWidth - root.clientWidth
+  if (scrollbarWidth > 0) {
+    body.style.paddingRight = `${scrollbarWidth}px`
+  }
+  body.style.overflow = 'hidden'
+  bodyScrollLocked = true
+}
+
+function unlockBodyScroll() {
+  if (!bodyScrollLocked || typeof document === 'undefined') return
+  const body = document.body
+  if (!body) return
+  body.style.overflow = previousBodyOverflow
+  body.style.paddingRight = previousBodyPaddingRight
+  bodyScrollLocked = false
+}
+
+function updateBackToTopVisibility() {
+  if (typeof window === 'undefined') return
+  const windowTop = window.scrollY || 0
+  const scrollerTop = timelineScroller.value?.scrollTop ?? 0
+  showBackToTop.value = Math.max(windowTop, scrollerTop) > 320
+}
+
+function scrollToTop() {
+  timelineScroller.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
 function handleEntrySelect(entryId: string) {
   if (showFavoritesOnly.value) {
     selectedFavoriteEntryId.value = entryId
   } else {
     store.selectEntry(entryId)
   }
+  openDetails()
 }
 
 function handleEntriesVisible(entries: Entry[]) {
@@ -265,6 +426,33 @@ watch(
   }
 )
 
+watch(detailsPresentation, (presentation) => {
+  if (presentation === 'docked') {
+    isDetailsOpen.value = false
+  }
+})
+
+watch(
+  () => currentSelectedEntry.value,
+  (entry) => {
+    if (!entry) {
+      isDetailsOpen.value = false
+    }
+  }
+)
+
+watch(
+  () => showDetailsOverlay.value,
+  (visible) => {
+    if (visible) {
+      lockBodyScroll()
+    } else {
+      unlockBodyScroll()
+    }
+  },
+  { immediate: true }
+)
+
 // Watch for favorites store errors
 watch(() => favoritesStore.error, (error) => {
   if (error) {
@@ -273,6 +461,23 @@ watch(() => favoritesStore.error, (error) => {
       favoritesStore.clearError()
     }, 100)
   }
+})
+
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  window.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
+  nextTick(() => {
+    timelineScroller.value = document.querySelector('.timeline__list') as HTMLElement | null
+    timelineScroller.value?.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
+    updateBackToTopVisibility()
+  })
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('scroll', updateBackToTopVisibility)
+  }
+  timelineScroller.value?.removeEventListener('scroll', updateBackToTopVisibility)
 })
 
 
@@ -315,6 +520,7 @@ onMounted(async () => {
 onUnmounted(() => {
   cleanupLayout()
   cleanupSync()
+  unlockBodyScroll()
 })
 
 watch(
@@ -322,7 +528,6 @@ watch(
   async (entry) => {
     if (!entry) {
       summaryText.value = ''
-      showTranslation.value = false
       return
     }
     const cached = store.summaryCache[entry.id]
@@ -342,11 +547,16 @@ watch(
       }
     }
 
-    // Reset translation state for new entry
-    showTranslation.value = false
-
     if (!entry.read) {
       await store.toggleEntryState(entry, { read: true })
+    }
+
+    if (showTitleTranslationRaw.value) {
+      try {
+        await requestTitleTranslation(entry.id, translationLanguage.value)
+      } catch (error) {
+        console.warn('Title translation failed:', error)
+      }
     }
   },
   { immediate: true },
@@ -359,7 +569,11 @@ watch(
       return
     }
 
-    if (!showTranslation.value || !currentSelectedEntry.value) {
+    if (!currentSelectedEntry.value) {
+      return
+    }
+
+    if (!showFullTextTranslation.value && !showTitleTranslationRaw.value) {
       return
     }
 
@@ -443,27 +657,6 @@ async function handleSummary() {
 }
 
 
-
-async function handleTranslation() {
-  if (!currentSelectedEntry.value) return
-
-  // If already showing translation, toggle back to original
-  if (showTranslation.value) {
-    showTranslation.value = false
-    return
-  }
-
-  // Toggle on immediately
-  showTranslation.value = true
-
-  // Request Title Translation for the header
-  const currentEntryId = currentSelectedEntry.value.id
-  try {
-    await requestTitleTranslation(currentEntryId, translationLanguage.value)
-  } catch (error) {
-    console.warn('Title translation failed:', error)
-  }
-}
 
 async function toggleStar() {
   await handleToggleStar(currentSelectedEntry.value, showFavoritesOnly.value, async () => {
@@ -756,6 +949,7 @@ async function handleMarkFeedAsRead(feedId: string) {
     />
 
     <div
+      v-if="detailsPresentation === 'docked'"
       class="resizer resizer-right"
       :class="{ active: isDraggingRight }"
       @mousedown="handleMouseDownRight"
@@ -763,20 +957,90 @@ async function handleMarkFeedAsRead(feedId: string) {
     ></div>
 
     <DetailsPanel
+      v-if="detailsPresentation === 'docked'"
       :entry="currentSelectedEntry"
-      :show-translation="showTranslation"
       :translated-title="translatedTitle"
-      :translation-loading="translationLoading"
       :translation-language="translationLanguage"
       :summary-text="summaryText"
       :summary-loading="summaryLoading"
+      :is-translating="isTitleTranslating"
+      :show-translation="showTitleTranslation"
+      :full-text-translation-blocks="fullTextTranslationBlocks"
+      :is-full-text-translating="isFullTextTranslating"
+      :show-full-text-translation="showFullTextTranslation"
+      :full-text-translation-progress="fullTextTranslationProgress"
+      :get-full-text-translation="getFullTextTranslation"
+      :is-full-text-block-loading="isFullTextBlockLoading"
+      :is-full-text-block-failed="isFullTextBlockFailed"
       @open-external="openExternal(currentSelectedEntry?.url)"
       @toggle-star="toggleStar"
-      @toggle-translation="handleTranslation"
       @generate-summary="handleSummary"
       @update:translation-language="translationLanguage = $event"
+      @toggle-translation="handleTitleTranslation"
+      @toggle-full-text-translation="handleFullTextTranslation"
     />
   </div>
+
+  <Teleport to="body">
+    <div v-if="showDetailsOverlay" class="details-overlay" @click="closeDetails">
+      <div class="details-overlay__backdrop"></div>
+      <div
+        class="details-overlay__panel"
+        :class="{ 'is-fullscreen': detailsPresentation === 'fullscreen' }"
+        :style="detailsOverlayStyle"
+        @click.stop
+        @wheel.stop
+        @touchmove.stop
+      >
+        <div class="details-overlay__toolbar">
+          <button class="details-overlay__close" type="button" @click="closeDetails">
+            {{ detailsPresentation === 'fullscreen' ? t('common.back') : t('common.close') }}
+          </button>
+        </div>
+        <div class="details-overlay__content">
+          <DetailsPanel
+            in-overlay
+            :entry="currentSelectedEntry"
+            :translated-title="translatedTitle"
+            :translation-language="translationLanguage"
+            :summary-text="summaryText"
+            :summary-loading="summaryLoading"
+            :is-translating="isTitleTranslating"
+            :show-translation="showTitleTranslation"
+            :full-text-translation-blocks="fullTextTranslationBlocks"
+            :is-full-text-translating="isFullTextTranslating"
+            :show-full-text-translation="showFullTextTranslation"
+            :full-text-translation-progress="fullTextTranslationProgress"
+            :get-full-text-translation="getFullTextTranslation"
+            :is-full-text-block-loading="isFullTextBlockLoading"
+            :is-full-text-block-failed="isFullTextBlockFailed"
+            @open-external="openExternal(currentSelectedEntry?.url)"
+            @toggle-star="toggleStar"
+            @generate-summary="handleSummary"
+            @update:translation-language="translationLanguage = $event"
+            @toggle-translation="handleTitleTranslation"
+            @toggle-full-text-translation="handleFullTextTranslation"
+          />
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <button
+    v-if="showBackToTopButton"
+    class="back-to-top"
+    type="button"
+    :title="t('common.backToTop')"
+    :aria-label="t('common.backToTop')"
+    @click="scrollToTop"
+  >
+    <svg class="back-to-top__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 5l-7 7 1.4 1.4L11 8.8V19h2V8.8l4.6 4.6L19 12z"
+        fill="currentColor"
+      />
+    </svg>
+  </button>
 </template>
 <style scoped>
 .app-shell {
@@ -844,6 +1108,109 @@ async function handleMarkFeedAsRead(feedId: string) {
 
 :global(.dark) .resizer.active {
   background: rgba(255, 122, 24, 0.7);
+}
+
+.details-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  overscroll-behavior: contain;
+}
+
+.details-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 12, 18, 0.35);
+  backdrop-filter: blur(4px);
+}
+
+.details-overlay__panel {
+  position: relative;
+  height: 100%;
+  max-width: 100vw;
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-color);
+  box-shadow: -12px 0 30px rgba(15, 17, 21, 0.2);
+  z-index: 1;
+  animation: details-slide-in 0.22s ease-out;
+}
+
+.details-overlay__panel.is-fullscreen {
+  border-left: none;
+  box-shadow: none;
+}
+
+.details-overlay__toolbar {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}
+
+.details-overlay__close {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 999px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.details-overlay__close:hover {
+  background: rgba(255, 122, 24, 0.15);
+}
+
+.details-overlay__content {
+  flex: 1;
+  min-height: 0;
+}
+
+.back-to-top {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 24px rgba(15, 17, 21, 0.18);
+  z-index: 1100;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.back-to-top:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(15, 17, 21, 0.22);
+  background: rgba(255, 122, 24, 0.1);
+}
+
+.back-to-top__icon {
+  width: 20px;
+  height: 20px;
+}
+
+@keyframes details-slide-in {
+  from {
+    transform: translateX(12%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 960px) {

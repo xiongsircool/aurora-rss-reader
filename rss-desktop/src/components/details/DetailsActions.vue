@@ -3,16 +3,22 @@ import { useI18n } from 'vue-i18n'
 
 defineProps<{
   isStarred: boolean
-  isTranslating: boolean
-  showTranslation: boolean
   translationLanguage: string
+  // 标题翻译相关
+  isTranslating?: boolean
+  showTranslation?: boolean
+  // 全文翻译相关
+  isFullTextTranslating?: boolean
+  showFullTextTranslation?: boolean
+  fullTextTranslationProgress?: number
 }>()
 
 const emit = defineEmits<{
   (e: 'open-external'): void
   (e: 'toggle-star'): void
-  (e: 'toggle-translation'): void
   (e: 'update:translationLanguage', value: string): void
+  (e: 'toggle-translation'): void
+  (e: 'toggle-full-text-translation'): void
 }>()
 
 const { t } = useI18n()
@@ -34,11 +40,34 @@ const { t } = useI18n()
       @click="emit('toggle-translation')"
       :disabled="isTranslating"
       class="action-btn h-[clamp(28px,3.2vw,34px)] px-[clamp(10px,1.3vw,14px)] rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-primary)] font-medium text-[clamp(0.72rem,1vw,0.8rem)] tracking-tight cursor-pointer transition-all duration-200 min-w-17 whitespace-nowrap shadow-sm hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:c-white hover:shadow-lg disabled:op-60 disabled:cursor-not-allowed disabled:c-[var(--text-secondary)] disabled:bg-[var(--bg-surface)] disabled:border-[var(--border-color)] disabled:shadow-none"
+      :class="{ 'is-active': showTranslation && !isTranslating }"
     >
-      {{ isTranslating ? t('ai.translating') : (showTranslation ? t('articles.showOriginal') : t('ai.translate')) }}
+      <template v-if="isTranslating">
+        {{ t('ai.translating') }}
+      </template>
+      <template v-else>
+        {{ t('ai.translateTitle') }}
+      </template>
     </button>
-    <select 
-      :value="translationLanguage" 
+    <!-- 全文翻译按钮（包含标题翻译） -->
+    <button
+      @click="emit('toggle-full-text-translation')"
+      :disabled="isFullTextTranslating"
+      class="action-btn h-[clamp(28px,3.2vw,34px)] px-[clamp(10px,1.3vw,14px)] rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-primary)] font-medium text-[clamp(0.72rem,1vw,0.8rem)] tracking-tight cursor-pointer transition-all duration-200 min-w-17 whitespace-nowrap shadow-sm hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:c-white hover:shadow-lg disabled:op-60 disabled:cursor-not-allowed disabled:c-[var(--text-secondary)] disabled:bg-[var(--bg-surface)] disabled:border-[var(--border-color)] disabled:shadow-none"
+      :class="{ 'is-active': showFullTextTranslation && !isFullTextTranslating }"
+    >
+      <template v-if="isFullTextTranslating">
+        {{ t('ai.translating') }} ({{ fullTextTranslationProgress }}%)
+      </template>
+      <template v-else-if="showFullTextTranslation">
+        {{ t('ai.hideFullTextTranslation') }}
+      </template>
+      <template v-else>
+        {{ t('ai.translateFullText') }}
+      </template>
+    </button>
+    <select
+      :value="translationLanguage"
       @change="emit('update:translationLanguage', ($event.target as HTMLSelectElement).value)"
       class="lang-select"
     >
@@ -84,6 +113,12 @@ const { t } = useI18n()
 .lang-select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.action-btn.is-active {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  color: #fff;
 }
 
 @media (max-width: 560px) {

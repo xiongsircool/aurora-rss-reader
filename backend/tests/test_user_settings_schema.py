@@ -1,7 +1,9 @@
+import asyncio
 import sqlite3
 
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import Session, create_engine
 
 from app.services import user_settings_service as service_module
 from app.services.user_settings_service import UserSettingsService
@@ -28,27 +30,26 @@ def test_get_settings_backfills_missing_columns(tmp_path):
         )
         conn.commit()
 
-    test_engine = create_engine(
-        f"sqlite:///{legacy_db}",
-        connect_args={"check_same_thread": False},
-    )
-    test_session_local = sessionmaker(
-        autocommit=False,
-        autoflush=False,
-        bind=test_engine,
-        class_=Session,
-    )
-
     original_engine = service_module.engine
-    original_session_local = service_module.SessionLocal
+    original_session_maker = service_module.async_session_maker
     original_schema_checked = service_module._schema_checked
 
     try:
+        test_engine = create_async_engine(
+            f"sqlite+aiosqlite:///{legacy_db}",
+            connect_args={"check_same_thread": False},
+        )
+        test_session_maker = sessionmaker(
+            test_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+
         service_module.engine = test_engine
-        service_module.SessionLocal = test_session_local
+        service_module.async_session_maker = test_session_maker
         service_module._schema_checked = False
 
-        settings = UserSettingsService.get_settings()
+        settings = asyncio.run(UserSettingsService.get_settings())
 
         assert settings.show_entry_summary is True
         assert settings.enable_date_filter is True
@@ -56,5 +57,5 @@ def test_get_settings_backfills_missing_columns(tmp_path):
         assert settings.time_field == "inserted_at"
     finally:
         service_module.engine = original_engine
-        service_module.SessionLocal = original_session_local
+        service_module.async_session_maker = original_session_maker
         service_module._schema_checked = original_schema_checked

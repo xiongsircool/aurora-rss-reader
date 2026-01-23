@@ -103,3 +103,133 @@ Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebre
 CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
 Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
 Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 10:22:45.637934] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 14:42:54.807881] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 14:42:55.545997] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 15:38:56.384350] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:27:56.294265] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:28:08.721495] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:28:26.734059] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:28:37.030255] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:28:47.327914] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:30:29.019998] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:30:43.322228] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:31:01.028936] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:31:08.474049] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:31:15.918693] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:33:09.414640] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:33:18.012987] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:33:32.088985] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:33:47.623400] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:33:55.034882] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:48:11.544950] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:48:25.247859] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:53:16.829207] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 21:53:19.292335] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 22:24:05.818414] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 22:24:15.467244] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']
+
+[2026-01-23 22:24:26.608495] Python process started.
+CWD: /Users/Apple/Documents/githubs/aurora-rss-reader/backend
+Executable: /Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/bin/python
+Path: ['/Users/Apple/Documents/githubs/aurora-rss-reader/backend', '/opt/homebrew/Caskroom/miniforge/base/lib/python312.zip', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12', '/opt/homebrew/Caskroom/miniforge/base/lib/python3.12/lib-dynload', '/Users/Apple/Documents/githubs/aurora-rss-reader/backend/.venv/lib/python3.12/site-packages']

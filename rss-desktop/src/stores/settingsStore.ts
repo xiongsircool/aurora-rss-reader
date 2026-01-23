@@ -16,6 +16,8 @@ export interface AppSettings {
   max_auto_title_translations: number
   // 一键已读相关设置
   mark_as_read_range: string // 'current' | '3d' | '7d' | '30d' | 'all'
+  // 详情栏显示模式
+  details_panel_mode: 'docked' | 'click'
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -29,7 +31,8 @@ export const useSettingsStore = defineStore('settings', () => {
     show_entry_summary: true,
     open_original_mode: 'system',
     max_auto_title_translations: getDefaultAutoTitleTranslationLimit(),
-    mark_as_read_range: 'current'
+    mark_as_read_range: 'current',
+    details_panel_mode: 'docked'
   })
 
   const loading = ref(false)

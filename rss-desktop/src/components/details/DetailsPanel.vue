@@ -1,37 +1,62 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Entry } from '../../types'
+import type { ContentBlock } from '../../composables/useArticleParser'
 import DetailsHeader from './DetailsHeader.vue'
 import DetailsActions from './DetailsActions.vue'
 import AISummaryCard from './AISummaryCard.vue'
+import ArticleContent from './ArticleContent.vue'
+import { useSanitize } from '../../composables/useSanitize'
 
 const props = defineProps<{
   entry: Entry | null
+  inOverlay?: boolean
 
-  // Translation state (title only)
-  showTranslation: boolean
-  translatedTitle: string | null
-  translationLoading: boolean
+  // Translation language
   translationLanguage: string
 
   // Summary state
   summaryText: string
   summaryLoading: boolean
+
+  // Title translation state
+  isTranslating: boolean
+  showTranslation: boolean
+
+  // Full-text translation state
+  fullTextTranslationBlocks: ContentBlock[]
+  isFullTextTranslating: boolean
+  showFullTextTranslation: boolean
+  fullTextTranslationProgress: number
+  translatedTitle: string | null
+  getFullTextTranslation: (blockId: string) => string | null
+  isFullTextBlockLoading: (blockId: string) => boolean
+  isFullTextBlockFailed: (blockId: string) => boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'open-external'): void
   (e: 'toggle-star'): void
-  (e: 'toggle-translation'): void
   (e: 'generate-summary'): void
   (e: 'update:translationLanguage', value: string): void
+  (e: 'toggle-translation'): void
+  (e: 'toggle-full-text-translation'): void
 }>()
 
 const { t } = useI18n()
+const { sanitize } = useSanitize()
+const safeContent = computed(() => sanitize(props.entry?.content ?? ''))
+
+const containerClasses = computed(() => [
+  'details bg-[var(--bg-surface)] p-6 shrink-0 min-w-70 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden w-[var(--details-width,420px)]',
+  props.inOverlay ? 'h-full max-h-none' : 'max-h-screen',
+  props.inOverlay ? '' : 'lt-md:w-full! lt-md:max-w-none lt-md:h-auto lt-md:max-h-none lt-md:overflow-visible',
+])
 </script>
 
 <template>
-  <section class="details bg-[var(--bg-surface)] p-6 shrink-0 min-w-70 flex flex-col max-h-screen min-h-0 overflow-y-auto overflow-x-hidden w-[var(--details-width,420px)] lt-md:w-full! lt-md:max-w-none lt-md:h-auto lt-md:max-h-none lt-md:overflow-visible">
+  <section :class="containerClasses">
     <div v-if="entry" class="flex flex-col min-h-0">
       <DetailsHeader
         :entry="entry"
@@ -41,13 +66,17 @@ const { t } = useI18n()
 
       <DetailsActions
         :is-starred="entry.starred"
-        :is-translating="translationLoading"
-        :show-translation="showTranslation"
         :translation-language="translationLanguage"
+        :is-translating="isTranslating"
+        :show-translation="showTranslation"
+        :is-full-text-translating="isFullTextTranslating"
+        :show-full-text-translation="showFullTextTranslation"
+        :full-text-translation-progress="fullTextTranslationProgress"
         @open-external="emit('open-external')"
         @toggle-star="emit('toggle-star')"
-        @toggle-translation="emit('toggle-translation')"
         @update:translation-language="emit('update:translationLanguage', $event)"
+        @toggle-translation="emit('toggle-translation')"
+        @toggle-full-text-translation="emit('toggle-full-text-translation')"
       />
 
       <AISummaryCard
@@ -57,9 +86,19 @@ const { t } = useI18n()
       />
 
       <!-- Article Body -->
+      <ArticleContent
+        v-if="fullTextTranslationBlocks.length > 0"
+        :blocks="fullTextTranslationBlocks"
+        :show-translation="showFullTextTranslation"
+        :get-translation="getFullTextTranslation"
+        :is-block-loading="isFullTextBlockLoading"
+        :is-block-failed="isFullTextBlockFailed"
+        class="details__body"
+      />
       <article
+        v-else
         class="details__body text-base leading-relaxed c-[var(--text-primary)] break-words flex-initial overflow-visible min-h-auto"
-        v-html="entry.content"
+        v-html="safeContent"
       />
     </div>
     <div v-else class="grid place-items-center c-[var(--text-secondary)] text-center p-6 h-full">

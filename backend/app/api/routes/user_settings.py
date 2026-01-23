@@ -62,6 +62,7 @@ class UserSettingsResponse(BaseModel):
     time_field: str
     max_auto_title_translations: int
     mark_as_read_range: str
+    details_panel_mode: str
 
 
 class UserSettingsUpdate(BaseModel):
@@ -79,6 +80,7 @@ class UserSettingsUpdate(BaseModel):
     time_field: Optional[str] = None
     max_auto_title_translations: Optional[int] = None
     mark_as_read_range: Optional[str] = None
+    details_panel_mode: Optional[str] = None
 
 
 class RSSHubURLUpdate(BaseModel):
@@ -102,7 +104,8 @@ async def get_settings():
         default_date_range=settings.default_date_range,
         time_field=settings.time_field,
         max_auto_title_translations=settings.max_auto_title_translations,
-        mark_as_read_range=settings.mark_as_read_range
+        mark_as_read_range=settings.mark_as_read_range,
+        details_panel_mode=settings.details_panel_mode
     )
 
 
@@ -128,9 +131,10 @@ async def update_settings(update_data: UserSettingsUpdate, request: Request):
             enable_date_filter=settings.enable_date_filter,
             default_date_range=settings.default_date_range,
             time_field=settings.time_field,
-            max_auto_title_translations=settings.max_auto_title_translations,
-            mark_as_read_range=settings.mark_as_read_range
-        )
+        max_auto_title_translations=settings.max_auto_title_translations,
+        mark_as_read_range=settings.mark_as_read_range,
+        details_panel_mode=settings.details_panel_mode
+    )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"更新设置失败: {str(e)}")
 
@@ -152,9 +156,10 @@ async def update_rsshub_url(update_data: RSSHubURLUpdate):
             enable_date_filter=settings.enable_date_filter,
             default_date_range=settings.default_date_range,
             time_field=settings.time_field,
-            max_auto_title_translations=settings.max_auto_title_translations,
-            mark_as_read_range=settings.mark_as_read_range
-        )
+        max_auto_title_translations=settings.max_auto_title_translations,
+        mark_as_read_range=settings.mark_as_read_range,
+        details_panel_mode=settings.details_panel_mode
+    )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"更新RSSHub URL失败: {str(e)}")
 

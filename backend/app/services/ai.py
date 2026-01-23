@@ -127,6 +127,102 @@ class GLMClient:
                 return "".join(part.get("text", "") for part in message)
             return str(message)
 
+    async def translate_batch(
+        self,
+        blocks: list[Dict[str, str]],
+        *,
+        target_language: str = "zh",
+    ) -> Dict[str, str]:
+        """
+        批量翻译多个段落。
+
+        Args:
+            blocks: [{"id": "hash_id", "text": "原文"}, ...]
+            target_language: 目标语言代码
+
+        Returns:
+            {"block_id": "翻译文本", ...}
+        """
+        self._ensure_ready()
+
+        if not blocks:
+            return {}
+
+        language_names = {
+            "zh": "中文",
+            "en": "English",
+            "ja": "日本語",
+            "ko": "한국어",
+            "fr": "Français",
+            "de": "Deutsch",
+            "es": "Español",
+        }
+        lang_display = language_names.get(target_language, target_language)
+
+        # 构建批量翻译 prompt
+        blocks_text = "\n\n".join(
+            f"[ID:{b['id']}]\n{b['text']}" for b in blocks
+        )
+
+        prompt = f"""请将以下段落翻译成{lang_display}，保持原文格式和语气。
+
+每段用 [ID:xxx] 标记，请保持对应关系。
+
+{blocks_text}
+
+请按以下格式输出（每段翻译前加上对应的 ID 标记）："""
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "你是专业翻译助手。请严格按照要求的格式输出翻译结果，保持 ID 标记与原文一一对应。",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": 4096,
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=120) as client:
+            response = await client.post("/chat/completions", json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            content = (
+                data.get("choices", [{}])[0]
+                .get("message", {})
+                .get("content", "")
+            )
+            if isinstance(content, list):
+                content = "".join(part.get("text", "") for part in content)
+
+        # 解析响应，提取 ID 和翻译文本
+        return self._parse_batch_response(content, blocks)
+
+    def _parse_batch_response(
+        self, response: str, blocks: list[Dict[str, str]]
+    ) -> Dict[str, str]:
+        """解析批量翻译响应"""
+        import re
+
+        result: Dict[str, str] = {}
+        block_ids = {b["id"] for b in blocks}
+
+        # 尝试匹配 [ID:xxx] 格式
+        pattern = r"\[ID:([a-fA-F0-9]+)\]\s*\n?([\s\S]*?)(?=\[ID:|$)"
+        matches = re.findall(pattern, response)
+
+        for block_id, text in matches:
+            if block_id in block_ids:
+                result[block_id] = text.strip()
+
+        # 如果解析失败且只有一个 block，直接返回整个响应
+        if not result and len(blocks) == 1:
+            result[blocks[0]["id"]] = response.strip()
+
+        return result
+
 
 class AIClientManager:
     def __init__(self) -> None:

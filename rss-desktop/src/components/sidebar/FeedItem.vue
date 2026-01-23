@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 import type { Feed } from '../../types'
 import { useFeedIcons } from '../../composables/useFeedIcons'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -24,7 +23,6 @@ const emit = defineEmits<{
   (e: 'mark-feed-read', feedId: string): void
 }>()
 
-const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
 const { iconSrcFor, handleFeedIconLoad, handleFeedIconError, isFeedIconBroken, isFeedIconLoaded, getFeedColor, getFeedInitial } = useFeedIcons()

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import base64
-from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Query
 from fastapi.responses import Response
+
+from app.utils.network import fetch_with_redirects
 
 
 router = APIRouter(prefix="/icons", tags=["icons"])
@@ -15,14 +16,6 @@ router = APIRouter(prefix="/icons", tags=["icons"])
 _TRANSPARENT_GIF = base64.b64decode(
     b"R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw=="
 )
-
-
-def _ok_scheme(url: str) -> bool:
-    try:
-        p = urlparse(url)
-        return p.scheme in {"http", "https"}
-    except Exception:
-        return False
 
 
 def _build_headers(target_url: str) -> dict[str, str]:
@@ -45,7 +38,7 @@ async def proxy_icon(url: str = Query(..., description="Remote icon URL to proxy
     If the remote fetch fails or isn't an image, return a 1x1 transparent GIF
     with 200 to avoid noisy console errors in the frontend.
     """
-    if not url or not _ok_scheme(url):
+    if not url:
         return Response(
             content=_TRANSPARENT_GIF,
             media_type="image/gif",
@@ -53,8 +46,8 @@ async def proxy_icon(url: str = Query(..., description="Remote icon URL to proxy
         )
 
     try:
-        async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
-            r = await client.get(url, headers=_build_headers(url))
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await fetch_with_redirects(client, url, headers=_build_headers(url))
             ctype = r.headers.get("content-type", "").lower()
             if r.status_code == 200 and ctype.startswith("image/") and r.content:
                 return Response(
@@ -71,4 +64,3 @@ async def proxy_icon(url: str = Query(..., description="Remote icon URL to proxy
         media_type="image/gif",
         headers={"Cache-Control": "public, max-age=86400"},
     )
-

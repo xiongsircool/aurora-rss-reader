@@ -37,6 +37,7 @@ async def ensure_user_settings_schema():
         "time_field": "ALTER TABLE user_settings ADD COLUMN time_field TEXT NOT NULL DEFAULT 'inserted_at'",
         "max_auto_title_translations": "ALTER TABLE user_settings ADD COLUMN max_auto_title_translations INTEGER NOT NULL DEFAULT 10",
         "mark_as_read_range": "ALTER TABLE user_settings ADD COLUMN mark_as_read_range TEXT NOT NULL DEFAULT 'current'",
+        "details_panel_mode": "ALTER TABLE user_settings ADD COLUMN details_panel_mode TEXT NOT NULL DEFAULT 'docked'",
         "summary_api_key": "ALTER TABLE user_settings ADD COLUMN summary_api_key TEXT NOT NULL DEFAULT ''",
         "summary_base_url": f"ALTER TABLE user_settings ADD COLUMN summary_base_url TEXT NOT NULL DEFAULT '{settings.glm_base_url}'",
         "summary_model_name": f"ALTER TABLE user_settings ADD COLUMN summary_model_name TEXT NOT NULL DEFAULT '{settings.glm_model}'",

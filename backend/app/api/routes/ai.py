@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +15,8 @@ from sqlmodel import select
 from app.core.config import settings
 from app.db.deps import get_session
 from app.db.models import Entry, Summary, Translation
-from app.schemas.ai import SummaryRequest, SummaryResponse
+from app.db.session import async_session_maker
+from app.schemas.ai import SummaryRequest, SummaryResponse, TranslateBlocksRequest
 from app.services.ai import GLMClient, ai_client_manager, ServiceKey
 from app.services.user_settings_service import user_settings_service
 
@@ -131,14 +135,14 @@ async def generate_summary(
 
 @router.post("/translate-title")
 async def translate_entry_title(
-    payload: dict, session: AsyncSession = Depends(get_session)
+    payload: TranslateTitleRequest, session: AsyncSession = Depends(get_session)
 ) -> dict:
     """专门翻译文章标题，支持数据库缓存"""
-    entry = await session.get(Entry, payload["entry_id"])
+    entry = await session.get(Entry, payload.entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
-    target_language = payload.get("language", "zh")
+    target_language = payload.language
 
     if not entry.title:
         return {"entry_id": entry.id, "title": "", "language": target_language}
@@ -146,7 +150,7 @@ async def translate_entry_title(
     # 检查数据库缓存
     result = await session.exec(
         select(Translation).where(
-            Translation.entry_id == payload["entry_id"],
+            Translation.entry_id == payload.entry_id,
             Translation.language == target_language
         )
     )
@@ -172,7 +176,7 @@ async def translate_entry_title(
             # 重新检查一次，减少可预见的冲突（Double Checked Locking pattern logic in DB）
             result = await session.exec(
                 select(Translation).where(
-                    Translation.entry_id == payload["entry_id"],
+                    Translation.entry_id == payload.entry_id,
                     Translation.language == target_language
                 )
             )
@@ -206,7 +210,7 @@ async def translate_entry_title(
             # 重新获取已存在的记录
             result = await session.exec(
                 select(Translation).where(
-                    Translation.entry_id == payload["entry_id"],
+                    Translation.entry_id == payload.entry_id,
                     Translation.language == target_language
                 )
             )
@@ -276,6 +280,11 @@ class TestConnectionRequest(BaseModel):
     base_url: str | None = None
     model_name: str | None = None
     service: ServiceKey = "summary"
+
+
+class TranslateTitleRequest(BaseModel):
+    entry_id: str
+    language: str = "zh"
 
 
 def _build_service_config(settings_row, service: ServiceKey) -> AIServiceConfig:
@@ -368,3 +377,164 @@ async def test_ai_connection(payload: TestConnectionRequest) -> dict:
 
     except Exception as e:
         return {"success": False, "message": f"连接测试失败: {str(e)}"}
+
+
+# --- Block Translation (SSE) ---
+
+BATCH_SIZE = 5  # 每批翻译的段落数
+
+
+async def _sse_event(event: str, data: dict) -> str:
+    """格式化 SSE 事件"""
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+async def _translate_blocks_generator(
+    request: TranslateBlocksRequest,
+) -> AsyncGenerator[str, None]:
+    """SSE 流式翻译生成器"""
+    async with async_session_maker() as session:
+        entry_id = request.entry_id
+        cache_key = f"{request.source_lang}:{request.target_lang}"
+
+        # 1. 加载现有翻译记录
+        result = await session.exec(
+            select(Translation).where(
+                Translation.entry_id == entry_id,
+                Translation.language == request.target_lang,
+            )
+        )
+        translation_record = result.first()
+
+        # 获取 paragraph_map 缓存
+        cached_map: dict[str, str] = {}
+        if translation_record and translation_record.paragraph_map:
+            cached_map = dict(translation_record.paragraph_map.get(cache_key, {}))
+
+        # 2. 分离缓存命中/未命中
+        hits: list[tuple[str, str]] = []
+        misses: list[dict[str, str]] = []
+
+        for block in request.blocks:
+            if block.id in cached_map:
+                hits.append((block.id, cached_map[block.id]))
+            else:
+                misses.append({"id": block.id, "text": block.text})
+
+        total = len(request.blocks)
+        success_count = len(hits)
+        fail_count = 0
+
+        # 3. 发送进度事件
+        yield await _sse_event("progress", {"total": total, "completed": 0, "cached": len(hits)})
+
+        # 4. 立即返回缓存命中的翻译
+        for block_id, text in hits:
+            yield await _sse_event("translation", {"id": block_id, "text": text})
+
+        # 5. 批量翻译未命中的段落
+        # TODO: 未来可添加并发锁防止重复翻译（当前场景暂不需要）
+        if misses:
+            await _ensure_ai_clients_initialized()
+            client = ai_client_manager.get_client("translation")
+
+            # 分批处理
+            for i in range(0, len(misses), BATCH_SIZE):
+                batch = misses[i : i + BATCH_SIZE]
+
+                try:
+                    # 调用批量翻译
+                    translations = await client.translate_batch(
+                        batch, target_language=request.target_lang
+                    )
+
+                    # 逐个返回结果并更新缓存
+                    for block in batch:
+                        block_id = block["id"]
+                        if block_id in translations:
+                            translated_text = translations[block_id]
+                            yield await _sse_event(
+                                "translation", {"id": block_id, "text": translated_text}
+                            )
+                            success_count += 1
+
+                            # 更新缓存
+                            cached_map[block_id] = translated_text
+                        else:
+                            yield await _sse_event(
+                                "error", {"id": block_id, "error": "Translation not found in response"}
+                            )
+                            fail_count += 1
+
+                except Exception as e:
+                    logger.error(f"Batch translation error: {e}")
+                    for block in batch:
+                        yield await _sse_event("error", {"id": block["id"], "error": str(e)})
+                        fail_count += 1
+
+            # 6. 保存更新后的缓存到数据库
+            try:
+                if translation_record:
+                    # 更新现有记录
+                    existing_map = translation_record.paragraph_map or {}
+                    updated_map = dict(existing_map)
+                    updated_map[cache_key] = cached_map
+                    translation_record.paragraph_map = updated_map
+                    session.add(translation_record)
+                else:
+                    # 创建新记录
+                    new_translation = Translation(
+                        entry_id=entry_id,
+                        language=request.target_lang,
+                        paragraph_map={cache_key: cached_map},
+                    )
+                    session.add(new_translation)
+
+                await session.commit()
+            except IntegrityError:
+                await session.rollback()
+                logger.warning(f"Failed to save translation cache for entry {entry_id}")
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Error saving translation cache: {e}")
+
+        # 7. 发送完成事件
+        yield await _sse_event(
+            "done",
+            {
+                "total": total,
+                "success": success_count,
+                "failed": fail_count,
+                "cached": len(hits),
+            },
+        )
+
+
+@router.post("/translate-blocks")
+async def translate_blocks(
+    request: TranslateBlocksRequest,
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """
+    批量翻译文章段落（SSE 流式响应）
+
+    Events:
+    - progress: {"total": 10, "completed": 0, "cached": 5}
+    - translation: {"id": "hash_id", "text": "翻译文本"}
+    - error: {"id": "hash_id", "error": "错误信息"}
+    - done: {"total": 10, "success": 9, "failed": 1, "cached": 5}
+    """
+    # 验证 entry 存在
+    entry = await session.get(Entry, request.entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    return StreamingResponse(
+        _translate_blocks_generator(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

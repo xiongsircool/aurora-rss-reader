@@ -27,6 +27,7 @@ class UserSettings(SQLModel, table=True):
     time_field: str = Field(default="inserted_at", description="时间字段: 'published_at' 或 'inserted_at'")
     max_auto_title_translations: int = Field(default=10, description="自动标题翻译的并发/批量上限")
     mark_as_read_range: str = Field(default="current", description="一键已读范围: 'current', '3d', '7d', '30d', 'all'")
+    details_panel_mode: str = Field(default="docked", description="详情栏显示模式: 'docked' | 'click'")
 
     # AI config and features
     summary_api_key: str = Field(default="", description="AI summary API key")

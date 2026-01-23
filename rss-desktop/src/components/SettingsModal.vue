@@ -69,6 +69,11 @@ const markAsReadRange = computed({
   set: (value) => settingsStore.updateSettings({ mark_as_read_range: value })
 })
 
+const detailsPanelMode = computed({
+  get: () => settingsStore.settings.details_panel_mode,
+  set: (value) => settingsStore.updateSettings({ details_panel_mode: value })
+})
+
 // Watch modal visibility
 watch(() => props.show, async (show) => {
   if (show) {
@@ -169,6 +174,7 @@ async function saveSettings() {
             v-model:timeField="timeField"
             v-model:openOriginalMode="openOriginalMode"
             v-model:markAsReadRange="markAsReadRange"
+            v-model:detailsPanelMode="detailsPanelMode"
           />
 
           <SettingsAbout />

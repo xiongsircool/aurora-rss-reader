@@ -21,7 +21,7 @@ def test_priority_auto_increment(monkeypatch, tmp_path):
 
     from app.db import session as session_module
     importlib.reload(session_module)
-    session_module.init_db()
+    asyncio.run(session_module.init_db())
 
     from app.services import rsshub_manager as manager_module
     importlib.reload(manager_module)
@@ -35,12 +35,16 @@ def test_priority_auto_increment(monkeypatch, tmp_path):
         manager.add_mirror(name="Mirror B", base_url="https://b.example.com", priority=None)
     )
 
-    with session_module.SessionLocal() as session:
-        mirrors = session.exec(
-            select(rsshub_config_module.RSSHubConfig).order_by(
-                rsshub_config_module.RSSHubConfig.priority
+    async def fetch_mirrors():
+        async with session_module.async_session_maker() as session:
+            result = await session.exec(
+                select(rsshub_config_module.RSSHubConfig).order_by(
+                    rsshub_config_module.RSSHubConfig.priority
+                )
             )
-        ).all()
+            return result.all()
+
+    mirrors = asyncio.run(fetch_mirrors())
 
     assert [mirror.priority for mirror in mirrors] == [1, 2]
     assert [mirror.base_url for mirror in mirrors] == [

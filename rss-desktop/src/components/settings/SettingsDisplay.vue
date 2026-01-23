@@ -7,6 +7,7 @@ const enableDateFilter = defineModel<boolean>('enableDateFilter', { required: tr
 const defaultDateRange = defineModel<string>('defaultDateRange', { required: true })
 const timeField = defineModel<string>('timeField', { required: true })
 const markAsReadRange = defineModel<string>('markAsReadRange', { required: true })
+const detailsPanelMode = defineModel<'docked' | 'click'>('detailsPanelMode', { required: true })
 
 const { t } = useI18n()
 </script>
@@ -32,6 +33,16 @@ const { t } = useI18n()
         <option value="window">{{ t('settings.openOriginalModeWindow') }}</option>
       </select>
       <p class="mt-1.5 text-xs c-[var(--text-secondary)]">{{ t('settings.openOriginalModeDescription') }}</p>
+    </div>
+
+    <!-- Details Panel Mode -->
+    <div class="mb-4">
+      <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.detailsPanelMode') }}</label>
+      <select v-model="detailsPanelMode" class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-lg text-sm bg-[#fefefe] c-[var(--text-primary)] transition-all shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none">
+        <option value="docked">{{ t('settings.detailsPanelModeDocked') }}</option>
+        <option value="click">{{ t('settings.detailsPanelModeClick') }}</option>
+      </select>
+      <p class="mt-1.5 text-xs c-[var(--text-secondary)]">{{ t('settings.detailsPanelModeDescription') }}</p>
     </div>
 
     <!-- Enable Date Filter -->

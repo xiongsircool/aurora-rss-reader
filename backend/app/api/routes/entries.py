@@ -17,6 +17,7 @@ from typing import Optional
 import httpx
 from readability import Document
 from app.services.user_settings_service import user_settings_service
+from app.utils.network import fetch_with_redirects
 
 router = APIRouter(prefix="/entries", tags=["entries"])
 
@@ -497,8 +498,8 @@ async def fetch_entry_content(
             "Accept-Language": "en-US,en;q=0.9,zh;q=0.8",
         }
         
-        async with httpx.AsyncClient(timeout=30.0, headers=headers, follow_redirects=True) as client:
-            response = await client.get(entry.url)
+        async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
+            response = await fetch_with_redirects(client, entry.url, headers=headers)
             response.raise_for_status()
             
             # Detect encoding if needed, httpx handles this mostly but sometimes...
@@ -534,6 +535,8 @@ async def fetch_entry_content(
                 starred=entry.starred,
             )
 
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=f"Failed to fetch upstream content: {e}")
     except Exception as e:
