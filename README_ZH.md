@@ -122,69 +122,57 @@ chmod +x start.sh
 
 ### 界面预览
 
+#### 全局预览
+<div align="center">
+  <img src="images/整体UI进行美化.png" alt="整体界面预览" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
+</div>
+
 #### 🎨 布局模式
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" width="60%">
-        <img src="images/appimages/三栏式布局.png" alt="三栏式布局" width="100%" style="max-width:600px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" />
-        <br><strong>三栏式布局</strong>
-        <br><em>经典桌面阅读体验</em>
-      </td>
-      <td align="center" width="40%">
-        <img src="images/appimages/一拦式布局.png" alt="一栏式布局" width="100%" style="max-width:280px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" />
-        <br><strong>一栏式布局</strong>
-        <br><em>专注阅读模式</em>
-      </td>
-    </tr>
-  </table>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/appimages/三栏式布局.png" alt="三栏式布局" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>三栏式布局</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/更新支持两栏模式优化阅读体验.png" alt="两栏式布局" style="width:380px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>两栏式布局</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/appimages/一拦式布局.png" alt="一栏式布局" style="width:220px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>一栏式布局</figcaption>
+  </figure>
+</div>
+
+#### 📱 一栏交互
+<div align="center">
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
+    <img src="images/优化一栏目交互逻辑/实现双击记录展示详情.png" alt="双击打开详情" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>双击打开详情</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
+    <img src="images/优化一栏目交互逻辑/优化按键大小增加一个回到顶部.png" alt="回到顶部按钮" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>回到顶部按钮</figcaption>
+  </figure>
 </div>
 
 #### 🌍 多语言界面
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持中文.png" alt="中文界面" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇨🇳 中文</strong>
-      </td>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持英文.png" alt="English Interface" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇺🇸 English</strong>
-      </td>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持日语.png" alt="日本語" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇯🇵 日本語</strong>
-      </td>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持韩文.png" alt="한국어" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇰🇷 한국어</strong>
-      </td>
-    </tr>
-  </table>
-</div>
-
-#### ⚙️ 核心功能
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" width="33.33%">
-        <img src="images/appimages/支持订阅分组.png" alt="分组管理" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
-        <br><strong>📁 订阅源分组</strong>
-        <br><em>智能分类管理</em>
-      </td>
-      <td align="center" width="33.33%">
-        <img src="images/appimages/支持订阅信息时间过滤设定.png" alt="时间过滤" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
-        <br><strong>⏰ 时间过滤</strong>
-        <br><em>精准内容筛选</em>
-      </td>
-      <td align="center" width="33.33%">
-        <img src="images/appimages/支持特定内容收藏.png" alt="收藏功能" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
-        <br><strong>⭐ 收藏功能</strong>
-        <br><em>重要内容标记</em>
-      </td>
-    </tr>
-  </table>
+  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
+    <img src="images/appimages/多语言支持中文.png" alt="中文界面" style="width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(15,17,21,.1);" />
+    <figcaption>🇨🇳 中文</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
+    <img src="images/appimages/多语言支持英文.png" alt="英文界面" style="width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(15,17,21,.1);" />
+    <figcaption>🇺🇸 English</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
+    <img src="images/appimages/多语言支持日语.png" alt="日语界面" style="width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(15,17,21,.1);" />
+    <figcaption>🇯🇵 日本語</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
+    <img src="images/appimages/多语言支持韩文.png" alt="韩语界面" style="width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(15,17,21,.1);" />
+    <figcaption>🇰🇷 한국어</figcaption>
+  </figure>
 </div>
 
 ## 快速开始

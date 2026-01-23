@@ -69,43 +69,36 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 
 ## Interface Preview
 
+### Overview
+<div align="center">
+  <img src="images/整体UI进行美化.png" alt="UI overview" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
+</div>
+
 ### Layout Modes
 <div align="center">
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/appimages/三栏式布局.png" alt="Three-column layout" style="width:520px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/appimages/三栏式布局.png" alt="Three-column layout" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
     <figcaption>Three-column layout</figcaption>
   </figure>
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/appimages/一拦式布局.png" alt="Single-column layout" style="width:240px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/更新支持两栏模式优化阅读体验.png" alt="Two-column layout" style="width:380px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Two-column layout</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/appimages/一拦式布局.png" alt="Single-column layout" style="width:220px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
     <figcaption>Single-column layout</figcaption>
   </figure>
 </div>
 
-### Multi-language Experience
+### Single-column Interactions
 <div align="center">
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/多语言支持中文.png" alt="Chinese Interface" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Chinese Interface</figcaption>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
+    <img src="images/优化一栏目交互逻辑/实现双击记录展示详情.png" alt="Double click to open details" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Double-click to open details</figcaption>
   </figure>
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/多语言支持英文.png" alt="English Interface" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>English Interface</figcaption>
-  </figure>
-</div>
-
-### Management Features
-<div align="center">
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/支持订阅分组.png" alt="Group Management" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Subscription grouping</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/支持订阅信息时间过滤设定.png" alt="Time Filtering" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Time filtering</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/支持特定内容收藏.png" alt="Favorites" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Favorites feature</figcaption>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
+    <img src="images/优化一栏目交互逻辑/优化按键大小增加一个回到顶部.png" alt="Back to top button" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Back to top button</figcaption>
   </figure>
 </div>
 
