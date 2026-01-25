@@ -521,9 +521,13 @@ onMounted(async () => {
   initLayout()
   loadTheme()
   store.loadCollapsedGroups()
+  try {
+    await settingsStore.fetchSettings()
+  } catch (error) {
+    // Continue with defaults/local storage when settings fetch fails.
+  }
   await loadLanguage()
   await aiStore.fetchConfig()
-  await settingsStore.fetchSettings()
 
   dateRangeFilter.value = settingsStore.settings.default_date_range
   loadFavoritesData()
@@ -636,8 +640,8 @@ const timelineTitle = computed(() => {
   return t('navigation.allFeeds')
 })
 
-const timelineHasMore = computed(() => !showFavoritesOnly.value && store.entriesHasMore)
-const timelineLoadingMore = computed(() => !showFavoritesOnly.value && store.entriesLoadingMore)
+const timelineHasMore = computed(() => (!showFavoritesOnly.value && store.entriesHasMore === true) || false)
+const timelineLoadingMore = computed(() => (!showFavoritesOnly.value && store.entriesLoadingMore === true) || false)
 
 const timelineSubtitle = computed(() => {
   // Simple subtitle logic, can be enhanced

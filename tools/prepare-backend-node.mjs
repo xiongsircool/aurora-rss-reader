@@ -35,7 +35,10 @@ if (!existsSync(entryFile)) {
 rmSync(resourcesDir, { recursive: true, force: true });
 mkdirSync(resourcesDir, { recursive: true });
 cpSync(path.join(backendDir, 'dist'), path.join(resourcesDir, 'dist'), { recursive: true });
-cpSync(path.join(backendDir, 'node_modules'), path.join(resourcesDir, 'node_modules'), { recursive: true });
+cpSync(path.join(backendDir, 'node_modules'), path.join(resourcesDir, 'node_modules'), {
+  recursive: true,
+  dereference: true
+});
 cpSync(path.join(backendDir, 'package.json'), path.join(resourcesDir, 'package.json'));
 
 console.log(`✅ Backend resources staged at ${resourcesDir}`);

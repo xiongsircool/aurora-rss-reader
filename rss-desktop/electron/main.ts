@@ -330,6 +330,9 @@ function createWindow() {
       preload: PRELOAD_PATH,
       nodeIntegration: false,
       contextIsolation: true,
+      // 开发环境需要 unsafe-eval 用于 Vite HMR
+      // 生产环境会自动使用更严格的 CSP
+      devTools: isDev,
     },
   })
 
