@@ -1,4 +1,5 @@
 name: Build and Release
+# Multi-platform build workflow for Node.js backend
 
 on:
   push:
