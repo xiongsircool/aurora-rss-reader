@@ -7,6 +7,7 @@ import type { Entry } from '../types'
 
 type TitleTranslationResult = { title: string; language: string }
 type TranslationTask = { entryId: string; language: string }
+type TitleTranslationAutoRetryHandler = (entryId: string, language: string) => void
 
 /**
  * Composable for managing title translation with concurrency control
@@ -16,11 +17,16 @@ export function useTitleTranslation() {
   const aiStore = useAIStore()
   const settingsStore = useSettingsStore()
 
+  const TITLE_TRANSLATION_FAILURE_COOLDOWN_MS = 30_000
+
   const aiFeatures = computed(() => aiStore.config.features)
 
   const titleTranslationResults = ref<Record<string, string>>({})
   const titleTranslationLoadingMap = ref<Record<string, boolean>>({})
+  const titleTranslationFailureMap = ref<Record<string, number>>({})
   const inFlightPromises = new Map<string, Promise<TitleTranslationResult>>()
+  const autoRetryTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  let autoRetryHandler: TitleTranslationAutoRetryHandler | null = null
   const autoTranslationQueue: TranslationTask[] = []
   const queuedKeys = new Set<string>()
   let activeAutoTasks = 0
@@ -32,6 +38,64 @@ export function useTitleTranslation() {
   const maxAutoTitleTranslations = computed(() =>
     clampAutoTitleTranslationLimit(settingsStore.settings.max_auto_title_translations)
   )
+
+  function getFailureTimestamp(cacheKey: string): number | null {
+    return titleTranslationFailureMap.value[cacheKey] ?? null
+  }
+
+  function isInFailureCooldown(cacheKey: string): boolean {
+    const failedAt = getFailureTimestamp(cacheKey)
+    if (!failedAt) {
+      return false
+    }
+    return Date.now() - failedAt < TITLE_TRANSLATION_FAILURE_COOLDOWN_MS
+  }
+
+  function scheduleAutoRetry(cacheKey: string, entryId: string, language: string) {
+    const existingTimer = autoRetryTimers.get(cacheKey)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+    }
+    const timer = setTimeout(() => {
+      autoRetryTimers.delete(cacheKey)
+      if (!autoRetryHandler) {
+        return
+      }
+      if (titleTranslationResults.value[cacheKey] !== undefined) {
+        return
+      }
+      if (inFlightPromises.has(cacheKey)) {
+        return
+      }
+      autoRetryHandler(entryId, language)
+    }, TITLE_TRANSLATION_FAILURE_COOLDOWN_MS)
+    autoRetryTimers.set(cacheKey, timer)
+  }
+
+  function recordFailure(cacheKey: string, entryId: string, language: string) {
+    titleTranslationFailureMap.value[cacheKey] = Date.now()
+    scheduleAutoRetry(cacheKey, entryId, language)
+  }
+
+  function clearFailure(cacheKey: string) {
+    if (titleTranslationFailureMap.value[cacheKey]) {
+      delete titleTranslationFailureMap.value[cacheKey]
+    }
+    const timer = autoRetryTimers.get(cacheKey)
+    if (timer) {
+      clearTimeout(timer)
+      autoRetryTimers.delete(cacheKey)
+    }
+  }
+
+  function registerAutoRetryHandler(handler: TitleTranslationAutoRetryHandler | null) {
+    autoRetryHandler = handler
+    return () => {
+      if (autoRetryHandler === handler) {
+        autoRetryHandler = null
+      }
+    }
+  }
 
   function clearTitleTranslationCacheForLanguage(language?: string | null) {
     if (!language) {
@@ -48,6 +112,18 @@ export function useTitleTranslation() {
     Object.keys(loading).forEach((key) => {
       if (key.endsWith(suffix)) {
         delete loading[key]
+      }
+    })
+    const failures = titleTranslationFailureMap.value
+    Object.keys(failures).forEach((key) => {
+      if (key.endsWith(suffix)) {
+        delete failures[key]
+      }
+    })
+    autoRetryTimers.forEach((timer, key) => {
+      if (key.endsWith(suffix)) {
+        clearTimeout(timer)
+        autoRetryTimers.delete(key)
       }
     })
   }
@@ -87,6 +163,12 @@ export function useTitleTranslation() {
     return !!titleTranslationLoadingMap.value[cacheKey]
   }
 
+  function isTitleTranslationFailed(entryId: string, language?: string): boolean {
+    const currentLanguage = language || aiFeatures.value?.translation_language || 'zh'
+    const cacheKey = getTitleTranslationCacheKey(entryId, currentLanguage)
+    return !!titleTranslationFailureMap.value[cacheKey]
+  }
+
   /**
    * Request title translation and update local state
    */
@@ -94,6 +176,7 @@ export function useTitleTranslation() {
     const cacheKey = getTitleTranslationCacheKey(entryId, language)
     const cachedTitle = titleTranslationResults.value[cacheKey]
     if (cachedTitle !== undefined) {
+      clearFailure(cacheKey)
       if (titleTranslationLoadingMap.value[cacheKey]) {
         delete titleTranslationLoadingMap.value[cacheKey]
       }
@@ -105,11 +188,20 @@ export function useTitleTranslation() {
       return existing
     }
 
+    if (isInFailureCooldown(cacheKey)) {
+      throw new Error('Title translation is in cooldown')
+    }
+
     titleTranslationLoadingMap.value[cacheKey] = true
     const requestPromise = store.requestTitleTranslation(entryId, language)
       .then((result) => {
         titleTranslationResults.value[cacheKey] = result.title
+        clearFailure(cacheKey)
         return result
+      })
+      .catch((error) => {
+        recordFailure(cacheKey, entryId, language)
+        throw error
       })
       .finally(() => {
         delete titleTranslationLoadingMap.value[cacheKey]
@@ -125,6 +217,9 @@ export function useTitleTranslation() {
       return
     }
     const cacheKey = getTitleTranslationCacheKey(entry.id, language)
+    if (isInFailureCooldown(cacheKey)) {
+      return
+    }
     if (titleTranslationResults.value[cacheKey] !== undefined) {
       return
     }
@@ -219,6 +314,8 @@ export function useTitleTranslation() {
     getTitleTranslationCacheKey,
     getTranslatedTitle,
     isTitleTranslationLoading,
+    isTitleTranslationFailed,
+    registerAutoRetryHandler,
     requestTitleTranslation,
     queueAutoTitleTranslation,
     setupAutoTranslationWatcher

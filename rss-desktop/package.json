@@ -46,13 +46,13 @@
   "scripts": {
     "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\" --names \"UI,API\" --prefix-colors \"cyan,green\"",
     "dev:frontend": "vite --host",
-    "dev:backend": "cd ../backend && source .venv/bin/activate && python -m scripts.serve",
+    "dev:backend": "cd ../backend-node && npm run dev",
     "dev:electron": "vite --mode electron",
     "build": "vue-tsc && vite build",
-    "pack": "pnpm build && electron-builder",
+    "prepare:backend": "node ../tools/prepare-backend-node.mjs",
+    "pack": "pnpm prepare:backend && pnpm build && electron-builder",
     "build:web": "vue-tsc && vite build",
     "preview": "vite preview",
-    "migrate": "cd ../backend && source .venv/bin/activate && python -m scripts.migrate",
     "typecheck": "vue-tsc --noEmit",
     "clean": "rm -rf dist dist-electron release .vite out"
   },

@@ -29,7 +29,7 @@
 
 **Packaging Fix & Platform Support | 打包修复与平台支持**
 
-- 🔧 **Fixed Windows Packaging** - Resolved PyInstaller dependency issues, backend now starts correctly
+- 🔧 **Fixed Windows Packaging** - Backend now starts correctly on Windows installers
 - 🍎 **macOS Intel Support** - Added support for older Intel-based Macs (x64)
 - 📦 **Improved Build System** - All module dependencies now correctly included in packaged app
 - 🗄️ **Database Initialization** - Fixed database table creation on first launch
@@ -126,7 +126,6 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 
 ### System Requirements
 - Node.js 18+
-- Python 3.12+
 - pnpm 8+
 
 ### Installation and Running
@@ -135,65 +134,25 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 git clone https://github.com/xiongsircool/aurora-rss-reader.git
 cd aurora-rss-reader
 
-# One-click startup
+# Recommended: Node.js backend
+cd backend-node
+npm install
+cd ../rss-desktop
+pnpm install
+pnpm dev
+
+# Quick start (Node.js backend)
+cd ..
 chmod +x start.sh
 ./start.sh
 ```
 
 ### Development Setup (Manual)
+Recommended (backend-node):
+- `cd backend-node && npm install`
+- `cd rss-desktop && pnpm install`
+- `pnpm dev` (from `rss-desktop`)
 
-#### Windows
-
-1.  **Backend Setup**:
-    ```powershell
-    cd backend
-    copy .env.example .env
-    python -m venv .venv
-    .\.venv\Scripts\pip install -r requirements.txt
-    .\.venv\Scripts\pip install -e .
-    .\.venv\Scripts\python -m scripts.migrate
-    ```
-
-2.  **Frontend Setup**:
-    ```powershell
-    cd rss-desktop
-    copy .env.example .env
-    pnpm install
-    ```
-
-3.  **Run Application**:
-    ```powershell
-    cd rss-desktop
-    pnpm dev
-    ```
-
-#### Linux / macOS
-
-You can use the `start.sh` script or follow these manual steps:
-
-1.  **Backend Setup**:
-    ```bash
-    cd backend
-    cp .env.example .env
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
-    pip install -e .
-    python -m scripts.migrate
-    ```
-
-2.  **Frontend Setup**:
-    ```bash
-    cd rss-desktop
-    cp .env.example .env
-    pnpm install
-    ```
-
-3.  **Run Application**:
-    ```bash
-The startup script will automatically:
-- Create Python virtual environment
-- Install frontend and backend dependencies
 ### Troubleshooting
 ### macOS Compatibility
 **Initial Setup:**
@@ -218,12 +177,12 @@ A: Check the backend service logs if possible. First launch may take longer to i
 - **Web Interface**: http://localhost:5173
 - **API Service**: http://127.0.0.1:15432
 
-### Configuration File
-Edit `backend/.env` to configure AI and RSSHub:
+### Configuration
+Set environment variables for the Node.js backend to configure AI and RSSHub:
 
 ```env
 # RSSHub
-RSSHUB_BASE=https://rsshub.app
+RSSHUB_BASE_URL=https://rsshub.app
 
 # AI Configuration
 GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
@@ -252,9 +211,9 @@ Generated files:
 ## Tech Stack
 
 - **Frontend**: Vue 3 + Vite + Pinia + TypeScript
-- **Backend**: FastAPI + SQLModel + SQLite
+- **Backend**: Fastify + TypeScript + SQLite
 - **Desktop App**: Electron
-- **Build Tools**: PyInstaller + electron-builder
+- **Build Tools**: electron-builder
 
 ## Project Structure
 
@@ -263,9 +222,7 @@ aurora-rss-reader/
 ├── rss-desktop/          # Frontend code
 │   ├── src/             # Vue source code
 │   └── electron/        # Electron main process
-├── backend/             # Backend service
-│   ├── app/            # FastAPI application
-│   └── .venv/          # Python virtual environment
+├── backend-node/        # Node.js backend (Fastify)
 ├── images/              # Image resources
 └── start.sh            # Startup script
 ```

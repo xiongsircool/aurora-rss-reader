@@ -4,9 +4,6 @@ import { useI18n } from 'vue-i18n'
 defineProps<{
   isStarred: boolean
   translationLanguage: string
-  // 标题翻译相关
-  isTranslating?: boolean
-  showTranslation?: boolean
   // 全文翻译相关
   isFullTextTranslating?: boolean
   showFullTextTranslation?: boolean
@@ -17,7 +14,6 @@ const emit = defineEmits<{
   (e: 'open-external'): void
   (e: 'toggle-star'): void
   (e: 'update:translationLanguage', value: string): void
-  (e: 'toggle-translation'): void
   (e: 'toggle-full-text-translation'): void
 }>()
 
@@ -35,19 +31,6 @@ const { t } = useI18n()
       class="action-btn h-[clamp(28px,3.2vw,34px)] px-[clamp(10px,1.3vw,14px)] rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-primary)] font-medium text-[clamp(0.72rem,1vw,0.8rem)] tracking-tight cursor-pointer transition-all duration-200 min-w-17 whitespace-nowrap shadow-sm hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:c-white hover:shadow-lg"
     >
       {{ isStarred ? t('articles.cancelFavorite') : t('articles.addFavorite') }}
-    </button>
-    <button
-      @click="emit('toggle-translation')"
-      :disabled="isTranslating"
-      class="action-btn h-[clamp(28px,3.2vw,34px)] px-[clamp(10px,1.3vw,14px)] rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-primary)] font-medium text-[clamp(0.72rem,1vw,0.8rem)] tracking-tight cursor-pointer transition-all duration-200 min-w-17 whitespace-nowrap shadow-sm hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:c-white hover:shadow-lg disabled:op-60 disabled:cursor-not-allowed disabled:c-[var(--text-secondary)] disabled:bg-[var(--bg-surface)] disabled:border-[var(--border-color)] disabled:shadow-none"
-      :class="{ 'is-active': showTranslation && !isTranslating }"
-    >
-      <template v-if="isTranslating">
-        {{ t('ai.translating') }}
-      </template>
-      <template v-else>
-        {{ t('ai.translateTitle') }}
-      </template>
     </button>
     <!-- 全文翻译按钮（包含标题翻译） -->
     <button

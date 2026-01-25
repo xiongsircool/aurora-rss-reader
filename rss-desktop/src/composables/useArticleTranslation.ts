@@ -240,7 +240,8 @@ export function useArticleTranslation(
     switch (event) {
       case 'progress': {
         const progressData = data as SSEProgressEvent
-        progress.value = Math.round((progressData.cached / total) * 100)
+        // 使用 completed 而不是 cached 来计算进度
+        progress.value = Math.round((progressData.completed / total) * 100)
         break
       }
 

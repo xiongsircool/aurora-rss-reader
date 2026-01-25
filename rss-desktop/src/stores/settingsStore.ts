@@ -18,6 +18,8 @@ export interface AppSettings {
   mark_as_read_range: string // 'current' | '3d' | '7d' | '30d' | 'all'
   // 详情栏显示模式
   details_panel_mode: 'docked' | 'click'
+  // 语言设置
+  language: string // 'zh' | 'en' | 'ja' | 'ko'
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -32,7 +34,8 @@ export const useSettingsStore = defineStore('settings', () => {
     open_original_mode: 'system',
     max_auto_title_translations: getDefaultAutoTitleTranslationLimit(),
     mark_as_read_range: 'current',
-    details_panel_mode: 'docked'
+    details_panel_mode: 'docked',
+    language: 'zh'
   })
 
   const loading = ref(false)

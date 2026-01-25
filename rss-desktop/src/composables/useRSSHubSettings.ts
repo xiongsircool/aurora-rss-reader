@@ -55,24 +55,19 @@ export function useRSSHubSettings() {
 
         try {
             await saveRSSHubUrl()
-            const { data: result } = await api.post('/settings/test-rsshub-quick')
+            const { data: result } = await api.post('/settings/test-rsshub-quick', {
+                url: rsshubUrl.value
+            })
 
             if (result.success) {
                 rsshubTestResult.value = {
                     success: true,
-                    message: `✅ RSSHub连接测试成功！<br>
-                   响应时间: ${result.response_time?.toFixed(2)}秒<br>
-                   RSS条目数: ${result.entries_count}<br>
-                   Feed标题: ${result.feed_title}<br>
-                   测试路由: ${result.test_url.split('/').pop()}`
+                    message: `✅ ${result.message || 'RSSHub连接测试成功！'}`
                 }
             } else {
                 rsshubTestResult.value = {
                     success: false,
-                    message: `❌ RSSHub连接测试失败<br>
-                   错误信息: ${result.message}<br>
-                   测试地址: ${result.rsshub_url}<br>
-                   测试时间: ${new Date(result.tested_at).toLocaleString()}`
+                    message: `❌ ${result.message || 'RSSHub连接测试失败'}`
                 }
             }
         } catch (error) {

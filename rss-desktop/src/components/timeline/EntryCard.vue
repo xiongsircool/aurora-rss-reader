@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSanitize } from '../../composables/useSanitize'
+import { formatDate } from '../../utils/date'
 import type { Entry } from '../../types'
 
-defineProps<{
+const props = defineProps<{
   entry: Entry
   active: boolean
   showTranslation: boolean
   translatedTitle: string | null
   isTranslationLoading: boolean
+  isTranslationFailed: boolean
   titleDisplayMode: string
   translationLanguageLabel: string
   showSummary: boolean
@@ -20,20 +23,10 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const { sanitize } = useSanitize()
+const { sanitize, sanitizeTitle } = useSanitize()
 
-function formatDate(date?: string | null) {
-  if (!date) return '未知时间'
-  // Simple relative time - would use dayjs in real implementation
-  const d = new Date(date)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  if (hours < 1) return '刚刚'
-  if (hours < 24) return `${hours}小时前`
-  const days = Math.floor(hours / 24)
-  return `${days}天前`
-}
+const safeTitle = computed(() => sanitizeTitle(props.entry.title))
+const safeTranslatedTitle = computed(() => sanitizeTitle(props.translatedTitle))
 
 function getEntryPreview(entry: Entry): string {
   const summary = entry.summary?.trim()
@@ -64,34 +57,35 @@ function getEntryPreview(entry: Entry): string {
       <!-- Title display area -->
       <template v-if="showTranslation && translatedTitle">
         <!-- Mode 1: Replace - show translation only -->
-        <div v-if="titleDisplayMode === 'replace'" class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]">
-          {{ translatedTitle }}
-        </div>
-        
+        <div v-if="titleDisplayMode === 'replace'" class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]" v-html="safeTranslatedTitle"></div>
+
         <!-- Mode 2: Translation first -->
         <template v-else-if="titleDisplayMode === 'translation-first'">
-          <div class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]">{{ translatedTitle }}</div>
+          <div class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]" v-html="safeTranslatedTitle"></div>
           <div class="mt-1.5 flex items-center gap-1.5 text-[0.85rem] c-[var(--text-secondary)] italic dark:c-white/60">
             <span class="text-[0.75rem] op-70">🌐</span>
-            {{ entry.title || '未命名文章' }}
+            <span v-html="safeTitle || '未命名文章'"></span>
           </div>
         </template>
-        
+
         <!-- Mode 3: Original first (default) -->
         <template v-else>
-          <div class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]">{{ entry.title || '未命名文章' }}</div>
+          <div class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]" v-html="safeTitle || '未命名文章'"></div>
           <div class="mt-1.5 flex items-center gap-1.5 text-[0.85rem] c-[var(--text-secondary)] dark:c-white/75">
             <span class="inline-flex items-center h-[1.35rem] px-[0.45rem] rounded-full text-[0.72rem] tracking-wider font-semibold uppercase border border-[rgba(255,122,24,0.35)] bg-[rgba(255,122,24,0.14)] c-[#ff7a18] shadow-[inset_0_1px_1px_rgba(255,255,255,0.45)] dark:bg-white/10 dark:border-white/25 dark:c-[#ffe4d3]">{{ t('articles.translationLabel', { language: translationLanguageLabel }) }}</span>
-            {{ translatedTitle }}
+            <span v-html="safeTranslatedTitle"></span>
           </div>
         </template>
       </template>
-      
+
       <!-- No translation or loading -->
       <template v-else>
-        <div class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]">{{ entry.title || '未命名文章' }}</div>
+        <div class="font-semibold leading-relaxed break-words [overflow-wrap:anywhere]" v-html="safeTitle || '未命名文章'"></div>
         <div v-if="showTranslation && isTranslationLoading" class="mt-1.5 flex items-center gap-1.5 text-[0.85rem] c-[var(--text-secondary)]">
           <span class="inline-block c-[var(--text-secondary)] italic animate-pulse">{{ t('articles.translatingTitle') }}</span>
+        </div>
+        <div v-else-if="showTranslation && isTranslationFailed" class="mt-1.5 flex items-center gap-1.5 text-[0.85rem] c-[#c43838]">
+          <span class="inline-block italic">{{ t('ai.titleTranslationFailed') }}</span>
         </div>
       </template>
       
@@ -105,7 +99,7 @@ function getEntryPreview(entry: Entry): string {
         </span>
         <span>{{ entry.feed_title }}</span>
         <span>{{ t('articles.timeSeparator') }}</span>
-        <span>{{ formatDate(entry.published_at) }}</span>
+        <span>{{ formatDate(entry.published_at, entry.inserted_at) }}</span>
       </div>
       <p v-if="showSummary" class="c-[var(--text-secondary)] text-sm leading-relaxed line-clamp-3 break-words [overflow-wrap:anywhere] max-h-[clamp(4.2em,6vw,6.3em)] m-0">
         {{ getEntryPreview(entry) }}

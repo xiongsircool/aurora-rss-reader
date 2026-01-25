@@ -354,7 +354,8 @@
     "summarySuccess": "Summary generated successfully",
     "summaryFailed": "Summary generation failed, please check API config",
     "translationSuccess": "Translation successful",
-    "translationFailed": "Translation failed, please check API config"
+    "translationFailed": "Translation failed, please check API config",
+    "translationNoText": "No translatable text found in this article"
   },
   "errors": {
     "network": "Network connection failed",

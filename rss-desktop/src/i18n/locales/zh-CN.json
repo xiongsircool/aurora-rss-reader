@@ -214,6 +214,7 @@
   "settings": {
     "title": "设置",
     "general": "常规",
+    "sync": "同步",
     "appearance": "外观",
     "language": "语言",
     "theme": "主题",
@@ -357,7 +358,8 @@
     "summarySuccess": "摘要生成成功",
     "summaryFailed": "摘要生成失败，请检查 API 配置",
     "translationSuccess": "翻译成功",
-    "translationFailed": "翻译失败，请检查 API 配置"
+    "translationFailed": "翻译失败，请检查 API 配置",
+    "translationNoText": "未发现可翻译的文本"
   },
   "errors": {
     "network": "网络连接失败",

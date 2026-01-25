@@ -37,6 +37,7 @@ const props = defineProps<{
   // Function Props for Translation Helpers
   getTranslatedTitle: (entryId: string) => string | null
   isTranslationLoading: (entryId: string) => boolean
+  isTranslationFailed: (entryId: string) => boolean
 }>()
 
 const emit = defineEmits<{
@@ -131,6 +132,8 @@ function handleVisibleUpdate(
               item.summary,
               item.title,
               getTranslatedTitle(item.id),
+              isTranslationLoading(item.id),
+              isTranslationFailed(item.id),
               showSummary
             ]"
             :data-index="index"
@@ -142,6 +145,7 @@ function handleVisibleUpdate(
               :show-translation="autoTitleTranslation"
               :translated-title="getTranslatedTitle(item.id)"
               :is-translation-loading="isTranslationLoading(item.id)"
+              :is-translation-failed="isTranslationFailed(item.id)"
               :title-display-mode="titleDisplayMode"
               :translation-language-label="translationLanguageLabel"
               :show-summary="showSummary"

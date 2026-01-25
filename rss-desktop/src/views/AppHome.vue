@@ -40,6 +40,8 @@ const {
   titleTranslationLanguageLabel,
   getTranslatedTitle,
   isTitleTranslationLoading,
+  isTitleTranslationFailed,
+  registerAutoRetryHandler,
   queueAutoTitleTranslation,
   requestTitleTranslation,
   setupAutoTranslationWatcher
@@ -66,9 +68,6 @@ const {
 
 const { handleToggleStar } = useFeedActions()
 
-// 初始化语言设置
-loadLanguage()
-
 // Setup Watchers
 setupFilterWatchers()
 
@@ -76,6 +75,16 @@ const summaryText = ref('')
 const summaryLoading = ref(false)
 const translationLanguage = ref('zh')
 const lastVisibleEntries = ref<Entry[]>([])
+const cleanupTitleTranslationAutoRetry = registerAutoRetryHandler((entryId, language) => {
+  if (!aiFeatures.value?.auto_title_translation) {
+    return
+  }
+  const entry = lastVisibleEntries.value.find((item) => item.id === entryId)
+  if (!entry) {
+    return
+  }
+  queueAutoTitleTranslation(entry, language)
+})
 
 const editingFeedId = ref<string | null>(null)
 const editingGroupName = ref('')
@@ -211,15 +220,51 @@ const detailsOverlayStyle = computed(() => ({
   '--details-width': detailsOverlayWidth.value,
 }))
 
+function getContentTextLength(html?: string | null): number {
+  if (!html) return 0
+  if (typeof DOMParser === 'undefined') {
+    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().length
+  }
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const text = doc.body?.textContent ?? ''
+  return text.replace(/\s+/g, ' ').trim().length
+}
+
+function selectTranslationContent(entry: Entry | null): string | null {
+  if (!entry) return null
+  const candidates = [
+    { value: entry.readability_content, priority: 3 },
+    { value: entry.content, priority: 2 },
+    { value: entry.summary, priority: 1 },
+  ]
+
+  let best: { value: string; length: number; priority: number } | null = null
+
+  for (const candidate of candidates) {
+    if (!candidate.value) continue
+    const length = getContentTextLength(candidate.value)
+    if (!best || length > best.length || (length === best.length && candidate.priority > best.priority)) {
+      best = { value: candidate.value, length, priority: candidate.priority }
+    }
+  }
+
+  if (best && best.length > 0) {
+    return best.value
+  }
+
+  return entry.readability_content ?? entry.content ?? entry.summary ?? null
+}
+
 // 全文翻译相关状态
 const currentEntryId = computed(() => currentSelectedEntry.value?.id ?? null)
-const currentEntryContent = computed(() => currentSelectedEntry.value?.content ?? null)
+const currentEntryContent = computed(() => selectTranslationContent(currentSelectedEntry.value ?? null))
 
 const {
   progress: fullTextTranslationProgress,
   blocks: fullTextTranslationBlocks,
   isTranslating: isFullTextTranslating,
   showTranslation: showFullTextTranslation,
+  translatableBlocks: fullTextTranslatableBlocks,
   getTranslation: getFullTextTranslation,
   isBlockLoading: isFullTextBlockLoading,
   isBlockFailed: isFullTextBlockFailed,
@@ -232,31 +277,6 @@ const translatedTitle = computed(() => {
   return getTranslatedTitle(currentSelectedEntry.value.id, translationLanguage.value)
 })
 
-const showTitleTranslationRaw = ref(false)
-const showTitleTranslation = computed(
-  () => showFullTextTranslation.value || showTitleTranslationRaw.value
-)
-
-const isTitleTranslating = computed(() => {
-  if (!currentSelectedEntry.value) return false
-  return isTitleTranslationLoading(currentSelectedEntry.value.id, translationLanguage.value)
-})
-
-async function handleTitleTranslation() {
-  if (!currentSelectedEntry.value) return
-  const nextShow = !showTitleTranslationRaw.value
-  showTitleTranslationRaw.value = nextShow
-
-  if (!nextShow) {
-    return
-  }
-
-  try {
-    await requestTitleTranslation(currentSelectedEntry.value.id, translationLanguage.value)
-  } catch (error) {
-    console.warn('Title translation failed:', error)
-  }
-}
 
 // 全文翻译（包含标题翻译）
 async function handleFullTextTranslation() {
@@ -265,6 +285,11 @@ async function handleFullTextTranslation() {
 
   // 如果是开启翻译，同时翻译标题
   if (!wasShowing && currentSelectedEntry.value) {
+    await nextTick()
+    if (fullTextTranslatableBlocks.value.length === 0) {
+      showNotification(t('toast.translationNoText'), 'info')
+    }
+
     try {
       await requestTitleTranslation(currentSelectedEntry.value.id, translationLanguage.value)
     } catch (error) {
@@ -496,6 +521,7 @@ onMounted(async () => {
   initLayout()
   loadTheme()
   store.loadCollapsedGroups()
+  await loadLanguage()
   await aiStore.fetchConfig()
   await settingsStore.fetchSettings()
 
@@ -518,6 +544,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  cleanupTitleTranslationAutoRetry()
   cleanupLayout()
   cleanupSync()
   unlockBodyScroll()
@@ -551,13 +578,6 @@ watch(
       await store.toggleEntryState(entry, { read: true })
     }
 
-    if (showTitleTranslationRaw.value) {
-      try {
-        await requestTitleTranslation(entry.id, translationLanguage.value)
-      } catch (error) {
-        console.warn('Title translation failed:', error)
-      }
-    }
   },
   { immediate: true },
 )
@@ -573,7 +593,7 @@ watch(
       return
     }
 
-    if (!showFullTextTranslation.value && !showTitleTranslationRaw.value) {
+    if (!showFullTextTranslation.value) {
       return
     }
 
@@ -670,21 +690,34 @@ async function toggleStarFromList(entry: any) {
   })
 }
 
+function normalizeExternalUrl(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed
+  if (trimmed.startsWith('//')) return `https:${trimmed}`
+  return `https://${trimmed}`
+}
+
 async function openExternal(url?: string | null) {
   if (!url) return
+
+  const normalizedUrl = normalizeExternalUrl(url)
+  if (!normalizedUrl) return
 
   const mode = settingsStore.settings.open_original_mode ?? 'system'
   const ipc = window.ipcRenderer
   if (ipc?.invoke) {
     try {
-      await ipc.invoke('open-external', { url, mode })
-      return
+      const result = await ipc.invoke('open-external', { url: normalizedUrl, mode })
+      if (result?.success) {
+        return
+      }
     } catch (error) {
       console.warn('Failed to open external URL via main process:', error)
     }
   }
 
-  window.open(url, '_blank', 'noopener,noreferrer')
+  window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
 }
 
 async function handleGroupClick(groupName: string) {
@@ -936,6 +969,7 @@ async function handleMarkFeedAsRead(feedId: string) {
       :selected-entry-id="currentSelectedEntry?.id || null"
       :get-translated-title="getTranslatedTitle"
       :is-translation-loading="isTitleTranslationLoading"
+      :is-translation-failed="isTitleTranslationFailed"
       @refresh="reloadFeeds"
       @back-to-feeds="backToAllFeeds"
       @update:search-query="searchQuery = $event"
@@ -963,8 +997,6 @@ async function handleMarkFeedAsRead(feedId: string) {
       :translation-language="translationLanguage"
       :summary-text="summaryText"
       :summary-loading="summaryLoading"
-      :is-translating="isTitleTranslating"
-      :show-translation="showTitleTranslation"
       :full-text-translation-blocks="fullTextTranslationBlocks"
       :is-full-text-translating="isFullTextTranslating"
       :show-full-text-translation="showFullTextTranslation"
@@ -976,7 +1008,6 @@ async function handleMarkFeedAsRead(feedId: string) {
       @toggle-star="toggleStar"
       @generate-summary="handleSummary"
       @update:translation-language="translationLanguage = $event"
-      @toggle-translation="handleTitleTranslation"
       @toggle-full-text-translation="handleFullTextTranslation"
     />
   </div>
@@ -1005,8 +1036,6 @@ async function handleMarkFeedAsRead(feedId: string) {
             :translation-language="translationLanguage"
             :summary-text="summaryText"
             :summary-loading="summaryLoading"
-            :is-translating="isTitleTranslating"
-            :show-translation="showTitleTranslation"
             :full-text-translation-blocks="fullTextTranslationBlocks"
             :is-full-text-translating="isFullTextTranslating"
             :show-full-text-translation="showFullTextTranslation"
@@ -1018,7 +1047,6 @@ async function handleMarkFeedAsRead(feedId: string) {
             @toggle-star="toggleStar"
             @generate-summary="handleSummary"
             @update:translation-language="translationLanguage = $event"
-            @toggle-translation="handleTitleTranslation"
             @toggle-full-text-translation="handleFullTextTranslation"
           />
         </div>

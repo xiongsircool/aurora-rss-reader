@@ -11,6 +11,7 @@ export interface StarredEntry {
   author: string | null
   summary: string | null
   content: string | null
+  readability_content?: string | null
   published_at: string | null
   inserted_at: string | null
   read: boolean

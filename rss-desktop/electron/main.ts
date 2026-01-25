@@ -33,7 +33,7 @@ let backendReady = false
 const PRELOAD_PATH = resolvePreloadPath()
 const isDev = VITE_DEV_SERVER_URL !== undefined
 const projectRoot = path.join(process.env.APP_ROOT, '..')
-const backendDir = path.join(projectRoot, 'backend')
+const backendDir = path.join(projectRoot, 'backend-node')
 let devtoolsOpened = false
 
 // 后端配置
@@ -139,68 +139,52 @@ async function waitForBackendReady(): Promise<boolean> {
 /**
  * 获取后端可执行文件路径
  */
-function getBackendExecutable(): { exec: string; args: string[]; cwd: string } {
+function getBackendExecutable(): { exec: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv } {
   if (isDev) {
-    // 开发环境：使用Python虚拟环境
-    const venvPath = process.platform === 'win32'
-      ? path.join(backendDir, '.venv', 'Scripts', 'python.exe')
-      : path.join(backendDir, '.venv', 'bin', 'python3')
+    // 开发环境：使用 tsx 运行 Node.js 后端
+    const npmExec = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
-    const pythonExec = fs.existsSync(venvPath)
-      ? venvPath
-      : (process.platform === 'win32' ? 'python' : 'python3')
-
-    console.log('🔧 开发环境，使用Python:', pythonExec)
+    console.log('🔧 开发环境，使用 npm run dev')
 
     return {
-      exec: pythonExec,
-      args: ['-m', 'scripts.serve'],
+      exec: npmExec,
+      args: ['run', 'dev'],
       cwd: backendDir
     }
   } else {
-    // 生产环境：使用打包好的后端可执行文件
+    // 生产环境：使用打包好的 Node.js 后端入口脚本
     // 尝试多个可能的路径
-    const possiblePaths = [
+    const possibleRoots = [
       // 方式1: 在 app.asar 同级的 resources 目录
-      path.join(process.resourcesPath, 'backend', 'aurora-backend'),
-      // 方式2: 在 APP_ROOT 的 backend 目录
-      path.join(process.env.APP_ROOT || '', 'backend', 'aurora-backend'),
+      path.join(process.resourcesPath, 'backend-node'),
+      // 方式2: 在 APP_ROOT 的 backend-node 目录
+      path.join(process.env.APP_ROOT || '', 'backend-node'),
       // 方式3: 在应用目录
-      path.join(path.dirname(app.getPath('exe')), 'backend', 'aurora-backend'),
+      path.join(path.dirname(app.getPath('exe')), 'backend-node'),
     ]
 
-    // Windows 添加 .exe 后缀
-    if (process.platform === 'win32') {
-      possiblePaths.forEach((p, i) => {
-        possiblePaths[i] = p + '.exe'
-      })
-    }
+    const entryFile = path.join('dist', 'main.js')
+    const possibleEntries = possibleRoots.map((root) => path.join(root, entryFile))
 
-    console.log('🔍 搜索后端可执行文件...')
-    for (const backendPath of possiblePaths) {
-      console.log(`   检查: ${backendPath}`)
-      if (fs.existsSync(backendPath)) {
-        console.log(`✅ 找到后端: ${backendPath}`)
-
-        // 确保文件有执行权限 (Unix系统)
-        if (process.platform !== 'win32') {
-          try {
-            fs.chmodSync(backendPath, 0o755)
-          } catch (err) {
-            console.warn('⚠️  无法设置执行权限:', err)
-          }
-        }
+    console.log('🔍 搜索 Node.js 后端入口脚本...')
+    for (const entryPath of possibleEntries) {
+      console.log(`   检查: ${entryPath}`)
+      if (fs.existsSync(entryPath)) {
+        console.log(`✅ 找到后端入口: ${entryPath}`)
 
         return {
-          exec: backendPath,
-          args: [],
-          cwd: path.dirname(backendPath)
+          exec: process.execPath,
+          args: [entryPath],
+          cwd: path.dirname(path.dirname(entryPath)),
+          env: {
+            ELECTRON_RUN_AS_NODE: '1',
+          }
         }
       }
     }
 
-    console.error('❌ 找不到后端可执行文件，搜索路径:', possiblePaths)
-    throw new Error('Backend executable not found in any expected location')
+    console.error('❌ 找不到 Node.js 后端入口脚本，搜索路径:', possibleEntries)
+    throw new Error('Node.js backend entry not found in any expected location')
   }
 }
 
@@ -220,9 +204,9 @@ async function startBackend(): Promise<{ success: boolean; error?: string; path?
   let execPath = ''
 
   try {
-    logToFile('Finding backend executable...')
+    logToFile('Finding backend entry...')
     try {
-      const { exec, args, cwd } = getBackendExecutable()
+      const { exec, args, cwd, env: backendEnv } = getBackendExecutable()
       execPath = exec
 
       logToFile('🚀 启动后端服务...')
@@ -234,9 +218,11 @@ async function startBackend(): Promise<{ success: boolean; error?: string; path?
         cwd,
         env: {
           ...process.env,
-          PYTHONUNBUFFERED: '1',
+          ...(backendEnv || {}),
+          NODE_ENV: isDev ? 'development' : 'production',
           APP_ENV: isDev ? 'development' : 'production',
-          AURORA_DATA_DIR: app.getPath('userData')
+          API_PORT: String(BACKEND_PORT),
+          API_HOST: BACKEND_HOST
         },
         stdio: isDev ? 'inherit' : ['pipe', 'pipe', 'pipe'] as const
       }

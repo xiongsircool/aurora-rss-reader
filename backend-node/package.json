@@ -1,0 +1,35 @@
+{
+  "name": "aurora-rss-backend-node",
+  "version": "0.1.0",
+  "description": "Node.js backend for Aurora RSS Reader",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/multipart": "^8.3.1",
+    "@lancedb/lancedb": "^0.23.0",
+    "@mozilla/readability": "^0.5.0",
+    "better-sqlite3": "^9.4.0",
+    "dayjs": "^1.11.10",
+    "fast-xml-parser": "^4.3.4",
+    "fastify": "^4.26.0",
+    "jsdom": "^24.0.0",
+    "node-cron": "^3.0.3",
+    "openai": "^6.16.0",
+    "rss-parser": "^3.13.0",
+    "undici": "^6.6.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^20.11.0",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

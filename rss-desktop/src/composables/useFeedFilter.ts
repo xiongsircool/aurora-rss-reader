@@ -73,7 +73,9 @@ export function useFeedFilter() {
             result = result.filter(
                 (entry) =>
                     entry.title?.toLowerCase().includes(query) ||
+                    entry.translated_title?.toLowerCase().includes(query) ||
                     entry.summary?.toLowerCase().includes(query) ||
+                    entry.translated_summary?.toLowerCase().includes(query) ||
                     entry.content?.toLowerCase().includes(query) ||
                     entry.feed_title?.toLowerCase().includes(query)
             )

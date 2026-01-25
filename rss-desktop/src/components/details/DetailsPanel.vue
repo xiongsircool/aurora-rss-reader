@@ -20,10 +20,6 @@ const props = defineProps<{
   summaryText: string
   summaryLoading: boolean
 
-  // Title translation state
-  isTranslating: boolean
-  showTranslation: boolean
-
   // Full-text translation state
   fullTextTranslationBlocks: ContentBlock[]
   isFullTextTranslating: boolean
@@ -40,7 +36,6 @@ const emit = defineEmits<{
   (e: 'toggle-star'): void
   (e: 'generate-summary'): void
   (e: 'update:translationLanguage', value: string): void
-  (e: 'toggle-translation'): void
   (e: 'toggle-full-text-translation'): void
 }>()
 
@@ -60,22 +55,19 @@ const containerClasses = computed(() => [
     <div v-if="entry" class="flex flex-col min-h-0">
       <DetailsHeader
         :entry="entry"
-        :show-translated-title="showTranslation"
+        :show-translated-title="showFullTextTranslation"
         :translated-title="translatedTitle"
       />
 
       <DetailsActions
         :is-starred="entry.starred"
         :translation-language="translationLanguage"
-        :is-translating="isTranslating"
-        :show-translation="showTranslation"
         :is-full-text-translating="isFullTextTranslating"
         :show-full-text-translation="showFullTextTranslation"
         :full-text-translation-progress="fullTextTranslationProgress"
         @open-external="emit('open-external')"
         @toggle-star="emit('toggle-star')"
         @update:translation-language="emit('update:translationLanguage', $event)"
-        @toggle-translation="emit('toggle-translation')"
         @toggle-full-text-translation="emit('toggle-full-text-translation')"
       />
 

@@ -18,10 +18,13 @@ export interface Entry {
   author: string | null
   summary: string | null
   content: string | null
+  readability_content?: string | null
   published_at: string | null
   inserted_at: string | null
   read: boolean
   starred: boolean
+  translated_title?: string | null
+  translated_summary?: string | null
 }
 
 export interface EntryPage {

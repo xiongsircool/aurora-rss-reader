@@ -27,7 +27,7 @@
 
 **打包修复与平台支持 | Packaging Fix & Platform Support**
 
-- 🔧 **修复Windows打包** - 解决 PyInstaller 依赖问题，后端现在可以正确启动
+- 🔧 **修复Windows打包** - 后端现在可以正确启动
 - 🍎 **macOS Intel 支持** - 新增对老款 Intel Mac (x64) 的支持
 - 📦 **构建系统优化** - 确保所有模块依赖正确包含在打包应用中
 - 🗄️ **数据库初始化** - 修复首次启动时数据库表创建问题
@@ -37,7 +37,7 @@
 
 ---
 
-Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + FastAPI stack, providing smooth user experience and powerful functionality.
+Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + Fastify (Node.js) stack, providing smooth user experience and powerful functionality.
 
 **Current Version: v0.1.3**
 
@@ -88,9 +88,9 @@ chmod +x start.sh
 ### Tech Stack | 技术栈
 
 - **Frontend | 前端**: Vue 3 + Vite + Pinia + TypeScript
-- **Backend | 后端**: FastAPI + SQLModel + SQLite
+- **Backend | 后端**: Fastify + TypeScript + SQLite
 - **Desktop | 桌面**: Electron
-- **Build | 构建**: PyInstaller + electron-builder
+- **Build | 构建**: electron-builder
 
 </details>
 
@@ -179,7 +179,6 @@ chmod +x start.sh
 
 ### 系统要求
 - Node.js 18+
-- Python 3.12+
 - pnpm 8+
 
 ### 安装运行
@@ -188,28 +187,32 @@ chmod +x start.sh
 git clone https://github.com/xiongsircool/aurora-rss-reader.git
 cd aurora-rss-reader
 
-# 一键启动
+# 推荐：Node.js 后端
+cd backend-node
+npm install
+cd ../rss-desktop
+pnpm install
+pnpm dev
+
+# 快速启动（Node.js 后端）
+cd ..
 chmod +x start.sh
 ./start.sh
 ```
 
-启动脚本会自动：
-- 创建 Python 虚拟环境
-- 安装前后端依赖
-- 初始化数据库
-- 启动 Electron 应用
+`start.sh` 会安装依赖并启动 Electron。
 
 ### 访问地址
 - **桌面应用**：自动打开 Electron 窗口
 - **Web 界面**：http://localhost:5173
 - **API 服务**：http://127.0.0.1:15432
 
-### 配置文件
-编辑 `backend/.env` 配置 AI 和 RSSHub：
+### 配置
+通过环境变量配置 AI 和 RSSHub：
 
 ```env
 # RSSHub
-RSSHUB_BASE=https://rsshub.app
+RSSHUB_BASE_URL=https://rsshub.app
 
 # AI 配置
 GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
@@ -218,10 +221,10 @@ GLM_API_KEY=your_api_key_here
 ```
 
 ### 数据存储目录
-- **macOS**：`~/Library/Application Support/Aurora RSS Reader/rss.sqlite`
-- **Windows**：`%APPDATA%/Aurora RSS Reader/rss.sqlite`
-- **Linux**：`~/.config/aurora-rss-reader/rss.sqlite`
-- 可通过设置环境变量 `AURORA_DATA_DIR` 或在 `backend/.env` 中指定 `SQLITE_PATH` 来覆盖默认位置，方便在多设备或自定义路径间迁移数据。
+- **macOS**：`~/Library/Application Support/Aurora RSS Reader/aurora-rss.db`
+- **Windows**：`%APPDATA%/Aurora RSS Reader/aurora-rss.db`
+- **Linux**：`~/.config/aurora-rss-reader/aurora-rss.db`
+- 可通过设置环境变量 `DATABASE_PATH` 指定数据库路径。
 
 ## 构建发布
 
@@ -239,9 +242,9 @@ chmod +x build-release-app.sh
 ## 技术栈
 
 - **前端**：Vue 3 + Vite + Pinia + TypeScript
-- **后端**：FastAPI + SQLModel + SQLite
+- **后端**：Fastify + TypeScript + SQLite
 - **桌面应用**：Electron
-- **构建工具**：PyInstaller + electron-builder
+- **构建工具**：electron-builder
 
 ## 项目结构
 
@@ -250,9 +253,7 @@ aurora-rss-reader/
 ├── rss-desktop/          # 前端代码
 │   ├── src/             # Vue 源码
 │   └── electron/        # Electron 主进程
-├── backend/             # 后端服务
-│   ├── app/            # FastAPI 应用
-│   └── .venv/          # Python 虚拟环境
+├── backend-node/        # Node.js 后端（Fastify）
 ├── images/              # 图片资源
 └── start.sh            # 启动脚本
 ```
@@ -263,9 +264,9 @@ aurora-rss-reader/
 **打包修复与平台支持 | Packaging Fix & Platform Support**
 
 #### 🔧 核心修复 | Core Fixes
-- **Windows打包修复** - 彻底解决 PyInstaller 模块丢失问题 (pydantic, fastapi, etc.)
+- **Windows打包修复** - 后端启动稳定性提升
 - **数据库初始化** - 修复首次运行时数据库表未创建导致的崩溃问题
-- **依赖管理优化** - 自动收集所有 Python 子模块，确保打包完整性
+- **依赖管理优化** - 确保打包依赖完整性
 - **启动流程优化** - 增加健康检查超时时间至 5 分钟，防止慢速系统误报超时
 
 #### ✨ 新增功能 | New Features
@@ -325,13 +326,13 @@ A: 使用 `Cmd + Q` 快捷键或右键点击 dock 图标选择退出。
 
 ### 配置相关
 **Q: 如何配置 AI 服务？**
-A: 编辑 `backend/.env` 文件，添加相应的 API 密钥。
+A: 通过环境变量设置 `GLM_API_KEY` 等配置（例如在启动前导出环境变量）。
 
 **Q: 数据存储在哪里？**
 A: 数据默认存储在系统应用数据目录：
-- macOS: `~/Library/Application Support/Aurora RSS Reader/rss.sqlite`
-- Windows: `%APPDATA%/Aurora RSS Reader/rss.sqlite`
-- Linux: `~/.config/aurora-rss-reader/rss.sqlite`
+- macOS: `~/Library/Application Support/Aurora RSS Reader/aurora-rss.db`
+- Windows: `%APPDATA%/Aurora RSS Reader/aurora-rss.db`
+- Linux: `~/.config/aurora-rss-reader/aurora-rss.db`
 
 ### macOS 常见问题
 **安装问题：**
