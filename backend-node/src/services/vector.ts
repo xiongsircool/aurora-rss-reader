@@ -1,18 +1,10 @@
-import * as lancedb from "@lancedb/lancedb";
 import OpenAI from "openai";
-import path from "path";
-import fs from "fs";
 import { userSettingsService } from "./userSettings.js";
 import { getDatabase } from "../db/session.js";
-
-// Constants
-const DB_DIR_NAME = "lancedb";
-const VECTOR_TABLE_NAME = "rss_vectors";
 
 // Interfaces
 interface RssVectorItem {
     id: string;      // Entry ID
-    vector: number[]; // Embedding vector
     title: string;
     content: string; // The text content used for embedding
     feed_id: string;
@@ -20,24 +12,19 @@ interface RssVectorItem {
     url: string;
 }
 
-let dbInstance: lancedb.Connection | null = null;
+interface VectorSearchResult extends RssVectorItem {
+    distance: number;
+}
+
 let openaiClient: OpenAI | null = null;
 
 /**
- * Initialize LanceDB connection
+ * Initialize Vector DB (sqlite-vss)
+ * This is now handled in db/init.ts as part of the main database
  */
-export async function initVectorDB(): Promise<lancedb.Connection> {
-    if (dbInstance) return dbInstance;
-
-    const dbPath = path.join(process.cwd(), "data", DB_DIR_NAME);
-
-    if (!fs.existsSync(dbPath)) {
-        fs.mkdirSync(dbPath, { recursive: true });
-    }
-
-    console.log(`[Vector] Connecting to LanceDB at ${dbPath}`);
-    dbInstance = await lancedb.connect(dbPath);
-    return dbInstance;
+export async function initVectorDB(): Promise<void> {
+    // Vector tables are created in db/init.ts
+    console.log('[Vector] Using sqlite-vss for vector storage');
 }
 
 /**
@@ -45,7 +32,6 @@ export async function initVectorDB(): Promise<lancedb.Connection> {
  */
 async function getOpenAIClient(): Promise<OpenAI | null> {
     const settings = userSettingsService.getSettings();
-
 
     if (!settings.embedding_api_key) {
         console.warn("[Vector] No embedding API key configured");
@@ -99,92 +85,34 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
 }
 
 /**
- * Sync un-vectorized entries to LanceDB
+ * Sync un-vectorized entries to Vector DB
  * @param limit Max number of entries to process in this batch
  */
 export async function syncEntriesToVectorDB(limit: number = 10): Promise<number> {
-    const db = await initVectorDB();
-    const sqlite = getDatabase();
+    const db = getDatabase();
 
-    // 1. Ensure table exists
-    let table: lancedb.Table;
-    try {
-        table = await db.openTable(VECTOR_TABLE_NAME);
-    } catch {
-        // Determine dimension based on model? For now assume standard or user config
-        // Actually LanceDB infers schema from first data. 
-        // We will handle first insertion logic below.
-        console.log(`[Vector] Table ${VECTOR_TABLE_NAME} does not exist, will create on first insert.`);
-    }
+    // Get entries that don't have vectors yet
+    const entries = db.prepare(`
+        SELECT e.id, e.title, e.content, e.summary, e.feed_id, e.published_at, e.url
+        FROM entries e
+        LEFT JOIN rss_vectors v ON e.id = v.entry_id
+        WHERE v.entry_id IS NULL
+        AND e.content IS NOT NULL
+        AND length(e.content) > 50
+        ORDER BY e.inserted_at DESC
+        LIMIT ?
+    `).all(limit) as any[];
 
-    // 2. Find entries that are NOT in vector DB
-    // Since we can't easily JOIN across SQLite and LanceDB, we use a simple strategy:
-    // Get latest Entry IDs from SQLite and check if they exist in LanceDB?
-    // Or better: Add a 'vectorized' column to SQLite entries table? 
-    // For now, let's keep it non-intrusive: 
-    // We will select a batch of recent articles from SQLite.
-    // Then we check which ones are already in LanceDB (by ID).
-
-    // Strategy:
-    // We can query LanceDB for "all IDs" if dataset is small.
-    // Or query SQLite for entries, then filter.
-    // Given we are running locally, let's try:
-    // Select entries from SQLite where published_at > some_date order by inserted_at desc limit X
-    // Check if ID exists in LanceDB.
-
-    // Refined Strategy:
-    // Just get the latest entries. We will rely on LanceDB's merge/upsert capabilities or simple check.
-    // Let's grab 50 recent entries from SQLite.
-
-    const entries = sqlite.prepare(`
-    SELECT id, title, content, summary, feed_id, published_at, url 
-    FROM entries 
-    WHERE content IS NOT NULL AND length(content) > 50
-    ORDER BY inserted_at DESC 
-    LIMIT 200
-  `).all() as any[];
-
-    if (entries.length === 0) return 0;
-
-    // Get existing IDs from LanceDB to avoid re-processing
-    let existingIds: Set<string> = new Set();
-    try {
-        const t = await db.openTable(VECTOR_TABLE_NAME);
-        // This might be slow if table is huge, but for local RSS it's fine for now.
-        // Optimization: Only query IDs in the candidate list.
-        // LanceDB filtering: "id IN ['a','b']"
-        const idList = entries.map(e => `'${e.id}'`).join(",");
-        const existing = await t.query()
-            .where(`id IN (${idList})`)
-            .select(["id"])
-            .limit(entries.length)
-            .toArray();
-        existing.forEach((r: any) => existingIds.add(r.id));
-    } catch (e) {
-        // Table doesn't exist yet, so no existing IDs
-    }
-
-    const newEntries = entries.filter(e => !existingIds.has(e.id));
-
-    if (newEntries.length === 0) {
-        // console.log("[Vector] No new entries to sync in this batch check.");
+    if (entries.length === 0) {
         return 0;
     }
 
-    // Limit processing to requested limit
-    const entriesToProcess = newEntries.slice(0, limit);
-    console.log(`[Vector] Processing ${entriesToProcess.length} new entries...`);
+    console.log(`[Vector] Processing ${entries.length} new entries...`);
 
-    const vectorItems: RssVectorItem[] = [];
+    let processedCount = 0;
 
-    for (const entry of entriesToProcess) {
-        // Prepare text for embedding: Title + Summary + Content (truncated)
-        // Clean HTML from content? Ideally yes. For now assume content is relatively clean or raw text.
-        // Note: entry.readability_content is usually HTML. We should strip tags if we can, or just embed raw.
-        // Simpler: Title + Summary is often enough for high quality retrieval.
-        // Let's use Title + Summary + First 500 chars of content.
-
-        // Simple HTML strip regex
+    for (const entry of entries) {
+        // Prepare text for embedding
         const cleanContent = (entry.content || "").replace(/<[^>]*>?/gm, "").substring(0, 5000);
         const summary = entry.summary || "";
         const textToEmbed = `${entry.title || ""} \n ${summary} \n ${cleanContent}`;
@@ -192,48 +120,65 @@ export async function syncEntriesToVectorDB(limit: number = 10): Promise<number>
         const vector = await generateEmbedding(textToEmbed);
 
         if (vector) {
-            vectorItems.push({
-                id: entry.id,
-                vector: vector,
-                title: entry.title || "No Title",
-                content: textToEmbed, // Storing what we embedded for debugging/context
-                feed_id: entry.feed_id,
-                published_at: entry.published_at || "",
-                url: entry.url || ""
-            });
+            try {
+                // Insert into rss_vectors table
+                db.prepare(`
+                    INSERT INTO rss_vectors (entry_id, title, content, feed_id, published_at, url)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `).run(entry.id, entry.title || "No Title", textToEmbed, entry.feed_id, entry.published_at || "", entry.url || "");
+
+                // Insert vector into vss table
+                const vectorBlob = Buffer.from(new Float32Array(vector).buffer);
+                db.prepare(`
+                    INSERT INTO vss_rss_vectors (rowid, embedding)
+                    VALUES ((SELECT rowid FROM rss_vectors WHERE entry_id = ?), ?)
+                `).run(entry.id, vectorBlob);
+
+                processedCount++;
+            } catch (error) {
+                console.error(`[Vector] Error inserting vector for entry ${entry.id}:`, error);
+            }
         }
     }
 
-    if (vectorItems.length > 0) {
-        try {
-            const t = await db.openTable(VECTOR_TABLE_NAME);
-            await t.add(vectorItems as any[]);
-            console.log(`[Vector] Added ${vectorItems.length} entries to LanceDB.`);
-        } catch (e) {
-            // Create table if not exists with data
-            await db.createTable(VECTOR_TABLE_NAME, vectorItems as any[]);
-            console.log(`[Vector] Created table and added ${vectorItems.length} entries.`);
-        }
+    if (processedCount > 0) {
+        console.log(`[Vector] Added ${processedCount} entries to vector DB.`);
     }
-    return vectorItems.length;
+
+    return processedCount;
 }
 
-
 /**
- * Semantic Search
+ * Semantic Search using sqlite-vss
  */
-export async function searchVectors(query: string, limit: number = 10) {
-    const db = await initVectorDB();
+export async function searchVectors(query: string, limit: number = 10): Promise<VectorSearchResult[]> {
+    const db = getDatabase();
     const vector = await generateEmbedding(query);
 
     if (!vector) {
         throw new Error("Failed to generate embedding for query");
     }
 
-    const table = await db.openTable(VECTOR_TABLE_NAME);
-    const results = await table.vectorSearch(vector)
-        .limit(limit)
-        .toArray();
+    // Convert vector to blob for sqlite-vss
+    const vectorBlob = Buffer.from(new Float32Array(vector).buffer);
+
+    // Search using vss_search
+    const results = db.prepare(`
+        SELECT
+            v.entry_id as id,
+            v.title,
+            v.content,
+            v.feed_id,
+            v.published_at,
+            v.url,
+            vss.distance
+        FROM vss_rss_vectors vss
+        JOIN rss_vectors v ON v.rowid = vss.rowid
+        WHERE vss_search(vss.embedding, ?)
+        ORDER BY vss.distance
+        LIMIT ?
+    `).all(vectorBlob, limit) as VectorSearchResult[];
 
     return results;
 }
+

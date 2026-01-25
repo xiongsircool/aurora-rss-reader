@@ -1,6 +1,23 @@
 import { getDatabase } from './session.js';
 
 /**
+ * Load sqlite-vss extension
+ */
+function loadVssExtension(): void {
+  const db = getDatabase();
+
+  try {
+    // Load sqlite-vss extension
+    // The extension will be loaded from node_modules/sqlite-vss
+    db.loadExtension('sqlite-vss');
+    console.log('✅ sqlite-vss extension loaded');
+  } catch (error) {
+    console.warn('⚠️  sqlite-vss extension not loaded:', error);
+    console.warn('Vector search functionality will not be available');
+  }
+}
+
+/**
  * Run database migrations
  */
 function runMigrations(): void {
@@ -171,4 +188,45 @@ export function initDatabase(): void {
 
   // Run migrations for existing databases
   runMigrations();
+
+  // Load sqlite-vss extension and create vector tables
+  loadVssExtension();
+  createVectorTables();
+}
+
+/**
+ * Create vector search tables
+ */
+function createVectorTables(): void {
+  const db = getDatabase();
+
+  try {
+    // Create rss_vectors table to store metadata
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS rss_vectors (
+        entry_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        feed_id TEXT NOT NULL,
+        published_at TEXT,
+        url TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (entry_id) REFERENCES entries(id)
+      )
+    `);
+
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_rss_vectors_entry_id ON rss_vectors(entry_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_rss_vectors_feed_id ON rss_vectors(feed_id)`);
+
+    // Create virtual table for vector search using sqlite-vss
+    db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS vss_rss_vectors USING vss0(
+        embedding(1536)
+      )
+    `);
+
+    console.log('✅ Vector tables created');
+  } catch (error) {
+    console.warn('⚠️  Could not create vector tables:', error);
+  }
 }

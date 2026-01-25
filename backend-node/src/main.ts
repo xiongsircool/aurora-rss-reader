@@ -74,10 +74,7 @@ app.get('/health', async () => {
 try {
   initDatabase();
   console.log('✅ Database initialized');
-  // Initialize Vector DB
-  import('./services/vector.js').then(({ initVectorDB }) => {
-    initVectorDB().then(() => console.log('✅ Vector DB initialized')).catch(e => console.error('❌ Vector DB init failed:', e));
-  });
+  console.log('✅ Vector DB initialized (sqlite-vss)');
 } catch (error) {
   console.error('❌ Database initialization failed:', error);
   process.exit(1);
