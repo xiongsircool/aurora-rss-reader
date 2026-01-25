@@ -39,7 +39,7 @@
     "gatekeeperAssess": false,
     "entitlements": null,
     "entitlementsInherit": null,
-    "x64ArchFiles": "Contents/Resources/backend-node/node_modules/{.bin/**/*,**/prebuilds/**/*,better-sqlite3/**/*,@esbuild/**/*,esbuild/**/*,sqlite-vss/**/*}"
+    "x64ArchFiles": "Contents/Resources/backend-node/node_modules/{.bin/**/*,**/prebuilds/**/*,better-sqlite3/**/*,@esbuild/**/*,esbuild/**/*,**/esbuild/**/*,sqlite-vss/**/*}"
   },
   "win": {
     "extraResources": [
