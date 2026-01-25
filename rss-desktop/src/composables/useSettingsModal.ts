@@ -18,6 +18,7 @@ export interface LocalFeatureConfig {
 export interface LocalConfig {
     summary: LocalServiceConfig
     translation: LocalServiceConfig
+    embedding: LocalServiceConfig
     features: LocalFeatureConfig
 }
 
@@ -41,12 +42,14 @@ export function useSettingsModal() {
     const localConfig = ref<LocalConfig>({
         summary: createLocalServiceConfig(),
         translation: createLocalServiceConfig(),
+        embedding: createLocalServiceConfig(),
         features: createLocalFeatureConfig()
     })
 
     function syncFromStore() {
         const summary = aiStore.config.summary || {}
         const translation = aiStore.config.translation || {}
+        const embedding = aiStore.config.embedding || {}
         const features = aiStore.config.features || {}
 
         localConfig.value.summary = {
@@ -60,6 +63,12 @@ export function useSettingsModal() {
             api_key: translation.api_key ?? localConfig.value.translation.api_key,
             base_url: translation.base_url ?? localConfig.value.translation.base_url,
             model_name: translation.model_name ?? localConfig.value.translation.model_name
+        }
+        localConfig.value.embedding = {
+            ...localConfig.value.embedding,
+            api_key: embedding.api_key ?? localConfig.value.embedding.api_key,
+            base_url: embedding.base_url ?? localConfig.value.embedding.base_url,
+            model_name: embedding.model_name ?? localConfig.value.embedding.model_name
         }
         localConfig.value.features = {
             ...localConfig.value.features,
@@ -92,6 +101,7 @@ export function useSettingsModal() {
         const success = await aiStore.updateConfig({
             summary: { ...localConfig.value.summary },
             translation: { ...localConfig.value.translation },
+            embedding: { ...localConfig.value.embedding },
             features: { ...localConfig.value.features }
         })
         if (!success) {

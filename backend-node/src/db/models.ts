@@ -93,6 +93,9 @@ export interface UserSettings {
   ai_title_display_mode: string;
   ai_translation_language: string;
   language: string; // 'zh' | 'en' | 'ja' | 'ko'
+  embedding_model: string;
+  embedding_api_key: string;
+  embedding_base_url: string;
   created_at: string;
   updated_at: string;
 }

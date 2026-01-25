@@ -4,6 +4,7 @@
 
 import { FastifyInstance } from 'fastify';
 import { AIClient, type ServiceKey } from '../services/ai.js';
+import { generateEmbedding } from '../services/vector.js';
 import { EntryRepository, TranslationRepository, SummaryRepository } from '../db/repositories/index.js';
 import { userSettingsService } from '../services/userSettings.js';
 import { getConfig } from '../config/index.js';
@@ -21,6 +22,14 @@ function resolveServiceConfig(service: ServiceKey) {
       apiKey: settings.summary_api_key || fallbackApiKey,
       baseUrl: settings.summary_base_url || fallbackBaseUrl,
       modelName: settings.summary_model_name || fallbackModel,
+    };
+  }
+
+  if (service === 'embedding') {
+    return {
+      apiKey: settings.embedding_api_key || '',
+      baseUrl: settings.embedding_base_url || '',
+      modelName: settings.embedding_model || '',
     };
   }
 
@@ -324,6 +333,8 @@ export async function aiRoutes(app: FastifyInstance) {
   app.get('/ai/config', async () => {
     const summaryConfig = resolveServiceConfig('summary');
     const translationConfig = resolveServiceConfig('translation');
+    // @ts-ignore - 'embedding' is a new service key not yet in ServiceKey type maybe
+    const embeddingConfig = resolveServiceConfig('embedding' as any);
     const settings = userSettingsService.getSettings();
 
     return {
@@ -339,6 +350,12 @@ export async function aiRoutes(app: FastifyInstance) {
         model_name: translationConfig.modelName,
         has_api_key: !!translationConfig.apiKey,
       },
+      embedding: {
+        api_key: embeddingConfig.apiKey,
+        base_url: embeddingConfig.baseUrl,
+        model_name: embeddingConfig.modelName,
+        has_api_key: !!embeddingConfig.apiKey,
+      },
       features: {
         auto_summary: !!settings.ai_auto_summary,
         auto_title_translation: !!settings.ai_auto_title_translation,
@@ -353,6 +370,7 @@ export async function aiRoutes(app: FastifyInstance) {
     const body = request.body as any;
     const summaryConfig = body.summary || {};
     const translationConfig = body.translation || {};
+    const embeddingConfig = body.embedding || {};
     const features = body.features || {};
 
     const updates: Record<string, any> = {};
@@ -364,6 +382,10 @@ export async function aiRoutes(app: FastifyInstance) {
     if (translationConfig.api_key !== undefined) updates.translation_api_key = translationConfig.api_key;
     if (translationConfig.base_url !== undefined) updates.translation_base_url = translationConfig.base_url;
     if (translationConfig.model_name !== undefined) updates.translation_model_name = translationConfig.model_name;
+
+    if (embeddingConfig.api_key !== undefined) updates.embedding_api_key = embeddingConfig.api_key;
+    if (embeddingConfig.base_url !== undefined) updates.embedding_base_url = embeddingConfig.base_url;
+    if (embeddingConfig.model_name !== undefined) updates.embedding_model = embeddingConfig.model_name;
 
     if (features.auto_summary !== undefined) updates.ai_auto_summary = features.auto_summary ? 1 : 0;
     if (features.auto_title_translation !== undefined) updates.ai_auto_title_translation = features.auto_title_translation ? 1 : 0;
@@ -389,6 +411,33 @@ export async function aiRoutes(app: FastifyInstance) {
         success: false,
         message: 'Missing api_key, base_url, or model_name',
       };
+    }
+
+    // Special case for embedding testing
+    if (service === 'embedding' as any) {
+      try {
+        // We need to bypass the client creation and test embedding generation directly
+        // or construct a temporary client configuration.
+        // Since generateEmbedding reads from UserSettings, we should ideally construct a temporary client.
+        // But generateEmbedding is hardcoded to read from settings. 
+        // For testing, let's update settings temporarily? No that's bad.
+        // Let's modify generateEmbedding to accept overrides or create a temp test function here.
+
+        // Simple test using openai directly
+        const OpenAI = (await import("openai")).default;
+        const client = new OpenAI({ apiKey, baseURL: baseUrl });
+        await client.embeddings.create({
+          model: modelName,
+          input: "test",
+          encoding_format: "float"
+        });
+        return { success: true, message: 'Embedding API connection test succeeded' };
+      } catch (error) {
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : 'Embedding API connection test failed',
+        };
+      }
     }
 
     try {

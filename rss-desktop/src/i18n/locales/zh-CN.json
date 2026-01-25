@@ -238,6 +238,8 @@
     "contentTranslation": "内容翻译",
     "translationSubtitle": "用于全文翻译与标题翻译",
     "useSummaryConfig": "沿用摘要配置",
+    "knowledgeBase": "知识库 / 语义检索",
+    "embeddingSubtitle": "配置 Embedding 模型以启用 AI 搜索与知识库",
     "apiKey": "API Key",
     "apiKeyPlaceholder": "输入 GLM API Key",
     "translationApiKeyPlaceholder": "输入翻译使用的 API Key",

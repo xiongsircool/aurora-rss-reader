@@ -317,6 +317,7 @@ async function saveSettings() {
                     <SettingsAIConfig
                       v-model:summaryConfig="localConfig.summary"
                       v-model:translationConfig="localConfig.translation"
+                      v-model:embeddingConfig="localConfig.embedding"
                       :serviceTesting="aiConfig.serviceTesting.value"
                       :serviceTestResult="aiConfig.serviceTestResult.value"
                       @testConnection="aiConfig.testConnection"

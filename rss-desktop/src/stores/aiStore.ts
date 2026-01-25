@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '../api/client'
 
-export type AIServiceKey = 'summary' | 'translation'
+// Service keys available for configuration
+export type AIServiceKey = 'summary' | 'translation' | 'embedding'
 
 export interface AIServiceConfig {
   api_key: string
@@ -21,12 +22,14 @@ export interface AIFeatureConfig {
 export interface AIConfig {
   summary: AIServiceConfig
   translation: AIServiceConfig
+  embedding: AIServiceConfig
   features: AIFeatureConfig
 }
 
 export type PartialAIConfig = {
   summary?: Partial<AIServiceConfig>
   translation?: Partial<AIServiceConfig>
+  embedding?: Partial<AIServiceConfig>
   features?: Partial<AIFeatureConfig>
 }
 
@@ -40,6 +43,7 @@ const createDefaultServiceConfig = (): AIServiceConfig => ({
 const createDefaultConfig = (): AIConfig => ({
   summary: createDefaultServiceConfig(),
   translation: createDefaultServiceConfig(),
+  embedding: createDefaultServiceConfig(),
   features: {
     auto_summary: false,
     auto_title_translation: false,
@@ -52,6 +56,7 @@ function mergeConfig(target: AIConfig, updates: PartialAIConfig): AIConfig {
   return {
     summary: updates.summary ? { ...target.summary, ...updates.summary } : target.summary,
     translation: updates.translation ? { ...target.translation, ...updates.translation } : target.translation,
+    embedding: updates.embedding ? { ...target.embedding, ...updates.embedding } : target.embedding,
     features: updates.features ? { ...target.features, ...updates.features } : target.features
   }
 }

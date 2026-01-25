@@ -7,6 +7,7 @@ import cron from 'node-cron';
 import { FeedRepository } from '../db/repositories/index.js';
 import { refreshFeed } from './fetcher.js';
 import { UserSettingsService } from './userSettings.js';
+import { syncEntriesToVectorDB } from './vector.js';
 
 export class SchedulerService {
   private cronJob: cron.ScheduledTask | null = null;
@@ -97,6 +98,15 @@ export class SchedulerService {
       if (refreshedCount > 0 || errorCount > 0) {
         console.log(`📊 Scheduler run complete: ${refreshedCount} refreshed, ${errorCount} errors`);
       }
+
+      // Sync vectors for new content
+      // Runs every scheduler loop
+      try {
+        await syncEntriesToVectorDB(20); // Sync up to 20 items per loop
+      } catch (e) {
+        console.error('❌ Vector sync error:', e);
+      }
+
     } catch (error) {
       console.error('❌ Scheduler error:', error);
     } finally {

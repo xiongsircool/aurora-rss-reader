@@ -177,6 +177,7 @@ function getBackendExecutable(): { exec: string; args: string[]; cwd: string; en
           args: [entryPath],
           cwd: path.dirname(path.dirname(entryPath)),
           env: {
+            ...process.env,
             ELECTRON_RUN_AS_NODE: '1',
           }
         }

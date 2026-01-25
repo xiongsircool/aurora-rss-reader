@@ -15,6 +15,17 @@ function runMigrations(): void {
     db.exec(`ALTER TABLE user_settings ADD COLUMN language TEXT NOT NULL DEFAULT 'zh'`);
     console.log('Migration completed: language column added');
   }
+
+  // Check if embedding columns exist
+  const hasEmbeddingModel = tableInfo.some((col: any) => col.name === 'embedding_model');
+
+  if (!hasEmbeddingModel) {
+    console.log('Running migration: Adding embedding columns to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN embedding_model TEXT NOT NULL DEFAULT 'netease-youdao/bce-embedding-base_v1'`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN embedding_api_key TEXT NOT NULL DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN embedding_base_url TEXT NOT NULL DEFAULT 'https://api.siliconflow.cn/v1'`);
+    console.log('Migration completed: embedding columns added');
+  }
 }
 
 export function initDatabase(): void {
@@ -149,6 +160,9 @@ export function initDatabase(): void {
       ai_title_display_mode TEXT NOT NULL DEFAULT 'original-first',
       ai_translation_language TEXT NOT NULL DEFAULT 'zh',
       language TEXT NOT NULL DEFAULT 'zh',
+      embedding_model TEXT NOT NULL DEFAULT 'netease-youdao/bce-embedding-base_v1',
+      embedding_api_key TEXT NOT NULL DEFAULT '',
+      embedding_base_url TEXT NOT NULL DEFAULT 'https://api.siliconflow.cn/v1',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       CHECK (id = 1)

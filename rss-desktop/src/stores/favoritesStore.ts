@@ -16,6 +16,8 @@ export interface StarredEntry {
   inserted_at: string | null
   read: boolean
   starred: boolean
+  translated_title?: string | null
+  translated_summary?: string | null
 }
 
 export interface StarredStats {

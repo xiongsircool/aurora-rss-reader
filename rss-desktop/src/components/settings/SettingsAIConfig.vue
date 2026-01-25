@@ -19,6 +19,7 @@ const { t } = useI18n()
 // Two-way binding for config objects
 const summaryConfig = defineModel<LocalServiceConfig>('summaryConfig', { required: true })
 const translationConfig = defineModel<LocalServiceConfig>('translationConfig', { required: true })
+const embeddingConfig = defineModel<LocalServiceConfig>('embeddingConfig', { required: true })
 </script>
 
 <template>
@@ -158,6 +159,68 @@ const translationConfig = defineModel<LocalServiceConfig>('translationConfig', {
           :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.translation.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.translation.success }"
         >
           {{ serviceTestResult.translation.message }}
+        </div>
+      </div>
+
+      <!-- Embedding Config Card -->
+      <div class="border border-[var(--border-color)] rounded-xl p-4 bg-[var(--bg-surface)] flex flex-col justify-between h-full">
+        <div class="flex-1">
+          <div class="flex justify-between items-center gap-3 mb-3 flex-wrap min-h-[52px]">
+            <div>
+              <p class="m-0 text-[15px] font-semibold text-[var(--text-primary)]">{{ t('settings.knowledgeBase') }}</p>
+              <p class="m-[4px_0_0_0] text-[13px] text-[var(--text-secondary)]">{{ t('settings.embeddingSubtitle') }}</p>
+            </div>
+            <button
+                @click="emit('testConnection', 'embedding')"
+                :disabled="serviceTesting.embedding || !embeddingConfig.api_key || !embeddingConfig.base_url || !embeddingConfig.model_name"
+                class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-[0_10px_20px_rgba(255,122,24,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
+                :class="{
+                'op-70 transform-none': serviceTesting.embedding,
+                'bg-[#34c759]! shadow-none!': serviceTestResult.embedding?.success,
+                'bg-[#ff4d4f]! shadow-none!': serviceTestResult.embedding?.success === false
+              }"
+            >
+              {{ serviceTesting.embedding ? t('common.testing') : t('settings.testConnection') }}
+            </button>
+          </div>
+
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.apiKey') }}</label>
+            <input
+                v-model="embeddingConfig.api_key"
+                type="password"
+                :placeholder="t('settings.apiKeyPlaceholder')"
+                class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.apiUrl') }}</label>
+            <input
+                v-model="embeddingConfig.base_url"
+                type="text"
+                :placeholder="t('settings.apiUrlPlaceholder')"
+                class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.modelName') }}</label>
+            <input
+                v-model="embeddingConfig.model_name"
+                type="text"
+                :placeholder="t('settings.modelPlaceholder')"
+                class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
+            />
+          </div>
+        </div>
+
+        <div
+            v-if="serviceTestResult.embedding"
+            class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-[var(--bg-elevated)] shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+            :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.embedding.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.embedding.success }"
+        >
+          {{ serviceTestResult.embedding.message }}
         </div>
       </div>
     </div>

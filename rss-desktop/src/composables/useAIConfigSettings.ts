@@ -12,12 +12,14 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
 
     const serviceTesting = ref<Record<AIServiceKey, boolean>>({
         summary: false,
-        translation: false
+        translation: false,
+        embedding: false
     })
 
     const serviceTestResult = ref<Record<AIServiceKey, TestResult | null>>({
         summary: null,
-        translation: null
+        translation: null,
+        embedding: null
     })
 
     async function testConnection(service: AIServiceKey) {
@@ -51,6 +53,7 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
     function resetTestResults() {
         serviceTestResult.value.summary = null
         serviceTestResult.value.translation = null
+        serviceTestResult.value.embedding = null
     }
 
     return {
