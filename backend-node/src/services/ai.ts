@@ -5,7 +5,7 @@
 
 import OpenAI from 'openai';
 
-export type ServiceKey = 'summary' | 'translation';
+export type ServiceKey = 'summary' | 'translation' | 'embedding';
 
 export class AIClient {
   private client: OpenAI | null = null;

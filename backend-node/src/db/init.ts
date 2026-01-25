@@ -7,8 +7,8 @@ function runMigrations(): void {
   const db = getDatabase();
 
   // Check if language column exists in user_settings
-  const tableInfo = db.pragma('table_info(user_settings)');
-  const hasLanguageColumn = tableInfo.some((col: any) => col.name === 'language');
+  const tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasLanguageColumn = tableInfo.some((col) => col.name === 'language');
 
   if (!hasLanguageColumn) {
     console.log('Running migration: Adding language column to user_settings');
@@ -17,7 +17,7 @@ function runMigrations(): void {
   }
 
   // Check if embedding columns exist
-  const hasEmbeddingModel = tableInfo.some((col: any) => col.name === 'embedding_model');
+  const hasEmbeddingModel = tableInfo.some((col) => col.name === 'embedding_model');
 
   if (!hasEmbeddingModel) {
     console.log('Running migration: Adding embedding columns to user_settings');

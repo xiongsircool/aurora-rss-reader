@@ -88,7 +88,7 @@ export async function entriesRoutes(app: FastifyInstance) {
 
     const settings = userSettingsService.getSettings();
     const parsedLimit = query.limit ? Number.parseInt(query.limit, 10) : undefined;
-    const fallbackLimit = Number.isFinite(parsedLimit) ? parsedLimit : settings.items_per_page;
+    const fallbackLimit = parsedLimit !== undefined && Number.isFinite(parsedLimit) ? parsedLimit : settings.items_per_page;
     const limit = Math.max(1, Math.min(fallbackLimit, 200));
 
     const parsedOffset = query.offset ? Number.parseInt(query.offset, 10) : 0;

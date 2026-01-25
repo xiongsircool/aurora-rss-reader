@@ -25,7 +25,8 @@ export async function opmlRoutes(app: FastifyInstance) {
       const opml_content = buffer.toString('utf-8');
 
       // Get group_name from fields if provided
-      const group_name = data.fields.group_name?.value as string | undefined;
+      const groupNameField = data.fields.group_name;
+      const group_name = (groupNameField && 'value' in groupNameField) ? groupNameField.value as string : undefined;
 
       if (!opml_content) {
         return reply.code(400).send({ error: 'OPML content is required' });
