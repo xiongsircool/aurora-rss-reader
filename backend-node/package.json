@@ -14,7 +14,7 @@
     "@fastify/multipart": "^8.3.1",
     "@fastify/schedule": "^6.0.0",
     "@mozilla/readability": "^0.5.0",
-    "better-sqlite3": "^9.4.0",
+    "better-sqlite3": "^12.6.2",
     "dayjs": "^1.11.10",
     "fast-xml-parser": "^4.3.4",
     "fastify": "^4.26.0",

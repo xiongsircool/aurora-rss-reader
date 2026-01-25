@@ -68,6 +68,7 @@
     "vue-virtual-scroller": "2.0.0-beta.8"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.2",
     "@vitejs/plugin-vue": "^5.0.4",
     "concurrently": "^8.2.2",
     "electron": "39.1.2",

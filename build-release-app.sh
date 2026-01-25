@@ -85,9 +85,32 @@ build_backend() {
     cp -R "$BACKEND_NODE_DIR/dist" "$BACKEND_RESOURCES_DIR/"
     cp "$BACKEND_NODE_DIR/package.json" "$BACKEND_RESOURCES_DIR/"
 
-    # 只安装生产依赖，避免包含 devDependencies（如 tsx、esbuild 等）
-    log "📦 安装生产依赖..."
+    # 复制 .npmrc 配置文件（如果存在）
+    if [ -f "$BACKEND_NODE_DIR/.npmrc" ]; then
+        cp "$BACKEND_NODE_DIR/.npmrc" "$BACKEND_RESOURCES_DIR/"
+    fi
+
+    # 使用 Electron 的 Node.js 安装生产依赖
+    log "📦 使用 Electron 的 Node.js 安装生产依赖..."
+    cd "$FRONTEND_DIR"
+
+    # 使用 electron 的 node 来安装依赖，确保原生模块与 Electron 版本匹配
+    npx --yes electron-rebuild --version > /dev/null 2>&1 || pnpm add -D @electron/rebuild
+
     cd "$BACKEND_RESOURCES_DIR"
+
+    # 设置环境变量，让 npm 使用 Electron 的 headers 和 C++20 标准
+    export npm_config_target=$(cd "$FRONTEND_DIR" && node -p "require('./package.json').devDependencies.electron")
+    export npm_config_arch=$(node -p "process.arch")
+    export npm_config_target_arch=$(node -p "process.arch")
+    export npm_config_disturl=https://electronjs.org/headers
+    export npm_config_runtime=electron
+    export npm_config_build_from_source=true
+    export CXXFLAGS="-std=c++20"
+
+    log "   Electron 版本: $npm_config_target"
+    log "   架构: $npm_config_arch"
+
     npm install --omit=dev --production
 
     log "✅ 后端构建完成 ($(du -sh "$BACKEND_RESOURCES_DIR" | cut -f1))"
