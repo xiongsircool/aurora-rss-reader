@@ -38,7 +38,8 @@
     "hardenedRuntime": false,
     "gatekeeperAssess": false,
     "entitlements": null,
-    "entitlementsInherit": null
+    "entitlementsInherit": null,
+    "x64ArchFiles": "Contents/Resources/backend-node/node_modules/{.bin/**/*,**/prebuilds/**/*,better-sqlite3/**/*,esbuild*/**/*}"
   },
   "win": {
     "extraResources": [
