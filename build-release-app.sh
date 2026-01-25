@@ -83,8 +83,12 @@ build_backend() {
     rm -rf "$BACKEND_RESOURCES_DIR"
     mkdir -p "$BACKEND_RESOURCES_DIR"
     cp -R "$BACKEND_NODE_DIR/dist" "$BACKEND_RESOURCES_DIR/"
-    cp -R "$BACKEND_NODE_DIR/node_modules" "$BACKEND_RESOURCES_DIR/"
     cp "$BACKEND_NODE_DIR/package.json" "$BACKEND_RESOURCES_DIR/"
+
+    # 只安装生产依赖，避免包含 devDependencies（如 tsx、esbuild 等）
+    log "📦 安装生产依赖..."
+    cd "$BACKEND_RESOURCES_DIR"
+    npm install --omit=dev --production
 
     log "✅ 后端构建完成 ($(du -sh "$BACKEND_RESOURCES_DIR" | cut -f1))"
 }
