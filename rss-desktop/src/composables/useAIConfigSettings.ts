@@ -56,11 +56,59 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
         serviceTestResult.value.embedding = null
     }
 
+    const rebuildingVectors = ref(false)
+    const rebuildResult = ref<TestResult | null>(null)
+
+    async function rebuildVectors() {
+        if (!localConfig.value.embedding.api_key) {
+            rebuildResult.value = {
+                success: false,
+                message: '请先配置 Embedding API'
+            }
+            return
+        }
+
+        // 确认对话框
+        const confirmed = confirm(
+            '确定要重建向量数据库吗？\n\n' +
+            '这将清除现有向量并重新处理所有文章标题。\n' +
+            '根据文章数量，可能需要几分钟时间。'
+        )
+
+        if (!confirmed) return
+
+        rebuildingVectors.value = true
+        rebuildResult.value = null
+
+        try {
+            const result = await aiStore.rebuildVectors()
+            rebuildResult.value = {
+                success: result.success,
+                message: result.message || (result.success ? '重建成功！' : '重建失败')
+            }
+
+            // 5秒后清除结果
+            setTimeout(() => {
+                rebuildResult.value = null
+            }, 5000)
+        } catch (error) {
+            rebuildResult.value = {
+                success: false,
+                message: '重建向量库失败'
+            }
+        } finally {
+            rebuildingVectors.value = false
+        }
+    }
+
     return {
         serviceTesting,
         serviceTestResult,
         testConnection,
         copySummaryToTranslation,
-        resetTestResults
+        resetTestResults,
+        rebuildingVectors,
+        rebuildResult,
+        rebuildVectors
     }
 }

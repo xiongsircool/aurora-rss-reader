@@ -1,4 +1,5 @@
 import { getDatabase } from './session.js';
+import * as sqliteVss from 'sqlite-vss';
 
 /**
  * Load sqlite-vss extension
@@ -7,10 +8,10 @@ function loadVssExtension(): void {
   const db = getDatabase();
 
   try {
-    // Load sqlite-vss extension
-    // The extension will be loaded from node_modules/sqlite-vss
-    db.loadExtension('sqlite-vss');
-    console.log('✅ sqlite-vss extension loaded');
+    // Load sqlite-vss extension using the official package loader
+    // This will automatically find the correct platform-specific binary
+    sqliteVss.load(db);
+    console.log('✅ sqlite-vss extension loaded successfully');
   } catch (error) {
     console.warn('⚠️  sqlite-vss extension not loaded:', error);
     console.warn('Vector search functionality will not be available');

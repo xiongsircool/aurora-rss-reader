@@ -7,11 +7,14 @@ import type { AIServiceKey } from '../../stores/aiStore'
 defineProps<{
   serviceTesting: Record<AIServiceKey, boolean>
   serviceTestResult: Record<AIServiceKey, TestResult | null>
+  rebuildingVectors: boolean
+  rebuildResult: TestResult | null
 }>()
 
 const emit = defineEmits<{
   testConnection: [service: AIServiceKey]
   copySummaryToTranslation: []
+  rebuildVectors: []
 }>()
 
 const { t } = useI18n()
@@ -170,18 +173,28 @@ const embeddingConfig = defineModel<LocalServiceConfig>('embeddingConfig', { req
               <p class="m-0 text-[15px] font-semibold text-[var(--text-primary)]">{{ t('settings.knowledgeBase') }}</p>
               <p class="m-[4px_0_0_0] text-[13px] text-[var(--text-secondary)]">{{ t('settings.embeddingSubtitle') }}</p>
             </div>
-            <button
+            <div class="flex gap-2 items-center flex-wrap justify-end">
+              <button
+                @click="emit('rebuildVectors')"
+                :disabled="rebuildingVectors || !embeddingConfig.api_key"
+                class="border border-dashed border-blue-500/40 bg-blue-500/10 text-blue-600 p-[7px_12px] rounded-lg text-[13px] cursor-pointer transition-all hover:bg-blue-500/20 hover:border-blue-600 hover:text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/8 dark:text-blue-400 dark:hover:bg-blue-500/15 dark:hover:border-blue-400 disabled:op-60 disabled:cursor-not-allowed"
+                type="button"
+              >
+                {{ rebuildingVectors ? t('settings.rebuildingVectors') : t('settings.rebuildVectors') }}
+              </button>
+              <button
                 @click="emit('testConnection', 'embedding')"
                 :disabled="serviceTesting.embedding || !embeddingConfig.api_key || !embeddingConfig.base_url || !embeddingConfig.model_name"
                 class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-[0_10px_20px_rgba(255,122,24,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
                 :class="{
-                'op-70 transform-none': serviceTesting.embedding,
-                'bg-[#34c759]! shadow-none!': serviceTestResult.embedding?.success,
-                'bg-[#ff4d4f]! shadow-none!': serviceTestResult.embedding?.success === false
-              }"
-            >
-              {{ serviceTesting.embedding ? t('common.testing') : t('settings.testConnection') }}
-            </button>
+                  'op-70 transform-none': serviceTesting.embedding,
+                  'bg-[#34c759]! shadow-none!': serviceTestResult.embedding?.success,
+                  'bg-[#ff4d4f]! shadow-none!': serviceTestResult.embedding?.success === false
+                }"
+              >
+                {{ serviceTesting.embedding ? t('common.testing') : t('settings.testConnection') }}
+              </button>
+            </div>
           </div>
 
           <div class="mb-4">
@@ -221,6 +234,15 @@ const embeddingConfig = defineModel<LocalServiceConfig>('embeddingConfig', { req
             :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.embedding.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.embedding.success }"
         >
           {{ serviceTestResult.embedding.message }}
+        </div>
+
+        <!-- 重建结果显示 -->
+        <div
+            v-if="rebuildResult"
+            class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-[var(--bg-elevated)] shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+            :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': rebuildResult.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !rebuildResult.success }"
+        >
+          {{ rebuildResult.message }}
         </div>
       </div>
     </div>

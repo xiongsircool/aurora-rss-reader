@@ -451,4 +451,47 @@ export async function aiRoutes(app: FastifyInstance) {
       };
     }
   });
+
+  // POST /ai/vector/rebuild - Rebuild vector database
+  app.post('/ai/vector/rebuild', async (request, reply) => {
+    try {
+      const { rebuildVectorDB } = await import('../services/vector.js');
+
+      // Check if embedding is configured
+      const embeddingConfig = resolveServiceConfig('embedding' as any);
+      if (!embeddingConfig.apiKey) {
+        return reply.code(400).send({
+          error: 'Embedding API key not configured'
+        });
+      }
+
+      // Start rebuild (batch size 50 to avoid overwhelming the API)
+      const result = await rebuildVectorDB(50);
+
+      return {
+        success: true,
+        message: `Vector database rebuilt: ${result.processed} processed, ${result.failed} failed`,
+        ...result
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Vector rebuild failed';
+      console.error('[Vector] Rebuild error:', error);
+      return reply.code(500).send({ error: message });
+    }
+  });
+
+  // GET /ai/vector/stats - Get vector database statistics
+  app.get('/ai/vector/stats', async () => {
+    try {
+      const { getVectorStats } = await import('../services/vector.js');
+      return getVectorStats();
+    } catch (error) {
+      console.error('[Vector] Stats error:', error);
+      return {
+        total_entries: 0,
+        vectorized_entries: 0,
+        pending_entries: 0
+      };
+    }
+  });
 }

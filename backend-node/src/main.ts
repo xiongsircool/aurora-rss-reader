@@ -11,6 +11,7 @@ import { opmlRoutes } from './routes/opml.js';
 import { iconsRoutes } from './routes/icons.js';
 import { schedulerRoutes } from './routes/scheduler.js';
 import { scheduler } from './services/scheduler.js';
+import { handleMcpRequest, handleMcpGetRequest, handleMcpDeleteRequest } from './mcp/server.js';
 
 const app = Fastify({
   logger: true
@@ -33,8 +34,8 @@ await app.register(cors, {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-  exposedHeaders: ['Content-Type']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Mcp-Session-Id'],
+  exposedHeaders: ['Content-Type', 'Mcp-Session-Id']
 });
 
 // Register multipart for file uploads
@@ -91,6 +92,38 @@ await app.register(aiRoutes, { prefix: '/api' });
 await app.register(opmlRoutes, { prefix: '/api' });
 await app.register(iconsRoutes, { prefix: '/api' });
 await app.register(schedulerRoutes, { prefix: '/api' });
+
+// ============================================
+// MCP (Model Context Protocol) Endpoint
+// Provides AI-accessible API via Streamable HTTP
+// ============================================
+
+// POST /mcp - Send JSON-RPC messages to MCP server
+app.post('/mcp', {
+  config: {
+    // Disable body parsing - MCP transport handles it
+    rawBody: true,
+  },
+}, async (request, reply) => {
+  // Use raw Node.js objects for MCP transport compatibility
+  await handleMcpRequest(request.raw, reply.raw, request.body);
+  // Prevent Fastify from sending response (MCP transport handles it)
+  reply.hijack();
+});
+
+// GET /mcp - SSE connection for server-to-client messages
+app.get('/mcp', async (request, reply) => {
+  await handleMcpGetRequest(request.raw, reply.raw);
+  reply.hijack();
+});
+
+// DELETE /mcp - Close MCP session
+app.delete('/mcp', async (request, reply) => {
+  await handleMcpDeleteRequest(request.raw, reply.raw);
+  reply.hijack();
+});
+
+console.log('✅ MCP endpoint registered at /mcp');
 
 const config = getConfig();
 
