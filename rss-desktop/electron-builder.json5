@@ -16,6 +16,15 @@
     "!dist-electron/**/*.map",
     "!dist/**/*.map"
   ],
+  // 自动更新配置
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "xiongsircool",
+      "repo": "aurora-rss-reader",
+      "releaseType": "release"
+    }
+  ],
   "mac": {
     "extraResources": [
       {

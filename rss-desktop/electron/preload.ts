@@ -22,3 +22,44 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   // You can expose other APTs you need here.
   // ...
 })
+
+// --------- Expose Electron-specific APIs ---------
+contextBridge.exposeInMainWorld('electron', {
+  // 检查更新
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+
+  // 获取应用版本
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+
+  // 监听更新事件
+  onUpdateChecking: (callback: () => void) => {
+    ipcRenderer.on('update-checking', callback)
+    return () => ipcRenderer.removeListener('update-checking', callback)
+  },
+
+  onUpdateAvailable: (callback: (info: any) => void) => {
+    ipcRenderer.on('update-available', (_event, info) => callback(info))
+    return () => ipcRenderer.removeAllListeners('update-available')
+  },
+
+  onUpdateDownloadStarted: (callback: (info: any) => void) => {
+    ipcRenderer.on('update-download-started', (_event, info) => callback(info))
+    return () => ipcRenderer.removeAllListeners('update-download-started')
+  },
+
+  onUpdateDownloadProgress: (callback: (progress: any) => void) => {
+    ipcRenderer.on('update-download-progress', (_event, progress) => callback(progress))
+    return () => ipcRenderer.removeAllListeners('update-download-progress')
+  },
+
+  onUpdateDownloadCompleted: (callback: (info: any) => void) => {
+    ipcRenderer.on('update-download-completed', (_event, info) => callback(info))
+    return () => ipcRenderer.removeAllListeners('update-download-completed')
+  },
+
+  onUpdateError: (callback: (error: any) => void) => {
+    ipcRenderer.on('update-error', (_event, error) => callback(error))
+    return () => ipcRenderer.removeAllListeners('update-error')
+  },
+})
+

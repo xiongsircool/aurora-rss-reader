@@ -3,6 +3,7 @@ import { spawn, ChildProcess } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import path from 'node:path'
+import { setupAutoUpdater, checkForUpdatesManually } from './autoUpdater'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -471,6 +472,20 @@ ipcMain.handle('open-external', async (_event, payload: OpenExternalPayload) => 
   }
 })
 
+// 手动检查更新
+ipcMain.handle('check-for-updates', async () => {
+  if (win && !isDev) {
+    checkForUpdatesManually(win)
+    return { success: true }
+  }
+  return { success: false, error: '开发模式不支持自动更新' }
+})
+
+// 获取应用版本
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion()
+})
+
 /**
  * 应用启动
  */
@@ -498,6 +513,11 @@ app.whenReady().then(async () => {
     }
 
     loadRendererContent()
+
+    // 启动自动更新（生产环境，延迟 5 秒）
+    if (!isDev && win) {
+      setupAutoUpdater(win)
+    }
   } else {
     showStartupStatus('正在启动后端服务，请稍候...')
 
@@ -516,6 +536,11 @@ app.whenReady().then(async () => {
     }
 
     loadRendererContent()
+
+    // 启动自动更新（生产环境）
+    if (win) {
+      setupAutoUpdater(win)
+    }
   }
 })
 

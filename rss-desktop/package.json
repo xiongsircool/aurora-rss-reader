@@ -61,6 +61,8 @@
     "axios": "^1.13.2",
     "dayjs": "^1.11.19",
     "dompurify": "^3.3.1",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.7.3",
     "pinia": "^3.0.4",
     "vue": "^3.4.21",
     "vue-i18n": "^9.14.5",

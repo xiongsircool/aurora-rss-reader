@@ -61,6 +61,7 @@ jobs:
           path: |
             rss-desktop/release/**/*.dmg
             rss-desktop/release/**/*.zip
+            rss-desktop/release/**/*.yml
           retention-days: 7
 
   build-windows:
@@ -110,6 +111,7 @@ jobs:
           name: windows-installers
           path: |
             rss-desktop/release/**/*.exe
+            rss-desktop/release/**/*.yml
           retention-days: 7
 
   build-linux:
@@ -160,6 +162,7 @@ jobs:
           path: |
             rss-desktop/release/**/*.AppImage
             rss-desktop/release/**/*.deb
+            rss-desktop/release/**/*.yml
           retention-days: 7
 
   create-release:

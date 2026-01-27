@@ -8,6 +8,21 @@ import { getDatabase } from '../db/session.js';
 import { refreshFeed } from '../services/fetcher.js';
 import { normalizeTimeField, parseRelativeTime } from '../utils/dateRange.js';
 
+// Leave headroom under SQLite's default 999-parameter limit.
+const SQLITE_IN_CLAUSE_CHUNK_SIZE = 900;
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export async function feedsRoutes(app: FastifyInstance) {
   const feedRepo = new FeedRepository();
   const entryRepo = new EntryRepository();
@@ -133,17 +148,74 @@ export async function feedsRoutes(app: FastifyInstance) {
   // DELETE /feeds/:id - Delete a feed
   app.delete('/feeds/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const db = getDatabase();
 
-    // Delete all entries for this feed first
-    const entries = entryRepo.findByFeedId(id);
-    for (const entry of entries) {
-      entryRepo.delete(entry.id);
+    // Check if feed exists first
+    const feed = feedRepo.findById(id);
+    if (!feed) {
+      return reply.code(404).send({ error: 'Feed not found' });
     }
 
+    // Get all entry IDs for this feed
+    const entries = entryRepo.findByFeedId(id);
+    const entryIds = entries.map(e => e.id);
+
+    const entryIdChunks = chunkArray(entryIds, SQLITE_IN_CLAUSE_CHUNK_SIZE);
+
+    // Delete related data in correct order to respect foreign key constraints
+    // 1. Delete translations for entries
+    if (entryIdChunks.length > 0) {
+      const hasRssVectors = Boolean(
+        db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = 'rss_vectors'").get()
+      );
+      const hasVssVectors = Boolean(
+        db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = 'vss_rss_vectors'").get()
+      );
+
+      for (const chunk of entryIdChunks) {
+        const placeholders = chunk.map(() => '?').join(',');
+        db.prepare(`DELETE FROM translations WHERE entry_id IN (${placeholders})`).run(...chunk);
+
+        // 2. Delete summaries for entries
+        db.prepare(`DELETE FROM summaries WHERE entry_id IN (${placeholders})`).run(...chunk);
+
+        // 3. Delete vector data for entries
+        if (hasRssVectors) {
+          if (hasVssVectors) {
+            try {
+              // First get rowids before deleting (vss_rss_vectors uses same rowid as rss_vectors)
+              const vectorRows = db.prepare(
+                `SELECT rowid FROM rss_vectors WHERE entry_id IN (${placeholders})`
+              ).all(...chunk) as Array<{ rowid: number }>;
+
+              // Delete from virtual VSS table first
+              for (const row of vectorRows) {
+                db.prepare('DELETE FROM vss_rss_vectors WHERE rowid = ?').run(row.rowid);
+              }
+            } catch (error) {
+              // VSS table might be unavailable even if it was created earlier
+              console.warn('Could not delete VSS vector data:', error);
+            }
+          }
+
+          // Then delete from rss_vectors
+          db.prepare(`DELETE FROM rss_vectors WHERE entry_id IN (${placeholders})`).run(...chunk);
+        }
+      }
+    }
+
+    // 4. Delete fetch logs for this feed
+    db.prepare('DELETE FROM fetch_logs WHERE feed_id = ?').run(id);
+
+    // 5. Delete all entries for this feed
+    db.prepare('DELETE FROM entries WHERE feed_id = ?').run(id);
+
+    // 6. Finally delete the feed
     const success = feedRepo.delete(id);
 
     if (!success) {
-      return reply.code(404).send({ error: 'Feed not found' });
+      // This shouldn't happen since we checked existence above
+      return reply.code(500).send({ error: 'Failed to delete feed' });
     }
 
     return { success: true };

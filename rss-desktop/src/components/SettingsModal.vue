@@ -320,8 +320,11 @@ async function saveSettings() {
                       v-model:embeddingConfig="localConfig.embedding"
                       :serviceTesting="aiConfig.serviceTesting.value"
                       :serviceTestResult="aiConfig.serviceTestResult.value"
+                      :rebuildingVectors="aiConfig.rebuildingVectors.value"
+                      :rebuildResult="aiConfig.rebuildResult.value"
                       @testConnection="aiConfig.testConnection"
                       @copySummaryToTranslation="aiConfig.copySummaryToTranslation"
+                      @rebuildVectors="aiConfig.rebuildVectors"
                     />
                     <div class="h-6"></div>
                     <SettingsAIFeatures
