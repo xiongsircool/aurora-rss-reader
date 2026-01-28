@@ -12,6 +12,10 @@ on:
         required: false
         default: 'manual-build'
 
+# Required permissions for electron-builder to create releases
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     runs-on: macos-latest
