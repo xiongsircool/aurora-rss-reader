@@ -190,6 +190,21 @@ GLM_MODEL=glm-4-flash
 GLM_API_KEY=your_api_key_here
 ```
 
+## 🐳 Docker Deployment
+
+```bash
+# Quick start with Docker Compose
+git clone https://github.com/xiongsircool/aurora-rss-reader.git
+cd aurora-rss-reader
+docker-compose up -d
+
+# Access: http://localhost:8080
+```
+
+For detailed Docker configuration, see [Docker README](docker/README.md).
+
+> **Note**: Docker image only supports `linux/amd64` architecture.
+
 ## Build and Release
 
 ```bash

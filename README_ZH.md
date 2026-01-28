@@ -226,6 +226,21 @@ GLM_API_KEY=your_api_key_here
 - **Linux**：`~/.config/aurora-rss-reader/aurora-rss.db`
 - 可通过设置环境变量 `DATABASE_PATH` 指定数据库路径。
 
+## 🐳 Docker 部署
+
+```bash
+# 使用 Docker Compose 快速启动
+git clone https://github.com/xiongsircool/aurora-rss-reader.git
+cd aurora-rss-reader
+docker-compose up -d
+
+# 访问: http://localhost:8080
+```
+
+详细配置请参考 [Docker 部署文档](docker/README.md)。
+
+> **注意**: Docker 镜像仅支持 `linux/amd64` 架构。
+
 ## 构建发布
 
 ```bash

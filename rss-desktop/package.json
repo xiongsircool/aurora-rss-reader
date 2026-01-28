@@ -51,7 +51,7 @@
     "build": "vue-tsc && vite build",
     "prepare:backend": "node ../tools/prepare-backend-node.mjs",
     "pack": "pnpm prepare:backend && pnpm build && electron-builder",
-    "build:web": "vue-tsc && vite build",
+    "build:web": "vue-tsc && vite build --config vite.config.web.ts",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "clean": "rm -rf dist dist-electron release .vite out"
