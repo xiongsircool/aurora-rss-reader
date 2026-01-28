@@ -23,23 +23,23 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.3 最新版本 | Latest Version
+### 🎉 v0.1.5 最新版本 | Latest Version
 
-**打包修复与平台支持 | Packaging Fix & Platform Support**
+**功能增强与稳定性改进 | Feature Enhancement & Stability Improvements**
 
-- 🔧 **修复Windows打包** - 后端现在可以正确启动
-- 🍎 **macOS Intel 支持** - 新增对老款 Intel Mac (x64) 的支持
-- 📦 **构建系统优化** - 确保所有模块依赖正确包含在打包应用中
-- 🗄️ **数据库初始化** - 修复首次启动时数据库表创建问题
-- ⚡ **启动优化** - 延长后端启动超时时间，适配性能较慢的系统
-- ✅ **一键已读** - 新增批量标记所有文章为已读功能
-- 🌙 **深色模式修复** - 修复设置页面在深色模式下的显示异常
+- 🔄 **应用内自动更新** - 集成 electron-updater，支持检测和安装新版本
+- 🤖 **MCP 服务器支持** - 新增 Model Context Protocol 服务器，增强 AI 集成能力
+- 🔍 **向量搜索** - 使用 sqlite-vss 实现语义搜索功能
+- 📝 **批量翻译** - 新增批量翻译 API，提升翻译效率
+- 🎨 **UI 优化** - 改进翻译流程、详情面板体验、收藏和未读标识
+- 🔧 **CI/CD 流水线** - GitHub Actions 多平台自动构建和发布
+- 🍎 **macOS 修复** - 解决 DMG 挂载问题，支持 Intel/Apple Silicon 双架构
 
 ---
 
 Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + Fastify (Node.js) stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.3**
+**Current Version: v0.1.5**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -50,7 +50,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.3**
+**Current Version: v0.1.5**
 
 ### Features | 功能特色
 
@@ -235,9 +235,9 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `AuroraRSSReader-Mac-0.1.3-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.3-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.3-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.5-{x64,arm64}.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.5-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.5-x64.AppImage`
 
 ## 技术栈
 
@@ -260,21 +260,27 @@ aurora-rss-reader/
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.3 (当前版本 | Current Version) 🎉
-**打包修复与平台支持 | Packaging Fix & Platform Support**
-
-#### 🔧 核心修复 | Core Fixes
-- **Windows打包修复** - 后端启动稳定性提升
-- **数据库初始化** - 修复首次运行时数据库表未创建导致的崩溃问题
-- **依赖管理优化** - 确保打包依赖完整性
-- **启动流程优化** - 增加健康检查超时时间至 5 分钟，防止慢速系统误报超时
+### v0.1.5 (当前版本 | Current Version) 🎉
+**功能增强与稳定性改进 | Feature Enhancement & Stability Improvements**
 
 #### ✨ 新增功能 | New Features
-- **一键已读** - 侧边栏新增"全部已读"按钮，快速清理未读消息
-- **macOS Intel支持** - 新增对 x64 架构 Mac 的构建支持
-- **深色模式优化** - 修复设置页面在深色模式下的文字颜色和背景显示问题
+- **应用内自动更新** - 集成 electron-updater 实现版本检测和自动安装
+- **MCP 服务器支持** - 新增 Model Context Protocol 服务器，增强 AI 集成
+- **向量搜索** - 使用 sqlite-vss 实现语义搜索功能
+- **批量翻译 API** - 支持批量翻译文章，提升效率
 
-### v0.1.2 (历史版本 | Previous Version)
+#### 🎨 UI/UX 优化 | UI/UX Improvements
+- **翻译流程优化** - 改进翻译交互体验
+- **详情面板增强** - 优化文章详情展示
+- **收藏和未读标识** - 精简视觉设计
+
+#### 🔧 技术优化 | Technical Improvements
+- **CI/CD 流水线** - GitHub Actions 多平台自动构建和发布
+- **macOS 双架构** - 支持 Intel (x64) 和 Apple Silicon (arm64)
+- **DMG 修复** - 解决 macOS DMG 挂载问题
+- **原生模块编译** - 升级 better-sqlite3 并修复 Electron 编译问题
+
+### v0.1.3 (历史版本 | Previous Version)
 **重要Bug修复版本 | Critical Bug Fix Release**
 
 #### 🐛 Bug修复 | Bug Fixes
@@ -312,7 +318,7 @@ aurora-rss-reader/
 
 ## 📚 文档 | Documentation
 
-- **[更新说明](UPDATE_README.md)** - v0.1.3详细更新内容
+- **[更新说明](UPDATE_README.md)** - 详细更新内容
 - **完整项目文档** - 旧版本文档已归档至 `docs_archive/` 目录
 
 ## ❓ 常见问题
