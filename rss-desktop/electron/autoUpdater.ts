@@ -13,6 +13,9 @@ autoUpdater.autoInstallOnAppQuit = true  // 退出时自动安装
 // 跳过版本列表（用户手动跳过的版本）
 let skippedVersions: Set<string> = new Set()
 
+// 标记是否为手动检查更新（用于区分错误提示）
+let isManualCheck = false
+
 /**
  * 设置自动更新器
  * @param mainWindow 主窗口实例
@@ -33,6 +36,8 @@ export function setupAutoUpdater(mainWindow: BrowserWindow) {
     log.info('🔍 开始检查更新...')
     autoUpdater.checkForUpdates().catch((err) => {
       log.error('❌ 检查更新失败:', err)
+      // 静默处理错误，不弹窗打扰用户
+      // 常见原因: 网络问题、旧版本缺少 latest-mac.yml 文件
     })
   }, 5000)
 
@@ -179,11 +184,26 @@ export function setupAutoUpdater(mainWindow: BrowserWindow) {
       stack: err.stack,
     })
 
+    // 如果是自动检查更新且是 404 错误（旧版本缺少 latest-mac.yml），静默处理
+    if (!isManualCheck && err.message.includes('404')) {
+      log.warn('⚠️  当前版本可能缺少更新清单文件，静默跳过（不弹窗）')
+      return
+    }
+
+    // 只在手动检查更新时才弹窗提示错误
+    if (!isManualCheck) {
+      log.warn('⚠️  自动检查更新失败，静默处理（不打扰用户）')
+      return
+    }
+
     // 判断错误类型
     let errorMessage = '检查更新时出错，请稍后重试'
     let errorDetail = err.message
 
-    if (err.message.includes('net::')) {
+    if (err.message.includes('404')) {
+      errorMessage = '更新服务暂不可用'
+      errorDetail = '当前版本可能过旧，请访问 GitHub 手动下载最新版本'
+    } else if (err.message.includes('net::')) {
       errorMessage = '网络连接失败'
       errorDetail = '无法连接到更新服务器，请检查网络连接后重试'
     } else if (err.message.includes('sha512')) {
@@ -196,31 +216,19 @@ export function setupAutoUpdater(mainWindow: BrowserWindow) {
 
     dialog
       .showMessageBox(mainWindow, {
-        type: 'error',
-        title: '更新失败',
+        type: 'warning',
+        title: '更新检查失败',
         message: errorMessage,
         detail: errorDetail,
-        buttons: ['手动下载', '重试', '关闭'],
-        defaultId: 1,
-        cancelId: 2,
+        buttons: ['手动下载', '关闭'],
+        defaultId: 0,
+        cancelId: 1,
         noLink: true,
       })
       .then((result) => {
-        switch (result.response) {
-          case 0:
-            // 手动下载
-            shell.openExternal('https://github.com/xiongsircool/aurora-rss-reader/releases/latest')
-            break
-          case 1:
-            // 重试
-            log.info('🔄 用户选择重试检查更新')
-            autoUpdater.checkForUpdates().catch((err) => {
-              log.error('❌ 重试失败:', err)
-            })
-            break
-          case 2:
-            // 关闭
-            break
+        if (result.response === 0) {
+          // 手动下载
+          shell.openExternal('https://github.com/xiongsircool/aurora-rss-reader/releases/latest')
         }
       })
       .catch((err) => {
@@ -244,6 +252,9 @@ export function setupAutoUpdater(mainWindow: BrowserWindow) {
 export function checkForUpdatesManually(mainWindow: BrowserWindow) {
   log.info('🔍 用户手动检查更新')
 
+  // 标记为手动检查（影响错误处理逻辑）
+  isManualCheck = true
+
   autoUpdater
     .checkForUpdates()
     .then((result) => {
@@ -260,6 +271,11 @@ export function checkForUpdatesManually(mainWindow: BrowserWindow) {
     })
     .catch((err) => {
       log.error('❌ 手动检查更新失败:', err)
+      // 错误会在 autoUpdater.on('error') 中统一处理
+    })
+    .finally(() => {
+      // 重置标记
+      isManualCheck = false
     })
 }
 
