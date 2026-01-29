@@ -7,6 +7,7 @@ import DetailsHeader from './DetailsHeader.vue'
 import DetailsActions from './DetailsActions.vue'
 import AISummaryCard from './AISummaryCard.vue'
 import ArticleContent from './ArticleContent.vue'
+import AudioPlayer from './AudioPlayer.vue'
 import { useSanitize } from '../../composables/useSanitize'
 
 const props = defineProps<{
@@ -43,6 +44,13 @@ const { t } = useI18n()
 const { sanitize } = useSanitize()
 const safeContent = computed(() => sanitize(props.entry?.content ?? ''))
 
+// Check if entry has audio enclosure
+const hasAudio = computed(() => {
+  const type = props.entry?.enclosure_type
+  const url = props.entry?.enclosure_url
+  return url && type?.startsWith('audio/')
+})
+
 const containerClasses = computed(() => [
   'details bg-[var(--bg-surface)] p-6 shrink-0 min-w-70 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden w-[var(--details-width,420px)]',
   props.inOverlay ? 'h-full max-h-none' : 'max-h-screen',
@@ -75,6 +83,16 @@ const containerClasses = computed(() => [
         :summary-text="summaryText"
         :summary-loading="summaryLoading"
         @generate-summary="emit('generate-summary')"
+      />
+
+      <!-- Audio Player -->
+      <AudioPlayer
+        v-if="hasAudio && entry.enclosure_url"
+        :src="entry.enclosure_url"
+        :duration="entry.duration"
+        :image-url="entry.image_url"
+        :title="entry.title"
+        class="mb-4"
       />
 
       <!-- Article Body -->

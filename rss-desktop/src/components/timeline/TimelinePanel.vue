@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { Entry } from '../../types'
+import type { Entry, ViewType } from '../../types'
 import TimelineHeader from './TimelineHeader.vue'
 import TimelineFilters from './TimelineFilters.vue'
 import EntryCard from './EntryCard.vue'
+import PictureCard from './PictureCard.vue'
+import VideoCard from './VideoCard.vue'
+import AudioCard from './AudioCard.vue'
 import LoadingSpinner from '../LoadingSpinner.vue'
 
 const props = defineProps<{
@@ -11,6 +15,9 @@ const props = defineProps<{
   title: string
   subtitle: string
   showFavoritesOnly: boolean
+
+  // View type
+  viewType?: ViewType
   
   // Filter props
   searchQuery: string
@@ -56,6 +63,71 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const loadMoreThreshold = 8
 let lastLoadMoreLength = 0
+
+// View type helpers
+const isPictureView = computed(() => props.viewType === 'pictures')
+const isVideoView = computed(() => props.viewType === 'videos')
+const isAudioView = computed(() => props.viewType === 'audio')
+const isGridView = computed(() => isPictureView.value || isVideoView.value)
+
+// Responsive grid columns
+const containerRef = ref<HTMLElement | null>(null)
+const gridColumns = ref(3)
+
+function updateGridColumns() {
+  if (!containerRef.value) return
+  const width = containerRef.value.clientWidth
+  if (width < 400) {
+    gridColumns.value = 2
+  } else if (width < 600) {
+    gridColumns.value = 3
+  } else if (width < 900) {
+    gridColumns.value = 4
+  } else {
+    gridColumns.value = 5
+  }
+}
+
+let resizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  if (containerRef.value) {
+    resizeObserver = new ResizeObserver(updateGridColumns)
+    resizeObserver.observe(containerRef.value)
+    updateGridColumns()
+  }
+})
+
+onUnmounted(() => {
+  resizeObserver?.disconnect()
+})
+
+// Grid scroll handler for load more
+function handleGridScroll(e: Event) {
+  const target = e.target as HTMLElement
+  if (!target) return
+
+  const { scrollTop, scrollHeight, clientHeight } = target
+  const scrollPercentage = (scrollTop + clientHeight) / scrollHeight
+
+  // Trigger load more when scrolled to 80%
+  if (scrollPercentage > 0.8 && !props.loading && !props.loadingMore && props.hasMore) {
+    if (props.entries.length !== lastLoadMoreLength) {
+      lastLoadMoreLength = props.entries.length
+      emit('load-more')
+    }
+  }
+
+  // Emit visible entries for auto title translation
+  const itemHeight = 200 // approximate height of picture card
+  const startIndex = Math.floor(scrollTop / itemHeight) * gridColumns.value
+  const visibleCount = Math.ceil(clientHeight / itemHeight) * gridColumns.value
+  const endIndex = Math.min(startIndex + visibleCount, props.entries.length - 1)
+
+  if (endIndex >= startIndex) {
+    emit('entries-visible', props.entries.slice(startIndex, endIndex + 1))
+  }
+}
 
 function handleVisibleUpdate(
   startIndex: number,
@@ -106,7 +178,12 @@ function handleVisibleUpdate(
       @update:date-range-filter="emit('update:dateRangeFilter', $event)"
     />
     
-    <section class="timeline__list relative flex-1 p-[clamp(12px,1.5vw,16px)] flex flex-col gap-[clamp(10px,1vw,14px)] overflow-y-auto overflow-x-hidden min-h-0">
+    <section
+      ref="containerRef"
+      class="timeline__list relative flex-1 p-[clamp(12px,1.5vw,16px)] overflow-y-auto overflow-x-hidden min-h-0"
+      :class="{ 'flex flex-col gap-[clamp(10px,1vw,14px)]': !isGridView }"
+      @scroll="isGridView ? handleGridScroll($event) : undefined"
+    >
       <div
         v-if="loading"
         class="absolute inset-0 z-10 grid place-items-center bg-[rgba(255,255,255,0.65)] dark:bg-[rgba(15,17,21,0.65)] pointer-events-none"
@@ -114,15 +191,62 @@ function handleVisibleUpdate(
         <LoadingSpinner message="加载中..." />
       </div>
 
-      <!-- Custom scrollbar style is applied to the scroller -->
+      <!-- Picture Grid View -->
+      <div
+        v-if="isPictureView && entries.length"
+        class="picture-grid"
+        :style="{ '--grid-columns': gridColumns }"
+      >
+        <PictureCard
+          v-for="entry in entries"
+          :key="entry.id"
+          :entry="entry"
+          :active="selectedEntryId === entry.id"
+          @select="emit('select-entry', $event)"
+          @toggle-star="emit('toggle-star', $event)"
+        />
+      </div>
+
+      <!-- Video Grid View -->
+      <div
+        v-else-if="isVideoView && entries.length"
+        class="video-grid"
+        :style="{ '--grid-columns': Math.max(2, gridColumns - 1) }"
+      >
+        <VideoCard
+          v-for="entry in entries"
+          :key="entry.id"
+          :entry="entry"
+          :active="selectedEntryId === entry.id"
+          @select="emit('select-entry', $event)"
+          @toggle-star="emit('toggle-star', $event)"
+        />
+      </div>
+
+      <!-- Audio List View -->
+      <div
+        v-else-if="isAudioView && entries.length"
+        class="audio-list flex flex-col gap-2"
+      >
+        <AudioCard
+          v-for="entry in entries"
+          :key="entry.id"
+          :entry="entry"
+          :active="selectedEntryId === entry.id"
+          @select="emit('select-entry', $event)"
+          @toggle-star="emit('toggle-star', $event)"
+        />
+      </div>
+
+      <!-- Default List View -->
       <DynamicScroller
+        v-else-if="!isGridView && !isAudioView && entries.length"
         class="h-full"
         :items="entries"
         :min-item-size="100"
         :emit-update="true"
         key-field="id"
         @update="handleVisibleUpdate"
-        v-if="entries.length"
       >
         <template v-slot="{ item, index, active }">
           <DynamicScrollerItem
@@ -178,6 +302,22 @@ function handleVisibleUpdate(
 
 :global(.dark) .timeline__list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
 :global(.dark) .timeline__list:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
+
+/* Picture Grid Layout */
+.picture-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--grid-columns, 3), 1fr);
+  gap: clamp(10px, 1.2vw, 16px);
+  padding-bottom: 20px;
+}
+
+/* Video Grid Layout */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--grid-columns, 2), 1fr);
+  gap: clamp(12px, 1.5vw, 20px);
+  padding-bottom: 20px;
+}
 
 .loading-bar {
   background: linear-gradient(90deg, transparent 0%, var(--accent) 35%, #34c759 65%, transparent 100%);

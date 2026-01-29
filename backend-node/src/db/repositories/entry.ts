@@ -13,6 +13,12 @@ export interface EntryCreateInput {
   readability_content?: string | null;
   categories_json?: string | null;
   published_at?: string | null;
+  // Enclosure fields for audio/video
+  enclosure_url?: string | null;
+  enclosure_type?: string | null;
+  enclosure_length?: number | null;
+  duration?: string | null;
+  image_url?: string | null;
 }
 
 export interface EntryUpdateInput {
@@ -50,14 +56,20 @@ export class EntryRepository {
       inserted_at: now,
       read: 0,
       starred: 0,
+      enclosure_url: input.enclosure_url ?? null,
+      enclosure_type: input.enclosure_type ?? null,
+      enclosure_length: input.enclosure_length ?? null,
+      duration: input.duration ?? null,
+      image_url: input.image_url ?? null,
     };
 
     const stmt = this.db.prepare(`
       INSERT INTO entries (
         id, feed_id, guid, title, url, title_translations, author,
         summary, content, readability_content, categories_json,
-        published_at, inserted_at, read, starred
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        published_at, inserted_at, read, starred,
+        enclosure_url, enclosure_type, enclosure_length, duration, image_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -75,7 +87,12 @@ export class EntryRepository {
       entry.published_at,
       entry.inserted_at,
       entry.read,
-      entry.starred
+      entry.starred,
+      entry.enclosure_url,
+      entry.enclosure_type,
+      entry.enclosure_length,
+      entry.duration,
+      entry.image_url
     );
 
     return entry;

@@ -319,6 +319,91 @@ function selectFeedIcon(feedData: any, siteUrl: string | null, feedUrl: string):
 }
 
 /**
+ * Extract enclosure data from RSS item (for audio/video)
+ */
+interface EnclosureData {
+  url: string;
+  type: string | null;
+  length: number | null;
+}
+
+function extractEnclosure(item: any): EnclosureData | null {
+  // Try standard enclosure field
+  if (item.enclosure) {
+    const enc = item.enclosure;
+    const url = enc.url || enc.href || enc;
+    if (typeof url === 'string' && url.startsWith('http')) {
+      return {
+        url,
+        type: enc.type || null,
+        length: enc.length ? parseInt(enc.length, 10) : null,
+      };
+    }
+  }
+
+  // Try media:content
+  if (item['media:content']) {
+    const media = item['media:content'];
+    const url = media.url || media.$?.url;
+    if (url) {
+      return {
+        url,
+        type: media.type || media.$?.type || null,
+        length: media.fileSize ? parseInt(media.fileSize, 10) : null,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract duration from RSS item (iTunes format)
+ */
+function extractDuration(item: any): string | null {
+  // iTunes duration
+  if (item.itunes?.duration) {
+    return String(item.itunes.duration);
+  }
+  if (item['itunes:duration']) {
+    return String(item['itunes:duration']);
+  }
+  return null;
+}
+
+/**
+ * Extract image URL from RSS item
+ */
+function extractImageUrl(item: any, feedData: any): string | null {
+  // Item-level image (iTunes)
+  if (item.itunes?.image) {
+    const img = item.itunes.image;
+    return typeof img === 'string' ? img : img.href || img.url || null;
+  }
+  if (item['itunes:image']) {
+    const img = item['itunes:image'];
+    return typeof img === 'string' ? img : img.$?.href || null;
+  }
+
+  // media:thumbnail
+  if (item['media:thumbnail']) {
+    const thumb = item['media:thumbnail'];
+    return thumb.url || thumb.$?.url || null;
+  }
+
+  // Fall back to feed-level image
+  if (feedData?.itunes?.image) {
+    const img = feedData.itunes.image;
+    return typeof img === 'string' ? img : img.href || img.url || null;
+  }
+  if (feedData?.image?.url) {
+    return feedData.image.url;
+  }
+
+  return null;
+}
+
+/**
  * Fetch and parse a single RSS feed
  */
 export async function refreshFeed(feedId: string): Promise<FetchResult> {
@@ -458,6 +543,11 @@ export async function refreshFeed(feedId: string): Promise<FetchResult> {
       // Clean summary
       const summary = cleanHtmlText(item.contentSnippet || item.summary || item.content || item['content:encoded']);
 
+      // Extract enclosure data (for audio/video podcasts)
+      const enclosure = extractEnclosure(item);
+      const duration = extractDuration(item);
+      const imageUrl = extractImageUrl(item, feedData);
+
       // Create entry
       entryRepo.create({
         feed_id: feedId,
@@ -470,6 +560,11 @@ export async function refreshFeed(feedId: string): Promise<FetchResult> {
         readability_content: readabilityContent,
         categories_json: item.categories ? JSON.stringify(item.categories) : null,
         published_at: publishedAt,
+        enclosure_url: enclosure?.url || null,
+        enclosure_type: enclosure?.type || null,
+        enclosure_length: enclosure?.length || null,
+        duration: duration,
+        image_url: imageUrl,
       });
 
       newItemCount++;

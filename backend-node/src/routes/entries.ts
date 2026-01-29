@@ -32,6 +32,12 @@ function normalizeEntry(row: any, translationRepo: TranslationRepository, target
     starred: !!row.starred,
     translated_title: null as string | null,
     translated_summary: null as string | null,
+    // Enclosure fields for audio/video
+    enclosure_url: row.enclosure_url ?? null,
+    enclosure_type: row.enclosure_type ?? null,
+    enclosure_length: row.enclosure_length ?? null,
+    duration: row.duration ?? null,
+    image_url: row.image_url ?? null,
   };
 
   // Fetch translation if available

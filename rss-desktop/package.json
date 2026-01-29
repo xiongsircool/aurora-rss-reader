@@ -58,6 +58,7 @@
   },
   "dependencies": {
     "@types/dompurify": "^3.2.0",
+    "@vueuse/core": "^14.1.0",
     "axios": "^1.13.2",
     "dayjs": "^1.11.19",
     "dompurify": "^3.3.1",
@@ -71,6 +72,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.2",
+    "@iconify-json/carbon": "^1.2.18",
     "@vitejs/plugin-vue": "^5.0.4",
     "concurrently": "^8.2.2",
     "electron": "39.1.2",

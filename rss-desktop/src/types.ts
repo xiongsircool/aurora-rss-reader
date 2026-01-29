@@ -48,6 +48,12 @@ export interface Entry {
   starred: boolean
   translated_title?: string | null
   translated_summary?: string | null
+  // Enclosure fields for audio/video
+  enclosure_url?: string | null
+  enclosure_type?: string | null
+  enclosure_length?: number | null
+  duration?: string | null
+  image_url?: string | null
 }
 
 export interface EntryPage {

@@ -6,7 +6,7 @@ import { useFeedIcons } from '../../composables/useFeedIcons'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useI18n } from 'vue-i18n'
 
-const props = defineProps<{
+defineProps<{
   feed: Feed
   active: boolean
   isEditing: boolean

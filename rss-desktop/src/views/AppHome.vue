@@ -648,6 +648,21 @@ const timelineSubtitle = computed(() => {
   return `${filteredEntries.value.length} Articles`
 })
 
+// Get current view type from store (used for view type filtering mode)
+const timelineViewType = computed(() => {
+  // When filtering by view type (no specific feed/group selected)
+  if (!store.activeFeedId && !store.activeGroupName) {
+    return store.activeViewType
+  }
+  // When viewing a specific feed, use that feed's view type
+  if (store.activeFeedId) {
+    const feed = store.feeds.find(f => f.id === store.activeFeedId)
+    return feed?.view_type || 'articles'
+  }
+  // Default to articles for group view
+  return 'articles'
+})
+
 async function handleAddFeed(url: string) {
   if (!url) return
   try {
@@ -983,6 +998,7 @@ async function handleChangeViewType(feedId: string, viewType: string) {
       :title="timelineTitle"
       :subtitle="timelineSubtitle"
       :show-favorites-only="showFavoritesOnly"
+      :view-type="timelineViewType"
       :search-query="searchQuery"
       :filter-mode="filterMode"
       :date-range-filter="dateRangeFilter"

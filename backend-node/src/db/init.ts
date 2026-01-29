@@ -55,6 +55,20 @@ function runMigrations(): void {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_feeds_view_type ON feeds(view_type)`);
     console.log('Migration completed: view_type column added');
   }
+
+  // Check if enclosure columns exist in entries (for audio/video support)
+  const entriesTableInfo = db.pragma('table_info(entries)') as Array<{ name: string }>;
+  const hasEnclosureUrl = entriesTableInfo.some((col) => col.name === 'enclosure_url');
+
+  if (!hasEnclosureUrl) {
+    console.log('Running migration: Adding enclosure columns to entries');
+    db.exec(`ALTER TABLE entries ADD COLUMN enclosure_url TEXT`);
+    db.exec(`ALTER TABLE entries ADD COLUMN enclosure_type TEXT`);
+    db.exec(`ALTER TABLE entries ADD COLUMN enclosure_length INTEGER`);
+    db.exec(`ALTER TABLE entries ADD COLUMN duration TEXT`);
+    db.exec(`ALTER TABLE entries ADD COLUMN image_url TEXT`);
+    console.log('Migration completed: enclosure columns added');
+  }
 }
 
 export function initDatabase(): void {
