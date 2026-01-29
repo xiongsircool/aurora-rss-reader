@@ -165,6 +165,25 @@ const containerClasses = computed(() => [
   height: auto;
 }
 
+.details__body :deep(video) {
+  max-width: 100%;
+  height: auto;
+}
+
+.details__body :deep(iframe) {
+  max-width: 100%;
+}
+
+.details__body :deep(figure) {
+  max-width: 100%;
+  margin: 0;
+}
+
+.details__body :deep(embed),
+.details__body :deep(object) {
+  max-width: 100%;
+}
+
 .details__body :deep(pre) {
   background: var(--bg-elevated);
   padding: 1em;

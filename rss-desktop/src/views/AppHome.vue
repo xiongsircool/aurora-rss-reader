@@ -659,7 +659,11 @@ const timelineViewType = computed(() => {
     const feed = store.feeds.find(f => f.id === store.activeFeedId)
     return feed?.view_type || 'articles'
   }
-  // Default to articles for group view
+  // When viewing a group, keep the current active view type
+  if (store.activeGroupName) {
+    return store.activeViewType
+  }
+  // Default to articles
   return 'articles'
 })
 
