@@ -111,6 +111,7 @@
     "unnamedArticle": "無名の記事",
     "authorUnknown": "不明な著者",
     "openOriginal": "原文を開く",
+    "changeViewType": "表示タイプを変更",
     "viewTypeChanged": "フィードタイプが変更されました",
     "viewTypeChangeFailed": "フィードタイプの変更に失敗しました"
   },

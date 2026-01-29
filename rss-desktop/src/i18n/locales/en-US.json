@@ -112,6 +112,7 @@
     "unnamedArticle": "Unnamed Article",
     "authorUnknown": "Unknown Author",
     "openOriginal": "Open Original",
+    "changeViewType": "Change View Type",
     "viewTypeChanged": "Feed type changed",
     "viewTypeChangeFailed": "Failed to change feed type"
   },

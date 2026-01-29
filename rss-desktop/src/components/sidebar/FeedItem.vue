@@ -4,8 +4,9 @@ import type { Feed, ViewType } from '../../types'
 import { VIEW_TYPES, VIEW_TYPE_LABELS } from '../../types'
 import { useFeedIcons } from '../../composables/useFeedIcons'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { useI18n } from 'vue-i18n'
 
-defineProps<{
+const props = defineProps<{
   feed: Feed
   active: boolean
   isEditing: boolean
@@ -25,22 +26,70 @@ const emit = defineEmits<{
   (e: 'change-view-type', feedId: string, viewType: ViewType): void
 }>()
 
+const { t } = useI18n()
 const settingsStore = useSettingsStore()
-const showTypeMenu = ref(false)
 
-function closeTypeMenu(e: MouseEvent) {
+// 右键菜单状态
+const showContextMenu = ref(false)
+const contextMenuPos = ref({ x: 0, y: 0 })
+const showViewTypeSubmenu = ref(false)
+
+// 全局事件：关闭所有其他菜单
+const CLOSE_ALL_MENUS_EVENT = 'feed-context-menu:close-all'
+
+function handleContextMenu(e: MouseEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+
+  // 先关闭所有其他菜单
+  window.dispatchEvent(new CustomEvent(CLOSE_ALL_MENUS_EVENT))
+
+  // 计算菜单位置，确保不超出视口
+  const menuWidth = 200
+  const menuHeight = 220
+  let x = e.clientX
+  let y = e.clientY
+
+  if (x + menuWidth > window.innerWidth) {
+    x = window.innerWidth - menuWidth - 10
+  }
+  if (y + menuHeight > window.innerHeight) {
+    y = window.innerHeight - menuHeight - 10
+  }
+
+  contextMenuPos.value = { x, y }
+  showViewTypeSubmenu.value = false
+
+  // 延迟显示，确保其他菜单已关闭
+  requestAnimationFrame(() => {
+    showContextMenu.value = true
+  })
+}
+
+function closeContextMenu() {
+  showContextMenu.value = false
+  showViewTypeSubmenu.value = false
+}
+
+function handleCloseAllMenus() {
+  closeContextMenu()
+}
+
+function handleGlobalClick(e: MouseEvent) {
   const target = e.target as HTMLElement
-  if (!target.closest('.type-menu-container')) {
-    showTypeMenu.value = false
+  if (!target.closest('.feed-context-menu')) {
+    closeContextMenu()
   }
 }
 
 onMounted(() => {
-  document.addEventListener('click', closeTypeMenu)
+  document.addEventListener('click', handleGlobalClick)
+  window.addEventListener(CLOSE_ALL_MENUS_EVENT, handleCloseAllMenus)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', closeTypeMenu)
+  document.removeEventListener('click', handleGlobalClick)
+  window.removeEventListener(CLOSE_ALL_MENUS_EVENT, handleCloseAllMenus)
 })
 
 const { iconSrcFor, handleFeedIconLoad, handleFeedIconError, isFeedIconBroken, isFeedIconLoaded, getFeedColor, getFeedInitial } = useFeedIcons()
@@ -86,9 +135,10 @@ function getFeedRefreshTooltip(_feed: Feed): string {
 </script>
 
 <template>
-  <div 
+  <div
     class="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[0_6px_14px_rgba(15,17,21,0.05)] transition-all duration-200 my-1 mx-2 group"
     :class="{ 'border-[var(--accent)] bg-[rgba(255,122,24,0.08)] shadow-[0_14px_28px_rgba(255,122,24,0.15)]': active, 'hover:border-[rgba(255,122,24,0.4)] hover:shadow-[0_12px_24px_rgba(15,17,21,0.1)] hover:-translate-y-px': !active }"
+    @contextmenu="handleContextMenu"
   >
     <button class="flex-1 min-w-0 border-none bg-transparent text-left flex items-center gap-3 p-0 c-[var(--text-primary)] cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--accent)] outline-offset-2" @click="emit('select', feed.id)">
       <div
@@ -165,65 +215,6 @@ function getFeedRefreshTooltip(_feed: Feed): string {
       >
         ✎
       </button>
-      <!-- View Type Selector -->
-      <div v-if="!isEditing" class="relative type-menu-container">
-        <button
-          @click="showTypeMenu = !showTypeMenu"
-          class="type-btn border border-[var(--border-color)] bg-[var(--bg-surface)] p-[6px_8px] rounded-lg cursor-pointer transition-all c-[var(--text-primary)] hover:bg-[#5856d6] hover:c-white hover:border-[#5856d6] hover:-translate-y-px"
-          :title="`类型: ${VIEW_TYPE_LABELS[feed.view_type]}`"
-        >
-          <svg v-if="feed.view_type === 'articles'" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-          </svg>
-          <svg v-else-if="feed.view_type === 'social'" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-          <svg v-else-if="feed.view_type === 'pictures'" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-          </svg>
-          <svg v-else-if="feed.view_type === 'videos'" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-          </svg>
-          <svg v-else-if="feed.view_type === 'audio'" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
-          </svg>
-          <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
-        </button>
-        <div
-          v-if="showTypeMenu"
-          class="absolute right-0 top-full mt-1 z-50 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-lg py-1.5 min-w-[140px]"
-        >
-          <button
-            v-for="vt in VIEW_TYPES"
-            :key="vt"
-            @click="emit('change-view-type', feed.id, vt); showTypeMenu = false"
-            class="w-full px-3 py-2 text-left text-[12px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors"
-            :class="{ 'bg-[rgba(255,122,24,0.12)] c-[var(--accent)] font-medium': feed.view_type === vt }"
-          >
-            <svg v-if="vt === 'articles'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-            <svg v-else-if="vt === 'social'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <svg v-else-if="vt === 'pictures'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-            </svg>
-            <svg v-else-if="vt === 'videos'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-            </svg>
-            <svg v-else-if="vt === 'audio'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
-            </svg>
-            <svg v-else class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
-            <span>{{ VIEW_TYPE_LABELS[vt] }}</span>
-          </button>
-        </div>
-      </div>
       <button
         @click="emit('delete', feed.id)"
         class="border border-[var(--border-color)] bg-[var(--bg-surface)] p-[6px_10px] rounded-lg cursor-pointer text-[13px] transition-all c-[var(--text-primary)] hover:bg-[#ff3b30] hover:c-white hover:border-[var(--accent)] hover:-translate-y-px"
@@ -233,6 +224,108 @@ function getFeedRefreshTooltip(_feed: Feed): string {
       </button>
     </div>
   </div>
+
+  <!-- 右键菜单 (使用 Teleport 渲染到 body) -->
+  <Teleport to="body">
+    <div
+      v-if="showContextMenu"
+      class="feed-context-menu fixed z-[9999] bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.2)] py-1.5 min-w-[200px]"
+      :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }"
+    >
+      <!-- 标记已读 -->
+      <button
+        @click="emit('mark-feed-read', feed.id); closeContextMenu()"
+        class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
+      >
+        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span>{{ t('articles.markAsRead') }}</span>
+      </button>
+
+      <!-- 编辑分组 -->
+      <button
+        @click="emit('start-edit', feed.id, feed.group_name); closeContextMenu()"
+        class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
+      >
+        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        <span>{{ t('feeds.editTitle') }}</span>
+      </button>
+
+      <div class="h-px bg-[var(--border-color)] my-1.5"></div>
+
+      <!-- 更改视图类型 (带子菜单) -->
+      <div class="relative">
+        <button
+          @click="showViewTypeSubmenu = !showViewTypeSubmenu"
+          class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
+        >
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          <span class="flex-1">{{ t('feeds.changeViewType') }}</span>
+          <span class="text-[11px] c-[var(--text-tertiary)] mr-1">{{ VIEW_TYPE_LABELS[feed.view_type] }}</span>
+          <svg class="w-3 h-3 shrink-0 c-[var(--text-tertiary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
+
+        <!-- 视图类型子菜单 -->
+        <div
+          v-if="showViewTypeSubmenu"
+          class="absolute left-full top-0 ml-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.2)] py-1.5 min-w-[160px]"
+        >
+          <button
+            v-for="vt in VIEW_TYPES"
+            :key="vt"
+            @click="emit('change-view-type', feed.id, vt); closeContextMenu()"
+            class="w-full px-3 py-2 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
+            :class="{ 'bg-[rgba(255,122,24,0.12)] c-[var(--accent)]! font-medium': feed.view_type === vt }"
+          >
+            <svg v-if="vt === 'articles'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <svg v-else-if="vt === 'social'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <svg v-else-if="vt === 'pictures'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+            </svg>
+            <svg v-else-if="vt === 'videos'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+            </svg>
+            <svg v-else-if="vt === 'audio'" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+            </svg>
+            <svg v-else class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span>{{ VIEW_TYPE_LABELS[vt] }}</span>
+            <svg v-if="feed.view_type === vt" class="w-4 h-4 ml-auto c-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="h-px bg-[var(--border-color)] my-1.5"></div>
+
+      <!-- 删除订阅 -->
+      <button
+        @click="emit('delete', feed.id); closeContextMenu()"
+        class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,59,48,0.1)] transition-colors c-[#ff3b30]"
+      >
+        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        <span>{{ t('feeds.deleteTitle') }}</span>
+      </button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>

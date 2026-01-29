@@ -112,6 +112,7 @@
     "unnamedArticle": "未命名文章",
     "authorUnknown": "未知作者",
     "openOriginal": "打开原文",
+    "changeViewType": "更改视图类型",
     "viewTypeChanged": "订阅类型已更改",
     "viewTypeChangeFailed": "更改订阅类型失败"
   },
