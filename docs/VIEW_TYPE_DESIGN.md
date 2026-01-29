@@ -19,7 +19,7 @@
 
 **重要**：`articles` 为默认类型，确保旧数据平滑迁移：
 - 数据库迁移时，所有现有订阅源的 `view_type` 设为 `'articles'`
-- 新增订阅时自动识别类型，识别失败则默认为 `'articles'`
+- 新增订阅时默认为 `'articles'`
 - 用户可通过右键菜单手动修改类型
 
 ## 数据模型变更
@@ -41,26 +41,6 @@ interface Feed {
 }
 ```
 
-## 自动识别规则
-
-### URL 匹配规则
-
-| URL 特征 | 识别为 |
-|----------|--------|
-| `youtube.com`, `bilibili.com`, `vimeo.com` | videos |
-| `twitter.com`, `x.com`, `mastodon`, `weibo.com` | social |
-| `instagram.com`, `flickr.com`, `unsplash.com` | pictures |
-| `github.com/*/notifications`, `gitlab.com` | notifications |
-
-### RSS 内容分析规则
-
-| 特征 | 识别为 |
-|------|--------|
-| `<enclosure type="audio/...">` | audio |
-| `<media:content type="video/...">` | videos |
-| 条目内容以图片为主 | pictures |
-| 都不匹配 | articles（默认） |
-
 ## 后端 API 变更
 
 ### 1. GET /feeds
@@ -69,8 +49,8 @@ interface Feed {
 
 ### 2. POST /feeds
 
-- 自动识别 `view_type`
-- 返回值包含识别结果
+- 新增订阅默认 `view_type = 'articles'`
+- 返回值包含 view_type 字段
 
 ### 3. PUT /feeds/:id
 
@@ -166,10 +146,14 @@ src/components/
 ### 1. 添加订阅
 
 ```
-用户输入 URL → 后端解析 → 自动识别类型 → 保存
-                                ↓
-                    返回识别结果给前端显示
+用户在某类型视图下（如 Videos）输入 URL
+        ↓
+后端解析 RSS，view_type = 当前选中的类型
+        ↓
+新订阅自动归入该类型分类
 ```
+
+**逻辑**：添加订阅时，使用当前 `activeViewType` 作为新订阅的类型。
 
 ### 2. 修改订阅类型（右键菜单）
 
@@ -200,20 +184,16 @@ activeViewType = 'videos'
 - [ ] 数据迁移（现有数据设为 articles）
 - [ ] 后端 API 支持 view_type
 
-### Phase 2: 自动识别
-- [ ] URL 匹配规则实现
-- [ ] RSS 内容分析规则实现
-
-### Phase 3: 前端基础
+### Phase 2: 前端基础
 - [ ] feedStore 扩展 view_type 状态
 - [ ] ViewTypeNav 组件
 - [ ] 侧边栏按类型过滤
 
-### Phase 4: 右键菜单
+### Phase 3: 右键菜单
 - [ ] 订阅源右键菜单增加"修改类型"选项
 - [ ] 类型选择弹窗组件
 
-### Phase 5: 差异化卡片（可选）
+### Phase 4: 差异化卡片（可选，后续迭代）
 - [ ] VideoCard 组件
 - [ ] SocialCard 组件
 - [ ] PictureCard + PictureGrid 组件
@@ -224,4 +204,9 @@ activeViewType = 'videos'
 
 1. **向后兼容**：默认类型为 `articles`，确保升级不影响现有用户
 2. **渐进增强**：先实现类型切换，卡片差异化可后续迭代
-3. **用户可控**：自动识别 + 手动修改，给用户最终控制权
+3. **用户可控**：通过右键菜单手动修改类型
+
+## 后续扩展（暂不实现）
+
+- 自动识别规则：根据 URL 和 RSS 内容自动判断类型
+- 差异化卡片组件：VideoCard、SocialCard 等

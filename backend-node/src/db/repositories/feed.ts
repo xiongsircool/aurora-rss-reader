@@ -1,5 +1,5 @@
 import { getDatabase } from '../session.js';
-import { Feed, generateId } from '../models.js';
+import { Feed, generateId, ViewType } from '../models.js';
 
 export interface FeedCreateInput {
   url: string;
@@ -8,6 +8,7 @@ export interface FeedCreateInput {
   description?: string | null;
   favicon_url?: string | null;
   group_name?: string;
+  view_type?: ViewType;
   update_interval_minutes?: number;
 }
 
@@ -18,6 +19,7 @@ export interface FeedUpdateInput {
   description?: string | null;
   favicon_url?: string | null;
   group_name?: string;
+  view_type?: ViewType;
   last_checked_at?: string | null;
   last_error?: string | null;
   update_interval_minutes?: number;
@@ -36,6 +38,7 @@ export class FeedRepository {
       description: input.description ?? null,
       favicon_url: input.favicon_url ?? null,
       group_name: input.group_name ?? 'default',
+      view_type: input.view_type ?? 'articles',
       last_checked_at: null,
       last_error: null,
       update_interval_minutes: input.update_interval_minutes ?? 60,
@@ -46,9 +49,9 @@ export class FeedRepository {
     const stmt = this.db.prepare(`
       INSERT INTO feeds (
         id, url, title, site_url, description, favicon_url,
-        group_name, last_checked_at, last_error, update_interval_minutes,
+        group_name, view_type, last_checked_at, last_error, update_interval_minutes,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -59,6 +62,7 @@ export class FeedRepository {
       feed.description,
       feed.favicon_url,
       feed.group_name,
+      feed.view_type,
       feed.last_checked_at,
       feed.last_error,
       feed.update_interval_minutes,
@@ -111,6 +115,7 @@ export class FeedRepository {
         description = ?,
         favicon_url = ?,
         group_name = ?,
+        view_type = ?,
         last_checked_at = ?,
         last_error = ?,
         update_interval_minutes = ?,
@@ -125,6 +130,7 @@ export class FeedRepository {
       updated.description,
       updated.favicon_url,
       updated.group_name,
+      updated.view_type,
       updated.last_checked_at,
       updated.last_error,
       updated.update_interval_minutes,
@@ -150,6 +156,17 @@ export class FeedRepository {
   countByGroupName(groupName: string): number {
     const stmt = this.db.prepare('SELECT COUNT(*) as count FROM feeds WHERE group_name = ?');
     const row = stmt.get(groupName) as { count: number };
+    return row.count;
+  }
+
+  findByViewType(viewType: ViewType): Feed[] {
+    const stmt = this.db.prepare('SELECT * FROM feeds WHERE view_type = ? ORDER BY created_at DESC');
+    return stmt.all(viewType) as Feed[];
+  }
+
+  countByViewType(viewType: ViewType): number {
+    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM feeds WHERE view_type = ?');
+    const row = stmt.get(viewType) as { count: number };
     return row.count;
   }
 }

@@ -1,8 +1,21 @@
 import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
+import { execSync } from 'node:child_process'
 import vue from '@vitejs/plugin-vue'
 import electron from 'vite-plugin-electron'
 import UnoCSS from 'unocss/vite'
+
+// Custom plugin to build preload with esbuild (ensures CJS format)
+function buildPreloadPlugin() {
+  return {
+    name: 'build-preload',
+    buildStart() {
+      execSync('npx esbuild electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/preload.cjs', {
+        stdio: 'inherit'
+      })
+    }
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -17,29 +30,9 @@ export default defineConfig({
     electron([
       {
         entry: 'electron/main.ts',
-      },
-      {
-        entry: 'electron/preload.ts',
-        onstart(options) {
-          options.reload()
-        },
         vite: {
-          build: {
-            outDir: 'dist-electron',
-            minify: false,
-            lib: {
-              entry: 'electron/preload.ts',
-              formats: ['cjs'],
-              fileName: () => 'preload.js',
-            },
-            rollupOptions: {
-              external: ['electron'],
-              output: {
-                format: 'cjs',
-              },
-            },
-          },
-        },
+          plugins: [buildPreloadPlugin()]
+        }
       },
     ]),
   ],

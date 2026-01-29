@@ -3,12 +3,13 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFeedStore } from '../../stores/feedStore'
 import { useFavoritesStore } from '../../stores/favoritesStore'
-import type { Feed } from '../../types'
+import type { Feed, ViewType } from '../../types'
 import SidebarHeader from './SidebarHeader.vue'
 import AddFeedForm from './AddFeedForm.vue'
 import OpmlActions from './OpmlActions.vue'
 import FavoritesSection from './FavoritesSection.vue'
 import FeedGroup from './FeedGroup.vue'
+import ViewTypeNav from './ViewTypeNav.vue'
 
 const props = defineProps<{
   // Header props
@@ -63,6 +64,10 @@ const emit = defineEmits<{
   // Mark as read
   (e: 'mark-group-read', groupName: string): void
   (e: 'mark-feed-read', feedId: string): void
+
+  // View type
+  (e: 'select-view-type', viewType: string): void
+  (e: 'change-view-type', feedId: string, viewType: ViewType): void
 }>()
 
 const { t } = useI18n()
@@ -111,14 +116,20 @@ function isGroupCollapsed(groupName: string): boolean {
       @toggle-favorites="emit('toggle-favorites')"
       @select-feed="emit('select-favorite-feed', $event)"
     />
-    
+
+    <!-- View Type Navigation -->
+    <ViewTypeNav
+      v-show="!showFavoritesOnly"
+      @select="emit('select-view-type', $event)"
+    />
+
     <div class="flex-1" v-show="!showFavoritesOnly">
       <!-- Group controls -->
-      <div class="flex gap-2 mb-3 px-1" v-if="feedStore.sortedGroupNames.length > 1">
-        <button @click="emit('expand-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlTitle')">
+      <div class="flex gap-1.5 mb-2 px-1" v-if="feedStore.sortedGroupNames.length > 1">
+        <button @click="emit('expand-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-2 py-1 rounded-md text-[11px] cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlTitle')">
           {{ t('common.expandAll') }}
         </button>
-        <button @click="emit('collapse-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-3 py-1.5 rounded-md text-xs cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlCollapseTitle')">
+        <button @click="emit('collapse-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-2 py-1 rounded-md text-[11px] cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlCollapseTitle')">
           {{ t('common.collapseAll') }}
         </button>
       </div>
@@ -148,6 +159,7 @@ function isGroupCollapsed(groupName: string): boolean {
         @update:editing-group-name="emit('update:editingGroupName', $event)"
         @mark-group-read="emit('mark-group-read', $event)"
         @mark-feed-read="emit('mark-feed-read', $event)"
+        @change-view-type="(feedId, viewType) => emit('change-view-type', feedId, viewType)"
       />
     </div>
   </aside>

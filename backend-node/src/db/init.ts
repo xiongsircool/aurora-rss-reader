@@ -44,6 +44,17 @@ function runMigrations(): void {
     db.exec(`ALTER TABLE user_settings ADD COLUMN embedding_base_url TEXT NOT NULL DEFAULT 'https://api.siliconflow.cn/v1'`);
     console.log('Migration completed: embedding columns added');
   }
+
+  // Check if view_type column exists in feeds
+  const feedsTableInfo = db.pragma('table_info(feeds)') as Array<{ name: string }>;
+  const hasViewType = feedsTableInfo.some((col) => col.name === 'view_type');
+
+  if (!hasViewType) {
+    console.log('Running migration: Adding view_type column to feeds');
+    db.exec(`ALTER TABLE feeds ADD COLUMN view_type TEXT NOT NULL DEFAULT 'articles'`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_feeds_view_type ON feeds(view_type)`);
+    console.log('Migration completed: view_type column added');
+  }
 }
 
 export function initDatabase(): void {
@@ -59,6 +70,7 @@ export function initDatabase(): void {
       description TEXT,
       favicon_url TEXT,
       group_name TEXT DEFAULT 'default',
+      view_type TEXT DEFAULT 'articles',
       last_checked_at TEXT,
       last_error TEXT,
       update_interval_minutes INTEGER DEFAULT 60,

@@ -1,13 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import api from '../api/client'
-import type { Entry, EntryPage, Feed, SummaryResult } from '../types'
+import type { Entry, EntryPage, Feed, SummaryResult, ViewType } from '../types'
 
 export const useFeedStore = defineStore('feed', () => {
   const feeds = ref<Feed[]>([])
   const entries = ref<Entry[]>([])
   const activeFeedId = ref<string | null>(null)
   const activeGroupName = ref<string | null>(null)
+  const activeViewType = ref<ViewType>('articles')
   const selectedEntryId = ref<string | null>(null)
   const loadingFeeds = ref(false)
   const loadingEntries = ref(false)
@@ -26,12 +27,31 @@ export const useFeedStore = defineStore('feed', () => {
     entries.value.find((entry) => entry.id === selectedEntryId.value) ?? null
   )
 
-  // 分组相关的计算属性
+  // 当前类型下的订阅源
+  const filteredFeeds = computed(() => {
+    return feeds.value.filter(f => f.view_type === activeViewType.value)
+  })
+
+  // 各类型的统计
+  const viewTypeStats = computed(() => {
+    const stats: Record<string, { count: number; unread: number }> = {}
+    const types = ['articles', 'social', 'pictures', 'videos', 'audio', 'notifications']
+    types.forEach(type => {
+      const typeFeeds = feeds.value.filter(f => f.view_type === type)
+      stats[type] = {
+        count: typeFeeds.length,
+        unread: typeFeeds.reduce((sum, f) => sum + (f.unread_count || 0), 0)
+      }
+    })
+    return stats
+  })
+
+  // 分组相关的计算属性（基于当前类型过滤后的订阅源）
   const groupedFeeds = computed(() => {
     const groups: Record<string, Feed[]> = {}
 
-    // 将feeds按分组归类
-    feeds.value.forEach(feed => {
+    // 将当前类型的feeds按分组归类
+    filteredFeeds.value.forEach(feed => {
       const groupName = feed.group_name || '未分组'
       if (!groups[groupName]) {
         groups[groupName] = []
@@ -72,6 +92,7 @@ export const useFeedStore = defineStore('feed', () => {
   function buildEntriesQueryKey(params: {
     feedId: string | null
     groupName: string | null
+    viewType?: string | null
     unreadOnly: boolean
     dateRange?: string
     timeField?: string
@@ -79,6 +100,7 @@ export const useFeedStore = defineStore('feed', () => {
     return JSON.stringify({
       feedId: params.feedId,
       groupName: params.groupName,
+      viewType: params.viewType ?? null,
       unreadOnly: params.unreadOnly,
       dateRange: params.dateRange ?? null,
       timeField: params.timeField ?? null,
@@ -119,11 +141,7 @@ export const useFeedStore = defineStore('feed', () => {
 
       const { data } = await api.get<Feed[]>('/feeds', { params })
       feeds.value = data
-      // 仅在没有任何选择时（既未选中订阅，也未选中分组）才设定默认订阅
-      // 避免在分组模式下被刷新订阅列表时意外切回到单个订阅
-      if (!activeFeedId.value && !activeGroupName.value && data.length > 0) {
-        activeFeedId.value = data[0].id
-      }
+      // 不再自动选择订阅源，让用户通过视图类型导航来浏览内容
     } catch (error) {
       console.error(error)
       errorMessage.value = '加载订阅列表失败'
@@ -132,20 +150,19 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  async function addFeed(url: string, options?: { groupName?: string | null }) {
+  async function addFeed(url: string, options?: { groupName?: string | null; viewType?: ViewType }) {
     if (!url) return
     addingFeed.value = true
     try {
-      const payload: { url: string; group_name?: string } = { url }
+      const payload: { url: string; group_name?: string; view_type?: string } = { url }
       if (options?.groupName) {
         payload.group_name = options.groupName
       }
+      // 使用当前选中的类型作为新订阅的类型
+      payload.view_type = options?.viewType ?? activeViewType.value
       const { data } = await api.post<Feed>('/feeds', payload)
       feeds.value = [data, ...feeds.value]
-      const hasSelection = !!activeFeedId.value || !!activeGroupName.value
-      if (!hasSelection) {
-        activeFeedId.value = data.id
-      }
+      // 不再自动选择新添加的订阅源，保持当前视图类型模式
       // 保留当前的过滤器状态
       await fetchEntries({
         unreadOnly: lastEntryFilters.value?.unreadOnly,
@@ -225,18 +242,10 @@ export const useFeedStore = defineStore('feed', () => {
     try {
       await api.delete(`/feeds/${feedId}`)
       feeds.value = feeds.value.filter((f) => f.id !== feedId)
+      // 如果删除的是当前选中的订阅源，清除选择并清空文章列表
       if (activeFeedId.value === feedId) {
-        activeFeedId.value = feeds.value.length > 0 ? feeds.value[0].id : null
-        if (activeFeedId.value) {
-          // 保留当前的过滤器状态
-          await fetchEntries({
-            unreadOnly: lastEntryFilters.value?.unreadOnly,
-            dateRange: lastEntryFilters.value?.dateRange,
-            timeField: lastEntryFilters.value?.timeField,
-          })
-        } else {
-          entries.value = []
-        }
+        activeFeedId.value = null
+        entries.value = []
       }
     } catch (error) {
       console.error(error)
@@ -259,9 +268,23 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
+  async function updateFeedViewType(feedId: string, viewType: ViewType) {
+    try {
+      const { data } = await api.patch<Feed>(`/feeds/${feedId}`, { view_type: viewType })
+      const index = feeds.value.findIndex((f) => f.id === feedId)
+      if (index !== -1) {
+        feeds.value[index] = data
+      }
+    } catch (error) {
+      console.error(error)
+      errorMessage.value = '更新订阅类型失败'
+    }
+  }
+
   async function fetchEntries(options?: {
     feedId?: string
     groupName?: string
+    viewType?: ViewType
     unreadOnly?: boolean
     dateRange?: string
     timeField?: string
@@ -270,9 +293,10 @@ export const useFeedStore = defineStore('feed', () => {
     const append = !!options?.append
     const targetFeed = options?.feedId ?? activeFeedId.value
     const targetGroup = options?.groupName ?? activeGroupName.value
+    const targetViewType = options?.viewType ?? (!targetFeed && !targetGroup ? activeViewType.value : null)
 
-    // 如果既没有feed也没有group，则返回
-    if (!targetFeed && !targetGroup) return
+    // 如果既没有feed也没有group也没有viewType，则返回
+    if (!targetFeed && !targetGroup && !targetViewType) return
 
     const hasUnreadOnly = options && Object.prototype.hasOwnProperty.call(options, 'unreadOnly')
     const hasDateRange = options && Object.prototype.hasOwnProperty.call(options, 'dateRange')
@@ -287,6 +311,7 @@ export const useFeedStore = defineStore('feed', () => {
     const queryKey = buildEntriesQueryKey({
       feedId: targetFeed,
       groupName: targetGroup,
+      viewType: targetViewType,
       unreadOnly: mergedFilters.unreadOnly,
       dateRange: mergedFilters.dateRange,
       timeField: mergedFilters.timeField,
@@ -311,11 +336,13 @@ export const useFeedStore = defineStore('feed', () => {
     try {
       const params: Record<string, string | number | boolean> = {}
 
-      // 优先使用 feedId，其次使用 groupName
+      // 优先使用 feedId，其次使用 groupName，最后使用 viewType
       if (targetFeed) {
         params.feed_id = targetFeed
       } else if (targetGroup) {
         params.group_name = targetGroup
+      } else if (targetViewType) {
+        params.view_type = targetViewType
       }
 
       if (mergedFilters.unreadOnly) {
@@ -374,6 +401,13 @@ export const useFeedStore = defineStore('feed', () => {
     if (activeGroupName.value === groupName) return
     activeGroupName.value = groupName
     activeFeedId.value = null  // 清除单个订阅源选择
+  }
+
+  function selectViewType(viewType: ViewType) {
+    if (activeViewType.value === viewType) return
+    activeViewType.value = viewType
+    activeFeedId.value = null
+    activeGroupName.value = null
   }
 
   function selectEntry(entryId: string) {
@@ -603,6 +637,7 @@ export const useFeedStore = defineStore('feed', () => {
     selectedEntry,
     activeFeedId,
     activeGroupName,
+    activeViewType,
     loadingFeeds,
     loadingEntries,
     entriesHasMore,
@@ -615,6 +650,9 @@ export const useFeedStore = defineStore('feed', () => {
     groupStats,
     sortedGroupNames,
     collapsedGroups,
+    // 类型相关属性
+    filteredFeeds,
+    viewTypeStats,
     // 方法
     fetchFeeds,
     fetchEntries,
@@ -622,10 +660,12 @@ export const useFeedStore = defineStore('feed', () => {
     addFeed,
     selectFeed,
     selectGroup,
+    selectViewType,
     selectEntry,
     refreshActiveFeed,
     deleteFeed,
     updateFeed,
+    updateFeedViewType,
     toggleEntryState,
     requestSummary,
     requestTitleTranslation,

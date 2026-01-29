@@ -74,6 +74,7 @@ export async function entriesRoutes(app: FastifyInstance) {
     const query = request.query as {
       feed_id?: string;
       group_name?: string;
+      view_type?: string;
       unread_only?: string | boolean;
       limit?: string;
       offset?: string;
@@ -84,6 +85,7 @@ export async function entriesRoutes(app: FastifyInstance) {
 
     const feedId = query.feed_id ?? null;
     const groupName = feedId ? null : query.group_name ?? null;
+    const viewType = feedId || groupName ? null : query.view_type ?? null;
     const unreadOnly = parseBoolean(query.unread_only);
 
     const settings = userSettingsService.getSettings();
@@ -115,6 +117,9 @@ export async function entriesRoutes(app: FastifyInstance) {
     } else if (groupName) {
       where.push('feeds.group_name = ?');
       params.push(groupName);
+    } else if (viewType) {
+      where.push('feeds.view_type = ?');
+      params.push(viewType);
     }
 
     if (unreadOnly) {

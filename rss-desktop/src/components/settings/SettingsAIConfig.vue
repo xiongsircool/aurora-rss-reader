@@ -9,12 +9,15 @@ defineProps<{
   serviceTestResult: Record<AIServiceKey, TestResult | null>
   rebuildingVectors: boolean
   rebuildResult: TestResult | null
+  mcpTesting: boolean
+  mcpTestResult: TestResult | null
 }>()
 
 const emit = defineEmits<{
   testConnection: [service: AIServiceKey]
   copySummaryToTranslation: []
   rebuildVectors: []
+  testMcp: []
 }>()
 
 const { t } = useI18n()
@@ -243,6 +246,68 @@ const embeddingConfig = defineModel<LocalServiceConfig>('embeddingConfig', { req
             :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': rebuildResult.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !rebuildResult.success }"
         >
           {{ rebuildResult.message }}
+        </div>
+      </div>
+
+      <!-- MCP Service Status Card -->
+      <div class="border border-[var(--border-color)] rounded-xl p-4 bg-[var(--bg-surface)] flex flex-col justify-between h-full">
+        <div class="flex-1">
+          <div class="flex justify-between items-center gap-3 mb-3 flex-wrap min-h-[52px]">
+            <div>
+              <p class="m-0 text-[15px] font-semibold text-[var(--text-primary)]">{{ t('settings.mcpService') }}</p>
+              <p class="m-[4px_0_0_0] text-[13px] text-[var(--text-secondary)]">{{ t('settings.mcpSubtitle') }}</p>
+            </div>
+            <button
+              @click="emit('testMcp')"
+              :disabled="mcpTesting"
+              class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-[0_10px_20px_rgba(255,122,24,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
+              :class="{
+                'op-70 transform-none': mcpTesting,
+                'bg-[#34c759]! shadow-none!': mcpTestResult?.success,
+                'bg-[#ff4d4f]! shadow-none!': mcpTestResult?.success === false
+              }"
+            >
+              {{ mcpTesting ? t('common.testing') : t('settings.testMcp') }}
+            </button>
+          </div>
+
+          <!-- MCP Endpoint -->
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpEndpoint') }}</label>
+            <div class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-secondary)] font-mono">
+              http://127.0.0.1:15432/mcp
+            </div>
+          </div>
+
+          <!-- MCP Status -->
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpStatus') }}</label>
+            <div class="flex items-center gap-2">
+              <span
+                class="w-2.5 h-2.5 rounded-full"
+                :class="mcpTestResult?.success ? 'bg-[#34c759]' : 'bg-[var(--text-tertiary)]'"
+              ></span>
+              <span class="text-sm" :class="mcpTestResult?.success ? 'text-[#34c759]' : 'text-[var(--text-secondary)]'">
+                {{ mcpTestResult?.success ? t('settings.mcpConnected') : t('settings.mcpDisconnected') }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Available Tools -->
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpTools') }}</label>
+            <p class="m-0 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+              {{ t('settings.mcpToolsList') }}
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-if="mcpTestResult"
+          class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-[var(--bg-elevated)] shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+          :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': mcpTestResult.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !mcpTestResult.success }"
+        >
+          {{ mcpTestResult.message }}
         </div>
       </div>
     </div>

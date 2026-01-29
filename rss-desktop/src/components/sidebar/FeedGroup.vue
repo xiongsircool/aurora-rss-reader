@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import type { Feed } from '../../types'
+import type { Feed, ViewType } from '../../types'
 import FeedItem from './FeedItem.vue'
 
 defineProps<{
@@ -30,6 +30,7 @@ const emit = defineEmits<{
   (e: 'update:editingGroupName', value: string): void
   (e: 'mark-group-read', groupName: string): void
   (e: 'mark-feed-read', feedId: string): void
+  (e: 'change-view-type', feedId: string, viewType: ViewType): void
 }>()
 
 </script>
@@ -89,6 +90,7 @@ const emit = defineEmits<{
         @delete="emit('delete-feed', $event)"
         @update:editing-group-name="emit('update:editingGroupName', $event)"
         @mark-feed-read="emit('mark-feed-read', $event)"
+        @change-view-type="(feedId, viewType) => emit('change-view-type', feedId, viewType)"
       />
     </div>
   </div>

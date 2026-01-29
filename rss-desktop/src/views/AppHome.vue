@@ -710,17 +710,19 @@ async function openExternal(url?: string | null) {
 
   const mode = settingsStore.settings.open_original_mode ?? 'system'
   const ipc = window.ipcRenderer
+
   if (ipc?.invoke) {
     try {
-      const result = await ipc.invoke('open-external', { url: normalizedUrl, mode })
+      const result = await ipc.invoke('open-external', { url: normalizedUrl, mode }) as { success?: boolean; error?: string }
       if (result?.success) {
         return
       }
     } catch (error) {
-      console.warn('Failed to open external URL via main process:', error)
+      // Fallback to window.open on error
     }
   }
 
+  // Fallback to window.open
   window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
 }
 
@@ -891,6 +893,28 @@ async function handleMarkFeedAsRead(feedId: string) {
     showNotification(t('articles.markAsReadFailed'), 'error')
   }
 }
+
+// 切换视图类型
+async function handleSelectViewType(viewType: string) {
+  store.selectViewType(viewType as any)
+  await store.fetchEntries({
+    viewType: viewType as any,
+    unreadOnly: filterMode.value === 'unread',
+    dateRange: dateRangeFilter.value,
+    timeField: settingsStore.settings.time_field,
+  })
+}
+
+// 修改订阅源的视图类型
+async function handleChangeViewType(feedId: string, viewType: string) {
+  try {
+    await store.updateFeedViewType(feedId, viewType as any)
+    showNotification(t('feeds.viewTypeChanged'), 'success')
+  } catch (error) {
+    console.error('Change view type failed:', error)
+    showNotification(t('feeds.viewTypeChangeFailed'), 'error')
+  }
+}
 </script>
 
 <template>
@@ -944,6 +968,8 @@ async function handleMarkFeedAsRead(feedId: string) {
       @update:editing-group-name="editingGroupName = $event"
       @mark-group-read="handleMarkGroupAsRead"
       @mark-feed-read="handleMarkFeedAsRead"
+      @select-view-type="handleSelectViewType"
+      @change-view-type="handleChangeViewType"
     />
 
     <div

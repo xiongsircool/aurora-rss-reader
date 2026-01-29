@@ -111,7 +111,9 @@
     "noArticlesAdd": "暂无文章，请先添加订阅或刷新",
     "unnamedArticle": "未命名文章",
     "authorUnknown": "未知作者",
-    "openOriginal": "打开原文"
+    "openOriginal": "打开原文",
+    "viewTypeChanged": "订阅类型已更改",
+    "viewTypeChangeFailed": "更改订阅类型失败"
   },
   "articles": {
     "title": "文章",
@@ -240,6 +242,15 @@
     "useSummaryConfig": "沿用摘要配置",
     "knowledgeBase": "知识库 / 语义检索",
     "embeddingSubtitle": "配置 Embedding 模型以启用 AI 搜索与知识库",
+    "mcpService": "MCP 服务",
+    "mcpSubtitle": "Model Context Protocol - AI 工具访问接口",
+    "mcpEndpoint": "服务端点",
+    "mcpStatus": "服务状态",
+    "mcpConnected": "已连接",
+    "mcpDisconnected": "未连接",
+    "mcpTools": "可用工具",
+    "mcpToolsList": "query_entries, search, manage_feeds, batch_update, get_overview",
+    "testMcp": "测试连接",
     "rebuildVectors": "重建向量库",
     "rebuildingVectors": "重建中...",
     "apiKey": "API Key",

@@ -28,17 +28,17 @@ function handleFileChange(event: Event) {
 </script>
 
 <template>
-  <div class="flex gap-2 mb-4">
+  <div class="flex gap-1.5 mb-2">
     <button
       @click="emit('export')"
-      class="flex-1 border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-primary)] p-2 rounded-lg cursor-pointer text-xs transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:border-[var(--accent)]"
+      class="flex-1 border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-secondary)] py-1.5 px-2 rounded-lg cursor-pointer text-[11px] transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:border-[var(--accent)] hover:c-[var(--text-primary)]"
     >
       {{ t('opml.export') }}
     </button>
     <button
       @click="triggerImport"
       :disabled="importLoading"
-      class="flex-1 border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-primary)] p-2 rounded-lg cursor-pointer text-xs transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:border-[var(--accent)] disabled:op-50 disabled:cursor-not-allowed"
+      class="flex-1 border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-secondary)] py-1.5 px-2 rounded-lg cursor-pointer text-[11px] transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:border-[var(--accent)] hover:c-[var(--text-primary)] disabled:op-50 disabled:cursor-not-allowed"
     >
       {{ importLoading ? t('toast.importing') : t('opml.import') }}
     </button>

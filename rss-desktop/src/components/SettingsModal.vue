@@ -93,17 +93,21 @@ watch(() => props.show, async (show) => {
       rsshub.fetchRSSHubUrl,
       () => {
         aiConfig.resetTestResults()
+        aiConfig.resetMcpTestResult()
         rsshub.resetTestResult()
       }
     )
     refresh.syncFromStore()
     // Sync the local autoTitleTranslationLimit with store value
     autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
-    
+
     // Reset view state
     activeCategory.value = 'general'
     isMobileDetailOpen.value = false
-    
+
+    // Auto-test MCP connection on modal open
+    aiConfig.testMcp()
+
     // Lock body scroll
     document.body.style.overflow = 'hidden'
   } else {
@@ -322,9 +326,12 @@ async function saveSettings() {
                       :serviceTestResult="aiConfig.serviceTestResult.value"
                       :rebuildingVectors="aiConfig.rebuildingVectors.value"
                       :rebuildResult="aiConfig.rebuildResult.value"
+                      :mcpTesting="aiConfig.mcpTesting.value"
+                      :mcpTestResult="aiConfig.mcpTestResult.value"
                       @testConnection="aiConfig.testConnection"
                       @copySummaryToTranslation="aiConfig.copySummaryToTranslation"
                       @rebuildVectors="aiConfig.rebuildVectors"
+                      @testMcp="aiConfig.testMcp"
                     />
                     <div class="h-6"></div>
                     <SettingsAIFeatures

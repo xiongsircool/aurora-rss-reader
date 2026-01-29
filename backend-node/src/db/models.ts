@@ -4,6 +4,11 @@ export function generateId(): string {
   return randomBytes(16).toString('hex');
 }
 
+// View type for feed classification (similar to Folo)
+export type ViewType = 'articles' | 'social' | 'pictures' | 'videos' | 'audio' | 'notifications';
+
+export const VIEW_TYPES: ViewType[] = ['articles', 'social', 'pictures', 'videos', 'audio', 'notifications'];
+
 export interface Feed {
   id: string;
   url: string;
@@ -12,6 +17,7 @@ export interface Feed {
   description: string | null;
   favicon_url: string | null;
   group_name: string;
+  view_type: ViewType;
   last_checked_at: string | null;
   last_error: string | null;
   update_interval_minutes: number;

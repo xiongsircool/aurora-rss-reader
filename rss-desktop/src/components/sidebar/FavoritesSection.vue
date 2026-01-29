@@ -32,22 +32,20 @@ const { iconSrcFor, handleFeedIconLoad, handleFeedIconError, isFeedIconBroken, i
 </script>
 
 <template>
-  <div class="my-4 rounded-xl border border-[rgba(255,122,24,0.22)] bg-[linear-gradient(180deg,#fff6ee,rgba(255,243,230,0.92))] shadow-[0_10px_22px_rgba(255,122,24,0.12),0_6px_16px_rgba(15,17,21,0.08)] py-3 px-2 dark:bg-[linear-gradient(180deg,rgba(32,22,16,0.92),rgba(18,14,12,0.92))] dark:border-[rgba(255,122,24,0.38)] dark:shadow-[0_12px_26px_rgba(0,0,0,0.55),0_0_0_1px_rgba(255,138,61,0.22)]" v-if="totalStarred > 0">
-    <div class="mb-2">
+  <div class="my-2 rounded-xl border border-[rgba(255,122,24,0.22)] bg-[linear-gradient(180deg,#fff6ee,rgba(255,243,230,0.92))] shadow-[0_6px_16px_rgba(255,122,24,0.1),0_4px_12px_rgba(15,17,21,0.06)] py-1.5 px-1.5 dark:bg-[linear-gradient(180deg,rgba(32,22,16,0.92),rgba(18,14,12,0.92))] dark:border-[rgba(255,122,24,0.38)] dark:shadow-[0_8px_20px_rgba(0,0,0,0.45),0_0_0_1px_rgba(255,138,61,0.22)]" v-if="totalStarred > 0">
+    <div>
       <button
-        class="w-full flex items-center gap-2 px-3 py-2.5 bg-transparent border border-transparent rounded-lg text-left cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.1)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.2)] dark:hover:border-[rgba(255,122,24,0.4)]"
+        class="w-full flex items-center gap-2 px-2.5 py-1.5 bg-transparent border border-transparent rounded-lg text-left cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.1)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.2)] dark:hover:border-[rgba(255,122,24,0.4)]"
         :class="{ 'bg-[rgba(255,122,24,0.15)] border-[rgba(255,122,24,0.3)] c-[var(--accent)] dark:bg-[rgba(255,122,24,0.25)] dark:border-[rgba(255,122,24,0.5)]': showFavoritesOnly }"
         @click="emit('toggle-favorites')"
       >
         <span class="text-0 leading-none flex items-center" aria-hidden="true">
-          <svg class="w-[18px] h-[18px] block" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M12 3.5l2.7 5.61 6.3.92-4.55 4.44 1.08 6.28L12 17.77l-5.53 2.98 1.08-6.28L3 10.03l6.3-.92L12 3.5z"
-            />
+          <svg class="w-4 h-4 block" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3.5l2.7 5.61 6.3.92-4.55 4.44 1.08 6.28L12 17.77l-5.53 2.98 1.08-6.28L3 10.03l6.3-.92L12 3.5z"/>
           </svg>
         </span>
-        <span class="flex-1 font-semibold text-[15px] c-[var(--text-primary)] dark:c-[rgba(255,255,255,0.95)]">{{ t('groups.myFavorites') }}</span>
-        <span class="text-xs bg-[var(--accent)] text-white px-1.5 py-0.5 rounded-[10px] font-medium">{{ totalStarred }}</span>
+        <span class="flex-1 font-semibold text-[13px] c-[var(--text-primary)] dark:c-[rgba(255,255,255,0.95)]">{{ t('groups.myFavorites') }}</span>
+        <span class="text-[11px] bg-[var(--accent)] text-white px-1.5 py-0.5 rounded-[10px] font-medium">{{ totalStarred }}</span>
       </button>
     </div>
 

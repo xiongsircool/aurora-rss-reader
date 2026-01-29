@@ -1,8 +1,31 @@
+export type ViewType = 'articles' | 'social' | 'pictures' | 'videos' | 'audio' | 'notifications'
+
+export const VIEW_TYPES: ViewType[] = ['articles', 'social', 'pictures', 'videos', 'audio', 'notifications']
+
+export const VIEW_TYPE_ICONS: Record<ViewType, string> = {
+  articles: '📄',
+  social: '💬',
+  pictures: '🖼️',
+  videos: '🎬',
+  audio: '🎧',
+  notifications: '🔔',
+}
+
+export const VIEW_TYPE_LABELS: Record<ViewType, string> = {
+  articles: 'Articles',
+  social: 'Social',
+  pictures: 'Pictures',
+  videos: 'Videos',
+  audio: 'Audio',
+  notifications: 'Notifications',
+}
+
 export interface Feed {
   id: string
   url: string
   title: string | null
   group_name: string
+  view_type: ViewType
   favicon_url: string | null
   unread_count: number
   last_checked_at: string | null

@@ -59,6 +59,10 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
     const rebuildingVectors = ref(false)
     const rebuildResult = ref<TestResult | null>(null)
 
+    // MCP testing state
+    const mcpTesting = ref(false)
+    const mcpTestResult = ref<TestResult | null>(null)
+
     async function rebuildVectors() {
         if (!localConfig.value.embedding.api_key) {
             rebuildResult.value = {
@@ -101,6 +105,40 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
         }
     }
 
+    async function testMcp() {
+        mcpTesting.value = true
+        mcpTestResult.value = null
+
+        try {
+            // Health endpoint is at root, not under /api
+            const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') ?? 'http://127.0.0.1:15432'
+            const response = await fetch(`${baseUrl}/health`)
+            const data = await response.json()
+            if (data?.status === 'ok' || data?.status === 'degraded') {
+                mcpTestResult.value = {
+                    success: true,
+                    message: 'MCP 服务连接正常'
+                }
+            } else {
+                mcpTestResult.value = {
+                    success: false,
+                    message: 'MCP 服务响应异常'
+                }
+            }
+        } catch (error) {
+            mcpTestResult.value = {
+                success: false,
+                message: 'MCP 服务连接失败'
+            }
+        } finally {
+            mcpTesting.value = false
+        }
+    }
+
+    function resetMcpTestResult() {
+        mcpTestResult.value = null
+    }
+
     return {
         serviceTesting,
         serviceTestResult,
@@ -109,6 +147,10 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
         resetTestResults,
         rebuildingVectors,
         rebuildResult,
-        rebuildVectors
+        rebuildVectors,
+        mcpTesting,
+        mcpTestResult,
+        testMcp,
+        resetMcpTestResult
     }
 }

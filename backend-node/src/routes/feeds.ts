@@ -76,6 +76,7 @@ export async function feedsRoutes(app: FastifyInstance) {
       url: feed.url,
       title: feed.title,
       group_name: feed.group_name,
+      view_type: feed.view_type,
       favicon_url: feed.favicon_url,
       unread_count: unreadMap.get(feed.id) ?? 0,
       last_checked_at: feed.last_checked_at,
@@ -85,7 +86,7 @@ export async function feedsRoutes(app: FastifyInstance) {
 
   // POST /feeds - Create a new feed
   app.post('/feeds', async (request, reply) => {
-    const { url, title, group_name } = request.body as any;
+    const { url, title, group_name, view_type } = request.body as any;
     const trimmedUrl = typeof url === 'string' ? url.trim() : '';
 
     if (!trimmedUrl) {
@@ -101,6 +102,7 @@ export async function feedsRoutes(app: FastifyInstance) {
       url: trimmedUrl,
       title: title || null,
       group_name: group_name || 'default',
+      view_type: view_type || 'articles',
     });
 
     refreshFeed(feed.id).catch((error) => {
@@ -112,6 +114,7 @@ export async function feedsRoutes(app: FastifyInstance) {
       url: feed.url,
       title: feed.title,
       group_name: feed.group_name,
+      view_type: feed.view_type,
       favicon_url: feed.favicon_url,
       unread_count: 0,
       last_checked_at: feed.last_checked_at,
@@ -258,6 +261,7 @@ export async function feedsRoutes(app: FastifyInstance) {
       url: feed.url,
       title: feed.title,
       group_name: feed.group_name,
+      view_type: feed.view_type,
       favicon_url: feed.favicon_url,
       unread_count: row?.count ?? 0,
       last_checked_at: feed.last_checked_at,
