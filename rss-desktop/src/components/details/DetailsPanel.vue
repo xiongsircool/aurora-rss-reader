@@ -172,6 +172,9 @@ const containerClasses = computed(() => [
 
 .details__body :deep(iframe) {
   max-width: 100%;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
 }
 
 .details__body :deep(figure) {
@@ -182,6 +185,9 @@ const containerClasses = computed(() => [
 .details__body :deep(embed),
 .details__body :deep(object) {
   max-width: 100%;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
 }
 
 .details__body :deep(pre) {
