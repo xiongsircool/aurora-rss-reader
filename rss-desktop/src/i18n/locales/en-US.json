@@ -131,8 +131,12 @@
     "addToFavorites": "Add to Favorites",
     "removeFromFavorites": "Remove from Favorites",
     "openInBrowser": "Open in Browser",
+    "selectToRead": "Select an article to read",
     "share": "Share",
     "copyLink": "Copy Link",
+    "linkCopied": "Link copied",
+    "star": "Star",
+    "unstar": "Unstar",
     "noArticles": "No articles",
     "noUnreadArticles": "No unread articles",
     "noFavoriteArticles": "No favorite articles",
@@ -420,6 +424,13 @@
     "de": "Deutsch",
     "es": "Español"
   },
+  "zotero": {
+    "sendTo": "Send to Zotero",
+    "sending": "Sending...",
+    "sent": "Sent",
+    "notRunning": "Please start Zotero first",
+    "sendFailed": "Send failed"
+  },
   "filters": {
     "last1Day": "Last 1 day",
     "last2Days": "Last 2 days",
@@ -435,5 +446,40 @@
     "filteringData": "Getting data based on filter criteria",
     "dateFilterNote": "Left unread count syncs with this time range",
     "allTimeRange": "All time range"
+  },
+  "collections": {
+    "title": "Bookmark Groups",
+    "addTo": "Add to Bookmark Group",
+    "removeFrom": "Remove from Bookmark Group",
+    "create": "New Bookmark Group",
+    "edit": "Edit Bookmark Group",
+    "delete": "Delete Bookmark Group",
+    "name": "Name",
+    "namePlaceholder": "Enter bookmark group name",
+    "empty": "Bookmark group is empty",
+    "noCollections": "No bookmark groups yet",
+    "createFirst": "Create your first bookmark group",
+    "addSuccess": "Added to bookmark group",
+    "addFailed": "Failed to add",
+    "removeSuccess": "Removed from collection",
+    "removeFailed": "Failed to remove",
+    "createSuccess": "Bookmark group created",
+    "createFailed": "Failed to create",
+    "deleteConfirm": "Delete this bookmark group?",
+    "deleteSuccess": "Bookmark group deleted",
+    "deleteFailed": "Failed to delete",
+    "selectCollection": "Select a bookmark group to view",
+    "alreadyIn": "Already in this bookmark group",
+    "items": "items",
+    "noEntries": "No articles in this bookmark group",
+    "removeFromCollection": "Remove from bookmark group"
+  },
+  "workspace": {
+    "title": "Workspace",
+    "backToReader": "Back to Reader",
+    "collections": "Bookmark Groups",
+    "blog": "Blog Generator",
+    "share": "Share",
+    "stats": "Statistics"
   }
 }

@@ -386,6 +386,13 @@
     "de": "Deutsch",
     "es": "Español"
   },
+  "zotero": {
+    "sendTo": "Zoteroに送信",
+    "sending": "送信中...",
+    "sent": "送信済み",
+    "notRunning": "Zoteroを起動してください",
+    "sendFailed": "送信失敗"
+  },
   "filters": {
     "last1Day": "過去1日",
     "last2Days": "過去2日",

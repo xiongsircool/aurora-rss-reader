@@ -55,6 +55,10 @@ const emit = defineEmits<{
   (e: 'update:dateRangeFilter', value: string): void
   (e: 'select-entry', entryId: string): void
   (e: 'toggle-star', entry: Entry): void
+  (e: 'toggle-read', entry: Entry): void
+  (e: 'add-to-bookmark-group', entry: Entry): void
+  (e: 'copy-link', entry: Entry): void
+  (e: 'open-external', entry: Entry): void
   (e: 'mark-all-read'): void
   (e: 'entries-visible', entries: Entry[]): void
   (e: 'load-more'): void
@@ -275,6 +279,10 @@ function handleVisibleUpdate(
               :show-summary="showSummary"
               @select="emit('select-entry', $event)"
               @toggle-star="emit('toggle-star', $event)"
+              @toggle-read="emit('toggle-read', $event)"
+              @add-to-collection="emit('add-to-bookmark-group', $event)"
+              @copy-link="emit('copy-link', $event)"
+              @open-external="emit('open-external', $event)"
             />
           </DynamicScrollerItem>
         </template>

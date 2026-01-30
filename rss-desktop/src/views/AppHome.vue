@@ -24,6 +24,7 @@ import type { Entry, Feed } from '../types'
 
 import { defineAsyncComponent } from 'vue'
 const SettingsModal = defineAsyncComponent(() => import('../components/SettingsModal.vue'))
+const AddToBookmarkGroupModal = defineAsyncComponent(() => import('../components/collections/AddToCollectionModal.vue'))
 
 
 
@@ -91,6 +92,8 @@ const editingGroupName = ref('')
 
 const importLoading = ref(false)
 const showSettings = ref(false)
+const showBookmarkGroupModal = ref(false)
+const bookmarkGroupEntryId = ref<string | null>(null)
 
 const { showToast, toastMessage, toastType, showNotification } = useNotification()
 const { darkMode, toggleTheme, loadTheme } = useTheme()
@@ -713,6 +716,29 @@ async function toggleStarFromList(entry: any) {
   })
 }
 
+// Right-click menu handlers
+function handleAddToBookmarkGroup(entry: Entry) {
+  bookmarkGroupEntryId.value = entry.id
+  showBookmarkGroupModal.value = true
+}
+
+async function handleToggleReadFromList(entry: Entry) {
+  await store.toggleEntryRead(entry.id, !entry.read)
+}
+
+function handleCopyLink(entry: Entry) {
+  if (entry.url) {
+    navigator.clipboard.writeText(entry.url)
+    showNotification(t('articles.linkCopied'), 'success')
+  }
+}
+
+function handleOpenExternal(entry: Entry) {
+  if (entry.url) {
+    window.open(entry.url, '_blank')
+  }
+}
+
 function normalizeExternalUrl(raw: string): string | null {
   const trimmed = raw.trim()
   if (!trimmed) return null
@@ -943,9 +969,16 @@ async function handleChangeViewType(feedId: string, viewType: string) {
     :type="toastType" 
     @close="showToast = false" 
   />
-  <SettingsModal 
-    :show="showSettings" 
-    @close="showSettings = false" 
+  <SettingsModal
+    :show="showSettings"
+    @close="showSettings = false"
+  />
+  <AddToBookmarkGroupModal
+    v-if="bookmarkGroupEntryId"
+    :show="showBookmarkGroupModal"
+    :entry-id="bookmarkGroupEntryId"
+    @close="showBookmarkGroupModal = false; bookmarkGroupEntryId = null"
+    @added="showNotification(t('collections.addSuccess'), 'success')"
   />
   <div
     class="app-shell"
@@ -1029,6 +1062,10 @@ async function handleChangeViewType(feedId: string, viewType: string) {
       @entries-visible="handleEntriesVisible"
       @load-more="handleLoadMoreEntries"
       @toggle-star="toggleStarFromList"
+      @toggle-read="handleToggleReadFromList"
+      @add-to-bookmark-group="handleAddToBookmarkGroup"
+      @copy-link="handleCopyLink"
+      @open-external="handleOpenExternal"
       @mark-all-read="handleMarkAllAsRead"
     />
 

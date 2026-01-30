@@ -131,8 +131,12 @@
     "addToFavorites": "添加到收藏",
     "removeFromFavorites": "从收藏中移除",
     "openInBrowser": "在浏览器中打开",
+    "selectToRead": "选择文章查看详情",
     "share": "分享",
     "copyLink": "复制链接",
+    "linkCopied": "链接已复制",
+    "star": "收藏",
+    "unstar": "取消收藏",
     "noArticles": "暂无文章",
     "noUnreadArticles": "暂无未读文章",
     "noFavoriteArticles": "暂无收藏文章",
@@ -424,6 +428,13 @@
     "de": "Deutsch",
     "es": "Español"
   },
+  "zotero": {
+    "sendTo": "发送到 Zotero",
+    "sending": "发送中...",
+    "sent": "已发送",
+    "notRunning": "请先启动 Zotero",
+    "sendFailed": "发送失败"
+  },
   "filters": {
     "last1Day": "最近1天",
     "last2Days": "最近2天",
@@ -439,5 +450,40 @@
     "filteringData": "正在根据筛选条件获取数据",
     "dateFilterNote": "左侧未读统计同步该时间范围",
     "allTimeRange": "全部时间范围"
+  },
+  "collections": {
+    "title": "书签组",
+    "addTo": "添加到书签组",
+    "removeFrom": "从书签组移除",
+    "create": "新建书签组",
+    "edit": "编辑书签组",
+    "delete": "删除书签组",
+    "name": "名称",
+    "namePlaceholder": "输入书签组名称",
+    "empty": "书签组为空",
+    "noCollections": "暂无书签组",
+    "createFirst": "创建第一个书签组",
+    "addSuccess": "已添加到书签组",
+    "addFailed": "添加失败",
+    "removeSuccess": "已从书签组移除",
+    "removeFailed": "移除失败",
+    "createSuccess": "书签组创建成功",
+    "createFailed": "创建失败",
+    "deleteConfirm": "确定要删除这个书签组吗？",
+    "deleteSuccess": "书签组已删除",
+    "deleteFailed": "删除失败",
+    "selectCollection": "选择一个书签组查看",
+    "alreadyIn": "已在此书签组中",
+    "items": "篇文章",
+    "noEntries": "此书签组暂无文章",
+    "removeFromCollection": "从书签组移除"
+  },
+  "workspace": {
+    "title": "功能工作台",
+    "backToReader": "返回阅读器",
+    "collections": "书签组",
+    "blog": "博客生成",
+    "share": "分享",
+    "stats": "统计"
   }
 }

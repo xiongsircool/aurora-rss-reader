@@ -394,6 +394,13 @@
     "de": "Deutsch",
     "es": "Español"
   },
+  "zotero": {
+    "sendTo": "Zotero로 보내기",
+    "sending": "전송 중...",
+    "sent": "전송됨",
+    "notRunning": "Zotero를 먼저 실행하세요",
+    "sendFailed": "전송 실패"
+  },
   "layout": {
     "themeToggleTitle": "라이트 모드로 전환",
     "themeToggleTitleDark": "다크 모드로 전환",

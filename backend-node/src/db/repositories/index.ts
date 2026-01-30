@@ -3,6 +3,7 @@ export { EntryRepository } from './entry.js';
 export { TranslationRepository } from './translation.js';
 export { SummaryRepository } from './summary.js';
 export { FetchLogRepository } from './fetchLog.js';
+export { CollectionRepository } from './collections.js';
 
 export type {
   FeedCreateInput,
@@ -28,3 +29,9 @@ export type {
   FetchLogCreateInput,
   FetchLogUpdateInput,
 } from './fetchLog.js';
+
+export type {
+  CollectionCreateInput,
+  CollectionUpdateInput,
+  CollectionEntryCreateInput,
+} from './collections.js';
