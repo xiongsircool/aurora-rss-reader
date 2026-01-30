@@ -25,17 +25,17 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.1.5 Latest Release | 最新版本
+## 🎉 v0.1.6 Latest Release | 最新版本
 
-**Feature Enhancement & Stability Improvements | 功能增强与稳定性改进**
+**Major UI Enhancement & New Features | 重大UI升级与新功能**
 
-- 🔄 **In-App Auto Update** - Integrated electron-updater for version detection and installation
-- 🤖 **MCP Server Support** - Added Model Context Protocol server for enhanced AI integration
-- 🔍 **Vector Search** - Semantic search powered by sqlite-vss
-- 📝 **Batch Translation** - New batch translation API for improved efficiency
-- 🎨 **UI Improvements** - Enhanced translation flow, details panel, favorites and unread indicators
-- 🔧 **CI/CD Pipeline** - GitHub Actions multi-platform automated builds and releases
-- 🍎 **macOS Fixes** - Resolved DMG mount issues, supports Intel/Apple Silicon
+- 🎬 **Media Feed Support** - Enhanced display for video and image feeds with optimized layouts
+- 🎧 **Podcast Support** - Audio player with enclosure support for podcast feeds
+- 📚 **Zotero Integration** - Send academic articles to Zotero with DOI/PMID auto-detection
+- 📁 **Collections Feature** - Organize articles into custom bookmark collections
+- 🖱️ **Enhanced Context Menu** - Rich right-click menu for feeds and entries
+- 🔬 **MCP Status Display** - Visual indicator for Model Context Protocol server status
+- 🎨 **View Type Classification** - Auto-detect and optimize display for blogs, videos, images, podcasts
 
 ---
 
@@ -43,7 +43,7 @@
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.5**
+**Current Version: v0.1.6**
 
 ## Key Features
 
@@ -69,37 +69,38 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 
 ## Interface Preview
 
-### Overview
-<div align="center">
-  <img src="images/整体UI进行美化.png" alt="UI overview" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
-</div>
-
-### Layout Modes
+### Media Feed Support
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/appimages/三栏式布局.png" alt="Three-column layout" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Three-column layout</figcaption>
+    <img src="images/v0.1.6/视频订阅显示增强.png" alt="Video feed display" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Video Feed Display</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/更新支持两栏模式优化阅读体验.png" alt="Two-column layout" style="width:380px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Two-column layout</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/appimages/一拦式布局.png" alt="Single-column layout" style="width:220px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Single-column layout</figcaption>
+    <img src="images/v0.1.6/图像订阅显示增强.png" alt="Image feed display" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Image Feed Display</figcaption>
   </figure>
 </div>
 
-### Single-column Interactions
+### Blog & Article Enhancement
+<div align="center">
+  <img src="images/v0.1.6/博客订阅增强.png" alt="Blog feed enhancement" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
+</div>
+
+### Context Menu & Collections
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
-    <img src="images/优化一栏目交互逻辑/实现双击记录展示详情.png" alt="Double click to open details" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Double-click to open details</figcaption>
+    <img src="images/v0.1.6/右键功能增强feeds.png" alt="Feed context menu" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Feed Context Menu</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
-    <img src="images/优化一栏目交互逻辑/优化按键大小增加一个回到顶部.png" alt="Back to top button" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Back to top button</figcaption>
+    <img src="images/v0.1.6/右键将订阅记录添加到书签组.png" alt="Add to collection" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Add to Collection</figcaption>
   </figure>
+</div>
+
+### MCP Status Display
+<div align="center">
+  <img src="images/v0.1.6/MCP服务显性检测.png" alt="MCP status indicator" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
 </div>
 
 ### Multi-language Interface
@@ -214,9 +215,9 @@ chmod +x build-release-app.sh
 ```
 
 Generated files:
-- macOS: `AuroraRSSReader-Mac-0.1.5-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.5-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.5-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.6-{x64,arm64}.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.6-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.6-x64.AppImage`
 
 ## 📋 Documentation | 文档
 
@@ -259,7 +260,7 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 ### Short-term Plans (v0.2)
 - [ ] **Mobile Support** - Develop iOS and Android mobile applications
 - [ ] **AI Daily Briefing** - Smart daily news summaries and personalized recommendations
-- [ ] **Podcast Support** - Support for audio podcast subscription and playback
+- [x] **Podcast Support** - Support for audio podcast subscription and playback ✅
 - [ ] **Reading Analytics** - Personal reading habits analysis and data visualization
 
 ### Mid-term Plans (v0.3)

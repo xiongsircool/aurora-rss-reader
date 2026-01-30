@@ -23,23 +23,23 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.5 最新版本 | Latest Version
+### 🎉 v0.1.6 最新版本 | Latest Version
 
-**功能增强与稳定性改进 | Feature Enhancement & Stability Improvements**
+**重大UI升级与新功能 | Major UI Enhancement & New Features**
 
-- 🔄 **应用内自动更新** - 集成 electron-updater，支持检测和安装新版本
-- 🤖 **MCP 服务器支持** - 新增 Model Context Protocol 服务器，增强 AI 集成能力
-- 🔍 **向量搜索** - 使用 sqlite-vss 实现语义搜索功能
-- 📝 **批量翻译** - 新增批量翻译 API，提升翻译效率
-- 🎨 **UI 优化** - 改进翻译流程、详情面板体验、收藏和未读标识
-- 🔧 **CI/CD 流水线** - GitHub Actions 多平台自动构建和发布
-- 🍎 **macOS 修复** - 解决 DMG 挂载问题，支持 Intel/Apple Silicon 双架构
+- 🎬 **媒体订阅支持** - 视频和图片订阅源优化显示布局
+- 🎧 **播客支持** - 音频播放器支持播客订阅
+- 📚 **Zotero 集成** - 学术文献一键发送到 Zotero，自动识别 DOI/PMID
+- 📁 **收藏夹功能** - 将文章整理到自定义书签组
+- 🖱️ **右键菜单增强** - 订阅源和文章的丰富右键操作
+- 🔬 **MCP 状态显示** - Model Context Protocol 服务器状态可视化
+- 🎨 **视图类型分类** - 自动识别博客、视频、图片、播客并优化显示
 
 ---
 
 Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + Fastify (Node.js) stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.5**
+**Current Version: v0.1.6**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -50,7 +50,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.5**
+**Current Version: v0.1.6**
 
 ### Features | 功能特色
 
@@ -122,37 +122,38 @@ chmod +x start.sh
 
 ### 界面预览
 
-#### 全局预览
-<div align="center">
-  <img src="images/整体UI进行美化.png" alt="整体界面预览" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
-</div>
-
-#### 🎨 布局模式
+#### 🎬 媒体订阅支持
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/appimages/三栏式布局.png" alt="三栏式布局" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>三栏式布局</figcaption>
+    <img src="images/v0.1.6/视频订阅显示增强.png" alt="视频订阅显示" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>视频订阅显示</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/更新支持两栏模式优化阅读体验.png" alt="两栏式布局" style="width:380px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>两栏式布局</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/appimages/一拦式布局.png" alt="一栏式布局" style="width:220px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>一栏式布局</figcaption>
+    <img src="images/v0.1.6/图像订阅显示增强.png" alt="图片订阅显示" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>图片订阅显示</figcaption>
   </figure>
 </div>
 
-#### 📱 一栏交互
+#### 📝 博客订阅增强
+<div align="center">
+  <img src="images/v0.1.6/博客订阅增强.png" alt="博客订阅增强" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
+</div>
+
+#### 🖱️ 右键菜单与收藏夹
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
-    <img src="images/优化一栏目交互逻辑/实现双击记录展示详情.png" alt="双击打开详情" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>双击打开详情</figcaption>
+    <img src="images/v0.1.6/右键功能增强feeds.png" alt="订阅源右键菜单" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>订阅源右键菜单</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
-    <img src="images/优化一栏目交互逻辑/优化按键大小增加一个回到顶部.png" alt="回到顶部按钮" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>回到顶部按钮</figcaption>
+    <img src="images/v0.1.6/右键将订阅记录添加到书签组.png" alt="添加到收藏夹" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>添加到收藏夹</figcaption>
   </figure>
+</div>
+
+#### 🔬 MCP 状态显示
+<div align="center">
+  <img src="images/v0.1.6/MCP服务显性检测.png" alt="MCP状态指示器" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
 </div>
 
 #### 🌍 多语言界面
@@ -250,9 +251,9 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `AuroraRSSReader-Mac-0.1.5-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.5-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.5-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.6-{x64,arm64}.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.6-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.6-x64.AppImage`
 
 ## 技术栈
 
@@ -275,7 +276,19 @@ aurora-rss-reader/
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.5 (当前版本 | Current Version) 🎉
+### v0.1.6 (当前版本 | Current Version) 🎉
+**重大UI升级与新功能 | Major UI Enhancement & New Features**
+
+#### ✨ 新增功能 | New Features
+- **媒体订阅支持** - 视频和图片订阅源优化显示布局
+- **播客支持** - 音频播放器支持播客订阅和播放
+- **Zotero 集成** - 学术文献一键发送到 Zotero，自动识别 DOI/PMID
+- **收藏夹功能** - 将文章整理到自定义书签组
+- **右键菜单增强** - 订阅源和文章的丰富右键操作
+- **MCP 状态显示** - Model Context Protocol 服务器状态可视化
+- **视图类型分类** - 自动识别博客、视频、图片、播客并优化显示
+
+### v0.1.5 (历史版本 | Previous Version)
 **功能增强与稳定性改进 | Feature Enhancement & Stability Improvements**
 
 #### ✨ 新增功能 | New Features
@@ -387,7 +400,7 @@ A: 检查后端服务是否正常启动，可以查看终端输出的启动日�
 
 ### 近期计划 (v0.2)
 - [ ] **AI日报功能** - 智能生成每日热点新闻摘要和个性化推荐
-- [ ] **播客支持** - 支持音频播客订阅和播放功能
+- [x] **播客支持** - 支持音频播客订阅和播放功能 ✅
 - [ ] **阅读统计** - 个人阅读习惯分析和数据可视化
 - [ ] **兼容性开发** - 兼容RssHub支持RssHUB导入订阅
 - [ ] **开发浏览器插件** - AI解析网站出Rsshub的订阅规则
