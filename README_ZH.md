@@ -156,24 +156,14 @@ chmod +x start.sh
   <img src="images/v0.1.6/MCP服务显性检测.png" alt="MCP状态指示器" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
 </div>
 
-#### 🌍 多语言界面
+#### 📚 Zotero 集成
 <div align="center">
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持中文.png" alt="中文界面" style="width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(15,17,21,.1);" />
-    <figcaption>🇨🇳 中文</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持英文.png" alt="英文界面" style="width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(15,17,21,.1);" />
-    <figcaption>🇺🇸 English</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持日语.png" alt="日语界面" style="width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(15,17,21,.1);" />
-    <figcaption>🇯🇵 日本語</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持韩文.png" alt="韩语界面" style="width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(15,17,21,.1);" />
-    <figcaption>🇰🇷 한국어</figcaption>
-  </figure>
+  <img src="images/v0.1.6/发送到zotero支持.png" alt="发送到Zotero" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
+</div>
+
+#### 🔍 工作区高级检索
+<div align="center">
+  <img src="images/v0.1.6/工作区域高级检索标签组.png" alt="工作区高级检索" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
 </div>
 
 ## 快速开始

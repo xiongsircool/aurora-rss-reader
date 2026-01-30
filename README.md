@@ -103,24 +103,14 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
   <img src="images/v0.1.6/MCP服务显性检测.png" alt="MCP status indicator" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
 </div>
 
-### Multi-language Interface
+### Zotero Integration
 <div align="center">
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持中文.png" alt="Chinese" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption>Chinese</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持英文.png" alt="English" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption>English</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持日语.png" alt="Japanese" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption>Japanese</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持韩文.png" alt="Korean" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption>Korean</figcaption>
-  </figure>
+  <img src="images/v0.1.6/发送到zotero支持.png" alt="Send to Zotero" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
+</div>
+
+### Workspace Advanced Search
+<div align="center">
+  <img src="images/v0.1.6/工作区域高级检索标签组.png" alt="Workspace advanced search" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
 </div>
 
 ## Quick Start
