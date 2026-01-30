@@ -2,10 +2,20 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSanitize } from '../../composables/useSanitize'
-import type { CollectionEntry } from '../../stores/collectionsStore'
+
+// Common entry type that works for both CollectionEntry and SearchResult
+interface DisplayEntry {
+  id: string
+  title: string
+  url: string | null
+  content: string | null
+  summary?: string | null
+  feed_title?: string
+  published_at: string | null
+}
 
 const props = defineProps<{
-  entry: CollectionEntry | null
+  entry: DisplayEntry | null
   showRemove?: boolean
 }>()
 

@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useTheme } from '../composables/useTheme'
 import { useNotification } from '../composables/useNotification'
 import { useCollectionsStore, type CollectionEntry } from '../stores/collectionsStore'
-import { useSearchStore, type SearchResult } from '../stores/searchStore'
+import { type SearchResult } from '../stores/searchStore'
 import WorkspaceHeader from '../components/workspace/WorkspaceHeader.vue'
 import WorkspaceNav from '../components/workspace/WorkspaceNav.vue'
 import CollectionList from '../components/collections/CollectionList.vue'
@@ -19,7 +19,6 @@ const { t } = useI18n()
 const { darkMode, toggleTheme } = useTheme()
 const { showToast, toastMessage, toastType, showNotification } = useNotification()
 const collectionsStore = useCollectionsStore()
-const searchStore = useSearchStore()
 
 const activeModule = ref('collections')
 const selectedEntry = ref<CollectionEntry | null>(null)

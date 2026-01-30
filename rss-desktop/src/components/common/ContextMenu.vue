@@ -6,7 +6,7 @@ defineProps<{
   position: ContextMenuPosition
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'close'): void
 }>()
 </script>
