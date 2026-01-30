@@ -7,7 +7,7 @@ const emit = defineEmits<{
   (e: 'select-result', result: SearchResult): void
 }>()
 
-const props = defineProps<{
+defineProps<{
   selectedResultId: string | null
 }>()
 

@@ -723,7 +723,7 @@ function handleAddToBookmarkGroup(entry: Entry) {
 }
 
 async function handleToggleReadFromList(entry: Entry) {
-  await store.toggleEntryRead(entry.id, !entry.read)
+  await store.toggleEntryState(entry, { read: !entry.read })
 }
 
 function handleCopyLink(entry: Entry) {
