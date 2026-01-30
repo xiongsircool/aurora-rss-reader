@@ -23,23 +23,24 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.3 最新版本 | Latest Version
+### 🎉 v0.1.6 最新版本 | Latest Version
 
-**打包修复与平台支持 | Packaging Fix & Platform Support**
+**重大UI升级与新功能 | Major UI Enhancement & New Features**
 
-- 🔧 **修复Windows打包** - 解决 PyInstaller 依赖问题，后端现在可以正确启动
-- 🍎 **macOS Intel 支持** - 新增对老款 Intel Mac (x64) 的支持
-- 📦 **构建系统优化** - 确保所有模块依赖正确包含在打包应用中
-- 🗄️ **数据库初始化** - 修复首次启动时数据库表创建问题
-- ⚡ **启动优化** - 延长后端启动超时时间，适配性能较慢的系统
-- ✅ **一键已读** - 新增批量标记所有文章为已读功能
-- 🌙 **深色模式修复** - 修复设置页面在深色模式下的显示异常
+- 🎬 **媒体订阅支持** - 视频和图片订阅源优化显示布局
+- 🎧 **播客支持** - 音频播放器支持播客订阅
+- 📚 **Zotero 集成** - 学术文献一键发送到 Zotero，自动识别 DOI/PMID
+- 📁 **收藏夹功能** - 将文章整理到自定义书签组
+- 🖱️ **右键菜单增强** - 订阅源和文章的丰富右键操作
+- 🔬 **MCP 状态显示** - Model Context Protocol 服务器状态可视化
+- 🎨 **视图类型分类** - 自动识别博客、视频、图片、播客并优化显示
+- 🔍 **工作区高级检索** - 支持标签组和高级筛选的工作区检索功能
 
 ---
 
-Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + FastAPI stack, providing smooth user experience and powerful functionality.
+Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + Fastify (Node.js) stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.3**
+**Current Version: v0.1.6**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -50,7 +51,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.3**
+**Current Version: v0.1.6**
 
 ### Features | 功能特色
 
@@ -88,9 +89,9 @@ chmod +x start.sh
 ### Tech Stack | 技术栈
 
 - **Frontend | 前端**: Vue 3 + Vite + Pinia + TypeScript
-- **Backend | 后端**: FastAPI + SQLModel + SQLite
+- **Backend | 后端**: Fastify + TypeScript + SQLite
 - **Desktop | 桌面**: Electron
-- **Build | 构建**: PyInstaller + electron-builder
+- **Build | 构建**: electron-builder
 
 </details>
 
@@ -122,76 +123,54 @@ chmod +x start.sh
 
 ### 界面预览
 
-#### 🎨 布局模式
+#### 🎬 媒体订阅支持
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" width="60%">
-        <img src="images/appimages/三栏式布局.png" alt="三栏式布局" width="100%" style="max-width:600px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" />
-        <br><strong>三栏式布局</strong>
-        <br><em>经典桌面阅读体验</em>
-      </td>
-      <td align="center" width="40%">
-        <img src="images/appimages/一拦式布局.png" alt="一栏式布局" width="100%" style="max-width:280px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);" />
-        <br><strong>一栏式布局</strong>
-        <br><em>专注阅读模式</em>
-      </td>
-    </tr>
-  </table>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.6/视频订阅显示增强.png" alt="视频订阅显示" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>视频订阅显示</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.6/图像订阅显示增强.png" alt="图片订阅显示" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>图片订阅显示</figcaption>
+  </figure>
 </div>
 
-#### 🌍 多语言界面
+#### 📝 博客订阅增强
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持中文.png" alt="中文界面" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇨🇳 中文</strong>
-      </td>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持英文.png" alt="English Interface" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇺🇸 English</strong>
-      </td>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持日语.png" alt="日本語" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇯🇵 日本語</strong>
-      </td>
-      <td align="center" width="25%">
-        <img src="images/appimages/多语言支持韩文.png" alt="한국어" width="100%" style="max-width:200px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
-        <br><strong>🇰🇷 한국어</strong>
-      </td>
-    </tr>
-  </table>
+  <img src="images/v0.1.6/博客订阅增强.png" alt="博客订阅增强" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
 </div>
 
-#### ⚙️ 核心功能
+#### 🖱️ 右键菜单与收藏夹
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" width="33.33%">
-        <img src="images/appimages/支持订阅分组.png" alt="分组管理" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
-        <br><strong>📁 订阅源分组</strong>
-        <br><em>智能分类管理</em>
-      </td>
-      <td align="center" width="33.33%">
-        <img src="images/appimages/支持订阅信息时间过滤设定.png" alt="时间过滤" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
-        <br><strong>⏰ 时间过滤</strong>
-        <br><em>精准内容筛选</em>
-      </td>
-      <td align="center" width="33.33%">
-        <img src="images/appimages/支持特定内容收藏.png" alt="收藏功能" width="100%" style="max-width:300px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.1);" />
-        <br><strong>⭐ 收藏功能</strong>
-        <br><em>重要内容标记</em>
-      </td>
-    </tr>
-  </table>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
+    <img src="images/v0.1.6/右键功能增强feeds.png" alt="订阅源右键菜单" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>订阅源右键菜单</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
+    <img src="images/v0.1.6/右键将订阅记录添加到书签组.png" alt="添加到收藏夹" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>添加到收藏夹</figcaption>
+  </figure>
+</div>
+
+#### 🔬 MCP 状态显示
+<div align="center">
+  <img src="images/v0.1.6/MCP服务显性检测.png" alt="MCP状态指示器" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+</div>
+
+#### 📚 Zotero 集成
+<div align="center">
+  <img src="images/v0.1.6/发送到zotero支持.png" alt="发送到Zotero" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
+</div>
+
+#### 🔍 工作区高级检索
+<div align="center">
+  <img src="images/v0.1.6/工作区域高级检索标签组.png" alt="工作区高级检索" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
 </div>
 
 ## 快速开始
 
 ### 系统要求
 - Node.js 18+
-- Python 3.12+
 - pnpm 8+
 
 ### 安装运行
@@ -200,28 +179,32 @@ chmod +x start.sh
 git clone https://github.com/xiongsircool/aurora-rss-reader.git
 cd aurora-rss-reader
 
-# 一键启动
+# 推荐：Node.js 后端
+cd backend-node
+npm install
+cd ../rss-desktop
+pnpm install
+pnpm dev
+
+# 快速启动（Node.js 后端）
+cd ..
 chmod +x start.sh
 ./start.sh
 ```
 
-启动脚本会自动：
-- 创建 Python 虚拟环境
-- 安装前后端依赖
-- 初始化数据库
-- 启动 Electron 应用
+`start.sh` 会安装依赖并启动 Electron。
 
 ### 访问地址
 - **桌面应用**：自动打开 Electron 窗口
 - **Web 界面**：http://localhost:5173
 - **API 服务**：http://127.0.0.1:15432
 
-### 配置文件
-编辑 `backend/.env` 配置 AI 和 RSSHub：
+### 配置
+通过环境变量配置 AI 和 RSSHub：
 
 ```env
 # RSSHub
-RSSHUB_BASE=https://rsshub.app
+RSSHUB_BASE_URL=https://rsshub.app
 
 # AI 配置
 GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
@@ -230,10 +213,25 @@ GLM_API_KEY=your_api_key_here
 ```
 
 ### 数据存储目录
-- **macOS**：`~/Library/Application Support/Aurora RSS Reader/rss.sqlite`
-- **Windows**：`%APPDATA%/Aurora RSS Reader/rss.sqlite`
-- **Linux**：`~/.config/aurora-rss-reader/rss.sqlite`
-- 可通过设置环境变量 `AURORA_DATA_DIR` 或在 `backend/.env` 中指定 `SQLITE_PATH` 来覆盖默认位置，方便在多设备或自定义路径间迁移数据。
+- **macOS**：`~/Library/Application Support/Aurora RSS Reader/aurora-rss.db`
+- **Windows**：`%APPDATA%/Aurora RSS Reader/aurora-rss.db`
+- **Linux**：`~/.config/aurora-rss-reader/aurora-rss.db`
+- 可通过设置环境变量 `DATABASE_PATH` 指定数据库路径。
+
+## 🐳 Docker 部署
+
+```bash
+# 使用 Docker Compose 快速启动
+git clone https://github.com/xiongsircool/aurora-rss-reader.git
+cd aurora-rss-reader
+docker-compose up -d
+
+# 访问: http://localhost:8080
+```
+
+详细配置请参考 [Docker 部署文档](docker/README.md)。
+
+> **注意**: Docker 镜像仅支持 `linux/amd64` 架构。
 
 ## 构建发布
 
@@ -244,16 +242,16 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `AuroraRSSReader-Mac-0.1.3-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.3-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.3-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.6-{x64,arm64}.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.6-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.6-x64.AppImage`
 
 ## 技术栈
 
 - **前端**：Vue 3 + Vite + Pinia + TypeScript
-- **后端**：FastAPI + SQLModel + SQLite
+- **后端**：Fastify + TypeScript + SQLite
 - **桌面应用**：Electron
-- **构建工具**：PyInstaller + electron-builder
+- **构建工具**：electron-builder
 
 ## 项目结构
 
@@ -262,30 +260,46 @@ aurora-rss-reader/
 ├── rss-desktop/          # 前端代码
 │   ├── src/             # Vue 源码
 │   └── electron/        # Electron 主进程
-├── backend/             # 后端服务
-│   ├── app/            # FastAPI 应用
-│   └── .venv/          # Python 虚拟环境
+├── backend-node/        # Node.js 后端（Fastify）
 ├── images/              # 图片资源
 └── start.sh            # 启动脚本
 ```
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.3 (当前版本 | Current Version) 🎉
-**打包修复与平台支持 | Packaging Fix & Platform Support**
-
-#### 🔧 核心修复 | Core Fixes
-- **Windows打包修复** - 彻底解决 PyInstaller 模块丢失问题 (pydantic, fastapi, etc.)
-- **数据库初始化** - 修复首次运行时数据库表未创建导致的崩溃问题
-- **依赖管理优化** - 自动收集所有 Python 子模块，确保打包完整性
-- **启动流程优化** - 增加健康检查超时时间至 5 分钟，防止慢速系统误报超时
+### v0.1.6 (当前版本 | Current Version) 🎉
+**重大UI升级与新功能 | Major UI Enhancement & New Features**
 
 #### ✨ 新增功能 | New Features
-- **一键已读** - 侧边栏新增"全部已读"按钮，快速清理未读消息
-- **macOS Intel支持** - 新增对 x64 架构 Mac 的构建支持
-- **深色模式优化** - 修复设置页面在深色模式下的文字颜色和背景显示问题
+- **媒体订阅支持** - 视频和图片订阅源优化显示布局
+- **播客支持** - 音频播放器支持播客订阅和播放
+- **Zotero 集成** - 学术文献一键发送到 Zotero，自动识别 DOI/PMID
+- **收藏夹功能** - 将文章整理到自定义书签组
+- **右键菜单增强** - 订阅源和文章的丰富右键操作
+- **MCP 状态显示** - Model Context Protocol 服务器状态可视化
+- **视图类型分类** - 自动识别博客、视频、图片、播客并优化显示
 
-### v0.1.2 (历史版本 | Previous Version)
+### v0.1.5 (历史版本 | Previous Version)
+**功能增强与稳定性改进 | Feature Enhancement & Stability Improvements**
+
+#### ✨ 新增功能 | New Features
+- **应用内自动更新** - 集成 electron-updater 实现版本检测和自动安装
+- **MCP 服务器支持** - 新增 Model Context Protocol 服务器，增强 AI 集成
+- **向量搜索** - 使用 sqlite-vss 实现语义搜索功能
+- **批量翻译 API** - 支持批量翻译文章，提升效率
+
+#### 🎨 UI/UX 优化 | UI/UX Improvements
+- **翻译流程优化** - 改进翻译交互体验
+- **详情面板增强** - 优化文章详情展示
+- **收藏和未读标识** - 精简视觉设计
+
+#### 🔧 技术优化 | Technical Improvements
+- **CI/CD 流水线** - GitHub Actions 多平台自动构建和发布
+- **macOS 双架构** - 支持 Intel (x64) 和 Apple Silicon (arm64)
+- **DMG 修复** - 解决 macOS DMG 挂载问题
+- **原生模块编译** - 升级 better-sqlite3 并修复 Electron 编译问题
+
+### v0.1.3 (历史版本 | Previous Version)
 **重要Bug修复版本 | Critical Bug Fix Release**
 
 #### 🐛 Bug修复 | Bug Fixes
@@ -323,7 +337,7 @@ aurora-rss-reader/
 
 ## 📚 文档 | Documentation
 
-- **[更新说明](UPDATE_README.md)** - v0.1.3详细更新内容
+- **[更新说明](UPDATE_README.md)** - 详细更新内容
 - **完整项目文档** - 旧版本文档已归档至 `docs_archive/` 目录
 
 ## ❓ 常见问题
@@ -337,13 +351,13 @@ A: 使用 `Cmd + Q` 快捷键或右键点击 dock 图标选择退出。
 
 ### 配置相关
 **Q: 如何配置 AI 服务？**
-A: 编辑 `backend/.env` 文件，添加相应的 API 密钥。
+A: 通过环境变量设置 `GLM_API_KEY` 等配置（例如在启动前导出环境变量）。
 
 **Q: 数据存储在哪里？**
 A: 数据默认存储在系统应用数据目录：
-- macOS: `~/Library/Application Support/Aurora RSS Reader/rss.sqlite`
-- Windows: `%APPDATA%/Aurora RSS Reader/rss.sqlite`
-- Linux: `~/.config/aurora-rss-reader/rss.sqlite`
+- macOS: `~/Library/Application Support/Aurora RSS Reader/aurora-rss.db`
+- Windows: `%APPDATA%/Aurora RSS Reader/aurora-rss.db`
+- Linux: `~/.config/aurora-rss-reader/aurora-rss.db`
 
 ### macOS 常见问题
 **安装问题：**
@@ -377,8 +391,10 @@ A: 检查后端服务是否正常启动，可以查看终端输出的启动日�
 
 ### 近期计划 (v0.2)
 - [ ] **AI日报功能** - 智能生成每日热点新闻摘要和个性化推荐
-- [ ] **播客支持** - 支持音频播客订阅和播放功能
+- [x] **播客支持** - 支持音频播客订阅和播放功能 ✅
 - [ ] **阅读统计** - 个人阅读习惯分析和数据可视化
+- [ ] **兼容性开发** - 兼容RssHub支持RssHUB导入订阅
+- [ ] **开发浏览器插件** - AI解析网站出Rsshub的订阅规则
 
 ### 中期计划 (v0.3)
 - [ ] **数据同步** - 跨设备数据同步和云备份

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  aurora-rss:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aurora-rss-reader:latest
+    container_name: aurora-rss-reader
+    ports:
+      - "8080:80"
+    volumes:
+      - aurora-data:/data
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/data/aurora-rss.db
+      - RSSHUB_BASE_URL=https://rsshub.app
+      # AI Configuration (optional)
+      # - GLM_API_KEY=your_api_key_here
+      # - GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+      # - GLM_MODEL=glm-4-flash
+    restart: unless-stopped
+
+volumes:
+  aurora-data:
+    driver: local

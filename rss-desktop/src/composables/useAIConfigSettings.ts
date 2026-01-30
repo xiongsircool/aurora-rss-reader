@@ -12,12 +12,14 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
 
     const serviceTesting = ref<Record<AIServiceKey, boolean>>({
         summary: false,
-        translation: false
+        translation: false,
+        embedding: false
     })
 
     const serviceTestResult = ref<Record<AIServiceKey, TestResult | null>>({
         summary: null,
-        translation: null
+        translation: null,
+        embedding: null
     })
 
     async function testConnection(service: AIServiceKey) {
@@ -51,6 +53,90 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
     function resetTestResults() {
         serviceTestResult.value.summary = null
         serviceTestResult.value.translation = null
+        serviceTestResult.value.embedding = null
+    }
+
+    const rebuildingVectors = ref(false)
+    const rebuildResult = ref<TestResult | null>(null)
+
+    // MCP testing state
+    const mcpTesting = ref(false)
+    const mcpTestResult = ref<TestResult | null>(null)
+
+    async function rebuildVectors() {
+        if (!localConfig.value.embedding.api_key) {
+            rebuildResult.value = {
+                success: false,
+                message: '请先配置 Embedding API'
+            }
+            return
+        }
+
+        // 确认对话框
+        const confirmed = confirm(
+            '确定要重建向量数据库吗？\n\n' +
+            '这将清除现有向量并重新处理所有文章标题。\n' +
+            '根据文章数量，可能需要几分钟时间。'
+        )
+
+        if (!confirmed) return
+
+        rebuildingVectors.value = true
+        rebuildResult.value = null
+
+        try {
+            const result = await aiStore.rebuildVectors()
+            rebuildResult.value = {
+                success: result.success,
+                message: result.message || (result.success ? '重建成功！' : '重建失败')
+            }
+
+            // 5秒后清除结果
+            setTimeout(() => {
+                rebuildResult.value = null
+            }, 5000)
+        } catch (error) {
+            rebuildResult.value = {
+                success: false,
+                message: '重建向量库失败'
+            }
+        } finally {
+            rebuildingVectors.value = false
+        }
+    }
+
+    async function testMcp() {
+        mcpTesting.value = true
+        mcpTestResult.value = null
+
+        try {
+            // Health endpoint is at root, not under /api
+            const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') ?? 'http://127.0.0.1:15432'
+            const response = await fetch(`${baseUrl}/health`)
+            const data = await response.json()
+            if (data?.status === 'ok' || data?.status === 'degraded') {
+                mcpTestResult.value = {
+                    success: true,
+                    message: 'MCP 服务连接正常'
+                }
+            } else {
+                mcpTestResult.value = {
+                    success: false,
+                    message: 'MCP 服务响应异常'
+                }
+            }
+        } catch (error) {
+            mcpTestResult.value = {
+                success: false,
+                message: 'MCP 服务连接失败'
+            }
+        } finally {
+            mcpTesting.value = false
+        }
+    }
+
+    function resetMcpTestResult() {
+        mcpTestResult.value = null
     }
 
     return {
@@ -58,6 +144,13 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
         serviceTestResult,
         testConnection,
         copySummaryToTranslation,
-        resetTestResults
+        resetTestResults,
+        rebuildingVectors,
+        rebuildResult,
+        rebuildVectors,
+        mcpTesting,
+        mcpTestResult,
+        testMcp,
+        resetMcpTestResult
     }
 }

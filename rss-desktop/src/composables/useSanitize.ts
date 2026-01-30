@@ -48,7 +48,25 @@ export function useSanitize() {
         }
     })
 
+    /**
+     * Sanitizes title HTML content with stricter rules than article content.
+     * Only allows basic formatting tags commonly used in RSS titles.
+     *
+     * @param title - The raw title string that may contain HTML
+     * @returns Sanitized HTML string safe for v-html rendering
+     */
+    function sanitizeTitle(title: string | null | undefined): string {
+        if (!title) return ''
+
+        return DOMPurify.sanitize(title, {
+            ALLOWED_TAGS: ['em', 'i', 'strong', 'b', 'sup', 'sub', 'code'],
+            ALLOWED_ATTR: [], // No attributes needed for title formatting
+            KEEP_CONTENT: true, // Keep text content even if tags are removed
+        })
+    }
+
     return {
-        sanitize
+        sanitize,
+        sanitizeTitle
     }
 }

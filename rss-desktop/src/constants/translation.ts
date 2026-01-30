@@ -1,4 +1,4 @@
-const DEFAULT_LIMIT = 6
+const DEFAULT_LIMIT = 10
 
 export type NavigatorConnection = {
   downlink?: number
@@ -8,8 +8,8 @@ export type NavigatorConnection = {
   onchange?: ((this: NavigatorConnection, ev: Event) => unknown) | null
 }
 
-export const MIN_AUTO_TITLE_TRANSLATIONS = 3
-export const MAX_AUTO_TITLE_TRANSLATIONS = 12
+export const MIN_AUTO_TITLE_TRANSLATIONS = 1
+export const MAX_AUTO_TITLE_TRANSLATIONS = 50
 export const TITLE_TRANSLATION_CONCURRENCY_FALLBACK = 2
 
 function clamp(value: number, min: number, max: number) {

@@ -10,16 +10,15 @@ export interface LocalServiceConfig {
 
 export interface LocalFeatureConfig {
     auto_summary: boolean
-    auto_translation: boolean
     auto_title_translation: boolean
     title_display_mode: 'replace' | 'translation-first' | 'original-first'
-    content_display_mode: 'replace' | 'bilingual'
     translation_language: string
 }
 
 export interface LocalConfig {
     summary: LocalServiceConfig
     translation: LocalServiceConfig
+    embedding: LocalServiceConfig
     features: LocalFeatureConfig
 }
 
@@ -31,10 +30,8 @@ const createLocalServiceConfig = (): LocalServiceConfig => ({
 
 const createLocalFeatureConfig = (): LocalFeatureConfig => ({
     auto_summary: false,
-    auto_translation: false,
     auto_title_translation: false,
     title_display_mode: 'original-first',
-    content_display_mode: 'replace',
     translation_language: 'zh'
 })
 
@@ -45,12 +42,14 @@ export function useSettingsModal() {
     const localConfig = ref<LocalConfig>({
         summary: createLocalServiceConfig(),
         translation: createLocalServiceConfig(),
+        embedding: createLocalServiceConfig(),
         features: createLocalFeatureConfig()
     })
 
     function syncFromStore() {
         const summary = aiStore.config.summary || {}
         const translation = aiStore.config.translation || {}
+        const embedding = aiStore.config.embedding || {}
         const features = aiStore.config.features || {}
 
         localConfig.value.summary = {
@@ -65,13 +64,17 @@ export function useSettingsModal() {
             base_url: translation.base_url ?? localConfig.value.translation.base_url,
             model_name: translation.model_name ?? localConfig.value.translation.model_name
         }
+        localConfig.value.embedding = {
+            ...localConfig.value.embedding,
+            api_key: embedding.api_key ?? localConfig.value.embedding.api_key,
+            base_url: embedding.base_url ?? localConfig.value.embedding.base_url,
+            model_name: embedding.model_name ?? localConfig.value.embedding.model_name
+        }
         localConfig.value.features = {
             ...localConfig.value.features,
             auto_summary: features.auto_summary ?? localConfig.value.features.auto_summary,
-            auto_translation: features.auto_translation ?? localConfig.value.features.auto_translation,
             auto_title_translation: features.auto_title_translation ?? localConfig.value.features.auto_title_translation,
             title_display_mode: features.title_display_mode ?? localConfig.value.features.title_display_mode,
-            content_display_mode: features.content_display_mode ?? localConfig.value.features.content_display_mode,
             translation_language: features.translation_language ?? localConfig.value.features.translation_language
         }
     }
@@ -98,6 +101,7 @@ export function useSettingsModal() {
         const success = await aiStore.updateConfig({
             summary: { ...localConfig.value.summary },
             translation: { ...localConfig.value.translation },
+            embedding: { ...localConfig.value.embedding },
             features: { ...localConfig.value.features }
         })
         if (!success) {

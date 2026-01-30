@@ -25,17 +25,18 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.1.3 Latest Release | 最新版本
+## 🎉 v0.1.6 Latest Release | 最新版本
 
-**Packaging Fix & Platform Support | 打包修复与平台支持**
+**Major UI Enhancement & New Features | 重大UI升级与新功能**
 
-- 🔧 **Fixed Windows Packaging** - Resolved PyInstaller dependency issues, backend now starts correctly
-- 🍎 **macOS Intel Support** - Added support for older Intel-based Macs (x64)
-- 📦 **Improved Build System** - All module dependencies now correctly included in packaged app
-- 🗄️ **Database Initialization** - Fixed database table creation on first launch
-- ⚡ **Startup Optimization** - Extended backend startup timeout for slower systems
-- ✅ **One-Click Mark All Read** - Added batch mark all articles as read feature
-- 🌙 **Dark Mode Fix** - Fixed settings page display issues in dark mode
+- 🎬 **Media Feed Support** - Enhanced display for video and image feeds with optimized layouts
+- 🎧 **Podcast Support** - Audio player with enclosure support for podcast feeds
+- 📚 **Zotero Integration** - Send academic articles to Zotero with DOI/PMID auto-detection
+- 📁 **Collections Feature** - Organize articles into custom bookmark collections
+- 🖱️ **Enhanced Context Menu** - Rich right-click menu for feeds and entries
+- 🔬 **MCP Status Display** - Visual indicator for Model Context Protocol server status
+- 🎨 **View Type Classification** - Auto-detect and optimize display for blogs, videos, images, podcasts
+- 🔍 **Workspace Advanced Search** - Tag groups and advanced filtering in workspace
 
 ---
 
@@ -43,7 +44,7 @@
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.3**
+**Current Version: v0.1.6**
 
 ## Key Features
 
@@ -69,71 +70,54 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 
 ## Interface Preview
 
-### Layout Modes
+### Media Feed Support
 <div align="center">
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/appimages/三栏式布局.png" alt="Three-column layout" style="width:520px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Three-column layout</figcaption>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.6/视频订阅显示增强.png" alt="Video feed display" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Video Feed Display</figcaption>
   </figure>
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/appimages/一拦式布局.png" alt="Single-column layout" style="width:240px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Single-column layout</figcaption>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.6/图像订阅显示增强.png" alt="Image feed display" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Image Feed Display</figcaption>
   </figure>
 </div>
 
-### Multi-language Experience
+### Blog & Article Enhancement
 <div align="center">
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/多语言支持中文.png" alt="Chinese Interface" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Chinese Interface</figcaption>
+  <img src="images/v0.1.6/博客订阅增强.png" alt="Blog feed enhancement" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
+</div>
+
+### Context Menu & Collections
+<div align="center">
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
+    <img src="images/v0.1.6/右键功能增强feeds.png" alt="Feed context menu" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Feed Context Menu</figcaption>
   </figure>
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/多语言支持英文.png" alt="English Interface" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>English Interface</figcaption>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;">
+    <img src="images/v0.1.6/右键将订阅记录添加到书签组.png" alt="Add to collection" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Add to Collection</figcaption>
   </figure>
 </div>
 
-### Management Features
+### MCP Status Display
 <div align="center">
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/支持订阅分组.png" alt="Group Management" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Subscription grouping</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/支持订阅信息时间过滤设定.png" alt="Time Filtering" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Time filtering</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 16px 18px;text-align:center;">
-    <img src="images/appimages/支持特定内容收藏.png" alt="Favorites" style="width:360px;border-radius:14px;box-shadow:0 6px 30px rgba(15,17,21,.18);" />
-    <figcaption>Favorites feature</figcaption>
-  </figure>
+  <img src="images/v0.1.6/MCP服务显性检测.png" alt="MCP status indicator" style="width:320px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
 </div>
 
-### Multi-language Interface
+### Zotero Integration
 <div align="center">
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持中文.png" alt="Chinese" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption>Chinese</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持英文.png" alt="English" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption>English</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持日语.png" alt="Japanese" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption>Japanese</figcaption>
-  </figure>
-  <figure style="display:inline-block;margin:0 12px 16px;text-align:center;">
-    <img src="images/appimages/多语言支持韩文.png" alt="Korean" style="width:200px;border-radius:12px;box-shadow:0 4px 20px rgba(15,17,21,.1);" />
-    <figcaption>Korean</figcaption>
-  </figure>
+  <img src="images/v0.1.6/发送到zotero支持.png" alt="Send to Zotero" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
+</div>
+
+### Workspace Advanced Search
+<div align="center">
+  <img src="images/v0.1.6/工作区域高级检索标签组.png" alt="Workspace advanced search" style="width:88%;max-width:980px;border-radius:14px;box-shadow:0 6px 28px rgba(15,17,21,.18);" />
 </div>
 
 ## Quick Start
 
 ### System Requirements
 - Node.js 18+
-- Python 3.12+
 - pnpm 8+
 
 ### Installation and Running
@@ -142,65 +126,25 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 git clone https://github.com/xiongsircool/aurora-rss-reader.git
 cd aurora-rss-reader
 
-# One-click startup
+# Recommended: Node.js backend
+cd backend-node
+npm install
+cd ../rss-desktop
+pnpm install
+pnpm dev
+
+# Quick start (Node.js backend)
+cd ..
 chmod +x start.sh
 ./start.sh
 ```
 
 ### Development Setup (Manual)
+Recommended (backend-node):
+- `cd backend-node && npm install`
+- `cd rss-desktop && pnpm install`
+- `pnpm dev` (from `rss-desktop`)
 
-#### Windows
-
-1.  **Backend Setup**:
-    ```powershell
-    cd backend
-    copy .env.example .env
-    python -m venv .venv
-    .\.venv\Scripts\pip install -r requirements.txt
-    .\.venv\Scripts\pip install -e .
-    .\.venv\Scripts\python -m scripts.migrate
-    ```
-
-2.  **Frontend Setup**:
-    ```powershell
-    cd rss-desktop
-    copy .env.example .env
-    pnpm install
-    ```
-
-3.  **Run Application**:
-    ```powershell
-    cd rss-desktop
-    pnpm dev
-    ```
-
-#### Linux / macOS
-
-You can use the `start.sh` script or follow these manual steps:
-
-1.  **Backend Setup**:
-    ```bash
-    cd backend
-    cp .env.example .env
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
-    pip install -e .
-    python -m scripts.migrate
-    ```
-
-2.  **Frontend Setup**:
-    ```bash
-    cd rss-desktop
-    cp .env.example .env
-    pnpm install
-    ```
-
-3.  **Run Application**:
-    ```bash
-The startup script will automatically:
-- Create Python virtual environment
-- Install frontend and backend dependencies
 ### Troubleshooting
 ### macOS Compatibility
 **Initial Setup:**
@@ -225,18 +169,33 @@ A: Check the backend service logs if possible. First launch may take longer to i
 - **Web Interface**: http://localhost:5173
 - **API Service**: http://127.0.0.1:15432
 
-### Configuration File
-Edit `backend/.env` to configure AI and RSSHub:
+### Configuration
+Set environment variables for the Node.js backend to configure AI and RSSHub:
 
 ```env
 # RSSHub
-RSSHUB_BASE=https://rsshub.app
+RSSHUB_BASE_URL=https://rsshub.app
 
 # AI Configuration
 GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
 GLM_MODEL=glm-4-flash
 GLM_API_KEY=your_api_key_here
 ```
+
+## 🐳 Docker Deployment
+
+```bash
+# Quick start with Docker Compose
+git clone https://github.com/xiongsircool/aurora-rss-reader.git
+cd aurora-rss-reader
+docker-compose up -d
+
+# Access: http://localhost:8080
+```
+
+For detailed Docker configuration, see [Docker README](docker/README.md).
+
+> **Note**: Docker image only supports `linux/amd64` architecture.
 
 ## Build and Release
 
@@ -247,21 +206,21 @@ chmod +x build-release-app.sh
 ```
 
 Generated files:
-- macOS: `AuroraRSSReader-Mac-0.1.3-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.3-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.3-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.6-{x64,arm64}.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.6-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.6-x64.AppImage`
 
 ## 📋 Documentation | 文档
 
-- **[Update Details](UPDATE_README.md)** - Detailed v0.1.3 update content | v0.1.3详细更新内容
+- **[Update Details](UPDATE_README.md)** - Detailed update content | 详细更新内容
 - **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
 ## Tech Stack
 
 - **Frontend**: Vue 3 + Vite + Pinia + TypeScript
-- **Backend**: FastAPI + SQLModel + SQLite
+- **Backend**: Fastify + TypeScript + SQLite
 - **Desktop App**: Electron
-- **Build Tools**: PyInstaller + electron-builder
+- **Build Tools**: electron-builder
 
 ## Project Structure
 
@@ -270,17 +229,10 @@ aurora-rss-reader/
 ├── rss-desktop/          # Frontend code
 │   ├── src/             # Vue source code
 │   └── electron/        # Electron main process
-├── backend/             # Backend service
-│   ├── app/            # FastAPI application
-│   └── .venv/          # Python virtual environment
+├── backend-node/        # Node.js backend (Fastify)
 ├── images/              # Image resources
 └── start.sh            # Startup script
 ```
-
-## 📋 Documentation | 文档
-
-- **[Update Details](UPDATE_README.md)** - Detailed v0.1.3 update content | v0.1.3详细更新内容
-- **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
 ## Support
 
@@ -299,7 +251,7 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 ### Short-term Plans (v0.2)
 - [ ] **Mobile Support** - Develop iOS and Android mobile applications
 - [ ] **AI Daily Briefing** - Smart daily news summaries and personalized recommendations
-- [ ] **Podcast Support** - Support for audio podcast subscription and playback
+- [x] **Podcast Support** - Support for audio podcast subscription and playback ✅
 - [ ] **Reading Analytics** - Personal reading habits analysis and data visualization
 
 ### Mid-term Plans (v0.3)

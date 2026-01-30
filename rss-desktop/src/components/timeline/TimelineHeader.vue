@@ -20,8 +20,8 @@ const { t } = useI18n()
 <template>
   <header class="flex justify-between items-center px-[clamp(16px,2vw,22px)] py-[clamp(12px,1.5vw,18px)] border-b border-[var(--border-color)] gap-4 flex-wrap">
     <div class="flex-1 min-w-0 flex flex-col gap-1">
-      <h2 class="m-0 text-xl font-bold">{{ title }}</h2>
-      <p class="m-0 text-xs c-[var(--text-secondary)]">{{ subtitle }}</p>
+      <h2 class="m-0 text-xl font-bold line-clamp-2" :title="title">{{ title }}</h2>
+      <p class="m-0 text-xs c-[var(--text-secondary)] truncate" :title="subtitle">{{ subtitle }}</p>
     </div>
     <div class="flex gap-2.5 flex-wrap items-center justify-end">
       <!-- Mark All as Read Button -->

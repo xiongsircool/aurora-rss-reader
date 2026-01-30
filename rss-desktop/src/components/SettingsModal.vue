@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch, ref } from 'vue'
+import { computed, watch, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSettingsModal } from '../composables/useSettingsModal'
@@ -36,6 +36,18 @@ const rsshub = useRSSHubSettings()
 const aiConfig = useAIConfigSettings(localConfig)
 const refresh = useRefreshSettings()
 
+// Navigation
+type Category = 'general' | 'display' | 'sync' | 'intelligence'
+const activeCategory = ref<Category>('general')
+const isMobileDetailOpen = ref(false)
+
+const categories = [
+  { id: 'general', label: 'settings.general', icon: 'i-carbon-settings' },
+  { id: 'display', label: 'settings.displaySettings', icon: 'i-carbon-screen' },
+  { id: 'sync', label: 'settings.sync', icon: 'i-carbon-cycle' },
+  { id: 'intelligence', label: 'settings.aiConfig', icon: 'i-carbon-intelligence' },
+]
+
 // Display settings - synced with store
 const showEntrySummary = computed({
   get: () => settingsStore.settings.show_entry_summary,
@@ -57,11 +69,21 @@ const timeField = computed({
   set: (value) => settingsStore.updateSettings({ time_field: value })
 })
 
+const openOriginalMode = computed({
+  get: () => settingsStore.settings.open_original_mode,
+  set: (value) => settingsStore.updateSettings({ open_original_mode: value })
+})
+
 const autoTitleTranslationLimit = ref(settingsStore.settings.max_auto_title_translations)
 
 const markAsReadRange = computed({
   get: () => settingsStore.settings.mark_as_read_range,
   set: (value) => settingsStore.updateSettings({ mark_as_read_range: value })
+})
+
+const detailsPanelMode = computed({
+  get: () => settingsStore.settings.details_panel_mode,
+  set: (value) => settingsStore.updateSettings({ details_panel_mode: value })
 })
 
 // Watch modal visibility
@@ -71,13 +93,39 @@ watch(() => props.show, async (show) => {
       rsshub.fetchRSSHubUrl,
       () => {
         aiConfig.resetTestResults()
+        aiConfig.resetMcpTestResult()
         rsshub.resetTestResult()
       }
     )
     refresh.syncFromStore()
     // Sync the local autoTitleTranslationLimit with store value
     autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
+
+    // Reset view state
+    activeCategory.value = 'general'
+    isMobileDetailOpen.value = false
+
+    // Auto-test MCP connection on modal open
+    aiConfig.testMcp()
+
+    // Lock body scroll
+    document.body.style.overflow = 'hidden'
+  } else {
+    // Unlock body scroll
+    document.body.style.overflow = ''
   }
+})
+
+// Ensure scroll is unlocked when component is unmounted
+onMounted(() => {
+  if (props.show) {
+    document.body.style.overflow = 'hidden'
+  }
+})
+
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  document.body.style.overflow = ''
 })
 
 // Event handlers
@@ -91,8 +139,20 @@ function handleBackdropClick(event: MouseEvent) {
   }
 }
 
+function selectCategory(id: string) {
+  activeCategory.value = id as Category
+  isMobileDetailOpen.value = true
+}
+
+function backToCategories() {
+  isMobileDetailOpen.value = false
+}
+
 async function saveSettings() {
   try {
+    const autoRefreshValid = await refresh.commitAutoRefresh()
+    if (!autoRefreshValid) return
+
     const fetchIntervalValid = await refresh.commitFetchInterval()
     if (!fetchIntervalValid) return
 
@@ -115,57 +175,199 @@ async function saveSettings() {
 
 <template>
   <Transition name="modal">
-    <div v-if="show" class="fixed inset-0 bg-black/50 flex items-center justify-center z-1000 backdrop-blur-[4px] dark:bg-black/60" @click="handleBackdropClick">
-      <div class="w-[92%] max-w-[640px] max-h-[82vh] overflow-hidden flex flex-col rounded-[18px] border border-[rgba(15,20,25,0.08)] bg-gradient-to-b from-white to-[#f5f7fc] shadow-[0_20px_60px_rgba(15,20,25,0.25),0_2px_8px_rgba(15,20,25,0.08)] dark:bg-[linear-gradient(180deg,#1c1f26_0%,#12151a_100%)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)] modal-content">
-        <div class="flex justify-between items-center p-6 border-b border-[var(--border-color)] dark:border-[rgba(255,255,255,0.1)] dark:bg-black/20">
-          <h2 class="m-0 text-xl c-[var(--text-primary)]">{{ t('settings.title') }}</h2>
-          <button @click="handleClose" class="border-none bg-transparent text-2xl cursor-pointer c-[var(--text-secondary)] p-1 rounded transition-colors hover:bg-black/5 dark:hover:bg-white/8 dark:hover:c-[var(--text-primary)]">✕</button>
+    <div v-if="show" class="fixed inset-0 z-1000 flex items-center justify-center p-0 md:p-4 backdrop-blur-md bg-black/40 dark:bg-black/60" @click="handleBackdropClick">
+      
+      <!-- Main Modal Container -->
+      <div
+        class="
+          w-full max-w-4xl h-[85vh] md:h-[85vh] h-full
+          flex flex-col md:flex-row
+          rounded-none md:rounded-2xl overflow-hidden
+          bg-[var(--bg-base)] md:bg-white/80 md:dark:bg-[#0f1115]/75
+          md:backdrop-blur-2xl
+          border-0 md:border border-white/20 dark:border-white/10
+          shadow-none md:shadow-2xl md:shadow-black/40
+          relative top-0 md:top-auto
+        "
+      >
+
+        <!-- Sidebar (Desktop) / Category List (Mobile) -->
+        <div
+          class="
+            w-full md:w-64
+            flex flex-col
+            bg-[var(--bg-surface)]
+            border-r border-[var(--border-color)]
+            transition-transform duration-300 absolute inset-0 z-20 md:relative md:transform-none md:z-0
+          "
+          :class="isMobileDetailOpen ? '-translate-x-full md:translate-x-0' : 'translate-x-0'"
+        >
+          <div class="p-6 pb-4">
+            <h2 class="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent m-0">
+              {{ t('settings.title') }}
+            </h2>
+          </div>
+
+          <div class="flex-1 overflow-y-auto px-3 space-y-1">
+            <button
+              v-for="cat in categories"
+              :key="cat.id"
+              @click="selectCategory(cat.id)"
+              class="
+                w-full flex items-center justify-between px-4 py-3 rounded-xl
+                text-sm font-medium transition-all duration-200
+                group mb-1
+              "
+              :class="
+                activeCategory === cat.id
+                  ? 'bg-orange-500/10 dark:bg-white/5 text-orange-600 dark:text-white border-l-3 border-orange-500 dark:border-white shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] border-l-3 border-transparent'
+              "
+            >
+              <div class="flex items-center gap-3">
+                <span :class="[cat.icon, 'text-lg transition-colors', activeCategory === cat.id ? 'text-orange-500 dark:text-white' : 'text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]']"></span>
+                <span>{{ t(cat.label) }}</span>
+              </div>
+              <span class="i-carbon-chevron-right text-[var(--text-tertiary)] md:hidden"></span>
+            </button>
+          </div>
+
+          <!-- Bottom Actions (Mobile only in list view) -->
+          <div class="p-4 border-t border-[var(--border-color)] md:hidden space-y-3">
+             <button @click="saveSettings" class="w-full py-3 rounded-xl font-medium bg-orange-500 text-white shadow-lg shadow-orange-500/20 active:scale-95 transition-transform">
+              {{ t('settings.save') }}
+            </button>
+            <button @click="handleClose" class="w-full py-3 rounded-xl font-medium bg-[var(--bg-elevated)] text-[var(--text-primary)] active:scale-95 transition-transform">
+              {{ t('settings.cancel') }}
+            </button>
+          </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-6 bg-[rgba(255,255,255,0.7)] dark:bg-[rgba(18,21,26,0.95)] modal-body">
-          <SettingsLanguage />
+        <!-- Content Area -->
+        <div
+          class="
+            flex-1 flex flex-col h-full relative
+            bg-[var(--bg-base)] md:bg-transparent
+          "
+           :class="isMobileDetailOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'"
+        >
+          <!-- Mobile Header -->
+          <div class="md:hidden flex items-center gap-3 p-4 sticky top-0 z-10 backdrop-blur-xl bg-[var(--bg-surface)]/80 dark:bg-[#0f1115]/80 border-b border-[var(--border-color)]">
+            <button @click="backToCategories" class="p-1 -ml-1 rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-hover)] active:scale-95 transition-all flex items-center gap-1 bg-transparent">
+              <span class="i-carbon-chevron-left text-2xl text-orange-500 dark:text-white"></span>
+              <span class="text-base font-bold text-[var(--text-primary)]">{{ t('settings.title') }}</span>
+            </button>
+            <div class="flex-1"></div>
+          </div>
 
-          <SettingsRSSHub
-            v-model:rsshubUrl="rsshub.rsshubUrl.value"
-            :isTestingRSSHub="rsshub.isTestingRSSHub.value"
-            :rsshubTestResult="rsshub.rsshubTestResult.value"
-            @testConnection="rsshub.testRSSHubConnection"
-          />
+          <!-- Scrollable Content -->
+          <div class="flex-1 overflow-y-auto p-6 md:p-8 scroll-smooth">
+            <Transition name="fade" mode="out-in">
+              <div :key="activeCategory" class="max-w-3xl mx-auto space-y-6">
+                
+                <!-- General Section -->
+                <div v-if="activeCategory === 'general'" class="space-y-6">
+                   <div class="setting-group">
+                      <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.general') }}</h3>
+                      <SettingsLanguage />
+                   </div>
+                   <div class="setting-group">
+                      <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.about') }}</h3>
+                      <SettingsAbout />
+                   </div>
+                </div>
 
-          <SettingsAIConfig
-            v-model:summaryConfig="localConfig.summary"
-            v-model:translationConfig="localConfig.translation"
-            :serviceTesting="aiConfig.serviceTesting.value"
-            :serviceTestResult="aiConfig.serviceTestResult.value"
-            @testConnection="aiConfig.testConnection"
-            @copySummaryToTranslation="aiConfig.copySummaryToTranslation"
-          />
+                <!-- Display Section -->
+                <div v-if="activeCategory === 'display'" class="space-y-6">
+                  <div class="setting-group">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.displaySettings') }}</h3>
+                    <SettingsDisplay
+                      v-model:showEntrySummary="showEntrySummary"
+                      v-model:enableDateFilter="enableDateFilter"
+                      v-model:defaultDateRange="defaultDateRange"
+                      v-model:timeField="timeField"
+                      v-model:openOriginalMode="openOriginalMode"
+                      v-model:markAsReadRange="markAsReadRange"
+                      v-model:detailsPanelMode="detailsPanelMode"
+                    />
+                  </div>
+                </div>
 
-          <SettingsAIFeatures
-            v-model:features="localConfig.features"
-            v-model:autoTitleTranslationLimit="autoTitleTranslationLimit"
-          />
+                <!-- Sync Section -->
+                <div v-if="activeCategory === 'sync'" class="space-y-6">
+                  <div class="setting-group">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.sync') }}</h3>
+                    <SettingsRSSHub
+                      v-model:rsshubUrl="rsshub.rsshubUrl.value"
+                      :isTestingRSSHub="rsshub.isTestingRSSHub.value"
+                      :rsshubTestResult="rsshub.rsshubTestResult.value"
+                      @testConnection="rsshub.testRSSHubConnection"
+                    />
+                    <div class="h-6"></div>
+                    <SettingsRefresh
+                      v-model:autoRefresh="refresh.autoRefresh.value"
+                      v-model:fetchIntervalInput="refresh.fetchIntervalInput.value"
+                      :fetchIntervalError="refresh.fetchIntervalError.value"
+                      @change="refresh.handleFetchIntervalChange"
+                      @auto-refresh-change="refresh.handleAutoRefreshChange"
+                    />
+                  </div>
+                </div>
 
-          <SettingsRefresh
-            v-model:fetchIntervalInput="refresh.fetchIntervalInput.value"
-            :fetchIntervalError="refresh.fetchIntervalError.value"
-            @change="refresh.handleFetchIntervalChange"
-          />
+                <!-- Intelligence Section -->
+                <div v-if="activeCategory === 'intelligence'" class="space-y-6">
+                  <div class="setting-group">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.aiConfig') }}</h3>
+                    <SettingsAIConfig
+                      v-model:summaryConfig="localConfig.summary"
+                      v-model:translationConfig="localConfig.translation"
+                      v-model:embeddingConfig="localConfig.embedding"
+                      :serviceTesting="aiConfig.serviceTesting.value"
+                      :serviceTestResult="aiConfig.serviceTestResult.value"
+                      :rebuildingVectors="aiConfig.rebuildingVectors.value"
+                      :rebuildResult="aiConfig.rebuildResult.value"
+                      :mcpTesting="aiConfig.mcpTesting.value"
+                      :mcpTestResult="aiConfig.mcpTestResult.value"
+                      @testConnection="aiConfig.testConnection"
+                      @copySummaryToTranslation="aiConfig.copySummaryToTranslation"
+                      @rebuildVectors="aiConfig.rebuildVectors"
+                      @testMcp="aiConfig.testMcp"
+                    />
+                    <div class="h-6"></div>
+                    <SettingsAIFeatures
+                      v-model:features="localConfig.features"
+                      v-model:autoTitleTranslationLimit="autoTitleTranslationLimit"
+                    />
+                  </div>
+                </div>
 
-          <SettingsDisplay
-            v-model:showEntrySummary="showEntrySummary"
-            v-model:enableDateFilter="enableDateFilter"
-            v-model:defaultDateRange="defaultDateRange"
-            v-model:timeField="timeField"
-            v-model:markAsReadRange="markAsReadRange"
-          />
+              </div>
+            </Transition>
+          </div>
 
-          <SettingsAbout />
-        </div>
-
-        <div class="flex justify-end gap-3 p-[16px_24px] border-t border-[var(--border-color)] dark:border-[var(--border-color)]">
-          <button @click="handleClose" class="px-5 py-2.5 rounded-lg border-none text-sm font-medium cursor-pointer transition-all bg-[#f2f4fb] c-[#5a6276] border border-[rgba(92,106,138,0.2)] hover:bg-[#e4e8f4] dark:bg-white/6 dark:c-[var(--text-primary)] dark:border-white/16 dark:hover:bg-white/10">{{ t('settings.cancel') }}</button>
-          <button @click="saveSettings" class="px-5 py-2.5 rounded-lg border-none text-sm font-medium cursor-pointer transition-all bg-gradient-to-br from-[#4c74ff] to-[#2f54ff] c-white shadow-[0_12px_24px_rgba(76,116,255,0.25)] hover:-translate-y-0.5 hover:shadow-[0_18px_30px_rgba(76,116,255,0.3)]">{{ t('settings.save') }}</button>
+          <!-- Desktop Actions Footer -->
+          <div class="hidden md:flex items-center justify-end gap-3 p-6 border-t border-[var(--border-color)] bg-white/50 dark:bg-[var(--bg-surface)]/50 backdrop-blur-sm">
+            <button
+              @click="handleClose"
+              class="
+                px-5 py-2.5 rounded-xl font-medium text-sm transition-all
+                text-[var(--text-primary)] hover:bg-[var(--bg-hover)]
+              "
+            >
+              {{ t('settings.cancel') }}
+            </button>
+            <button
+              @click="saveSettings"
+              class="
+                px-6 py-2.5 rounded-xl font-medium text-sm text-white transition-all
+                bg-gradient-to-r from-orange-500 to-orange-600
+                hover:shadow-lg hover:shadow-orange-500/25 hover:-translate-y-0.5
+                active:translate-y-0
+              "
+            >
+              {{ t('settings.save') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -173,7 +375,7 @@ async function saveSettings() {
 </template>
 
 <style scoped>
-/* Modal transition */
+/* Modal Transitions */
 .modal-enter-active,
 .modal-leave-active {
   transition: opacity 0.3s ease;
@@ -186,21 +388,24 @@ async function saveSettings() {
 
 .modal-enter-active .modal-content,
 .modal-leave-active .modal-content {
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modal-enter-from .modal-content,
 .modal-leave-to .modal-content {
-  transform: scale(0.9);
+  transform: scale(0.95);
+  opacity: 0;
 }
 
-/* Modal body scrollbar */
-.modal-body::-webkit-scrollbar { width: 8px; height: 8px; }
-.modal-body::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.18); border-radius: 8px; }
-.modal-body:hover::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.28); }
-.modal-body { scrollbar-width: thin; scrollbar-color: rgba(15, 17, 21, 0.28) transparent; }
+/* Fade Transition for Tab Content */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
 
-:global(.dark) .modal-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
-:global(.dark) .modal-body:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.36); }
-:global(.dark) .modal-body { scrollbar-color: rgba(255, 255, 255, 0.36) transparent; }
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
 </style>

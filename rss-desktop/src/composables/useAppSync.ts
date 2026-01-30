@@ -5,7 +5,6 @@ import { useSettingsStore } from '../stores/settingsStore'
 export function useAppSync(
     showFavoritesOnly: { value: boolean },
     loadFavoritesData: () => Promise<void>,
-    applyFilters: (opts: { refreshFeeds: boolean }) => Promise<void> | void,
     dateRangeFilter: { value: string }
 ) {
     const store = useFeedStore()
@@ -25,8 +24,7 @@ export function useAppSync(
         if (showFavoritesOnly.value) {
             loadFavoritesData()
         } else {
-            // Full sync on focus
-            applyFilters({ refreshFeeds: true })
+            syncFeedsCounts()
         }
     }
 

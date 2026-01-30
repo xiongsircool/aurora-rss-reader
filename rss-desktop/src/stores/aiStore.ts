@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '../api/client'
 
-export type AIServiceKey = 'summary' | 'translation'
+// Service keys available for configuration
+export type AIServiceKey = 'summary' | 'translation' | 'embedding'
 
 export interface AIServiceConfig {
   api_key: string
@@ -13,22 +14,22 @@ export interface AIServiceConfig {
 
 export interface AIFeatureConfig {
   auto_summary: boolean
-  auto_translation: boolean
   auto_title_translation: boolean
   title_display_mode: 'replace' | 'translation-first' | 'original-first'
-  content_display_mode: 'replace' | 'bilingual'
   translation_language: string
 }
 
 export interface AIConfig {
   summary: AIServiceConfig
   translation: AIServiceConfig
+  embedding: AIServiceConfig
   features: AIFeatureConfig
 }
 
 export type PartialAIConfig = {
   summary?: Partial<AIServiceConfig>
   translation?: Partial<AIServiceConfig>
+  embedding?: Partial<AIServiceConfig>
   features?: Partial<AIFeatureConfig>
 }
 
@@ -42,12 +43,11 @@ const createDefaultServiceConfig = (): AIServiceConfig => ({
 const createDefaultConfig = (): AIConfig => ({
   summary: createDefaultServiceConfig(),
   translation: createDefaultServiceConfig(),
+  embedding: createDefaultServiceConfig(),
   features: {
     auto_summary: false,
-    auto_translation: false,
     auto_title_translation: false,
     title_display_mode: 'original-first',
-    content_display_mode: 'replace',
     translation_language: 'zh'
   }
 })
@@ -56,6 +56,7 @@ function mergeConfig(target: AIConfig, updates: PartialAIConfig): AIConfig {
   return {
     summary: updates.summary ? { ...target.summary, ...updates.summary } : target.summary,
     translation: updates.translation ? { ...target.translation, ...updates.translation } : target.translation,
+    embedding: updates.embedding ? { ...target.embedding, ...updates.embedding } : target.embedding,
     features: updates.features ? { ...target.features, ...updates.features } : target.features
   }
 }
@@ -144,6 +145,59 @@ export const useAIStore = defineStore('ai', () => {
     config.value = createDefaultConfig()
   }
 
+  async function rebuildVectors() {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.post<{
+        success: boolean
+        message: string
+        total: number
+        processed: number
+        failed: number
+      }>('/ai/vector/rebuild')
+
+      if (data.success) {
+        return {
+          success: true,
+          message: data.message,
+          stats: {
+            total: data.total,
+            processed: data.processed,
+            failed: data.failed
+          }
+        }
+      } else {
+        error.value = data.message || '重建向量库失败'
+        return { success: false, message: error.value }
+      }
+    } catch (err) {
+      console.error('Failed to rebuild vectors:', err)
+      error.value = '重建向量库失败'
+      return { success: false, message: error.value }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function getVectorStats() {
+    try {
+      const { data } = await api.get<{
+        total_entries: number
+        vectorized_entries: number
+        pending_entries: number
+      }>('/ai/vector/stats')
+      return data
+    } catch (err) {
+      console.error('Failed to get vector stats:', err)
+      return {
+        total_entries: 0,
+        vectorized_entries: 0,
+        pending_entries: 0
+      }
+    }
+  }
+
   return {
     config,
     loading,
@@ -152,6 +206,8 @@ export const useAIStore = defineStore('ai', () => {
     updateConfig,
     testConnection,
     clearError,
-    resetConfig
+    resetConfig,
+    rebuildVectors,
+    getVectorStats
   }
 })

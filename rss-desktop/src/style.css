@@ -7,21 +7,51 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 
+  /* Base colors */
   --bg-base: #f5f7fb;
   --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.08);
+
+  /* Text colors */
   --text-primary: #0f1419;
   --text-secondary: #6c7384;
+  --text-tertiary: #9aa0ad;
+  --text-disabled: #d1d5db;
+
+  /* Border colors */
   --border-color: rgba(15, 17, 21, 0.08);
+  --border-subtle: rgba(15, 17, 21, 0.06);
+  --border-strong: rgba(15, 17, 21, 0.12);
+
+  /* Accent */
   --accent: #ff7a18;
 }
 
 :root.dark {
+  /* Base colors - unified dark theme */
   --bg-base: #0f1115;
-  --bg-surface: #181b22;
-  --text-primary: #f5f6fa;
-  --text-secondary: #9ba1b3;
-  --border-color: rgba(255, 255, 255, 0.15);
-  --accent: #ff8a3d;
+  --bg-surface: #15171a;
+  --bg-elevated: #1a1d24;
+  --bg-input: #0d0f13;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.1);
+
+  /* Text colors - reduced brightness for better contrast */
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0ad;
+  --text-tertiary: #6c7384;
+  --text-disabled: #4b5563;
+
+  /* Border colors */
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.15);
+
+  /* Accent */
+  --accent: #ff7a18;
 }
 
 * {
@@ -43,6 +73,10 @@ body {
 button {
   cursor: pointer;
   font-family: inherit;
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
 }
 
 input,

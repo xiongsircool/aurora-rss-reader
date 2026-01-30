@@ -11,6 +11,7 @@ export function useRefreshSettings() {
 
     const fetchIntervalInput = ref<number | null>(settingsStore.settings.fetch_interval_minutes)
     const fetchIntervalError = ref('')
+    const autoRefresh = ref(settingsStore.settings.auto_refresh)
 
     // Watch for valid input to clear error
     watch(fetchIntervalInput, (value) => {
@@ -23,6 +24,17 @@ export function useRefreshSettings() {
     watch(() => settingsStore.settings.fetch_interval_minutes, (newValue) => {
         if (typeof newValue === 'number') {
             fetchIntervalInput.value = newValue
+        }
+    })
+    watch(() => settingsStore.settings.auto_refresh, (newValue) => {
+        if (typeof newValue === 'boolean') {
+            autoRefresh.value = newValue
+        }
+    })
+
+    watch(autoRefresh, (value) => {
+        if (!value) {
+            fetchIntervalError.value = ''
         }
     })
 
@@ -45,6 +57,10 @@ export function useRefreshSettings() {
     }
 
     async function commitFetchInterval(): Promise<boolean> {
+        if (!autoRefresh.value) {
+            fetchIntervalError.value = ''
+            return true
+        }
         const validValue = validateFetchInterval(fetchIntervalInput.value)
         if (validValue === null) {
             return false
@@ -64,22 +80,45 @@ export function useRefreshSettings() {
         }
     }
 
+    async function commitAutoRefresh(): Promise<boolean> {
+        if (autoRefresh.value === settingsStore.settings.auto_refresh) {
+            return true
+        }
+
+        try {
+            await settingsStore.updateSettings({ auto_refresh: autoRefresh.value })
+            return true
+        } catch (error) {
+            console.error('自动刷新设置保存失败', error)
+            autoRefresh.value = settingsStore.settings.auto_refresh
+            return false
+        }
+    }
+
     async function handleFetchIntervalChange() {
         await commitFetchInterval()
     }
 
+    async function handleAutoRefreshChange() {
+        await commitAutoRefresh()
+    }
+
     function syncFromStore() {
         fetchIntervalInput.value = settingsStore.settings.fetch_interval_minutes
+        autoRefresh.value = settingsStore.settings.auto_refresh
     }
 
     return {
         fetchIntervalInput,
         fetchIntervalError,
+        autoRefresh,
         FETCH_INTERVAL_MIN,
         FETCH_INTERVAL_MAX,
         validateFetchInterval,
         commitFetchInterval,
+        commitAutoRefresh,
         handleFetchIntervalChange,
+        handleAutoRefreshChange,
         syncFromStore
     }
 }

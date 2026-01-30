@@ -1,0 +1,45 @@
+# Dependencies
+**/node_modules/
+**/.pnpm-store/
+
+# Build outputs
+**/dist/
+**/dist-electron/
+**/release/
+**/.vite/
+**/out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+**/*.test.*
+**/*.spec.*
+__tests__/
+
+# Docker (avoid recursive)
+docker-compose*.yml

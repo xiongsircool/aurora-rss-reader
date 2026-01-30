@@ -6,10 +6,30 @@ import type { Feed } from '../types'
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 
-export function formatDate(date?: string | null): string {
-    if (!date) return '未知时间'
+export function formatDate(date?: string | null, insertedAt?: string | null): string {
+    // Use insertedAt as fallback if primary date is null
+    const effectiveDate = date || insertedAt;
+    if (!effectiveDate) return '未知时间';
+
     // Backend time is UTC, convert to local then relative
-    return dayjs.utc(date).local().fromNow()
+    return dayjs.utc(effectiveDate).local().fromNow();
+}
+
+export function formatDateDetailed(date?: string | null, insertedAt?: string | null): string {
+    const effectiveDate = date || insertedAt;
+    if (!effectiveDate) return '未知时间';
+
+    const d = dayjs.utc(effectiveDate).local();
+    const now = dayjs();
+    const diffDays = now.diff(d, 'day');
+
+    // Show relative time for recent items
+    if (diffDays < 7) {
+        return d.fromNow();
+    }
+
+    // Show full date for older items
+    return d.format('YYYY-MM-DD HH:mm');
 }
 
 export function formatLastChecked(date?: string | null): string {

@@ -1,35 +1,57 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import api from '../api/client'
-import type { Entry, Feed, SummaryResult, TranslationResult } from '../types'
+import type { Entry, EntryPage, Feed, SummaryResult, ViewType } from '../types'
 
 export const useFeedStore = defineStore('feed', () => {
   const feeds = ref<Feed[]>([])
   const entries = ref<Entry[]>([])
   const activeFeedId = ref<string | null>(null)
   const activeGroupName = ref<string | null>(null)
+  const activeViewType = ref<ViewType>('articles')
   const selectedEntryId = ref<string | null>(null)
   const loadingFeeds = ref(false)
   const loadingEntries = ref(false)
   const addingFeed = ref(false)
   const summaryCache = ref<Record<string, SummaryResult>>({})
-  const translationCache = ref<Record<string, TranslationResult>>({})
-  const titleTranslationCache = ref<Record<string, { title: string; language: string }>>({})
   const errorMessage = ref<string | null>(null)
   const collapsedGroups = ref<Set<string>>(new Set())
   const lastFeedFilters = ref<{ dateRange?: string; timeField?: string } | null>(null)
   const lastEntryFilters = ref<{ unreadOnly?: boolean; dateRange?: string; timeField?: string } | null>(null)
+  const entriesCursor = ref<string | null>(null)
+  const entriesHasMore = ref(true)
+  const entriesLoadingMore = ref(false)
+  const entriesQueryKey = ref('')
 
   const selectedEntry = computed(() =>
     entries.value.find((entry) => entry.id === selectedEntryId.value) ?? null
   )
 
-  // 分组相关的计算属性
+  // 当前类型下的订阅源
+  const filteredFeeds = computed(() => {
+    return feeds.value.filter(f => f.view_type === activeViewType.value)
+  })
+
+  // 各类型的统计
+  const viewTypeStats = computed(() => {
+    const stats: Record<string, { count: number; unread: number }> = {}
+    const types = ['articles', 'social', 'pictures', 'videos', 'audio', 'notifications']
+    types.forEach(type => {
+      const typeFeeds = feeds.value.filter(f => f.view_type === type)
+      stats[type] = {
+        count: typeFeeds.length,
+        unread: typeFeeds.reduce((sum, f) => sum + (f.unread_count || 0), 0)
+      }
+    })
+    return stats
+  })
+
+  // 分组相关的计算属性（基于当前类型过滤后的订阅源）
   const groupedFeeds = computed(() => {
     const groups: Record<string, Feed[]> = {}
 
-    // 将feeds按分组归类
-    feeds.value.forEach(feed => {
+    // 将当前类型的feeds按分组归类
+    filteredFeeds.value.forEach(feed => {
       const groupName = feed.group_name || '未分组'
       if (!groups[groupName]) {
         groups[groupName] = []
@@ -67,6 +89,37 @@ export const useFeedStore = defineStore('feed', () => {
     })
   })
 
+  function buildEntriesQueryKey(params: {
+    feedId: string | null
+    groupName: string | null
+    viewType?: string | null
+    unreadOnly: boolean
+    dateRange?: string
+    timeField?: string
+  }) {
+    return JSON.stringify({
+      feedId: params.feedId,
+      groupName: params.groupName,
+      viewType: params.viewType ?? null,
+      unreadOnly: params.unreadOnly,
+      dateRange: params.dateRange ?? null,
+      timeField: params.timeField ?? null,
+    })
+  }
+
+  function mergeEntries(existing: Entry[], incoming: Entry[]) {
+    if (!incoming.length) return existing
+    const seen = new Set(existing.map((entry) => entry.id))
+    const merged = existing.slice()
+    for (const entry of incoming) {
+      if (!seen.has(entry.id)) {
+        seen.add(entry.id)
+        merged.push(entry)
+      }
+    }
+    return merged
+  }
+
   async function fetchFeeds(options?: { dateRange?: string; timeField?: string }) {
     loadingFeeds.value = true
     try {
@@ -88,11 +141,7 @@ export const useFeedStore = defineStore('feed', () => {
 
       const { data } = await api.get<Feed[]>('/feeds', { params })
       feeds.value = data
-      // 仅在没有任何选择时（既未选中订阅，也未选中分组）才设定默认订阅
-      // 避免在分组模式下被刷新订阅列表时意外切回到单个订阅
-      if (!activeFeedId.value && !activeGroupName.value && data.length > 0) {
-        activeFeedId.value = data[0].id
-      }
+      // 不再自动选择订阅源，让用户通过视图类型导航来浏览内容
     } catch (error) {
       console.error(error)
       errorMessage.value = '加载订阅列表失败'
@@ -101,13 +150,19 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  async function addFeed(url: string) {
+  async function addFeed(url: string, options?: { groupName?: string | null; viewType?: ViewType }) {
     if (!url) return
     addingFeed.value = true
     try {
-      const { data } = await api.post<Feed>('/feeds', { url })
+      const payload: { url: string; group_name?: string; view_type?: string } = { url }
+      if (options?.groupName) {
+        payload.group_name = options.groupName
+      }
+      // 使用当前选中的类型作为新订阅的类型
+      payload.view_type = options?.viewType ?? activeViewType.value
+      const { data } = await api.post<Feed>('/feeds', payload)
       feeds.value = [data, ...feeds.value]
-      activeFeedId.value = data.id
+      // 不再自动选择新添加的订阅源，保持当前视图类型模式
       // 保留当前的过滤器状态
       await fetchEntries({
         unreadOnly: lastEntryFilters.value?.unreadOnly,
@@ -130,8 +185,6 @@ export const useFeedStore = defineStore('feed', () => {
         // 并行触发刷新，不等待逐个完成
         api.post(`/feeds/${feed.id}/refresh`).catch(err => {
           console.error(err)
-          // 不中断其他刷新，但记录错误
-          // errorMessage.value = `刷新 ${feed.title} 失败` // 可选：太频繁的报错可能不好
         })
       }
 
@@ -189,18 +242,10 @@ export const useFeedStore = defineStore('feed', () => {
     try {
       await api.delete(`/feeds/${feedId}`)
       feeds.value = feeds.value.filter((f) => f.id !== feedId)
+      // 如果删除的是当前选中的订阅源，清除选择并清空文章列表
       if (activeFeedId.value === feedId) {
-        activeFeedId.value = feeds.value.length > 0 ? feeds.value[0].id : null
-        if (activeFeedId.value) {
-          // 保留当前的过滤器状态
-          await fetchEntries({
-            unreadOnly: lastEntryFilters.value?.unreadOnly,
-            dateRange: lastEntryFilters.value?.dateRange,
-            timeField: lastEntryFilters.value?.timeField,
-          })
-        } else {
-          entries.value = []
-        }
+        activeFeedId.value = null
+        entries.value = []
       }
     } catch (error) {
       console.error(error)
@@ -223,38 +268,81 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
+  async function updateFeedViewType(feedId: string, viewType: ViewType) {
+    try {
+      const { data } = await api.patch<Feed>(`/feeds/${feedId}`, { view_type: viewType })
+      const index = feeds.value.findIndex((f) => f.id === feedId)
+      if (index !== -1) {
+        feeds.value[index] = data
+      }
+    } catch (error) {
+      console.error(error)
+      errorMessage.value = '更新订阅类型失败'
+    }
+  }
+
   async function fetchEntries(options?: {
     feedId?: string
     groupName?: string
+    viewType?: ViewType
     unreadOnly?: boolean
     dateRange?: string
     timeField?: string
+    append?: boolean
   }) {
+    const append = !!options?.append
     const targetFeed = options?.feedId ?? activeFeedId.value
     const targetGroup = options?.groupName ?? activeGroupName.value
+    const targetViewType = options?.viewType ?? (!targetFeed && !targetGroup ? activeViewType.value : null)
 
-    // 如果既没有feed也没有group，则返回
-    if (!targetFeed && !targetGroup) return
+    // 如果既没有feed也没有group也没有viewType，则返回
+    if (!targetFeed && !targetGroup && !targetViewType) return
 
-    loadingEntries.value = true
+    const hasUnreadOnly = options && Object.prototype.hasOwnProperty.call(options, 'unreadOnly')
+    const hasDateRange = options && Object.prototype.hasOwnProperty.call(options, 'dateRange')
+    const hasTimeField = options && Object.prototype.hasOwnProperty.call(options, 'timeField')
+    const mergedFilters = {
+      unreadOnly: hasUnreadOnly ? (options?.unreadOnly as boolean) : (lastEntryFilters.value?.unreadOnly ?? false),
+      dateRange: hasDateRange ? options?.dateRange : lastEntryFilters.value?.dateRange,
+      timeField: hasTimeField ? options?.timeField : lastEntryFilters.value?.timeField,
+    }
+    lastEntryFilters.value = mergedFilters
+
+    const queryKey = buildEntriesQueryKey({
+      feedId: targetFeed,
+      groupName: targetGroup,
+      viewType: targetViewType,
+      unreadOnly: mergedFilters.unreadOnly,
+      dateRange: mergedFilters.dateRange,
+      timeField: mergedFilters.timeField,
+    })
+    const queryChanged = queryKey !== entriesQueryKey.value
+    const resetPagination = !append || queryChanged
+    const shouldAppend = append && !resetPagination
+
+    if (resetPagination) {
+      entriesQueryKey.value = queryKey
+      entriesCursor.value = null
+      entriesHasMore.value = true
+    }
+
+    if (shouldAppend) {
+      if (entriesLoadingMore.value || loadingEntries.value || !entriesHasMore.value) return
+      entriesLoadingMore.value = true
+    } else {
+      loadingEntries.value = true
+    }
+
     try {
-      const hasUnreadOnly = options && Object.prototype.hasOwnProperty.call(options, 'unreadOnly')
-      const hasDateRange = options && Object.prototype.hasOwnProperty.call(options, 'dateRange')
-      const hasTimeField = options && Object.prototype.hasOwnProperty.call(options, 'timeField')
-      const mergedFilters = {
-        unreadOnly: hasUnreadOnly ? (options?.unreadOnly as boolean) : (lastEntryFilters.value?.unreadOnly ?? false),
-        dateRange: hasDateRange ? options?.dateRange : lastEntryFilters.value?.dateRange,
-        timeField: hasTimeField ? options?.timeField : lastEntryFilters.value?.timeField,
-      }
-      lastEntryFilters.value = mergedFilters
+      const params: Record<string, string | number | boolean> = {}
 
-      const params: Record<string, string | number | boolean> = { limit: 100 }
-
-      // 优先使用 feedId，其次使用 groupName
+      // 优先使用 feedId，其次使用 groupName，最后使用 viewType
       if (targetFeed) {
         params.feed_id = targetFeed
       } else if (targetGroup) {
         params.group_name = targetGroup
+      } else if (targetViewType) {
+        params.view_type = targetViewType
       }
 
       if (mergedFilters.unreadOnly) {
@@ -269,20 +357,38 @@ export const useFeedStore = defineStore('feed', () => {
         params.time_field = mergedFilters.timeField
       }
 
-      const { data } = await api.get<Entry[]>('/entries', { params })
-      entries.value = data
-      if (data.length > 0) {
-        const defaultEntry = data.find((entry) => entry.id === selectedEntryId.value) ?? data[0]
-        selectedEntryId.value = defaultEntry.id
-      } else {
-        selectedEntryId.value = null
+      if (shouldAppend && entriesCursor.value) {
+        params.cursor = entriesCursor.value
+      }
+
+      const { data } = await api.get<EntryPage>('/entries', { params })
+      const pageItems = data.items ?? []
+      entries.value = shouldAppend ? mergeEntries(entries.value, pageItems) : pageItems
+      entriesCursor.value = data.next_cursor
+      entriesHasMore.value = data.has_more
+
+      if (!shouldAppend) {
+        if (entries.value.length > 0) {
+          const defaultEntry = entries.value.find((entry) => entry.id === selectedEntryId.value) ?? entries.value[0]
+          selectedEntryId.value = defaultEntry.id
+        } else {
+          selectedEntryId.value = null
+        }
       }
     } catch (error) {
       console.error(error)
       errorMessage.value = '加载文章失败'
     } finally {
-      loadingEntries.value = false
+      if (shouldAppend) {
+        entriesLoadingMore.value = false
+      } else {
+        loadingEntries.value = false
+      }
     }
+  }
+
+  async function loadMoreEntries() {
+    return fetchEntries({ append: true })
   }
 
   function selectFeed(id: string) {
@@ -295,6 +401,13 @@ export const useFeedStore = defineStore('feed', () => {
     if (activeGroupName.value === groupName) return
     activeGroupName.value = groupName
     activeFeedId.value = null  // 清除单个订阅源选择
+  }
+
+  function selectViewType(viewType: ViewType) {
+    if (activeViewType.value === viewType) return
+    activeViewType.value = viewType
+    activeFeedId.value = null
+    activeGroupName.value = null
   }
 
   function selectEntry(entryId: string) {
@@ -340,106 +453,17 @@ export const useFeedStore = defineStore('feed', () => {
     return data
   }
 
-  async function requestTranslation(entryId: string, language = 'zh', displayMode = 'replace') {
-    const cacheKey = `${entryId}_${language}_${displayMode}`
-    if (translationCache.value[cacheKey]) {
-      return translationCache.value[cacheKey]
-    }
-    const { data } = await api.post<TranslationResult>('/ai/translate', {
-      entry_id: entryId,
-      language,
-      display_mode: displayMode,
-    }, {
-      timeout: 120000, // 2 minutes for translation
-    })
-    translationCache.value[cacheKey] = data
-    return data
-  }
-
-  async function requestTranslationStream(
-    entryId: string,
-    language = 'zh',
-    displayMode = 'replace',
-    onProgress?: (percent: number, message: string) => void,
-    onSegment?: (index: number, content: string) => void
-  ) {
-    const cacheKey = `${entryId}_${language}_${displayMode}`
-    if (translationCache.value[cacheKey]) {
-      return translationCache.value[cacheKey]
-    }
-
-    // Use fetch for SSE
-    const response = await fetch(`${api.defaults.baseURL}/ai/translate-stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        entry_id: entryId,
-        language,
-        display_mode: displayMode,
-      }),
-    })
-
-    if (!response.body) throw new Error('No response body')
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let finalResult: TranslationResult | null = null
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = JSON.parse(line.slice(6))
-
-          if (data.type === 'progress') {
-            onProgress?.(data.percent, data.message)
-          } else if (data.type === 'segment_completed') {
-            onSegment?.(data.index, data.translated)
-          } else if (data.type === 'complete') {
-            finalResult = {
-              entry_id: entryId,
-              language,
-              ...data.result
-            }
-          } else if (data.type === 'error') {
-            throw new Error(data.message)
-          }
-        }
-      }
-    }
-
-    if (finalResult) {
-      translationCache.value[cacheKey] = finalResult
-      return finalResult
-    }
-    throw new Error('Translation stream ended without result')
-  }
-
   async function requestTitleTranslation(entryId: string, language = 'zh') {
-    const cacheKey = `${entryId}_${language}_title`
-    if (titleTranslationCache.value[cacheKey]) {
-      return titleTranslationCache.value[cacheKey]
-    }
     const { data } = await api.post<{ entry_id: string; title: string; language: string }>('/ai/translate-title', {
       entry_id: entryId,
       language,
     }, {
       timeout: 30000, // 30 seconds for title translation
     })
-    titleTranslationCache.value[cacheKey] = {
+    return {
       title: data.title,
       language: data.language
     }
-    return titleTranslationCache.value[cacheKey]
   }
 
   async function exportOpml() {
@@ -531,6 +555,50 @@ export const useFeedStore = defineStore('feed', () => {
     feed_counts: Record<string, number>
   }
 
+  function parseOlderThan(olderThan?: string | null): Date | null {
+    if (!olderThan) return null
+    if (olderThan === 'all' || olderThan === 'current') return null
+    const match = olderThan.match(/^(\d+)([hdmy])$/)
+    const now = Date.now()
+    if (!match) {
+      return new Date(now - 30 * 24 * 60 * 60 * 1000)
+    }
+    const value = Number(match[1])
+    const unit = match[2]
+    const hourMs = 60 * 60 * 1000
+    const dayMs = 24 * hourMs
+    let deltaMs = dayMs * 30
+    if (unit === 'h') deltaMs = value * hourMs
+    if (unit === 'd') deltaMs = value * dayMs
+    if (unit === 'm') deltaMs = value * dayMs * 30
+    if (unit === 'y') deltaMs = value * dayMs * 365
+    return new Date(now - deltaMs)
+  }
+
+  function parseEntryDate(value?: string | null): Date | null {
+    if (!value) return null
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  function shouldMarkEntryRead(entry: Entry, cutoff: Date | null, timeField: string, feedId?: string) {
+    if (feedId && entry.feed_id !== feedId) {
+      return false
+    }
+    if (!cutoff) {
+      return true
+    }
+    const insertedAt = parseEntryDate(entry.inserted_at)
+    if (timeField === 'published_at') {
+      const publishedAt = parseEntryDate(entry.published_at)
+      if (publishedAt) {
+        return publishedAt <= cutoff
+      }
+      return insertedAt ? insertedAt <= cutoff : false
+    }
+    return insertedAt ? insertedAt <= cutoff : false
+  }
+
   async function markAsRead(options: MarkAsReadOptions = {}): Promise<MarkAsReadResult> {
     try {
       const { data } = await api.post<MarkAsReadResult>('/entries/mark-read', {
@@ -548,8 +616,10 @@ export const useFeedStore = defineStore('feed', () => {
       }
 
       // 更新本地 entries 的已读状态
+      const cutoff = parseOlderThan(options.olderThan)
+      const timeField = options.timeField ?? 'inserted_at'
       entries.value.forEach(entry => {
-        if (data.feed_counts && data.feed_counts[entry.feed_id]) {
+        if (data.feed_counts && data.feed_counts[entry.feed_id] && shouldMarkEntryRead(entry, cutoff, timeField, options.feedId)) {
           entry.read = true
         }
       })
@@ -567,32 +637,37 @@ export const useFeedStore = defineStore('feed', () => {
     selectedEntry,
     activeFeedId,
     activeGroupName,
+    activeViewType,
     loadingFeeds,
     loadingEntries,
+    entriesHasMore,
+    entriesLoadingMore,
     addingFeed,
     errorMessage,
     summaryCache,
-    translationCache,
-    titleTranslationCache,
     // 分组相关属性
     groupedFeeds,
     groupStats,
     sortedGroupNames,
     collapsedGroups,
+    // 类型相关属性
+    filteredFeeds,
+    viewTypeStats,
     // 方法
     fetchFeeds,
     fetchEntries,
+    loadMoreEntries,
     addFeed,
     selectFeed,
     selectGroup,
+    selectViewType,
     selectEntry,
     refreshActiveFeed,
     deleteFeed,
     updateFeed,
+    updateFeedViewType,
     toggleEntryState,
     requestSummary,
-    requestTranslation,
-    requestTranslationStream,
     requestTitleTranslation,
     exportOpml,
     importOpml,

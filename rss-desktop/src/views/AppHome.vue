@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { useFeedStore } from '../stores/feedStore'
 import { useAIStore } from '../stores/aiStore'
@@ -14,15 +14,17 @@ import { useTitleTranslation } from '../composables/useTitleTranslation'
 import { useFeedFilter } from '../composables/useFeedFilter'
 import { useAppSync } from '../composables/useAppSync'
 import { useFeedActions } from '../composables/useFeedActions'
+import { useArticleTranslation } from '../composables/useArticleTranslation'
 
 import Toast from '../components/Toast.vue'
 import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
 import DetailsPanel from '../components/details/DetailsPanel.vue'
-import type { Feed } from '../types'
+import type { Entry, Feed } from '../types'
 
 import { defineAsyncComponent } from 'vue'
 const SettingsModal = defineAsyncComponent(() => import('../components/SettingsModal.vue'))
+const AddToBookmarkGroupModal = defineAsyncComponent(() => import('../components/collections/AddToCollectionModal.vue'))
 
 
 
@@ -37,10 +39,12 @@ const { loadLanguage } = useLanguage()
 const {
   aiFeatures,
   titleTranslationLanguageLabel,
-  bindConnectionListener,
-  cleanupConnectionListener,
   getTranslatedTitle,
   isTitleTranslationLoading,
+  isTitleTranslationFailed,
+  registerAutoRetryHandler,
+  queueAutoTitleTranslation,
+  requestTitleTranslation,
   setupAutoTranslationWatcher
 } = useTitleTranslation()
 
@@ -65,27 +69,31 @@ const {
 
 const { handleToggleStar } = useFeedActions()
 
-// 初始化语言设置
-loadLanguage()
-
 // Setup Watchers
 setupFilterWatchers()
 
 const summaryText = ref('')
 const summaryLoading = ref(false)
 const translationLanguage = ref('zh')
-const translationLoading = ref(false)
-const showTranslation = ref(false)
-const translatedContent = ref<{
-  title: string | null
-  content: string | null
-}>({ title: null, content: null })
+const lastVisibleEntries = ref<Entry[]>([])
+const cleanupTitleTranslationAutoRetry = registerAutoRetryHandler((entryId, language) => {
+  if (!aiFeatures.value?.auto_title_translation) {
+    return
+  }
+  const entry = lastVisibleEntries.value.find((item) => item.id === entryId)
+  if (!entry) {
+    return
+  }
+  queueAutoTitleTranslation(entry, language)
+})
 
 const editingFeedId = ref<string | null>(null)
 const editingGroupName = ref('')
 
 const importLoading = ref(false)
 const showSettings = ref(false)
+const showBookmarkGroupModal = ref(false)
+const bookmarkGroupEntryId = ref<string | null>(null)
 
 const { showToast, toastMessage, toastType, showNotification } = useNotification()
 const { darkMode, toggleTheme, loadTheme } = useTheme()
@@ -95,6 +103,8 @@ const {
   isDraggingLeft,
   isDraggingRight,
   logoSize,
+  detailsWidth,
+  viewportWidth,
   layoutStyle,
   handleMouseDownLeft,
   handleMouseDownRight,
@@ -102,6 +112,57 @@ const {
   cleanupLayout,
   resetLayout
 } = useLayoutManager()
+
+type DetailsPanelMode = 'docked' | 'click'
+type DetailsPresentation = 'docked' | 'drawer' | 'fullscreen'
+
+const DETAILS_FULLSCREEN_BREAKPOINT = 960
+const DETAILS_DRAWER_BREAKPOINT = 1200
+
+const detailsPanelMode = computed<DetailsPanelMode>(() => {
+  return settingsStore.settings.details_panel_mode === 'click' ? 'click' : 'docked'
+})
+
+const detailsPresentation = computed<DetailsPresentation>(() => {
+  const width = viewportWidth.value
+  if (width <= DETAILS_FULLSCREEN_BREAKPOINT) {
+    return 'fullscreen'
+  }
+  if (width <= DETAILS_DRAWER_BREAKPOINT) {
+    return 'drawer'
+  }
+  return detailsPanelMode.value === 'click' ? 'drawer' : 'docked'
+})
+
+const isDetailsOpen = ref(false)
+const timelineScroller = ref<HTMLElement | null>(null)
+const showBackToTop = ref(false)
+
+const isSingleColumn = computed(() => viewportWidth.value <= DETAILS_FULLSCREEN_BREAKPOINT)
+
+let previousBodyOverflow = ''
+let previousBodyPaddingRight = ''
+let bodyScrollLocked = false
+
+const collapsedGroups = computed<Record<string, boolean>>(() => {
+  const result: Record<string, boolean> = {}
+  store.collapsedGroups.forEach((groupName) => {
+    result[groupName] = true
+  })
+  return result
+})
+
+function toggleGroupCollapse(groupName: string) {
+  store.toggleGroupCollapse(groupName)
+}
+
+function expandAllGroups() {
+  store.expandAllGroups()
+}
+
+function collapseAllGroups() {
+  store.collapseAllGroups()
+}
 
 
 
@@ -137,6 +198,108 @@ const currentSelectedEntry = computed(() => {
   }
   return store.selectedEntry
 })
+
+const showDetailsOverlay = computed(() => {
+  if (detailsPresentation.value === 'docked') {
+    return false
+  }
+  return isDetailsOpen.value && !!currentSelectedEntry.value
+})
+
+const showBackToTopButton = computed(() => {
+  return isSingleColumn.value && showBackToTop.value && !showDetailsOverlay.value
+})
+
+const detailsOverlayWidth = computed(() => {
+  if (detailsPresentation.value === 'fullscreen') {
+    return '100vw'
+  }
+  const maxWidth = Math.min(detailsWidth.value, Math.round(viewportWidth.value * 0.92))
+  return `${maxWidth}px`
+})
+
+const detailsOverlayStyle = computed(() => ({
+  width: detailsOverlayWidth.value,
+  '--details-width': detailsOverlayWidth.value,
+}))
+
+function getContentTextLength(html?: string | null): number {
+  if (!html) return 0
+  if (typeof DOMParser === 'undefined') {
+    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().length
+  }
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const text = doc.body?.textContent ?? ''
+  return text.replace(/\s+/g, ' ').trim().length
+}
+
+function selectTranslationContent(entry: Entry | null): string | null {
+  if (!entry) return null
+  const candidates = [
+    { value: entry.readability_content, priority: 3 },
+    { value: entry.content, priority: 2 },
+    { value: entry.summary, priority: 1 },
+  ]
+
+  let best: { value: string; length: number; priority: number } | null = null
+
+  for (const candidate of candidates) {
+    if (!candidate.value) continue
+    const length = getContentTextLength(candidate.value)
+    if (!best || length > best.length || (length === best.length && candidate.priority > best.priority)) {
+      best = { value: candidate.value, length, priority: candidate.priority }
+    }
+  }
+
+  if (best && best.length > 0) {
+    return best.value
+  }
+
+  return entry.readability_content ?? entry.content ?? entry.summary ?? null
+}
+
+// 全文翻译相关状态
+const currentEntryId = computed(() => currentSelectedEntry.value?.id ?? null)
+const currentEntryContent = computed(() => selectTranslationContent(currentSelectedEntry.value ?? null))
+
+const {
+  progress: fullTextTranslationProgress,
+  blocks: fullTextTranslationBlocks,
+  isTranslating: isFullTextTranslating,
+  showTranslation: showFullTextTranslation,
+  translatableBlocks: fullTextTranslatableBlocks,
+  getTranslation: getFullTextTranslation,
+  isBlockLoading: isFullTextBlockLoading,
+  isBlockFailed: isFullTextBlockFailed,
+  toggleTranslation: toggleFullTextTranslationRaw,
+} = useArticleTranslation(currentEntryId, currentEntryContent, translationLanguage)
+
+// 翻译后的标题
+const translatedTitle = computed(() => {
+  if (!currentSelectedEntry.value) return null
+  return getTranslatedTitle(currentSelectedEntry.value.id, translationLanguage.value)
+})
+
+
+// 全文翻译（包含标题翻译）
+async function handleFullTextTranslation() {
+  const wasShowing = showFullTextTranslation.value
+  toggleFullTextTranslationRaw()
+
+  // 如果是开启翻译，同时翻译标题
+  if (!wasShowing && currentSelectedEntry.value) {
+    await nextTick()
+    if (fullTextTranslatableBlocks.value.length === 0) {
+      showNotification(t('toast.translationNoText'), 'info')
+    }
+
+    try {
+      await requestTitleTranslation(currentSelectedEntry.value.id, translationLanguage.value)
+    } catch (error) {
+      console.warn('Title translation failed:', error)
+    }
+  }
+}
 
 const feedMap = computed<Record<string, Feed>>(() => {
   return store.feeds.reduce<Record<string, Feed>>((acc, feed) => {
@@ -207,27 +370,116 @@ function ensureFavoriteSelection() {
   }
 }
 
+function openDetails() {
+  if (detailsPresentation.value === 'docked') {
+    return
+  }
+  isDetailsOpen.value = true
+}
+
+function closeDetails() {
+  isDetailsOpen.value = false
+}
+
+function lockBodyScroll() {
+  if (bodyScrollLocked || typeof document === 'undefined') return
+  const body = document.body
+  const root = document.documentElement
+  if (!body || !root) return
+  previousBodyOverflow = body.style.overflow
+  previousBodyPaddingRight = body.style.paddingRight
+  const scrollbarWidth = window.innerWidth - root.clientWidth
+  if (scrollbarWidth > 0) {
+    body.style.paddingRight = `${scrollbarWidth}px`
+  }
+  body.style.overflow = 'hidden'
+  bodyScrollLocked = true
+}
+
+function unlockBodyScroll() {
+  if (!bodyScrollLocked || typeof document === 'undefined') return
+  const body = document.body
+  if (!body) return
+  body.style.overflow = previousBodyOverflow
+  body.style.paddingRight = previousBodyPaddingRight
+  bodyScrollLocked = false
+}
+
+function updateBackToTopVisibility() {
+  if (typeof window === 'undefined') return
+  const windowTop = window.scrollY || 0
+  const scrollerTop = timelineScroller.value?.scrollTop ?? 0
+  showBackToTop.value = Math.max(windowTop, scrollerTop) > 320
+}
+
+function scrollToTop() {
+  timelineScroller.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
 function handleEntrySelect(entryId: string) {
   if (showFavoritesOnly.value) {
     selectedFavoriteEntryId.value = entryId
   } else {
     store.selectEntry(entryId)
   }
+  openDetails()
 }
 
+function handleEntriesVisible(entries: Entry[]) {
+  lastVisibleEntries.value = entries
+  entries.forEach((entry) => {
+    queueAutoTitleTranslation(entry)
+  })
+}
 
+async function handleLoadMoreEntries() {
+  if (showFavoritesOnly.value) {
+    return
+  }
+  await store.loadMoreEntries()
+}
 
+watch(
+  () => [aiFeatures.value?.auto_title_translation, aiFeatures.value?.translation_language],
+  ([autoEnabled]) => {
+    if (!autoEnabled || !lastVisibleEntries.value.length) {
+      return
+    }
+    lastVisibleEntries.value.forEach((entry) => {
+      queueAutoTitleTranslation(entry)
+    })
+  }
+)
 
-
-// Watch for AI store errors
-watch(() => aiStore.error, (error) => {
-  if (error) {
-    showNotification(error, 'error')
-    setTimeout(() => {
-      aiStore.clearError()
-    }, 100)
+watch(detailsPresentation, (presentation) => {
+  if (presentation === 'docked') {
+    isDetailsOpen.value = false
   }
 })
+
+watch(
+  () => currentSelectedEntry.value,
+  (entry) => {
+    if (!entry) {
+      isDetailsOpen.value = false
+    }
+  }
+)
+
+watch(
+  () => showDetailsOverlay.value,
+  (visible) => {
+    if (visible) {
+      lockBodyScroll()
+    } else {
+      unlockBodyScroll()
+    }
+  },
+  { immediate: true }
+)
 
 // Watch for favorites store errors
 watch(() => favoritesStore.error, (error) => {
@@ -239,26 +491,46 @@ watch(() => favoritesStore.error, (error) => {
   }
 })
 
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  window.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
+  nextTick(() => {
+    timelineScroller.value = document.querySelector('.timeline__list') as HTMLElement | null
+    timelineScroller.value?.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
+    updateBackToTopVisibility()
+  })
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('scroll', updateBackToTopVisibility)
+  }
+  timelineScroller.value?.removeEventListener('scroll', updateBackToTopVisibility)
+})
+
 
 
 // Initialize App Sync
 const { initSync, cleanupSync } = useAppSync(
     showFavoritesOnly,
     async () => { await loadFavoritesData() },
-    applyFilters,
     dateRangeFilter
 )
 
 // Setup Auto Translation Watcher
-setupAutoTranslationWatcher(() => filteredEntries.value) // Pass a getter for entries
+setupAutoTranslationWatcher()
 
 onMounted(async () => {
-  bindConnectionListener()
   initLayout()
   loadTheme()
   store.loadCollapsedGroups()
+  try {
+    await settingsStore.fetchSettings()
+  } catch (error) {
+    // Continue with defaults/local storage when settings fetch fails.
+  }
+  await loadLanguage()
   await aiStore.fetchConfig()
-  await settingsStore.fetchSettings()
 
   dateRangeFilter.value = settingsStore.settings.default_date_range
   loadFavoritesData()
@@ -279,9 +551,10 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  cleanupConnectionListener()
+  cleanupTitleTranslationAutoRetry()
   cleanupLayout()
   cleanupSync()
+  unlockBodyScroll()
 })
 
 watch(
@@ -289,10 +562,6 @@ watch(
   async (entry) => {
     if (!entry) {
       summaryText.value = ''
-      showTranslation.value = false
-      translationLoading.value = false
-      translationProgress.value = 0
-      translatedContent.value = { title: null, content: null }
       return
     }
     const cached = store.summaryCache[entry.id]
@@ -305,70 +574,50 @@ watch(
         summaryLoading.value = true
         const summary = await store.requestSummary(entry.id)
         summaryText.value = summary.summary
-        // 可选：显示通知让用户知道摘要已自动生成
-        // showNotification('摘要已自动生成', 'success')
       } catch (error) {
         console.error('自动生成摘要失败:', error)
-        // 不显示错误通知，避免干扰用户体验
       } finally {
         summaryLoading.value = false
       }
     }
 
-    // Check if translation exists
-  const displayMode = aiFeatures.value?.content_display_mode ?? 'replace'
-    const cacheKey = `${entry.id}_${translationLanguage.value}_${displayMode}`
-    const cachedTranslation = store.translationCache[cacheKey]
-    
-    // Reset translation state for new entry
-    translationLoading.value = false
-    translationProgress.value = 0
-    showTranslation.value = false
-    
-    if (cachedTranslation) {
-      translatedContent.value = {
-        title: cachedTranslation.title,
-        content: cachedTranslation.content,
-      }
-    } else {
-      translatedContent.value = { title: null, content: null }
-    }
-
     if (!entry.read) {
       await store.toggleEntryState(entry, { read: true })
     }
+
   },
   { immediate: true },
+)
+
+watch(
+  () => translationLanguage.value,
+  async (newLanguage, oldLanguage) => {
+    if (newLanguage === oldLanguage) {
+      return
+    }
+
+    if (!currentSelectedEntry.value) {
+      return
+    }
+
+    if (!showFullTextTranslation.value) {
+      return
+    }
+
+    try {
+      await requestTitleTranslation(currentSelectedEntry.value.id, newLanguage)
+    } catch (error) {
+      console.warn('Title translation failed:', error)
+    }
+  }
 )
 
 
 
 
 
-const collapsedGroups = ref<Record<string, boolean>>({})
-
-function toggleGroupCollapse(group: string) {
-  collapsedGroups.value[group] = !collapsedGroups.value[group]
-}
-
-function expandAllGroups() {
-  collapsedGroups.value = {}
-}
-
-function collapseAllGroups() {
-  store.sortedGroupNames.forEach(name => {
-    collapsedGroups.value[name] = true
-  })
-}
-
 async function handleFeedClick(feedId: string) {
   store.selectFeed(feedId)
-  // fetchEntries is handled by store store.selectFeed?
-  // Usually selectFeed sets the active ID, and we might need to fetch entries.
-  // In the original AppHome logic (if I could see it), it likely calls fetchEntries.
-  // store.activeFeedId watcher might handle it?
-  // Let's explicitly fetch to be sure, or check store logic.
-  // Assuming explicit fetch for now as per handleGroupClick example.
   await store.fetchEntries({ feedId })
 }
 
@@ -394,15 +643,45 @@ const timelineTitle = computed(() => {
   return t('navigation.allFeeds')
 })
 
+const timelineHasMore = computed(() => (!showFavoritesOnly.value && store.entriesHasMore === true) || false)
+const timelineLoadingMore = computed(() => (!showFavoritesOnly.value && store.entriesLoadingMore === true) || false)
+
 const timelineSubtitle = computed(() => {
   // Simple subtitle logic, can be enhanced
   return `${filteredEntries.value.length} Articles`
 })
 
+// Get current view type from store (used for view type filtering mode)
+const timelineViewType = computed(() => {
+  // When filtering by view type (no specific feed/group selected)
+  if (!store.activeFeedId && !store.activeGroupName) {
+    return store.activeViewType
+  }
+  // When viewing a specific feed, use that feed's view type
+  if (store.activeFeedId) {
+    const feed = store.feeds.find(f => f.id === store.activeFeedId)
+    return feed?.view_type || 'articles'
+  }
+  // When viewing a group, keep the current active view type
+  if (store.activeGroupName) {
+    return store.activeViewType
+  }
+  // Default to articles
+  return 'articles'
+})
+
 async function handleAddFeed(url: string) {
   if (!url) return
   try {
-    await store.addFeed(url)
+    let targetGroupName: string | null | undefined
+    if (!showFavoritesOnly.value) {
+      targetGroupName = store.activeGroupName
+      if (!targetGroupName && store.activeFeedId) {
+        const activeFeed = store.feeds.find((feed) => feed.id === store.activeFeedId)
+        targetGroupName = activeFeed?.group_name
+      }
+    }
+    await store.addFeed(url, { groupName: targetGroupName })
     showNotification(t('feeds.addSuccess'), 'success')
   } catch (error) {
     showNotification(t('feeds.addFailed'), 'error')
@@ -423,82 +702,7 @@ async function handleSummary() {
   }
 }
 
-  const translationProgress = ref(0)
 
-  async function handleTranslation() {
-  if (!currentSelectedEntry.value) return
-  
-  // If already showing translation, toggle back to original
-  if (showTranslation.value) {
-    showTranslation.value = false
-    return
-  }
-  
-  const displayMode = aiFeatures.value?.content_display_mode ?? 'replace'
-  // If translation already cached, just show it
-  const cacheKey = `${currentSelectedEntry.value.id}_${translationLanguage.value}_${displayMode}`
-  if (store.translationCache[cacheKey]) {
-    const cached = store.translationCache[cacheKey]
-    translatedContent.value = {
-      title: cached.title,
-      content: cached.content,
-    }
-    showTranslation.value = true
-    return
-  }
-  
-  // Otherwise, request translation
-  const currentEntryId = currentSelectedEntry.value.id
-  translationLoading.value = true
-  translationProgress.value = 0
-  try {
-    // Use streaming if available in store
-    if (store.requestTranslationStream) {
-        const translation = await store.requestTranslationStream(
-          currentSelectedEntry.value.id,
-          translationLanguage.value,
-          displayMode,
-          (percent, _message) => {
-            translationProgress.value = percent
-          }
-        )
-        if (currentSelectedEntry.value?.id === currentEntryId) {
-          translatedContent.value = {
-            title: translation.title,
-            content: translation.content,
-          }
-        }
-    } else {
-        // Fallback
-        const translation = await store.requestTranslation(
-          currentEntryId,
-          translationLanguage.value,
-          displayMode
-        )
-        if (currentSelectedEntry.value?.id === currentEntryId) {
-          translatedContent.value = {
-            title: translation.title,
-            content: translation.content,
-          }
-        }
-    }
-    
-    if (currentSelectedEntry.value?.id === currentEntryId) {
-      showTranslation.value = true
-      showNotification(t('toast.translationSuccess'), 'success')
-    }
-  } catch (error) {
-    if (currentSelectedEntry.value?.id === currentEntryId) {
-      console.error('Translation failed:', error)
-      showNotification(t('toast.translationFailed'), 'error')
-    }
-  } finally {
-    if (currentSelectedEntry.value?.id === currentEntryId) {
-      translationLoading.value = false
-      translationProgress.value = 0
-    }
-  }
-}
 
 async function toggleStar() {
   await handleToggleStar(currentSelectedEntry.value, showFavoritesOnly.value, async () => {
@@ -512,10 +716,59 @@ async function toggleStarFromList(entry: any) {
   })
 }
 
-function openExternal(url?: string | null) {
-  if (url) {
-    window.open(url, '_blank')
+// Right-click menu handlers
+function handleAddToBookmarkGroup(entry: Entry) {
+  bookmarkGroupEntryId.value = entry.id
+  showBookmarkGroupModal.value = true
+}
+
+async function handleToggleReadFromList(entry: Entry) {
+  await store.toggleEntryRead(entry.id, !entry.read)
+}
+
+function handleCopyLink(entry: Entry) {
+  if (entry.url) {
+    navigator.clipboard.writeText(entry.url)
+    showNotification(t('articles.linkCopied'), 'success')
   }
+}
+
+function handleOpenExternal(entry: Entry) {
+  if (entry.url) {
+    window.open(entry.url, '_blank')
+  }
+}
+
+function normalizeExternalUrl(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed
+  if (trimmed.startsWith('//')) return `https:${trimmed}`
+  return `https://${trimmed}`
+}
+
+async function openExternal(url?: string | null) {
+  if (!url) return
+
+  const normalizedUrl = normalizeExternalUrl(url)
+  if (!normalizedUrl) return
+
+  const mode = settingsStore.settings.open_original_mode ?? 'system'
+  const ipc = window.ipcRenderer
+
+  if (ipc?.invoke) {
+    try {
+      const result = await ipc.invoke('open-external', { url: normalizedUrl, mode }) as { success?: boolean; error?: string }
+      if (result?.success) {
+        return
+      }
+    } catch (error) {
+      // Fallback to window.open on error
+    }
+  }
+
+  // Fallback to window.open
+  window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
 }
 
 async function handleGroupClick(groupName: string) {
@@ -685,6 +938,28 @@ async function handleMarkFeedAsRead(feedId: string) {
     showNotification(t('articles.markAsReadFailed'), 'error')
   }
 }
+
+// 切换视图类型
+async function handleSelectViewType(viewType: string) {
+  store.selectViewType(viewType as any)
+  await store.fetchEntries({
+    viewType: viewType as any,
+    unreadOnly: filterMode.value === 'unread',
+    dateRange: dateRangeFilter.value,
+    timeField: settingsStore.settings.time_field,
+  })
+}
+
+// 修改订阅源的视图类型
+async function handleChangeViewType(feedId: string, viewType: string) {
+  try {
+    await store.updateFeedViewType(feedId, viewType as any)
+    showNotification(t('feeds.viewTypeChanged'), 'success')
+  } catch (error) {
+    console.error('Change view type failed:', error)
+    showNotification(t('feeds.viewTypeChangeFailed'), 'error')
+  }
+}
 </script>
 
 <template>
@@ -694,9 +969,16 @@ async function handleMarkFeedAsRead(feedId: string) {
     :type="toastType" 
     @close="showToast = false" 
   />
-  <SettingsModal 
-    :show="showSettings" 
-    @close="showSettings = false" 
+  <SettingsModal
+    :show="showSettings"
+    @close="showSettings = false"
+  />
+  <AddToBookmarkGroupModal
+    v-if="bookmarkGroupEntryId"
+    :show="showBookmarkGroupModal"
+    :entry-id="bookmarkGroupEntryId"
+    @close="showBookmarkGroupModal = false; bookmarkGroupEntryId = null"
+    @added="showNotification(t('collections.addSuccess'), 'success')"
   />
   <div
     class="app-shell"
@@ -738,6 +1020,8 @@ async function handleMarkFeedAsRead(feedId: string) {
       @update:editing-group-name="editingGroupName = $event"
       @mark-group-read="handleMarkGroupAsRead"
       @mark-feed-read="handleMarkFeedAsRead"
+      @select-view-type="handleSelectViewType"
+      @change-view-type="handleChangeViewType"
     />
 
     <div
@@ -751,6 +1035,7 @@ async function handleMarkFeedAsRead(feedId: string) {
       :title="timelineTitle"
       :subtitle="timelineSubtitle"
       :show-favorites-only="showFavoritesOnly"
+      :view-type="timelineViewType"
       :search-query="searchQuery"
       :filter-mode="filterMode"
       :date-range-filter="dateRangeFilter"
@@ -758,6 +1043,8 @@ async function handleMarkFeedAsRead(feedId: string) {
       :enable-date-filter="settingsStore.settings.enable_date_filter"
       :entries="filteredEntries"
       :loading="store.loadingEntries"
+      :has-more="timelineHasMore"
+      :loading-more="timelineLoadingMore"
       :show-summary="settingsStore.settings.show_entry_summary"
       :auto-title-translation="aiFeatures?.auto_title_translation"
       :title-display-mode="aiFeatures?.title_display_mode"
@@ -765,17 +1052,25 @@ async function handleMarkFeedAsRead(feedId: string) {
       :selected-entry-id="currentSelectedEntry?.id || null"
       :get-translated-title="getTranslatedTitle"
       :is-translation-loading="isTitleTranslationLoading"
+      :is-translation-failed="isTitleTranslationFailed"
       @refresh="reloadFeeds"
       @back-to-feeds="backToAllFeeds"
       @update:search-query="searchQuery = $event"
       @update:filter-mode="filterMode = $event"
       @update:date-range-filter="dateRangeFilter = $event"
       @select-entry="handleEntrySelect"
+      @entries-visible="handleEntriesVisible"
+      @load-more="handleLoadMoreEntries"
       @toggle-star="toggleStarFromList"
+      @toggle-read="handleToggleReadFromList"
+      @add-to-bookmark-group="handleAddToBookmarkGroup"
+      @copy-link="handleCopyLink"
+      @open-external="handleOpenExternal"
       @mark-all-read="handleMarkAllAsRead"
     />
 
     <div
+      v-if="detailsPresentation === 'docked'"
       class="resizer resizer-right"
       :class="{ active: isDraggingRight }"
       @mousedown="handleMouseDownRight"
@@ -783,22 +1078,84 @@ async function handleMarkFeedAsRead(feedId: string) {
     ></div>
 
     <DetailsPanel
+      v-if="detailsPresentation === 'docked'"
       :entry="currentSelectedEntry"
-      :show-translation="showTranslation"
-      :translated-title="translatedContent.title"
-      :translated-content="translatedContent.content"
-      :translation-loading="translationLoading"
-      :translation-progress="translationProgress"
+      :translated-title="translatedTitle"
       :translation-language="translationLanguage"
       :summary-text="summaryText"
       :summary-loading="summaryLoading"
+      :full-text-translation-blocks="fullTextTranslationBlocks"
+      :is-full-text-translating="isFullTextTranslating"
+      :show-full-text-translation="showFullTextTranslation"
+      :full-text-translation-progress="fullTextTranslationProgress"
+      :get-full-text-translation="getFullTextTranslation"
+      :is-full-text-block-loading="isFullTextBlockLoading"
+      :is-full-text-block-failed="isFullTextBlockFailed"
       @open-external="openExternal(currentSelectedEntry?.url)"
       @toggle-star="toggleStar"
-      @toggle-translation="handleTranslation"
       @generate-summary="handleSummary"
       @update:translation-language="translationLanguage = $event"
+      @toggle-full-text-translation="handleFullTextTranslation"
     />
   </div>
+
+  <Teleport to="body">
+    <div v-if="showDetailsOverlay" class="details-overlay" @click="closeDetails">
+      <div class="details-overlay__backdrop"></div>
+      <div
+        class="details-overlay__panel"
+        :class="{ 'is-fullscreen': detailsPresentation === 'fullscreen' }"
+        :style="detailsOverlayStyle"
+        @click.stop
+        @wheel.stop
+        @touchmove.stop
+      >
+        <div class="details-overlay__toolbar">
+          <button class="details-overlay__close" type="button" @click="closeDetails">
+            {{ detailsPresentation === 'fullscreen' ? t('common.back') : t('common.close') }}
+          </button>
+        </div>
+        <div class="details-overlay__content">
+          <DetailsPanel
+            in-overlay
+            :entry="currentSelectedEntry"
+            :translated-title="translatedTitle"
+            :translation-language="translationLanguage"
+            :summary-text="summaryText"
+            :summary-loading="summaryLoading"
+            :full-text-translation-blocks="fullTextTranslationBlocks"
+            :is-full-text-translating="isFullTextTranslating"
+            :show-full-text-translation="showFullTextTranslation"
+            :full-text-translation-progress="fullTextTranslationProgress"
+            :get-full-text-translation="getFullTextTranslation"
+            :is-full-text-block-loading="isFullTextBlockLoading"
+            :is-full-text-block-failed="isFullTextBlockFailed"
+            @open-external="openExternal(currentSelectedEntry?.url)"
+            @toggle-star="toggleStar"
+            @generate-summary="handleSummary"
+            @update:translation-language="translationLanguage = $event"
+            @toggle-full-text-translation="handleFullTextTranslation"
+          />
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <button
+    v-if="showBackToTopButton"
+    class="back-to-top"
+    type="button"
+    :title="t('common.backToTop')"
+    :aria-label="t('common.backToTop')"
+    @click="scrollToTop"
+  >
+    <svg class="back-to-top__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 5l-7 7 1.4 1.4L11 8.8V19h2V8.8l4.6 4.6L19 12z"
+        fill="currentColor"
+      />
+    </svg>
+  </button>
 </template>
 <style scoped>
 .app-shell {
@@ -866,6 +1223,109 @@ async function handleMarkFeedAsRead(feedId: string) {
 
 :global(.dark) .resizer.active {
   background: rgba(255, 122, 24, 0.7);
+}
+
+.details-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  overscroll-behavior: contain;
+}
+
+.details-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 12, 18, 0.35);
+  backdrop-filter: blur(4px);
+}
+
+.details-overlay__panel {
+  position: relative;
+  height: 100%;
+  max-width: 100vw;
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-color);
+  box-shadow: -12px 0 30px rgba(15, 17, 21, 0.2);
+  z-index: 1;
+  animation: details-slide-in 0.22s ease-out;
+}
+
+.details-overlay__panel.is-fullscreen {
+  border-left: none;
+  box-shadow: none;
+}
+
+.details-overlay__toolbar {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}
+
+.details-overlay__close {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 999px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.details-overlay__close:hover {
+  background: rgba(255, 122, 24, 0.15);
+}
+
+.details-overlay__content {
+  flex: 1;
+  min-height: 0;
+}
+
+.back-to-top {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 24px rgba(15, 17, 21, 0.18);
+  z-index: 1100;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.back-to-top:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(15, 17, 21, 0.22);
+  background: rgba(255, 122, 24, 0.1);
+}
+
+.back-to-top__icon {
+  width: 20px;
+  height: 20px;
+}
+
+@keyframes details-slide-in {
+  from {
+    transform: translateX(12%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 960px) {

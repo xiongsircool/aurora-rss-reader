@@ -7,11 +7,17 @@ import type { AIServiceKey } from '../../stores/aiStore'
 defineProps<{
   serviceTesting: Record<AIServiceKey, boolean>
   serviceTestResult: Record<AIServiceKey, TestResult | null>
+  rebuildingVectors: boolean
+  rebuildResult: TestResult | null
+  mcpTesting: boolean
+  mcpTestResult: TestResult | null
 }>()
 
 const emit = defineEmits<{
   testConnection: [service: AIServiceKey]
   copySummaryToTranslation: []
+  rebuildVectors: []
+  testMcp: []
 }>()
 
 const { t } = useI18n()
@@ -19,24 +25,25 @@ const { t } = useI18n()
 // Two-way binding for config objects
 const summaryConfig = defineModel<LocalServiceConfig>('summaryConfig', { required: true })
 const translationConfig = defineModel<LocalServiceConfig>('translationConfig', { required: true })
+const embeddingConfig = defineModel<LocalServiceConfig>('embeddingConfig', { required: true })
 </script>
 
 <template>
-  <section class="mb-6 p-[18px_20px] rounded-xl bg-[#f8faff] border border-[rgba(76,116,255,0.08)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)] last:mb-0 dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(255,255,255,0.1)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
-    <h3 class="m-[0_0_16px_0] text-base font-semibold c-[var(--text-primary)]">{{ t('settings.aiConfig') }}</h3>
+  <section class="mb-6 p-5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] last:mb-0">
+    <h3 class="m-[0_0_16px_0] text-base font-semibold text-[var(--text-primary)] hidden md:block">{{ t('settings.aiConfig') }}</h3>
     <div class="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
       <!-- Summary Config Card -->
-      <div class="border border-[rgba(15,17,21,0.12)] rounded-xl p-4 bg-[var(--bg-surface)] dark:bg-black/25 dark:border-white/10 flex flex-col justify-between h-full">
+      <div class="border border-[var(--border-color)] rounded-xl p-4 bg-[var(--bg-surface)] flex flex-col justify-between h-full">
         <div class="flex-1">
           <div class="flex justify-between items-center gap-3 mb-3 flex-wrap min-h-[52px]">
             <div>
-              <p class="m-0 text-[15px] font-semibold c-[var(--text-primary)]">{{ t('settings.summaryGeneration') }}</p>
-              <p class="m-[4px_0_0_0] text-[13px] c-[var(--text-secondary)]">{{ t('settings.summarySubtitle') }}</p>
+              <p class="m-0 text-[15px] font-semibold text-[var(--text-primary)]">{{ t('settings.summaryGeneration') }}</p>
+              <p class="m-[4px_0_0_0] text-[13px] text-[var(--text-secondary)]">{{ t('settings.summarySubtitle') }}</p>
             </div>
             <button
               @click="emit('testConnection', 'summary')"
               :disabled="serviceTesting.summary || !summaryConfig.api_key || !summaryConfig.base_url || !summaryConfig.model_name"
-              class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-[#4c74ff] to-[#2f54ff] c-white shadow-[0_10px_20px_rgba(76,116,255,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
+              class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-[0_10px_20px_rgba(255,122,24,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
               :class="{
                 'op-70 transform-none': serviceTesting.summary,
                 'bg-[#34c759]! shadow-none!': serviceTestResult.summary?.success,
@@ -48,68 +55,68 @@ const translationConfig = defineModel<LocalServiceConfig>('translationConfig', {
           </div>
 
           <div class="mb-4">
-            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.apiKey') }}</label>
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.apiKey') }}</label>
             <input
               v-model="summaryConfig.api_key"
               type="password"
               :placeholder="t('settings.apiKeyPlaceholder')"
-              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
+              class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
             />
-            <p class="mt-1.5 text-xs c-[var(--text-secondary)]">
+            <p class="mt-1.5 text-xs text-[var(--text-secondary)]">
               {{ t('settings.getApiKey') }}
-              <a href="https://open.bigmodel.cn" target="_blank" class="c-[var(--accent)] no-underline hover:underline">{{
+              <a href="https://open.bigmodel.cn" target="_blank" class="text-[var(--accent)] no-underline hover:underline">{{
                 'https://open.bigmodel.cn'
               }}</a>
             </p>
           </div>
 
           <div class="mb-4">
-            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.apiUrl') }}</label>
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.apiUrl') }}</label>
             <input
               v-model="summaryConfig.base_url"
               type="text"
               :placeholder="t('settings.apiUrlPlaceholder')"
-              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
+              class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
             />
           </div>
 
           <div class="mb-4">
-            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.modelName') }}</label>
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.modelName') }}</label>
             <input
               v-model="summaryConfig.model_name"
               type="text"
               :placeholder="t('settings.modelPlaceholder')"
-              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
+              class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
             />
-            <p class="mt-1.5 text-xs c-[var(--text-secondary)]">{{ t('settings.supportedModels') }}</p>
+            <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.supportedModels') }}</p>
           </div>
         </div>
 
         <div
           v-if="serviceTestResult.summary"
-          class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-white shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:bg-white/4 dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
-          :class="{ 'c-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.summary.success, 'c-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.summary.success }"
+          class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-[var(--bg-elevated)] shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+          :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.summary.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.summary.success }"
         >
           {{ serviceTestResult.summary.message }}
         </div>
       </div>
 
       <!-- Translation Config Card -->
-      <div class="border border-[rgba(15,17,21,0.12)] rounded-xl p-4 bg-[var(--bg-surface)] dark:bg-black/25 dark:border-white/10 flex flex-col justify-between h-full">
+      <div class="border border-[var(--border-color)] rounded-xl p-4 bg-[var(--bg-surface)] flex flex-col justify-between h-full">
         <div class="flex-1">
           <div class="flex justify-between items-center gap-3 mb-3 flex-wrap min-h-[52px]">
             <div>
-              <p class="m-0 text-[15px] font-semibold c-[var(--text-primary)]">{{ t('settings.contentTranslation') }}</p>
-              <p class="m-[4px_0_0_0] text-[13px] c-[var(--text-secondary)]">{{ t('settings.translationSubtitle') }}</p>
+              <p class="m-0 text-[15px] font-semibold text-[var(--text-primary)]">{{ t('settings.contentTranslation') }}</p>
+              <p class="m-[4px_0_0_0] text-[13px] text-[var(--text-secondary)]">{{ t('settings.translationSubtitle') }}</p>
             </div>
             <div class="flex gap-2 items-center flex-wrap justify-end">
-              <button class="border border-dashed border-[rgba(76,116,255,0.4)] bg-[rgba(76,116,255,0.08)] c-[#4c74ff] p-[7px_12px] rounded-lg text-[13px] cursor-pointer transition-all hover:bg-[rgba(76,116,255,0.15)] hover:border-[#2f54ff] hover:c-[#2f54ff] dark:border-white/25 dark:bg-white/6 dark:c-[var(--text-primary)] dark:hover:bg-white/10 dark:hover:border-[var(--accent)] dark:hover:c-[var(--accent)]" type="button" @click="emit('copySummaryToTranslation')">
+              <button class="border border-dashed border-orange-500/40 bg-orange-500/10 text-orange-600 p-[7px_12px] rounded-lg text-[13px] cursor-pointer transition-all hover:bg-orange-500/20 hover:border-orange-600 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/8 dark:text-orange-400 dark:hover:bg-orange-500/15 dark:hover:border-orange-400" type="button" @click="emit('copySummaryToTranslation')">
                 {{ t('settings.useSummaryConfig') }}
               </button>
               <button
                 @click="emit('testConnection', 'translation')"
                 :disabled="serviceTesting.translation || !translationConfig.api_key || !translationConfig.base_url || !translationConfig.model_name"
-                class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-[#4c74ff] to-[#2f54ff] c-white shadow-[0_10px_20px_rgba(76,116,255,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
+                class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-[0_10px_20px_rgba(255,122,24,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
                 :class="{
                   'op-70 transform-none': serviceTesting.translation,
                   'bg-[#34c759]! shadow-none!': serviceTestResult.translation?.success,
@@ -122,42 +129,185 @@ const translationConfig = defineModel<LocalServiceConfig>('translationConfig', {
           </div>
 
           <div class="mb-4">
-            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.apiKey') }}</label>
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.apiKey') }}</label>
             <input
               v-model="translationConfig.api_key"
               type="password"
               :placeholder="t('settings.translationApiKeyPlaceholder')"
-              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
+              class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
             />
           </div>
 
           <div class="mb-4">
-            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.apiUrl') }}</label>
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.apiUrl') }}</label>
             <input
               v-model="translationConfig.base_url"
               type="text"
               :placeholder="t('settings.apiUrlPlaceholder')"
-              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
+              class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
             />
           </div>
 
           <div class="mb-4">
-            <label class="block mb-2 text-sm font-medium c-[var(--text-primary)]">{{ t('settings.modelName') }}</label>
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.modelName') }}</label>
             <input
               v-model="translationConfig.model_name"
               type="text"
               :placeholder="t('settings.translationModelPlaceholder')"
-              class="w-full p-[11px_14px] border border-[rgba(92,106,138,0.22)] rounded-[10px] text-sm bg-[#fefefe] c-[var(--text-primary)] transition-border-color,box-shadow shadow-[inset_0_1px_2px_rgba(15,20,25,0.04)] placeholder:c-[rgba(90,98,118,0.62)] focus:outline-none focus:border-[#4c74ff] focus:shadow-[0_0_0_3px_rgba(76,116,255,0.15)] dark:bg-[var(--bg-surface)] dark:c-[var(--text-primary)] dark:border-[rgba(255,255,255,0.12)] dark:shadow-none dark:placeholder:c-[var(--text-secondary)]"
+              class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
             />
           </div>
         </div>
 
         <div
           v-if="serviceTestResult.translation"
-          class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-white shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:bg-white/4 dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
-          :class="{ 'c-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.translation.success, 'c-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.translation.success }"
+          class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-[var(--bg-elevated)] shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+          :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.translation.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.translation.success }"
         >
           {{ serviceTestResult.translation.message }}
+        </div>
+      </div>
+
+      <!-- Embedding Config Card -->
+      <div class="border border-[var(--border-color)] rounded-xl p-4 bg-[var(--bg-surface)] flex flex-col justify-between h-full">
+        <div class="flex-1">
+          <div class="flex justify-between items-center gap-3 mb-3 flex-wrap min-h-[52px]">
+            <div>
+              <p class="m-0 text-[15px] font-semibold text-[var(--text-primary)]">{{ t('settings.knowledgeBase') }}</p>
+              <p class="m-[4px_0_0_0] text-[13px] text-[var(--text-secondary)]">{{ t('settings.embeddingSubtitle') }}</p>
+            </div>
+            <div class="flex gap-2 items-center flex-wrap justify-end">
+              <button
+                @click="emit('rebuildVectors')"
+                :disabled="rebuildingVectors || !embeddingConfig.api_key"
+                class="border border-dashed border-blue-500/40 bg-blue-500/10 text-blue-600 p-[7px_12px] rounded-lg text-[13px] cursor-pointer transition-all hover:bg-blue-500/20 hover:border-blue-600 hover:text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/8 dark:text-blue-400 dark:hover:bg-blue-500/15 dark:hover:border-blue-400 disabled:op-60 disabled:cursor-not-allowed"
+                type="button"
+              >
+                {{ rebuildingVectors ? t('settings.rebuildingVectors') : t('settings.rebuildVectors') }}
+              </button>
+              <button
+                @click="emit('testConnection', 'embedding')"
+                :disabled="serviceTesting.embedding || !embeddingConfig.api_key || !embeddingConfig.base_url || !embeddingConfig.model_name"
+                class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-[0_10px_20px_rgba(255,122,24,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
+                :class="{
+                  'op-70 transform-none': serviceTesting.embedding,
+                  'bg-[#34c759]! shadow-none!': serviceTestResult.embedding?.success,
+                  'bg-[#ff4d4f]! shadow-none!': serviceTestResult.embedding?.success === false
+                }"
+              >
+                {{ serviceTesting.embedding ? t('common.testing') : t('settings.testConnection') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.apiKey') }}</label>
+            <input
+                v-model="embeddingConfig.api_key"
+                type="password"
+                :placeholder="t('settings.apiKeyPlaceholder')"
+                class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.apiUrl') }}</label>
+            <input
+                v-model="embeddingConfig.base_url"
+                type="text"
+                :placeholder="t('settings.apiUrlPlaceholder')"
+                class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.modelName') }}</label>
+            <input
+                v-model="embeddingConfig.model_name"
+                type="text"
+                :placeholder="t('settings.modelPlaceholder')"
+                class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-border-color,box-shadow shadow-none placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
+            />
+          </div>
+        </div>
+
+        <div
+            v-if="serviceTestResult.embedding"
+            class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-[var(--bg-elevated)] shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+            :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': serviceTestResult.embedding.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !serviceTestResult.embedding.success }"
+        >
+          {{ serviceTestResult.embedding.message }}
+        </div>
+
+        <!-- 重建结果显示 -->
+        <div
+            v-if="rebuildResult"
+            class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-[var(--bg-elevated)] shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+            :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': rebuildResult.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !rebuildResult.success }"
+        >
+          {{ rebuildResult.message }}
+        </div>
+      </div>
+
+      <!-- MCP Service Status Card -->
+      <div class="border border-[var(--border-color)] rounded-xl p-4 bg-[var(--bg-surface)] flex flex-col justify-between h-full">
+        <div class="flex-1">
+          <div class="flex justify-between items-center gap-3 mb-3 flex-wrap min-h-[52px]">
+            <div>
+              <p class="m-0 text-[15px] font-semibold text-[var(--text-primary)]">{{ t('settings.mcpService') }}</p>
+              <p class="m-[4px_0_0_0] text-[13px] text-[var(--text-secondary)]">{{ t('settings.mcpSubtitle') }}</p>
+            </div>
+            <button
+              @click="emit('testMcp')"
+              :disabled="mcpTesting"
+              class="border-none p-[10px_18px] rounded-[10px] text-sm font-semibold cursor-pointer transition-transform,opacity bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-[0_10px_20px_rgba(255,122,24,0.25)] hover:not-disabled:-translate-y-px hover:not-disabled:op-95 disabled:op-60 disabled:cursor-not-allowed disabled:shadow-none"
+              :class="{
+                'op-70 transform-none': mcpTesting,
+                'bg-[#34c759]! shadow-none!': mcpTestResult?.success,
+                'bg-[#ff4d4f]! shadow-none!': mcpTestResult?.success === false
+              }"
+            >
+              {{ mcpTesting ? t('common.testing') : t('settings.testMcp') }}
+            </button>
+          </div>
+
+          <!-- MCP Endpoint -->
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpEndpoint') }}</label>
+            <div class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-[10px] text-sm bg-[var(--bg-input)] text-[var(--text-secondary)] font-mono">
+              http://127.0.0.1:15432/mcp
+            </div>
+          </div>
+
+          <!-- MCP Status -->
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpStatus') }}</label>
+            <div class="flex items-center gap-2">
+              <span
+                class="w-2.5 h-2.5 rounded-full"
+                :class="mcpTestResult?.success ? 'bg-[#34c759]' : 'bg-[var(--text-tertiary)]'"
+              ></span>
+              <span class="text-sm" :class="mcpTestResult?.success ? 'text-[#34c759]' : 'text-[var(--text-secondary)]'">
+                {{ mcpTestResult?.success ? t('settings.mcpConnected') : t('settings.mcpDisconnected') }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Available Tools -->
+          <div class="mb-4">
+            <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpTools') }}</label>
+            <p class="m-0 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+              {{ t('settings.mcpToolsList') }}
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-if="mcpTestResult"
+          class="mt-2 p-3 rounded-[10px] text-[13px] font-medium border border-transparent bg-[var(--bg-elevated)] shadow-[0_10px_20px_rgba(15,20,25,0.08)] dark:shadow-[0_10px_20px_rgba(0,0,0,0.35)]"
+          :class="{ 'text-[#0f7a39] border-[rgba(52,199,89,0.35)]': mcpTestResult.success, 'text-[#c43838] border-[rgba(255,77,79,0.35)]': !mcpTestResult.success }"
+        >
+          {{ mcpTestResult.message }}
         </div>
       </div>
     </div>

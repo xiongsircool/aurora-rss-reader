@@ -25,8 +25,9 @@ error() {
 
 # 项目根目录
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$PROJECT_ROOT/backend"
+BACKEND_NODE_DIR="$PROJECT_ROOT/backend-node"
 FRONTEND_DIR="$PROJECT_ROOT/rss-desktop"
+BACKEND_RESOURCES_DIR="$FRONTEND_DIR/resources/backend-node"
 
 log "🚀 开始构建 Aurora RSS Reader..."
 log "📂 项目目录: $PROJECT_ROOT"
@@ -37,10 +38,6 @@ check_dependencies() {
 
     if ! command -v node &> /dev/null; then
         error "Node.js 未安装"
-    fi
-
-    if ! command -v python3 &> /dev/null; then
-        error "Python 3 未安装"
     fi
 
     if ! command -v pnpm &> /dev/null; then
@@ -54,42 +51,69 @@ check_dependencies() {
 clean_build() {
     log "🧹 清理旧构建文件..."
 
-    rm -rf "$BACKEND_DIR/dist"
-    rm -rf "$BACKEND_DIR/build"
+    rm -rf "$BACKEND_NODE_DIR/dist"
     rm -rf "$FRONTEND_DIR/dist"
     rm -rf "$FRONTEND_DIR/dist-electron"
     rm -rf "$FRONTEND_DIR/release"
+    rm -rf "$BACKEND_RESOURCES_DIR"
 
     log "✅ 清理完成"
 }
 
 # 构建后端
 build_backend() {
-    log "🐍 构建后端服务..."
+    log "🟩 构建 Node.js 后端服务..."
 
-    cd "$BACKEND_DIR"
+    cd "$BACKEND_NODE_DIR"
 
-    # 检查虚拟环境
-    if [ ! -d ".venv" ]; then
-        error "未找到虚拟环境 .venv，请先运行: python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
-    fi
+    # 安装后端依赖
+    log "📦 安装后端依赖..."
+    npm install
 
-    # 激活虚拟环境
-    source .venv/bin/activate
+    # 构建后端
+    log "🔨 编译后端..."
+    npm run build
 
-    # 安装/更新 PyInstaller
-    log "📦 检查 PyInstaller..."
-    pip install pyinstaller
-
-    # 使用 PyInstaller 打包后端
-    log "📦 使用 PyInstaller 打包后端..."
-    pyinstaller backend.spec
-
-    if [ ! -f "dist/aurora-backend/aurora-backend" ]; then
+    if [ ! -f "dist/main.js" ]; then
         error "后端构建失败"
     fi
 
-    log "✅ 后端构建完成 ($(du -sh dist/aurora-backend | cut -f1))"
+    # 准备打包资源
+    log "📦 准备后端资源目录..."
+    rm -rf "$BACKEND_RESOURCES_DIR"
+    mkdir -p "$BACKEND_RESOURCES_DIR"
+    cp -R "$BACKEND_NODE_DIR/dist" "$BACKEND_RESOURCES_DIR/"
+    cp "$BACKEND_NODE_DIR/package.json" "$BACKEND_RESOURCES_DIR/"
+
+    # 复制 .npmrc 配置文件（如果存在）
+    if [ -f "$BACKEND_NODE_DIR/.npmrc" ]; then
+        cp "$BACKEND_NODE_DIR/.npmrc" "$BACKEND_RESOURCES_DIR/"
+    fi
+
+    # 使用 Electron 的 Node.js 安装生产依赖
+    log "📦 使用 Electron 的 Node.js 安装生产依赖..."
+    cd "$FRONTEND_DIR"
+
+    # 使用 electron 的 node 来安装依赖，确保原生模块与 Electron 版本匹配
+    npx --yes electron-rebuild --version > /dev/null 2>&1 || pnpm add -D @electron/rebuild
+
+    cd "$BACKEND_RESOURCES_DIR"
+
+    # 设置环境变量，让 npm 使用 Electron 的 headers 和 C++20 标准
+    export npm_config_target=$(cd "$FRONTEND_DIR" && node -p "require('./package.json').devDependencies.electron")
+    export npm_config_arch=$(node -p "process.arch")
+    export npm_config_target_arch=$(node -p "process.arch")
+    export npm_config_disturl=https://electronjs.org/headers
+    export npm_config_runtime=electron
+    export npm_config_build_from_source=true
+    export CXXFLAGS="-std=c++20"
+
+    log "   Electron 版本: $npm_config_target"
+    log "   架构: $npm_config_arch"
+
+    npm install --omit=dev --production
+
+    log "✅ 后端构建完成 ($(du -sh "$BACKEND_RESOURCES_DIR" | cut -f1))"
 }
 
 # 构建前端
