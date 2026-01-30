@@ -36,6 +36,7 @@
 - 🖱️ **Enhanced Context Menu** - Rich right-click menu for feeds and entries
 - 🔬 **MCP Status Display** - Visual indicator for Model Context Protocol server status
 - 🎨 **View Type Classification** - Auto-detect and optimize display for blogs, videos, images, podcasts
+- 🔍 **Workspace Advanced Search** - Tag groups and advanced filtering in workspace
 
 ---
 
