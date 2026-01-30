@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCollectionsStore, type CollectionEntry } from '../../stores/collectionsStore'
 
@@ -9,6 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'select-entry', entry: CollectionEntry): void
+  (e: 'entry-removed', entryId: string): void
 }>()
 
 const { t } = useI18n()
@@ -18,10 +19,36 @@ const activeCollection = computed(() => collectionsStore.activeCollection)
 const entries = computed(() => collectionsStore.collectionEntries)
 const loading = computed(() => collectionsStore.loading)
 
+// 键盘导航
+function handleKeydown(e: KeyboardEvent) {
+  if (!entries.value.length) return
+
+  const currentIndex = entries.value.findIndex(entry => entry.id === props.selectedEntryId)
+
+  if (e.key === 'ArrowDown' || e.key === 'j') {
+    e.preventDefault()
+    const nextIndex = currentIndex < entries.value.length - 1 ? currentIndex + 1 : 0
+    emit('select-entry', entries.value[nextIndex])
+  } else if (e.key === 'ArrowUp' || e.key === 'k') {
+    e.preventDefault()
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : entries.value.length - 1
+    emit('select-entry', entries.value[prevIndex])
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
+
 async function handleRemove(entryId: string, event: Event) {
   event.stopPropagation()
   if (!activeCollection.value) return
   await collectionsStore.removeEntryFromCollection(activeCollection.value.id, entryId)
+  emit('entry-removed', entryId)
 }
 
 function formatDate(dateStr: string | null) {
@@ -71,29 +98,34 @@ function formatDate(dateStr: string | null) {
         <p class="text-sm">{{ t('collections.noEntries') }}</p>
       </div>
 
-      <!-- Entry List -->
-      <div v-else class="p-4 space-y-2">
+      <!-- Entry List with Virtual Scroll -->
+      <RecycleScroller
+        v-else
+        class="h-full"
+        :items="entries"
+        :item-size="88"
+        key-field="id"
+        v-slot="{ item: entry }"
+      >
         <div
-          v-for="entry in entries"
-          :key="entry.id"
           @click="emit('select-entry', entry)"
-          class="group p-4 rounded-xl bg-[var(--bg-surface)] border cursor-pointer transition-colors"
+          class="group px-5 py-3 cursor-pointer transition-colors border-b border-[var(--border-color)]"
           :class="selectedEntryId === entry.id
-            ? 'border-[var(--accent)] shadow-[0_0_0_1px_var(--accent)]'
-            : 'border-[var(--border-color)] hover:border-[var(--accent)]'"
+            ? 'bg-[rgba(255,122,24,0.08)]'
+            : 'hover:bg-[rgba(0,0,0,0.02)] dark:hover:bg-[rgba(255,255,255,0.03)]'"
         >
           <div class="flex items-start gap-3">
             <div class="flex-1 min-w-0">
-              <h3 class="font-medium text-[14px] mb-1 line-clamp-2">{{ entry.title }}</h3>
-              <p v-if="entry.summary" class="text-xs c-[var(--text-secondary)] line-clamp-2 mb-2">{{ entry.summary }}</p>
-              <div class="flex items-center gap-3 text-xs c-[var(--text-secondary)]">
-                <span>{{ entry.feed_title }}</span>
+              <h3 class="font-medium text-[14px] mb-1.5 line-clamp-2">{{ entry.title }}</h3>
+              <div class="flex items-center gap-2 text-xs c-[var(--text-secondary)]">
+                <span class="truncate max-w-[120px]">{{ entry.feed_title }}</span>
+                <span class="opacity-50">·</span>
                 <span>{{ formatDate(entry.published_at) }}</span>
               </div>
             </div>
             <button
               @click="handleRemove(entry.id, $event)"
-              class="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-[rgba(255,0,0,0.1)] c-red-500 transition-opacity"
+              class="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-[rgba(255,0,0,0.1)] c-red-500 transition-opacity shrink-0"
               :title="t('collections.removeFromCollection')"
             >
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -102,7 +134,7 @@ function formatDate(dateStr: string | null) {
             </button>
           </div>
         </div>
-      </div>
+      </RecycleScroller>
     </div>
   </div>
 </template>

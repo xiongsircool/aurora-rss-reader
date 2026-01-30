@@ -460,6 +460,7 @@
     "delete": "删除书签组",
     "name": "名称",
     "namePlaceholder": "输入书签组名称",
+    "color": "颜色",
     "empty": "书签组为空",
     "noCollections": "暂无书签组",
     "createFirst": "创建第一个书签组",
@@ -482,8 +483,26 @@
     "title": "功能工作台",
     "backToReader": "返回阅读器",
     "collections": "书签组",
+    "search": "智能搜索",
     "blog": "博客生成",
     "share": "分享",
     "stats": "统计"
+  },
+  "search": {
+    "title": "智能搜索",
+    "subtitle": "全文检索 + 语义搜索",
+    "placeholder": "输入关键词或描述你想找的内容...",
+    "search": "搜索",
+    "searching": "搜索中...",
+    "type": "搜索模式",
+    "typeHybrid": "混合搜索",
+    "typeSemantic": "语义搜索",
+    "typeKeyword": "关键词搜索",
+    "emptyTitle": "开始搜索",
+    "emptyHint": "支持关键词匹配和语义相似度搜索",
+    "noResults": "未找到匹配的文章",
+    "resultsCount": "找到 {count} 篇相关文章",
+    "matchSemantic": "语义",
+    "matchKeyword": "关键词"
   }
 }

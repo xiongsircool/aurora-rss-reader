@@ -494,4 +494,121 @@ export async function aiRoutes(app: FastifyInstance) {
       };
     }
   });
+
+  // POST /ai/search - Semantic search using vector similarity
+  app.post<{
+    Body: { query: string; limit?: number; type?: 'semantic' | 'keyword' | 'hybrid' }
+  }>('/ai/search', async (request, reply) => {
+    const { query, limit = 20, type = 'hybrid' } = request.body;
+
+    if (!query || query.trim().length === 0) {
+      return reply.status(400).send({ error: 'Query is required' });
+    }
+
+    try {
+      const results: Array<{
+        id: string;
+        title: string;
+        content?: string;
+        feed_id: string;
+        feed_title?: string;
+        published_at: string | null;
+        url: string | null;
+        score: number;
+        match_type: 'semantic' | 'keyword';
+      }> = [];
+
+      // Keyword search using SQL LIKE
+      if (type === 'keyword' || type === 'hybrid') {
+        const db = (await import('../db/session.js')).getDatabase();
+        const keywordResults = db.prepare(`
+          SELECT e.id, e.title, e.content, e.feed_id, f.title as feed_title,
+                 e.published_at, e.url
+          FROM entries e
+          LEFT JOIN feeds f ON e.feed_id = f.id
+          WHERE e.title LIKE ? OR e.content LIKE ?
+          ORDER BY e.published_at DESC
+          LIMIT ?
+        `).all(`%${query}%`, `%${query}%`, limit) as Array<{
+          id: string;
+          title: string;
+          content: string;
+          feed_id: string;
+          feed_title: string;
+          published_at: string | null;
+          url: string | null;
+        }>;
+
+        for (const r of keywordResults) {
+          results.push({
+            ...r,
+            score: 0.8,
+            match_type: 'keyword'
+          });
+        }
+      }
+
+      // Semantic search using vector similarity
+      if (type === 'semantic' || type === 'hybrid') {
+        try {
+          const { searchVectors } = await import('../services/vector.js');
+          const vectorResults = await searchVectors(query, limit);
+
+          if (vectorResults && vectorResults.length > 0) {
+            const db = (await import('../db/session.js')).getDatabase();
+
+            for (const vr of vectorResults) {
+              // Skip if already in results (from keyword search)
+              if (results.some(r => r.id === vr.id)) continue;
+
+              // Get full entry data
+              const entry = db.prepare(`
+                SELECT e.id, e.title, e.content, e.feed_id, f.title as feed_title,
+                       e.published_at, e.url
+                FROM entries e
+                LEFT JOIN feeds f ON e.feed_id = f.id
+                WHERE e.id = ?
+              `).get(vr.id) as {
+                id: string;
+                title: string;
+                content: string;
+                feed_id: string;
+                feed_title: string;
+                published_at: string | null;
+                url: string | null;
+              } | undefined;
+
+              if (entry) {
+                results.push({
+                  ...entry,
+                  score: 1 - (vr.distance || 0),
+                  match_type: 'semantic'
+                });
+              }
+            }
+          }
+        } catch (vectorError) {
+          console.warn('[Search] Vector search failed, using keyword only:', vectorError);
+        }
+      }
+
+      // Sort by score and deduplicate
+      const uniqueResults = results
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+
+      return {
+        query,
+        type,
+        total: uniqueResults.length,
+        results: uniqueResults.map(r => ({
+          ...r,
+          content: r.content ? r.content.substring(0, 300) : ''
+        }))
+      };
+    } catch (error) {
+      console.error('[Search] Error:', error);
+      return reply.status(500).send({ error: 'Search failed' });
+    }
+  });
 }

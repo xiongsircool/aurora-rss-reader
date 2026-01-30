@@ -456,6 +456,7 @@
     "delete": "Delete Bookmark Group",
     "name": "Name",
     "namePlaceholder": "Enter bookmark group name",
+    "color": "Color",
     "empty": "Bookmark group is empty",
     "noCollections": "No bookmark groups yet",
     "createFirst": "Create your first bookmark group",
@@ -478,8 +479,26 @@
     "title": "Workspace",
     "backToReader": "Back to Reader",
     "collections": "Bookmark Groups",
+    "search": "Smart Search",
     "blog": "Blog Generator",
     "share": "Share",
     "stats": "Statistics"
+  },
+  "search": {
+    "title": "Smart Search",
+    "subtitle": "Full-text + Semantic Search",
+    "placeholder": "Enter keywords or describe what you're looking for...",
+    "search": "Search",
+    "searching": "Searching...",
+    "type": "Search Mode",
+    "typeHybrid": "Hybrid",
+    "typeSemantic": "Semantic",
+    "typeKeyword": "Keyword",
+    "emptyTitle": "Start Searching",
+    "emptyHint": "Supports keyword matching and semantic similarity search",
+    "noResults": "No matching articles found",
+    "resultsCount": "Found {count} related articles",
+    "matchSemantic": "Semantic",
+    "matchKeyword": "Keyword"
   }
 }

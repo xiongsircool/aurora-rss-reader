@@ -6,6 +6,7 @@ import type { CollectionEntry } from '../../stores/collectionsStore'
 
 const props = defineProps<{
   entry: CollectionEntry | null
+  showRemove?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -74,6 +75,7 @@ function formatDate(dateStr: string | null) {
           {{ t('articles.openInBrowser') }}
         </button>
         <button
+          v-if="showRemove !== false"
           @click="emit('remove')"
           class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm c-red-500 hover:bg-[rgba(255,0,0,0.1)]"
         >
