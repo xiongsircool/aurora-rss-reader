@@ -23,15 +23,19 @@ export function useContextMenu<T = any>() {
     // Calculate position (avoid overflow)
     const menuWidth = 220
     const menuHeight = 300
+    const padding = 10
     let x = e.clientX
     let y = e.clientY
 
-    if (x + menuWidth > window.innerWidth) {
-      x = window.innerWidth - menuWidth - 10
+    if (x + menuWidth > window.innerWidth - padding) {
+      x = window.innerWidth - menuWidth - padding
     }
-    if (y + menuHeight > window.innerHeight) {
-      y = window.innerHeight - menuHeight - 10
+    if (y + menuHeight > window.innerHeight - padding) {
+      y = window.innerHeight - menuHeight - padding
     }
+
+    x = Math.max(padding, x)
+    y = Math.max(padding, y)
 
     position.value = { x, y }
     targetData.value = data
