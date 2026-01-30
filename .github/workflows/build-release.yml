@@ -64,7 +64,7 @@ jobs:
           name: macos-universal
           path: |
             rss-desktop/release/**/*.dmg
-            rss-desktop/release/**/*.zip
+            rss-desktop/release/**/AuroraRSSReader-Mac-*.zip
             rss-desktop/release/**/*.yml
           retention-days: 7
 
@@ -114,7 +114,7 @@ jobs:
         with:
           name: windows-installers
           path: |
-            rss-desktop/release/**/*.exe
+            rss-desktop/release/**/AuroraRSSReader-Windows-*.exe
             rss-desktop/release/**/*.yml
           retention-days: 7
 
@@ -187,12 +187,11 @@ jobs:
         with:
           files: |
             artifacts/**/*.dmg
-            artifacts/**/*.zip
-            artifacts/**/*.exe
+            artifacts/**/AuroraRSSReader-Mac-*.zip
+            artifacts/**/AuroraRSSReader-Windows-*.exe
             artifacts/**/*.AppImage
             artifacts/**/*.deb
             artifacts/**/latest*.yml
-            artifacts/**/builder-debug.yml
           draft: false
           prerelease: ${{ contains(github.ref, 'test') || contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           generate_release_notes: true
