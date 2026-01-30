@@ -47,6 +47,9 @@ export interface Entry {
   enclosure_length: number | null;
   duration: string | null;
   image_url: string | null;
+  // Academic article identifiers
+  doi: string | null;
+  pmid: string | null;
 }
 
 export interface Translation {
@@ -110,4 +113,23 @@ export interface UserSettings {
   embedding_base_url: string;
   created_at: string;
   updated_at: string;
+}
+
+// Collection (multi-folder system)
+export interface Collection {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Collection-Entry relationship
+export interface CollectionEntry {
+  collection_id: string;
+  entry_id: string;
+  added_at: string;
+  note: string | null;
 }

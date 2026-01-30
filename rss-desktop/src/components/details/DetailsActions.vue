@@ -1,13 +1,24 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { saveToZotero } from '../../api/zotero'
 
-defineProps<{
+const props = defineProps<{
   isStarred: boolean
   translationLanguage: string
   // 全文翻译相关
   isFullTextTranslating?: boolean
   showFullTextTranslation?: boolean
   fullTextTranslationProgress?: number
+  // Zotero 相关
+  entryUrl?: string
+  entryTitle?: string
+  entryAuthor?: string | null
+  entrySummary?: string | null
+  entryPublishedAt?: string | null
+  entryFeedTitle?: string | null
+  entryDoi?: string | null
+  entryPmid?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -18,6 +29,40 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+// Zotero 状态
+const zoteroSending = ref(false)
+const zoteroSent = ref(false)
+const zoteroError = ref('')
+
+async function handleSendToZotero() {
+  if (!props.entryUrl || !props.entryTitle) return
+
+  zoteroSending.value = true
+  zoteroError.value = ''
+
+  try {
+    const result = await saveToZotero({
+      url: props.entryUrl,
+      title: props.entryTitle,
+      author: props.entryAuthor,
+      summary: props.entrySummary,
+      publishedAt: props.entryPublishedAt,
+      feedTitle: props.entryFeedTitle,
+      doi: props.entryDoi,
+    })
+
+    if (result.success) {
+      zoteroSent.value = true
+    } else {
+      zoteroError.value = result.message
+    }
+  } catch (err) {
+    zoteroError.value = err instanceof Error ? err.message : '发送失败'
+  } finally {
+    zoteroSending.value = false
+  }
+}
 </script>
 
 <template>
@@ -59,6 +104,19 @@ const { t } = useI18n()
       <option value="ja">{{ t('languages.ja') }}</option>
       <option value="ko">{{ t('languages.ko') }}</option>
     </select>
+    <!-- 发送到 Zotero 按钮（仅学术文献显示，通过 DOI 或 PMID 判断） -->
+    <button
+      v-if="entryUrl && (entryDoi || entryPmid)"
+      @click="handleSendToZotero"
+      :disabled="zoteroSending || zoteroSent"
+      class="action-btn h-[clamp(28px,3.2vw,34px)] px-[clamp(10px,1.3vw,14px)] rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] c-[var(--text-primary)] font-medium text-[clamp(0.72rem,1vw,0.8rem)] tracking-tight cursor-pointer transition-all duration-200 min-w-17 whitespace-nowrap shadow-sm hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:c-white hover:shadow-lg disabled:op-60 disabled:cursor-not-allowed"
+      :class="{ 'is-success': zoteroSent }"
+      :title="zoteroError || ''"
+    >
+      <template v-if="zoteroSending">{{ t('zotero.sending') }}</template>
+      <template v-else-if="zoteroSent">{{ t('zotero.sent') }}</template>
+      <template v-else>{{ t('zotero.sendTo') }}</template>
+    </button>
   </div>
 </template>
 
@@ -101,6 +159,12 @@ const { t } = useI18n()
 .action-btn.is-active {
   border-color: var(--accent);
   background-color: var(--accent);
+  color: #fff;
+}
+
+.action-btn.is-success {
+  border-color: #22c55e;
+  background-color: #22c55e;
   color: #fff;
 }
 

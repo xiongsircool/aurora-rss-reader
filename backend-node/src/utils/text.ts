@@ -31,20 +31,3 @@ export function cleanHtmlText(value: string | null | undefined): string | null {
     return null;
   }
 }
-
-/**
- * Truncate text to a maximum length, adding ellipsis if needed
- */
-export function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
-  }
-  return text.substring(0, maxLength - 3) + '...';
-}
-
-/**
- * Strip HTML tags from a string (simple regex-based approach)
- */
-export function stripHtmlTags(html: string): string {
-  return html.replace(/<[^>]*>/g, '');
-}

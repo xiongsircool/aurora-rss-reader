@@ -372,6 +372,65 @@ function extractDuration(item: any): string | null {
 }
 
 /**
+ * Extract DOI from RSS item
+ * Supports: dc:identifier, prism:doi, and URL patterns
+ */
+function extractDoi(item: any): string | null {
+  // 1. dc:identifier (format: "doi:10.1038/xxx")
+  const dcIdentifier = item['dc:identifier'] || item.dc?.identifier;
+  if (dcIdentifier) {
+    const doiMatch = String(dcIdentifier).match(/^doi:(.+)$/i);
+    if (doiMatch) return doiMatch[1];
+    // Direct DOI format
+    if (String(dcIdentifier).match(/^10\.\d{4,}/)) return dcIdentifier;
+  }
+
+  // 2. prism:doi
+  const prismDoi = item['prism:doi'] || item.prism?.doi;
+  if (prismDoi && String(prismDoi).match(/^10\.\d{4,}/)) {
+    return prismDoi;
+  }
+
+  // 3. Extract from URL (nature.com, springer, etc.)
+  const url = item.link || item.url;
+  if (url) {
+    // doi.org URL
+    const doiOrgMatch = url.match(/doi\.org\/(10\.\d{4,}[^\s]+)/i);
+    if (doiOrgMatch) return doiOrgMatch[1];
+
+    // Nature: nature.com/articles/s41467-xxx
+    const natureMatch = url.match(/nature\.com\/articles\/(s\d+-\d+-\d+-\w)/);
+    if (natureMatch) return `10.1038/${natureMatch[1]}`;
+  }
+
+  return null;
+}
+
+/**
+ * Extract PMID from RSS item
+ */
+function extractPmid(item: any): string | null {
+  // dc:identifier with pmid prefix
+  const dcIdentifier = item['dc:identifier'] || item.dc?.identifier;
+  if (dcIdentifier) {
+    const pmidMatch = String(dcIdentifier).match(/^pmid:(\d+)$/i);
+    if (pmidMatch) return pmidMatch[1];
+  }
+
+  // Direct pmid field
+  if (item.pmid) return String(item.pmid);
+
+  // Extract from PubMed URL
+  const url = item.link || item.url;
+  if (url) {
+    const pubmedMatch = url.match(/pubmed\.ncbi\.nlm\.nih\.gov\/(\d+)/i);
+    if (pubmedMatch) return pubmedMatch[1];
+  }
+
+  return null;
+}
+
+/**
  * Extract image URL from RSS item
  */
 function extractImageUrl(item: any, feedData: any): string | null {
@@ -548,6 +607,10 @@ export async function refreshFeed(feedId: string): Promise<FetchResult> {
       const duration = extractDuration(item);
       const imageUrl = extractImageUrl(item, feedData);
 
+      // Extract DOI/PMID for academic articles
+      const doi = extractDoi(item);
+      const pmid = extractPmid(item);
+
       // Create entry
       entryRepo.create({
         feed_id: feedId,
@@ -565,6 +628,8 @@ export async function refreshFeed(feedId: string): Promise<FetchResult> {
         enclosure_length: enclosure?.length || null,
         duration: duration,
         image_url: imageUrl,
+        doi: doi,
+        pmid: pmid,
       });
 
       newItemCount++;

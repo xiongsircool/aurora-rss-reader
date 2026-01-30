@@ -19,6 +19,9 @@ export interface EntryCreateInput {
   enclosure_length?: number | null;
   duration?: string | null;
   image_url?: string | null;
+  // Academic article identifiers
+  doi?: string | null;
+  pmid?: string | null;
 }
 
 export interface EntryUpdateInput {
@@ -61,6 +64,8 @@ export class EntryRepository {
       enclosure_length: input.enclosure_length ?? null,
       duration: input.duration ?? null,
       image_url: input.image_url ?? null,
+      doi: input.doi ?? null,
+      pmid: input.pmid ?? null,
     };
 
     const stmt = this.db.prepare(`
@@ -68,8 +73,9 @@ export class EntryRepository {
         id, feed_id, guid, title, url, title_translations, author,
         summary, content, readability_content, categories_json,
         published_at, inserted_at, read, starred,
-        enclosure_url, enclosure_type, enclosure_length, duration, image_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        enclosure_url, enclosure_type, enclosure_length, duration, image_url,
+        doi, pmid
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -92,7 +98,9 @@ export class EntryRepository {
       entry.enclosure_type,
       entry.enclosure_length,
       entry.duration,
-      entry.image_url
+      entry.image_url,
+      entry.doi,
+      entry.pmid
     );
 
     return entry;

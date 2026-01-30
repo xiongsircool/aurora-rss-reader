@@ -54,6 +54,9 @@ export interface Entry {
   enclosure_length?: number | null
   duration?: string | null
   image_url?: string | null
+  // Academic article identifiers
+  doi?: string | null
+  pmid?: string | null
 }
 
 export interface EntryPage {

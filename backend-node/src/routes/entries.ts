@@ -38,6 +38,9 @@ function normalizeEntry(row: any, translationRepo: TranslationRepository, target
     enclosure_length: row.enclosure_length ?? null,
     duration: row.duration ?? null,
     image_url: row.image_url ?? null,
+    // Academic article identifiers
+    doi: row.doi ?? null,
+    pmid: row.pmid ?? null,
   };
 
   // Fetch translation if available

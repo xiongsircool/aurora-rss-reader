@@ -69,6 +69,16 @@ function runMigrations(): void {
     db.exec(`ALTER TABLE entries ADD COLUMN image_url TEXT`);
     console.log('Migration completed: enclosure columns added');
   }
+
+  // Check if DOI/PMID columns exist in entries (for academic article support)
+  const hasDoi = entriesTableInfo.some((col) => col.name === 'doi');
+  if (!hasDoi) {
+    console.log('Running migration: Adding DOI/PMID columns to entries');
+    db.exec(`ALTER TABLE entries ADD COLUMN doi TEXT`);
+    db.exec(`ALTER TABLE entries ADD COLUMN pmid TEXT`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_doi ON entries(doi)`);
+    console.log('Migration completed: DOI/PMID columns added');
+  }
 }
 
 export function initDatabase(): void {
@@ -212,6 +222,37 @@ export function initDatabase(): void {
       CHECK (id = 1)
     )
   `);
+
+  // Create collections table (for multi-folder system)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS collections (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      icon TEXT DEFAULT 'folder',
+      color TEXT DEFAULT '#ff7a18',
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_collections_sort_order ON collections(sort_order)`);
+
+  // Create collection_entries table (many-to-many relationship)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS collection_entries (
+      collection_id TEXT NOT NULL,
+      entry_id TEXT NOT NULL,
+      added_at TEXT NOT NULL,
+      note TEXT,
+      PRIMARY KEY (collection_id, entry_id),
+      FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+      FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_collection_entries_collection ON collection_entries(collection_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_collection_entries_entry ON collection_entries(entry_id)`);
 
   // Run migrations for existing databases
   runMigrations();

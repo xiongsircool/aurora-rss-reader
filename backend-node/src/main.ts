@@ -10,6 +10,8 @@ import { aiRoutes } from './routes/ai.js';
 import { opmlRoutes } from './routes/opml.js';
 import { iconsRoutes } from './routes/icons.js';
 import { schedulerRoutes } from './routes/scheduler.js';
+import { zoteroRoutes } from './routes/zotero.js';
+import { collectionsRoutes } from './routes/collections.js';
 import { scheduler } from './services/scheduler.js';
 import { handleMcpRequest, handleMcpGetRequest, handleMcpDeleteRequest } from './mcp/server.js';
 
@@ -92,6 +94,8 @@ await app.register(aiRoutes, { prefix: '/api' });
 await app.register(opmlRoutes, { prefix: '/api' });
 await app.register(iconsRoutes, { prefix: '/api' });
 await app.register(schedulerRoutes, { prefix: '/api' });
+await app.register(zoteroRoutes, { prefix: '/api' });
+await app.register(collectionsRoutes, { prefix: '/api' });
 
 // ============================================
 // MCP (Model Context Protocol) Endpoint
