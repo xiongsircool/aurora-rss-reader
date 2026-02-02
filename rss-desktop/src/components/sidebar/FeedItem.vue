@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import type { Feed, ViewType } from '../../types'
 import { VIEW_TYPES, VIEW_TYPE_LABELS } from '../../types'
 import { useFeedIcons } from '../../composables/useFeedIcons'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useI18n } from 'vue-i18n'
 
-defineProps<{
+const props = defineProps<{
   feed: Feed
   active: boolean
   isEditing: boolean
   editingGroupName: string
   isDateFilterActive: boolean
   timeFilterLabel: string
+  availableGroups: string[]
 }>()
 
 const emit = defineEmits<{
@@ -24,18 +25,66 @@ const emit = defineEmits<{
   (e: 'update:editingGroupName', value: string): void
   (e: 'mark-feed-read', feedId: string): void
   (e: 'change-view-type', feedId: string, viewType: ViewType): void
+  (e: 'move-to-group', feedId: string, groupName: string): void
+  (e: 'set-custom-title', feedId: string, customTitle: string | null): void
 }>()
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
+// 获取显示名称：优先使用 custom_title，否则使用 title 或 url
+const displayName = computed(() => {
+  return props.feed.custom_title || props.feed.title || props.feed.url
+})
+
 // 右键菜单状态
 const showContextMenu = ref(false)
 const contextMenuPos = ref({ x: 0, y: 0 })
+const contextMenuRef = ref<HTMLElement | null>(null)
+const lastContextMenuClick = ref<{ x: number; y: number } | null>(null)
 const showViewTypeSubmenu = ref(false)
+const showGroupSubmenu = ref(false)
+const groupSubmenuRef = ref<HTMLElement | null>(null)
+const viewTypeSubmenuRef = ref<HTMLElement | null>(null)
+
+// 设置别名状态（子菜单形式）
+const showAliasSubmenu = ref(false)
+const aliasInputValue = ref('')
+const aliasInputRef = ref<HTMLInputElement | null>(null)
+const aliasSubmenuRef = ref<HTMLElement | null>(null)
+const aliasSubmenuStyle = ref<{ top?: string; bottom?: string }>({})
+
+// 子菜单位置样式
+const groupSubmenuStyle = ref<{ top?: string; bottom?: string }>({})
+const viewTypeSubmenuStyle = ref<{ top?: string; bottom?: string }>({})
 
 // 全局事件：关闭所有其他菜单
 const CLOSE_ALL_MENUS_EVENT = 'feed-context-menu:close-all'
+
+function updateContextMenuPosition() {
+  const clickPos = lastContextMenuClick.value
+  if (!clickPos) return
+
+  const rect = contextMenuRef.value?.getBoundingClientRect()
+  const menuWidth = rect?.width || 220
+  const menuHeight = rect?.height || 320
+  const padding = 10
+
+  let x = clickPos.x
+  let y = clickPos.y
+
+  if (x + menuWidth > window.innerWidth - padding) {
+    x = window.innerWidth - menuWidth - padding
+  }
+  if (y + menuHeight > window.innerHeight - padding) {
+    y = window.innerHeight - menuHeight - padding
+  }
+
+  x = Math.max(padding, x)
+  y = Math.max(padding, y)
+
+  contextMenuPos.value = { x, y }
+}
 
 function handleContextMenu(e: MouseEvent) {
   e.preventDefault()
@@ -44,32 +93,80 @@ function handleContextMenu(e: MouseEvent) {
   // 先关闭所有其他菜单
   window.dispatchEvent(new CustomEvent(CLOSE_ALL_MENUS_EVENT))
 
-  // 计算菜单位置，确保不超出视口
-  const menuWidth = 200
-  const menuHeight = 220
-  let x = e.clientX
-  let y = e.clientY
-
-  if (x + menuWidth > window.innerWidth) {
-    x = window.innerWidth - menuWidth - 10
-  }
-  if (y + menuHeight > window.innerHeight) {
-    y = window.innerHeight - menuHeight - 10
-  }
-
-  contextMenuPos.value = { x, y }
+  lastContextMenuClick.value = { x: e.clientX, y: e.clientY }
+  contextMenuPos.value = { x: e.clientX, y: e.clientY }
   showViewTypeSubmenu.value = false
+  showGroupSubmenu.value = false
 
   // 延迟显示，确保其他菜单已关闭
   requestAnimationFrame(() => {
     showContextMenu.value = true
+    nextTick(() => updateContextMenuPosition())
   })
 }
 
 function closeContextMenu() {
   showContextMenu.value = false
   showViewTypeSubmenu.value = false
+  showGroupSubmenu.value = false
+  showAliasSubmenu.value = false
+  lastContextMenuClick.value = null
+  aliasInputValue.value = ''
+  groupSubmenuStyle.value = {}
+  viewTypeSubmenuStyle.value = {}
+  aliasSubmenuStyle.value = {}
 }
+
+// 打开别名子菜单
+function openAliasSubmenu() {
+  aliasInputValue.value = props.feed.custom_title || ''
+  showAliasSubmenu.value = true
+  showViewTypeSubmenu.value = false
+  showGroupSubmenu.value = false
+  // 自动聚焦输入框
+  nextTick(() => {
+    updateSubmenuPosition(aliasSubmenuRef.value, aliasSubmenuStyle)
+    aliasInputRef.value?.focus()
+  })
+}
+
+// 保存别名
+function saveAlias() {
+  const trimmed = aliasInputValue.value.trim()
+  emit('set-custom-title', props.feed.id, trimmed || null)
+  closeContextMenu()
+}
+
+// 计算子菜单位置，确保不超出视口
+function updateSubmenuPosition(submenuEl: HTMLElement | null, styleRef: typeof groupSubmenuStyle) {
+  if (!submenuEl) return
+
+  requestAnimationFrame(() => {
+    const rect = submenuEl.getBoundingClientRect()
+    const viewportHeight = window.innerHeight
+
+    // 如果子菜单底部超出视口
+    if (rect.bottom > viewportHeight - 10) {
+      // 改为从底部对齐
+      styleRef.value = { bottom: '0', top: 'auto' }
+    } else {
+      styleRef.value = { top: '0', bottom: 'auto' }
+    }
+  })
+}
+
+// 监听子菜单显示状态，自动调整位置
+watch(showGroupSubmenu, (show) => {
+  if (show) {
+    nextTick(() => updateSubmenuPosition(groupSubmenuRef.value, groupSubmenuStyle))
+  }
+})
+
+watch(showViewTypeSubmenu, (show) => {
+  if (show) {
+    nextTick(() => updateSubmenuPosition(viewTypeSubmenuRef.value, viewTypeSubmenuStyle))
+  }
+})
 
 function handleCloseAllMenus() {
   closeContextMenu()
@@ -156,15 +253,15 @@ function getFeedRefreshTooltip(_feed: Feed): string {
           @error="handleFeedIconError(feed.id, iconSrcFor(feed.favicon_url))"
           class="w-[calc(100%-4px)] h-[calc(100%-4px)] object-contain bg-[rgba(255,255,255,0.8)] rounded-lg block p-[2px]"
         />
-        <span 
-          class="text-[0.78rem] uppercase tracking-wide" 
+        <span
+          class="text-[0.78rem] uppercase tracking-wide"
           v-show="isFeedIconBroken(feed) || !isFeedIconLoaded(iconSrcFor(feed?.favicon_url))"
         >
-          {{ getFeedInitial(feed.title || feed.url) }}
+          {{ getFeedInitial(displayName) }}
         </span>
       </div>
       <div class="flex-1 flex flex-col gap-1 overflow-hidden">
-        <span class="font-semibold text-[13px] whitespace-nowrap overflow-hidden text-ellipsis">{{ feed.title || feed.url }}</span>
+        <span class="font-semibold text-[13px] whitespace-nowrap overflow-hidden text-ellipsis">{{ displayName }}</span>
         <span class="text-[11px] c-[#8a90a3] whitespace-nowrap overflow-hidden text-ellipsis op-80" v-if="!isEditing">{{ feed.url }}</span>
         <div class="flex items-center gap-2 c-[var(--text-secondary)] text-[11px]" v-if="!isEditing">
           <span class="last-checked" :title="getFeedRefreshTooltip(feed)">
@@ -229,6 +326,7 @@ function getFeedRefreshTooltip(_feed: Feed): string {
   <Teleport to="body">
     <div
       v-if="showContextMenu"
+      ref="contextMenuRef"
       class="feed-context-menu fixed z-[9999] bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.2)] py-1.5 min-w-[200px]"
       :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }"
     >
@@ -255,12 +353,58 @@ function getFeedRefreshTooltip(_feed: Feed): string {
         <span>{{ t('feeds.editTitle') }}</span>
       </button>
 
+      <!-- 设置别名 (带子菜单) -->
+      <div class="relative">
+        <button
+          @click="openAliasSubmenu"
+          class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
+        >
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+          </svg>
+          <span class="flex-1">{{ t('feeds.setAlias') }}</span>
+          <span v-if="feed.custom_title" class="text-[11px] c-[var(--text-tertiary)] max-w-16 truncate mr-1">{{ feed.custom_title }}</span>
+          <svg class="w-3 h-3 shrink-0 c-[var(--text-tertiary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
+
+        <!-- 别名输入子菜单 -->
+        <div
+          v-if="showAliasSubmenu"
+          ref="aliasSubmenuRef"
+          class="absolute left-full ml-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.2)] p-3 min-w-[220px]"
+          :style="aliasSubmenuStyle"
+          @click.stop
+        >
+          <div class="flex flex-col gap-2">
+            <input
+              ref="aliasInputRef"
+              v-model="aliasInputValue"
+              :placeholder="feed.title || feed.url"
+              class="w-full px-2.5 py-2 border-2 border-[var(--accent)] rounded-lg text-[13px] bg-white dark:bg-[#1a1d24] c-[var(--text-primary)] focus:outline-none shadow-[0_0_0_3px_rgba(255,122,24,0.2)]"
+              @keyup.enter="saveAlias"
+              @keyup.escape="showAliasSubmenu = false"
+            />
+            <div class="flex justify-between items-center">
+              <p class="text-[11px] c-[var(--text-tertiary)]">{{ t('feeds.aliasHint') }}</p>
+              <button
+                @click="saveAlias"
+                class="px-3 py-1.5 bg-[var(--accent)] c-white rounded-lg text-[12px] font-medium hover:op-90 shadow-sm"
+              >
+                {{ t('common.save') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="h-px bg-[var(--border-color)] my-1.5"></div>
 
       <!-- 更改视图类型 (带子菜单) -->
       <div class="relative">
         <button
-          @click="showViewTypeSubmenu = !showViewTypeSubmenu"
+          @click="showViewTypeSubmenu = !showViewTypeSubmenu; showGroupSubmenu = false; showAliasSubmenu = false"
           class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
         >
           <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -277,7 +421,9 @@ function getFeedRefreshTooltip(_feed: Feed): string {
         <!-- 视图类型子菜单 -->
         <div
           v-if="showViewTypeSubmenu"
-          class="absolute left-full top-0 ml-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.2)] py-1.5 min-w-[160px]"
+          ref="viewTypeSubmenuRef"
+          class="absolute left-full ml-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.2)] py-1.5 min-w-[160px]"
+          :style="viewTypeSubmenuStyle"
         >
           <button
             v-for="vt in VIEW_TYPES"
@@ -306,6 +452,47 @@ function getFeedRefreshTooltip(_feed: Feed): string {
             </svg>
             <span>{{ VIEW_TYPE_LABELS[vt] }}</span>
             <svg v-if="feed.view_type === vt" class="w-4 h-4 ml-auto c-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 移动到分组 (带子菜单) -->
+      <div class="relative">
+        <button
+          @click="showGroupSubmenu = !showGroupSubmenu; showViewTypeSubmenu = false; showAliasSubmenu = false"
+          class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
+        >
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span class="flex-1">{{ t('feeds.moveToGroup') }}</span>
+          <span class="text-[11px] c-[var(--text-tertiary)] mr-1 max-w-20 truncate">{{ feed.group_name || t('feeds.ungrouped') }}</span>
+          <svg class="w-3 h-3 shrink-0 c-[var(--text-tertiary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
+
+        <!-- 分组子菜单 -->
+        <div
+          v-if="showGroupSubmenu"
+          ref="groupSubmenuRef"
+          class="absolute left-full ml-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.2)] py-1.5 min-w-[160px] max-h-[240px] overflow-y-auto"
+          :style="groupSubmenuStyle"
+        >
+          <button
+            v-for="group in availableGroups"
+            :key="group"
+            @click="emit('move-to-group', feed.id, group); closeContextMenu()"
+            class="w-full px-3 py-2 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
+            :class="{ 'bg-[rgba(255,122,24,0.12)] c-[var(--accent)]! font-medium': feed.group_name === group }"
+          >
+            <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span class="flex-1 truncate">{{ group }}</span>
+            <svg v-if="feed.group_name === group" class="w-4 h-4 shrink-0 c-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </button>

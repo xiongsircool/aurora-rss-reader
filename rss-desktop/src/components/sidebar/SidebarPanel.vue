@@ -50,6 +50,7 @@ const emit = defineEmits<{
   // Feed groups
   (e: 'group-click', groupName: string): void
   (e: 'toggle-collapse', groupName: string): void
+  (e: 'group-row-click', groupName: string): void
   (e: 'expand-all'): void
   (e: 'collapse-all'): void
   
@@ -68,6 +69,12 @@ const emit = defineEmits<{
   // View type
   (e: 'select-view-type', viewType: string): void
   (e: 'change-view-type', feedId: string, viewType: ViewType): void
+
+  // Move to group
+  (e: 'move-to-group', feedId: string, groupName: string): void
+
+  // Custom title
+  (e: 'set-custom-title', feedId: string, customTitle: string | null): void
 }>()
 
 const { t } = useI18n()
@@ -79,6 +86,16 @@ const feedMap = computed<Record<string, Feed>>(() => {
     acc[feed.id] = feed
     return acc
   }, {})
+})
+
+const addFeedTargetGroupName = computed(() => {
+  if (props.showFavoritesOnly) return null
+  let targetGroupName = feedStore.activeGroupName
+  if (!targetGroupName && feedStore.activeFeedId) {
+    const activeFeed = feedStore.feeds.find((feed) => feed.id === feedStore.activeFeedId)
+    targetGroupName = activeFeed?.group_name
+  }
+  return targetGroupName
 })
 
 function isGroupCollapsed(groupName: string): boolean {
@@ -98,6 +115,7 @@ function isGroupCollapsed(groupName: string): boolean {
     
     <AddFeedForm
       :adding-feed="addingFeed"
+      :target-group-name="addFeedTargetGroupName"
       @add-feed="emit('add-feed', $event)"
     />
     
@@ -149,8 +167,10 @@ function isGroupCollapsed(groupName: string): boolean {
         :editing-group-name="editingGroupName"
         :is-date-filter-active="isDateFilterActive"
         :time-filter-label="timeFilterLabel"
+        :available-groups="feedStore.sortedGroupNames"
         @group-click="emit('group-click', $event)"
         @toggle-collapse="emit('toggle-collapse', $event)"
+        @group-row-click="emit('group-row-click', $event)"
         @select-feed="emit('select-feed', $event)"
         @start-edit="emit('start-edit', $event, groupName)"
         @save-edit="emit('save-edit', $event, editingGroupName)"
@@ -160,6 +180,8 @@ function isGroupCollapsed(groupName: string): boolean {
         @mark-group-read="emit('mark-group-read', $event)"
         @mark-feed-read="emit('mark-feed-read', $event)"
         @change-view-type="(feedId, viewType) => emit('change-view-type', feedId, viewType)"
+        @move-to-group="(feedId, groupName) => emit('move-to-group', feedId, groupName)"
+        @set-custom-title="(feedId, customTitle) => emit('set-custom-title', feedId, customTitle)"
       />
     </div>
   </aside>
