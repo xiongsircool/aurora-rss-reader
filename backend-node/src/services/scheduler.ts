@@ -8,6 +8,7 @@ import { FeedRepository } from '../db/repositories/index.js';
 import { refreshFeed } from './fetcher.js';
 import { UserSettingsService } from './userSettings.js';
 import { syncEntriesToVectorDB } from './vector.js';
+import { runAutoTaggingBatch } from './autoTagging.js';
 
 export class SchedulerService {
   private cronJob: cron.ScheduledTask | null = null;
@@ -105,6 +106,18 @@ export class SchedulerService {
         await syncEntriesToVectorDB(20); // Sync up to 20 items per loop
       } catch (e) {
         console.error('❌ Vector sync error:', e);
+      }
+
+      // Auto-tag new entries (if enabled)
+      try {
+        const tagStats = await runAutoTaggingBatch({ limit: 20 });
+        if (tagStats.processed > 0 || tagStats.failed > 0) {
+          console.log(
+            `🏷️  Auto tagging: ${tagStats.processed} processed (${tagStats.tagged} tagged, ${tagStats.untagged} untagged), ${tagStats.failed} failed`
+          );
+        }
+      } catch (e) {
+        console.error('❌ Auto tagging error:', e);
       }
 
     } catch (error) {

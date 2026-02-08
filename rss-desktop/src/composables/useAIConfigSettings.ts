@@ -1,24 +1,32 @@
 import { ref, type Ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAIStore, type AIServiceKey } from '../stores/aiStore'
 import type { LocalConfig } from './useSettingsModal'
+import type { ConfirmOptions } from './useConfirmDialog'
 
 export interface TestResult {
     success: boolean
     message: string
 }
 
-export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
+export function useAIConfigSettings(
+    localConfig: Ref<LocalConfig>,
+    requestConfirm: (options: ConfirmOptions) => Promise<boolean>
+) {
     const aiStore = useAIStore()
+    const { t } = useI18n()
 
     const serviceTesting = ref<Record<AIServiceKey, boolean>>({
         summary: false,
         translation: false,
+        tagging: false,
         embedding: false
     })
 
     const serviceTestResult = ref<Record<AIServiceKey, TestResult | null>>({
         summary: null,
         translation: null,
+        tagging: null,
         embedding: null
     })
 
@@ -53,6 +61,7 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
     function resetTestResults() {
         serviceTestResult.value.summary = null
         serviceTestResult.value.translation = null
+        serviceTestResult.value.tagging = null
         serviceTestResult.value.embedding = null
     }
 
@@ -72,13 +81,13 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
             return
         }
 
-        // 确认对话框
-        const confirmed = confirm(
-            '确定要重建向量数据库吗？\n\n' +
-            '这将清除现有向量并重新处理所有文章标题。\n' +
-            '根据文章数量，可能需要几分钟时间。'
-        )
-
+        const confirmed = await requestConfirm({
+            title: t('settings.rebuildVectors'),
+            message: t('settings.rebuildVectorsConfirm'),
+            confirmText: t('common.confirm'),
+            cancelText: t('common.cancel'),
+            danger: true
+        })
         if (!confirmed) return
 
         rebuildingVectors.value = true
@@ -110,9 +119,8 @@ export function useAIConfigSettings(localConfig: Ref<LocalConfig>) {
         mcpTestResult.value = null
 
         try {
-            // Health endpoint is at root, not under /api
-            const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') ?? 'http://127.0.0.1:15432'
-            const response = await fetch(`${baseUrl}/health`)
+            const apiBase = import.meta.env.VITE_API_BASE_URL ?? '/api'
+            const response = await fetch(`${apiBase}/health`)
             const data = await response.json()
             if (data?.status === 'ok' || data?.status === 'degraded') {
                 mcpTestResult.value = {

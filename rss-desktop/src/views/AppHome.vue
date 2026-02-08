@@ -15,8 +15,10 @@ import { useFeedFilter } from '../composables/useFeedFilter'
 import { useAppSync } from '../composables/useAppSync'
 import { useFeedActions } from '../composables/useFeedActions'
 import { useArticleTranslation } from '../composables/useArticleTranslation'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 
 import Toast from '../components/Toast.vue'
+import ConfirmModal from '../components/common/ConfirmModal.vue'
 import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
 import DetailsPanel from '../components/details/DetailsPanel.vue'
@@ -35,6 +37,13 @@ const favoritesStore = useFavoritesStore()
 const settingsStore = useSettingsStore()
 const { t, locale } = useI18n()
 const { loadLanguage } = useLanguage()
+const {
+  show: confirmShow,
+  options: confirmOptions,
+  requestConfirm,
+  handleConfirm,
+  handleCancel
+} = useConfirmDialog()
 // Initialize Composables
 const {
   aiFeatures,
@@ -524,6 +533,7 @@ onMounted(async () => {
   initLayout()
   loadTheme()
   store.loadCollapsedGroups()
+  store.loadCustomGroups()
   try {
     await settingsStore.fetchSettings()
   } catch (error) {
@@ -777,14 +787,27 @@ async function handleGroupClick(groupName: string) {
   await store.fetchEntries({ groupName })
 }
 
+async function handleGroupRowClick(groupName: string) {
+  // 点击分组整行时，同时展开/折叠和选中分组
+  store.toggleGroupCollapse(groupName)
+  store.selectGroup(groupName)
+  await store.fetchEntries({ groupName })
+}
+
 async function handleDeleteFeed(feedId: string) {
-  if (confirm(t('feeds.deleteConfirm'))) {
-    try {
-      await store.deleteFeed(feedId)
-      showNotification(t('feeds.deleteSuccess'), 'success')
-    } catch (error) {
-      showNotification(t('feeds.deleteFailed'), 'error')
-    }
+  const confirmed = await requestConfirm({
+    title: t('feeds.deleteFeed'),
+    message: t('feeds.deleteConfirm'),
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+    danger: true
+  })
+  if (!confirmed) return
+  try {
+    await store.deleteFeed(feedId)
+    showNotification(t('feeds.deleteSuccess'), 'success')
+  } catch (error) {
+    showNotification(t('feeds.deleteFailed'), 'error')
   }
 }
 
@@ -852,7 +875,12 @@ async function handleMarkAllAsRead() {
   const timeField = settingsStore.settings.time_field
   
   // 确认对话框
-  const confirmed = confirm(t('articles.markAsReadConfirmAll'))
+  const confirmed = await requestConfirm({
+    title: t('articles.markAsRead'),
+    message: t('articles.markAsReadConfirmAll'),
+    confirmText: t('common.confirm'),
+    cancelText: t('common.cancel')
+  })
   if (!confirmed) return
   
   try {
@@ -960,6 +988,28 @@ async function handleChangeViewType(feedId: string, viewType: string) {
     showNotification(t('feeds.viewTypeChangeFailed'), 'error')
   }
 }
+
+// 移动订阅源到指定分组
+async function handleMoveToGroup(feedId: string, groupName: string) {
+  try {
+    await store.updateFeed(feedId, { group_name: groupName })
+    showNotification(t('feeds.moveToGroupSuccess'), 'success')
+  } catch (error) {
+    console.error('Move to group failed:', error)
+    showNotification(t('feeds.moveToGroupFailed'), 'error')
+  }
+}
+
+// 设置订阅源别名
+async function handleSetCustomTitle(feedId: string, customTitle: string | null) {
+  try {
+    await store.updateFeed(feedId, { custom_title: customTitle })
+    showNotification(t('feeds.aliasSetSuccess'), 'success')
+  } catch (error) {
+    console.error('Set custom title failed:', error)
+    showNotification(t('feeds.aliasSetFailed'), 'error')
+  }
+}
 </script>
 
 <template>
@@ -968,6 +1018,16 @@ async function handleChangeViewType(feedId: string, viewType: string) {
     :message="toastMessage" 
     :type="toastType" 
     @close="showToast = false" 
+  />
+  <ConfirmModal
+    :show="confirmShow"
+    :title="confirmOptions.title || ''"
+    :message="confirmOptions.message"
+    :confirm-text="confirmOptions.confirmText"
+    :cancel-text="confirmOptions.cancelText"
+    :danger="confirmOptions.danger"
+    @confirm="handleConfirm"
+    @cancel="handleCancel"
   />
   <SettingsModal
     :show="showSettings"
@@ -1010,6 +1070,7 @@ async function handleChangeViewType(feedId: string, viewType: string) {
       @select-favorite-feed="selectFavoriteFeed"
       @group-click="handleGroupClick"
       @toggle-collapse="toggleGroupCollapse"
+      @group-row-click="handleGroupRowClick"
       @expand-all="expandAllGroups"
       @collapse-all="collapseAllGroups"
       @select-feed="handleFeedClick"
@@ -1022,6 +1083,8 @@ async function handleChangeViewType(feedId: string, viewType: string) {
       @mark-feed-read="handleMarkFeedAsRead"
       @select-view-type="handleSelectViewType"
       @change-view-type="handleChangeViewType"
+      @move-to-group="handleMoveToGroup"
+      @set-custom-title="handleSetCustomTitle"
     />
 
     <div

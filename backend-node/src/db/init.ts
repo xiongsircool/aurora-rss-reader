@@ -25,7 +25,7 @@ function runMigrations(): void {
   const db = getDatabase();
 
   // Check if language column exists in user_settings
-  const tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  let tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
   const hasLanguageColumn = tableInfo.some((col) => col.name === 'language');
 
   if (!hasLanguageColumn) {
@@ -79,7 +79,57 @@ function runMigrations(): void {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_doi ON entries(doi)`);
     console.log('Migration completed: DOI/PMID columns added');
   }
+
+  // Check if custom_title column exists in feeds (for feed alias support)
+  const hasCustomTitle = feedsTableInfo.some((col) => col.name === 'custom_title');
+  if (!hasCustomTitle) {
+    console.log('Running migration: Adding custom_title column to feeds');
+    db.exec(`ALTER TABLE feeds ADD COLUMN custom_title TEXT`);
+    console.log('Migration completed: custom_title column added');
+  }
+
+  // Check if ai_tagging_enabled column exists in feeds (for per-feed smart tagging control)
+  const hasAiTaggingEnabled = feedsTableInfo.some((col) => col.name === 'ai_tagging_enabled');
+  if (!hasAiTaggingEnabled) {
+    console.log('Running migration: Adding ai_tagging_enabled column to feeds');
+    db.exec(`ALTER TABLE feeds ADD COLUMN ai_tagging_enabled INTEGER NOT NULL DEFAULT 1`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_feeds_ai_tagging_enabled ON feeds(ai_tagging_enabled)`);
+    console.log('Migration completed: ai_tagging_enabled column added');
+  }
+
+  // Check if tagging columns exist in user_settings (for smart tagging feature)
+  const hasTaggingApiKey = tableInfo.some((col) => col.name === 'tagging_api_key');
+  if (!hasTaggingApiKey) {
+    console.log('Running migration: Adding tagging columns to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tagging_api_key TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tagging_base_url TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tagging_model_name TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN ai_auto_tagging INTEGER DEFAULT 0`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN ai_auto_tagging_start_at TEXT`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tags_version INTEGER DEFAULT 1`);
+    console.log('Migration completed: tagging columns added');
+  }
+
+  // Refresh after possible ALTER TABLE changes above.
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+
+  // Add ai_auto_tagging_start_at for databases that already have tagging columns
+  const hasAutoTaggingStartAt = tableInfo.some((col) => col.name === 'ai_auto_tagging_start_at');
+  if (!hasAutoTaggingStartAt) {
+    console.log('Running migration: Adding ai_auto_tagging_start_at column to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN ai_auto_tagging_start_at TEXT`);
+    console.log('Migration completed: ai_auto_tagging_start_at column added');
+  }
+
+  // Check if ai_prompt_preference column exists in user_settings
+  const hasAiPromptPreference = tableInfo.some((col) => col.name === 'ai_prompt_preference');
+  if (!hasAiPromptPreference) {
+    console.log('Running migration: Adding ai_prompt_preference column to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN ai_prompt_preference TEXT DEFAULT ''`);
+    console.log('Migration completed: ai_prompt_preference column added');
+  }
 }
+
 
 export function initDatabase(): void {
   const db = getDatabase();
@@ -90,11 +140,13 @@ export function initDatabase(): void {
       id TEXT PRIMARY KEY,
       url TEXT UNIQUE NOT NULL,
       title TEXT,
+      custom_title TEXT,
       site_url TEXT,
       description TEXT,
       favicon_url TEXT,
       group_name TEXT DEFAULT 'default',
       view_type TEXT DEFAULT 'articles',
+      ai_tagging_enabled INTEGER NOT NULL DEFAULT 1,
       last_checked_at TEXT,
       last_error TEXT,
       update_interval_minutes INTEGER DEFAULT 60,
@@ -217,6 +269,13 @@ export function initDatabase(): void {
       embedding_model TEXT NOT NULL DEFAULT 'netease-youdao/bce-embedding-base_v1',
       embedding_api_key TEXT NOT NULL DEFAULT '',
       embedding_base_url TEXT NOT NULL DEFAULT 'https://api.siliconflow.cn/v1',
+      tagging_api_key TEXT NOT NULL DEFAULT '',
+      tagging_base_url TEXT NOT NULL DEFAULT '',
+      tagging_model_name TEXT NOT NULL DEFAULT '',
+      ai_auto_tagging INTEGER NOT NULL DEFAULT 0,
+      ai_auto_tagging_start_at TEXT,
+      tags_version INTEGER NOT NULL DEFAULT 1,
+      ai_prompt_preference TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       CHECK (id = 1)
@@ -254,8 +313,55 @@ export function initDatabase(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_collection_entries_collection ON collection_entries(collection_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_collection_entries_entry ON collection_entries(entry_id)`);
 
+  // Create user_tags table (user-defined tags for smart tagging)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_tags (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      color TEXT DEFAULT '#3b82f6',
+      sort_order INTEGER DEFAULT 0,
+      enabled INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_user_tags_name ON user_tags(name)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_user_tags_enabled ON user_tags(enabled)`);
+
+  // Create entry_tags table (entry-tag relationship)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS entry_tags (
+      entry_id TEXT NOT NULL,
+      tag_id TEXT NOT NULL,
+      is_manual INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (entry_id, tag_id),
+      FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE,
+      FOREIGN KEY (tag_id) REFERENCES user_tags(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entry_tags_entry_id ON entry_tags(entry_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entry_tags_tag_id ON entry_tags(tag_id)`);
+
+  // Create entry_analysis_status table (tracking AI analysis status)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS entry_analysis_status (
+      entry_id TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'pending',
+      analyzed_at TEXT,
+      tags_version INTEGER DEFAULT 0,
+      FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entry_analysis_status_status ON entry_analysis_status(status)`);
+
   // Run migrations for existing databases
   runMigrations();
+
 
   // Load sqlite-vss extension and create vector tables
   loadVssExtension();

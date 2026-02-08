@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import api from '../api/client'
 
 // Service keys available for configuration
-export type AIServiceKey = 'summary' | 'translation' | 'embedding'
+export type AIServiceKey = 'summary' | 'translation' | 'tagging' | 'embedding'
 
 export interface AIServiceConfig {
   api_key: string
@@ -15,6 +15,7 @@ export interface AIServiceConfig {
 export interface AIFeatureConfig {
   auto_summary: boolean
   auto_title_translation: boolean
+  auto_tagging: boolean
   title_display_mode: 'replace' | 'translation-first' | 'original-first'
   translation_language: string
 }
@@ -22,6 +23,7 @@ export interface AIFeatureConfig {
 export interface AIConfig {
   summary: AIServiceConfig
   translation: AIServiceConfig
+  tagging: AIServiceConfig
   embedding: AIServiceConfig
   features: AIFeatureConfig
 }
@@ -29,6 +31,7 @@ export interface AIConfig {
 export type PartialAIConfig = {
   summary?: Partial<AIServiceConfig>
   translation?: Partial<AIServiceConfig>
+  tagging?: Partial<AIServiceConfig>
   embedding?: Partial<AIServiceConfig>
   features?: Partial<AIFeatureConfig>
 }
@@ -43,10 +46,12 @@ const createDefaultServiceConfig = (): AIServiceConfig => ({
 const createDefaultConfig = (): AIConfig => ({
   summary: createDefaultServiceConfig(),
   translation: createDefaultServiceConfig(),
+  tagging: createDefaultServiceConfig(),
   embedding: createDefaultServiceConfig(),
   features: {
     auto_summary: false,
     auto_title_translation: false,
+    auto_tagging: false,
     title_display_mode: 'original-first',
     translation_language: 'zh'
   }
@@ -56,6 +61,7 @@ function mergeConfig(target: AIConfig, updates: PartialAIConfig): AIConfig {
   return {
     summary: updates.summary ? { ...target.summary, ...updates.summary } : target.summary,
     translation: updates.translation ? { ...target.translation, ...updates.translation } : target.translation,
+    tagging: updates.tagging ? { ...target.tagging, ...updates.tagging } : target.tagging,
     embedding: updates.embedding ? { ...target.embedding, ...updates.embedding } : target.embedding,
     features: updates.features ? { ...target.features, ...updates.features } : target.features
   }

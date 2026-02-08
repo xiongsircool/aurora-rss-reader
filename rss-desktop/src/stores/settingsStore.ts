@@ -20,6 +20,8 @@ export interface AppSettings {
   details_panel_mode: 'docked' | 'click'
   // 语言设置
   language: string // 'zh' | 'en' | 'ja' | 'ko'
+  // AI 提示词偏好
+  ai_prompt_preference: string
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -35,7 +37,8 @@ export const useSettingsStore = defineStore('settings', () => {
     max_auto_title_translations: getDefaultAutoTitleTranslationLimit(),
     mark_as_read_range: 'current',
     details_panel_mode: 'docked',
-    language: 'zh'
+    language: 'zh',
+    ai_prompt_preference: ''
   })
 
   const loading = ref(false)

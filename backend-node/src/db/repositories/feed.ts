@@ -4,22 +4,26 @@ import { Feed, generateId, ViewType } from '../models.js';
 export interface FeedCreateInput {
   url: string;
   title?: string | null;
+  custom_title?: string | null;
   site_url?: string | null;
   description?: string | null;
   favicon_url?: string | null;
   group_name?: string;
   view_type?: ViewType;
+  ai_tagging_enabled?: boolean;
   update_interval_minutes?: number;
 }
 
 export interface FeedUpdateInput {
   url?: string;
   title?: string | null;
+  custom_title?: string | null;
   site_url?: string | null;
   description?: string | null;
   favicon_url?: string | null;
   group_name?: string;
   view_type?: ViewType;
+  ai_tagging_enabled?: boolean;
   last_checked_at?: string | null;
   last_error?: string | null;
   update_interval_minutes?: number;
@@ -34,11 +38,13 @@ export class FeedRepository {
       id: generateId(),
       url: input.url,
       title: input.title ?? null,
+      custom_title: input.custom_title ?? null,
       site_url: input.site_url ?? null,
       description: input.description ?? null,
       favicon_url: input.favicon_url ?? null,
       group_name: input.group_name ?? 'default',
       view_type: input.view_type ?? 'articles',
+      ai_tagging_enabled: input.ai_tagging_enabled === false ? 0 : 1,
       last_checked_at: null,
       last_error: null,
       update_interval_minutes: input.update_interval_minutes ?? 60,
@@ -48,21 +54,23 @@ export class FeedRepository {
 
     const stmt = this.db.prepare(`
       INSERT INTO feeds (
-        id, url, title, site_url, description, favicon_url,
-        group_name, view_type, last_checked_at, last_error, update_interval_minutes,
+        id, url, title, custom_title, site_url, description, favicon_url,
+        group_name, view_type, ai_tagging_enabled, last_checked_at, last_error, update_interval_minutes,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       feed.id,
       feed.url,
       feed.title,
+      feed.custom_title,
       feed.site_url,
       feed.description,
       feed.favicon_url,
       feed.group_name,
       feed.view_type,
+      feed.ai_tagging_enabled,
       feed.last_checked_at,
       feed.last_error,
       feed.update_interval_minutes,
@@ -104,6 +112,7 @@ export class FeedRepository {
     const updated: Feed = {
       ...existing,
       ...input,
+      ai_tagging_enabled: input.ai_tagging_enabled !== undefined ? (input.ai_tagging_enabled ? 1 : 0) : existing.ai_tagging_enabled,
       updated_at: new Date().toISOString(),
     };
 
@@ -111,11 +120,13 @@ export class FeedRepository {
       UPDATE feeds SET
         url = ?,
         title = ?,
+        custom_title = ?,
         site_url = ?,
         description = ?,
         favicon_url = ?,
         group_name = ?,
         view_type = ?,
+        ai_tagging_enabled = ?,
         last_checked_at = ?,
         last_error = ?,
         update_interval_minutes = ?,
@@ -126,11 +137,13 @@ export class FeedRepository {
     stmt.run(
       updated.url,
       updated.title,
+      updated.custom_title,
       updated.site_url,
       updated.description,
       updated.favicon_url,
       updated.group_name,
       updated.view_type,
+      updated.ai_tagging_enabled,
       updated.last_checked_at,
       updated.last_error,
       updated.update_interval_minutes,

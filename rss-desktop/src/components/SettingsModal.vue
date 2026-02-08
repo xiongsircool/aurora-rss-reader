@@ -7,6 +7,8 @@ import { useRSSHubSettings } from '../composables/useRSSHubSettings'
 import { useAIConfigSettings } from '../composables/useAIConfigSettings'
 import { useRefreshSettings } from '../composables/useRefreshSettings'
 import { clampAutoTitleTranslationLimit } from '../constants/translation'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
+import ConfirmModal from './common/ConfirmModal.vue'
 
 // Section Components
 import {
@@ -33,7 +35,14 @@ const settingsStore = useSettingsStore()
 // Initialize composables
 const { localConfig, initializeSettings, saveAIConfig } = useSettingsModal()
 const rsshub = useRSSHubSettings()
-const aiConfig = useAIConfigSettings(localConfig)
+const {
+  show: confirmShow,
+  options: confirmOptions,
+  requestConfirm,
+  handleConfirm,
+  handleCancel
+} = useConfirmDialog()
+const aiConfig = useAIConfigSettings(localConfig, requestConfirm)
 const refresh = useRefreshSettings()
 
 // Navigation
@@ -44,8 +53,8 @@ const isMobileDetailOpen = ref(false)
 const categories = [
   { id: 'general', label: 'settings.general', icon: 'i-carbon-settings' },
   { id: 'display', label: 'settings.displaySettings', icon: 'i-carbon-screen' },
-  { id: 'sync', label: 'settings.sync', icon: 'i-carbon-cycle' },
-  { id: 'intelligence', label: 'settings.aiConfig', icon: 'i-carbon-intelligence' },
+  { id: 'sync', label: 'settings.sync', icon: 'i-carbon-renew' },
+  { id: 'intelligence', label: 'settings.aiConfig', icon: 'i-carbon-machine-learning' },
 ]
 
 // Display settings - synced with store
@@ -76,6 +85,8 @@ const openOriginalMode = computed({
 
 const autoTitleTranslationLimit = ref(settingsStore.settings.max_auto_title_translations)
 
+const aiPromptPreference = ref(settingsStore.settings.ai_prompt_preference)
+
 const markAsReadRange = computed({
   get: () => settingsStore.settings.mark_as_read_range,
   set: (value) => settingsStore.updateSettings({ mark_as_read_range: value })
@@ -100,6 +111,8 @@ watch(() => props.show, async (show) => {
     refresh.syncFromStore()
     // Sync the local autoTitleTranslationLimit with store value
     autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
+    // Sync the local aiPromptPreference with store value
+    aiPromptPreference.value = settingsStore.settings.ai_prompt_preference
 
     // Reset view state
     activeCategory.value = 'general'
@@ -164,7 +177,10 @@ async function saveSettings() {
     
     // Save autoTitleTranslationLimit to store
     const clampedLimit = clampAutoTitleTranslationLimit(autoTitleTranslationLimit.value)
-    await settingsStore.updateSettings({ max_auto_title_translations: clampedLimit })
+    await settingsStore.updateSettings({
+      max_auto_title_translations: clampedLimit,
+      ai_prompt_preference: aiPromptPreference.value
+    })
     
     emit('close')
   } catch (error) {
@@ -194,7 +210,7 @@ async function saveSettings() {
         <!-- Sidebar (Desktop) / Category List (Mobile) -->
         <div
           class="
-            w-full md:w-64
+            w-full md:w-64 shrink-0
             flex flex-col
             bg-[var(--bg-surface)]
             border-r border-[var(--border-color)]
@@ -321,6 +337,7 @@ async function saveSettings() {
                     <SettingsAIConfig
                       v-model:summaryConfig="localConfig.summary"
                       v-model:translationConfig="localConfig.translation"
+                      v-model:taggingConfig="localConfig.tagging"
                       v-model:embeddingConfig="localConfig.embedding"
                       :serviceTesting="aiConfig.serviceTesting.value"
                       :serviceTestResult="aiConfig.serviceTestResult.value"
@@ -337,6 +354,7 @@ async function saveSettings() {
                     <SettingsAIFeatures
                       v-model:features="localConfig.features"
                       v-model:autoTitleTranslationLimit="autoTitleTranslationLimit"
+                      v-model:aiPromptPreference="aiPromptPreference"
                     />
                   </div>
                 </div>
@@ -372,6 +390,17 @@ async function saveSettings() {
       </div>
     </div>
   </Transition>
+
+  <ConfirmModal
+    :show="confirmShow"
+    :title="confirmOptions.title || ''"
+    :message="confirmOptions.message"
+    :confirm-text="confirmOptions.confirmText"
+    :cancel-text="confirmOptions.cancelText"
+    :danger="confirmOptions.danger"
+    @confirm="handleConfirm"
+    @cancel="handleCancel"
+  />
 </template>
 
 <style scoped>

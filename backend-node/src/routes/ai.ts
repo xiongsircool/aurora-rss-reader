@@ -8,6 +8,7 @@ import { generateEmbedding } from '../services/vector.js';
 import { EntryRepository, TranslationRepository, SummaryRepository } from '../db/repositories/index.js';
 import { userSettingsService } from '../services/userSettings.js';
 import { getConfig } from '../config/index.js';
+import { initTaggingClient } from '../services/tagging.js';
 
 function resolveServiceConfig(service: ServiceKey) {
   const settings = userSettingsService.getSettings();
@@ -22,6 +23,14 @@ function resolveServiceConfig(service: ServiceKey) {
       apiKey: settings.summary_api_key || fallbackApiKey,
       baseUrl: settings.summary_base_url || fallbackBaseUrl,
       modelName: settings.summary_model_name || fallbackModel,
+    };
+  }
+
+  if (service === 'tagging') {
+    return {
+      apiKey: settings.tagging_api_key || settings.summary_api_key || fallbackApiKey,
+      baseUrl: settings.tagging_base_url || settings.summary_base_url || fallbackBaseUrl,
+      modelName: settings.tagging_model_name || settings.summary_model_name || fallbackModel,
     };
   }
 
@@ -105,7 +114,9 @@ export async function aiRoutes(app: FastifyInstance) {
 
     try {
       const client = createClient('summary');
-      const summary = await client.summarize(combinedContent, { language: targetLanguage });
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
+      const summary = await client.summarize(combinedContent, { language: targetLanguage, userPreference });
       summaryRepo.upsert({ entry_id, language: targetLanguage, summary });
       return { entry_id, language: targetLanguage, summary };
     } catch (error) {
@@ -139,7 +150,9 @@ export async function aiRoutes(app: FastifyInstance) {
 
     try {
       const client = createClient('translation');
-      const title = await client.translate(entry.title, { targetLanguage });
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
+      const title = await client.translate(entry.title, { targetLanguage, userPreference });
       translationRepo.upsert({ entry_id, language: targetLanguage, title });
       return { entry_id, title, language: targetLanguage, from_cache: false };
     } catch (error) {
@@ -222,6 +235,8 @@ export async function aiRoutes(app: FastifyInstance) {
 
     try {
       const client = createClient('translation');
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
 
       for (const block of misses) {
         if (request.raw.aborted) {
@@ -229,7 +244,7 @@ export async function aiRoutes(app: FastifyInstance) {
         }
 
         try {
-          const translated = await client.translate(block.text, { targetLanguage: targetLang });
+          const translated = await client.translate(block.text, { targetLanguage: targetLang, userPreference });
           cachedMap[block.id] = translated;
           sendEvent('translation', { id: block.id, text: translated });
           successCount += 1;
@@ -278,7 +293,9 @@ export async function aiRoutes(app: FastifyInstance) {
       }
 
       const client = createClient('translation');
-      const translation = await client.translate(text, { targetLanguage: target_language || 'zh' });
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
+      const translation = await client.translate(text, { targetLanguage: target_language || 'zh', userPreference });
 
       if (entry_id) {
         translationRepo.upsert({
@@ -312,7 +329,9 @@ export async function aiRoutes(app: FastifyInstance) {
       }
 
       const client = createClient('summary');
-      const summary = await client.summarize(content, { language: language || 'zh' });
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
+      const summary = await client.summarize(content, { language: language || 'zh', userPreference });
 
       if (entry_id) {
         summaryRepo.upsert({
@@ -333,8 +352,8 @@ export async function aiRoutes(app: FastifyInstance) {
   app.get('/ai/config', async () => {
     const summaryConfig = resolveServiceConfig('summary');
     const translationConfig = resolveServiceConfig('translation');
-    // @ts-ignore - 'embedding' is a new service key not yet in ServiceKey type maybe
-    const embeddingConfig = resolveServiceConfig('embedding' as any);
+    const taggingConfig = resolveServiceConfig('tagging');
+    const embeddingConfig = resolveServiceConfig('embedding');
     const settings = userSettingsService.getSettings();
 
     return {
@@ -350,6 +369,12 @@ export async function aiRoutes(app: FastifyInstance) {
         model_name: translationConfig.modelName,
         has_api_key: !!translationConfig.apiKey,
       },
+      tagging: {
+        api_key: taggingConfig.apiKey,
+        base_url: taggingConfig.baseUrl,
+        model_name: taggingConfig.modelName,
+        has_api_key: !!taggingConfig.apiKey,
+      },
       embedding: {
         api_key: embeddingConfig.apiKey,
         base_url: embeddingConfig.baseUrl,
@@ -359,6 +384,7 @@ export async function aiRoutes(app: FastifyInstance) {
       features: {
         auto_summary: !!settings.ai_auto_summary,
         auto_title_translation: !!settings.ai_auto_title_translation,
+        auto_tagging: !!settings.ai_auto_tagging,
         title_display_mode: settings.ai_title_display_mode || 'original-first',
         translation_language: settings.ai_translation_language || 'zh',
       },
@@ -370,10 +396,14 @@ export async function aiRoutes(app: FastifyInstance) {
     const body = request.body as any;
     const summaryConfig = body.summary || {};
     const translationConfig = body.translation || {};
+    const taggingConfig = body.tagging || {};
     const embeddingConfig = body.embedding || {};
     const features = body.features || {};
 
     const updates: Record<string, any> = {};
+    const settings = userSettingsService.getSettings();
+    const wasAutoTaggingEnabled = settings.ai_auto_tagging === 1;
+    const now = new Date().toISOString();
 
     if (summaryConfig.api_key !== undefined) updates.summary_api_key = summaryConfig.api_key;
     if (summaryConfig.base_url !== undefined) updates.summary_base_url = summaryConfig.base_url;
@@ -383,16 +413,28 @@ export async function aiRoutes(app: FastifyInstance) {
     if (translationConfig.base_url !== undefined) updates.translation_base_url = translationConfig.base_url;
     if (translationConfig.model_name !== undefined) updates.translation_model_name = translationConfig.model_name;
 
+    if (taggingConfig.api_key !== undefined) updates.tagging_api_key = taggingConfig.api_key;
+    if (taggingConfig.base_url !== undefined) updates.tagging_base_url = taggingConfig.base_url;
+    if (taggingConfig.model_name !== undefined) updates.tagging_model_name = taggingConfig.model_name;
+
     if (embeddingConfig.api_key !== undefined) updates.embedding_api_key = embeddingConfig.api_key;
     if (embeddingConfig.base_url !== undefined) updates.embedding_base_url = embeddingConfig.base_url;
     if (embeddingConfig.model_name !== undefined) updates.embedding_model = embeddingConfig.model_name;
 
     if (features.auto_summary !== undefined) updates.ai_auto_summary = features.auto_summary ? 1 : 0;
     if (features.auto_title_translation !== undefined) updates.ai_auto_title_translation = features.auto_title_translation ? 1 : 0;
+    if (features.auto_tagging !== undefined) {
+      updates.ai_auto_tagging = features.auto_tagging ? 1 : 0;
+      if (features.auto_tagging && !wasAutoTaggingEnabled) {
+        // When enabling auto-tagging, record a start time so we don't process historical entries by default.
+        updates.ai_auto_tagging_start_at = now;
+      }
+    }
     if (features.title_display_mode !== undefined) updates.ai_title_display_mode = features.title_display_mode;
     if (features.translation_language !== undefined) updates.ai_translation_language = features.translation_language;
 
     userSettingsService.updateSettings(updates);
+    initTaggingClient();
 
     return { success: true, message: 'AI configuration updated' };
   });
@@ -414,7 +456,7 @@ export async function aiRoutes(app: FastifyInstance) {
     }
 
     // Special case for embedding testing
-    if (service === 'embedding' as any) {
+    if (service === 'embedding') {
       try {
         // We need to bypass the client creation and test embedding generation directly
         // or construct a temporary client configuration.

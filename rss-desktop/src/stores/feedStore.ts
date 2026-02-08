@@ -16,6 +16,7 @@ export const useFeedStore = defineStore('feed', () => {
   const summaryCache = ref<Record<string, SummaryResult>>({})
   const errorMessage = ref<string | null>(null)
   const collapsedGroups = ref<Set<string>>(new Set())
+  const customGroups = ref<Set<string>>(new Set())
   const lastFeedFilters = ref<{ dateRange?: string; timeField?: string } | null>(null)
   const lastEntryFilters = ref<{ unreadOnly?: boolean; dateRange?: string; timeField?: string } | null>(null)
   const entriesCursor = ref<string | null>(null)
@@ -57,6 +58,13 @@ export const useFeedStore = defineStore('feed', () => {
         groups[groupName] = []
       }
       groups[groupName].push(feed)
+    })
+
+    // 确保自定义分组也被包含进去（即便是空的）
+    customGroups.value.forEach(groupName => {
+      if (!groups[groupName]) {
+        groups[groupName] = []
+      }
     })
 
     // 对每个分组内的feeds按名称排序
@@ -253,7 +261,7 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  async function updateFeed(feedId: string, updates: { group_name?: string }) {
+  async function updateFeed(feedId: string, updates: { group_name?: string; custom_title?: string | null; ai_tagging_enabled?: boolean }) {
     try {
       const { data } = await api.patch<Feed>(`/feeds/${feedId}`, updates)
       const index = feeds.value.findIndex((f) => f.id === feedId)
@@ -265,6 +273,26 @@ export const useFeedStore = defineStore('feed', () => {
     } catch (error) {
       console.error(error)
       errorMessage.value = '更新订阅失败'
+    }
+  }
+
+  async function updateFeedTagging(feedId: string, enabled: boolean) {
+    try {
+      const { data } = await api.patch<Feed>(`/feeds/${feedId}`, { ai_tagging_enabled: enabled })
+      const index = feeds.value.findIndex((f) => f.id === feedId)
+      if (index !== -1) {
+        feeds.value[index] = data
+      }
+    } catch (error) {
+      console.error(error)
+      errorMessage.value = '更新订阅失败'
+    }
+  }
+
+  async function bulkUpdateFeedTagging(feedIds: string[], enabled: boolean) {
+    if (feedIds.length === 0) return
+    for (const id of feedIds) {
+      await updateFeedTagging(id, enabled)
     }
   }
 
@@ -631,6 +659,49 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
+  function loadCustomGroups() {
+    const saved = localStorage.getItem('customGroups')
+    if (saved) {
+      try {
+        customGroups.value = new Set(JSON.parse(saved))
+      } catch (e) {
+        console.error('Failed to load custom groups:', e)
+      }
+    }
+  }
+
+  function saveCustomGroups() {
+    localStorage.setItem('customGroups', JSON.stringify([...customGroups.value]))
+  }
+
+  function createGroup(name: string) {
+    if (!name || name.trim() === '') return
+
+    const trimmedName = name.trim()
+
+    // 如果已有同名custom group，无需再次添加
+    if (customGroups.value.has(trimmedName)) return
+
+    // 检查是否与现有的feeds分组名称冲突
+    const existingGroupNames = Object.keys(groupedFeeds.value)
+    if (existingGroupNames.includes(trimmedName)) {
+      // 如果该分组已经在feeds中存在（即已有订阅源），则无需作为custom group添加
+      return
+    }
+
+    customGroups.value.add(trimmedName)
+    saveCustomGroups()
+  }
+
+  function deleteGroup(name: string) {
+    customGroups.value.delete(name)
+    saveCustomGroups()
+  }
+
+  // 初始化时加载保存的数据
+  loadCollapsedGroups()
+  loadCustomGroups()
+
   return {
     feeds,
     entries,
@@ -665,6 +736,8 @@ export const useFeedStore = defineStore('feed', () => {
     refreshActiveFeed,
     deleteFeed,
     updateFeed,
+    updateFeedTagging,
+    bulkUpdateFeedTagging,
     updateFeedViewType,
     toggleEntryState,
     requestSummary,
@@ -679,5 +752,9 @@ export const useFeedStore = defineStore('feed', () => {
     loadCollapsedGroups,
     // 一键已读方法
     markAsRead,
+    loadCustomGroups,
+    // 自定义分组管理
+    createGroup,
+    deleteGroup,
   }
 })

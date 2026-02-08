@@ -11,6 +11,7 @@ export interface LocalServiceConfig {
 export interface LocalFeatureConfig {
     auto_summary: boolean
     auto_title_translation: boolean
+    auto_tagging: boolean
     title_display_mode: 'replace' | 'translation-first' | 'original-first'
     translation_language: string
 }
@@ -18,6 +19,7 @@ export interface LocalFeatureConfig {
 export interface LocalConfig {
     summary: LocalServiceConfig
     translation: LocalServiceConfig
+    tagging: LocalServiceConfig
     embedding: LocalServiceConfig
     features: LocalFeatureConfig
 }
@@ -31,6 +33,7 @@ const createLocalServiceConfig = (): LocalServiceConfig => ({
 const createLocalFeatureConfig = (): LocalFeatureConfig => ({
     auto_summary: false,
     auto_title_translation: false,
+    auto_tagging: false,
     title_display_mode: 'original-first',
     translation_language: 'zh'
 })
@@ -42,6 +45,7 @@ export function useSettingsModal() {
     const localConfig = ref<LocalConfig>({
         summary: createLocalServiceConfig(),
         translation: createLocalServiceConfig(),
+        tagging: createLocalServiceConfig(),
         embedding: createLocalServiceConfig(),
         features: createLocalFeatureConfig()
     })
@@ -49,6 +53,7 @@ export function useSettingsModal() {
     function syncFromStore() {
         const summary = aiStore.config.summary || {}
         const translation = aiStore.config.translation || {}
+        const tagging = aiStore.config.tagging || {}
         const embedding = aiStore.config.embedding || {}
         const features = aiStore.config.features || {}
 
@@ -64,6 +69,12 @@ export function useSettingsModal() {
             base_url: translation.base_url ?? localConfig.value.translation.base_url,
             model_name: translation.model_name ?? localConfig.value.translation.model_name
         }
+        localConfig.value.tagging = {
+            ...localConfig.value.tagging,
+            api_key: tagging.api_key ?? localConfig.value.tagging.api_key,
+            base_url: tagging.base_url ?? localConfig.value.tagging.base_url,
+            model_name: tagging.model_name ?? localConfig.value.tagging.model_name
+        }
         localConfig.value.embedding = {
             ...localConfig.value.embedding,
             api_key: embedding.api_key ?? localConfig.value.embedding.api_key,
@@ -74,6 +85,7 @@ export function useSettingsModal() {
             ...localConfig.value.features,
             auto_summary: features.auto_summary ?? localConfig.value.features.auto_summary,
             auto_title_translation: features.auto_title_translation ?? localConfig.value.features.auto_title_translation,
+            auto_tagging: features.auto_tagging ?? localConfig.value.features.auto_tagging,
             title_display_mode: features.title_display_mode ?? localConfig.value.features.title_display_mode,
             translation_language: features.translation_language ?? localConfig.value.features.translation_language
         }
@@ -101,6 +113,7 @@ export function useSettingsModal() {
         const success = await aiStore.updateConfig({
             summary: { ...localConfig.value.summary },
             translation: { ...localConfig.value.translation },
+            tagging: { ...localConfig.value.tagging },
             embedding: { ...localConfig.value.embedding },
             features: { ...localConfig.value.features }
         })

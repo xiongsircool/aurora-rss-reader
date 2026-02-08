@@ -47,6 +47,9 @@ const showGroupSubmenu = ref(false)
 const groupSubmenuRef = ref<HTMLElement | null>(null)
 const viewTypeSubmenuRef = ref<HTMLElement | null>(null)
 
+// 图标图片引用
+const iconImgRef = ref<HTMLImageElement | null>(null)
+
 // 设置别名状态（子菜单形式）
 const showAliasSubmenu = ref(false)
 const aliasInputValue = ref('')
@@ -179,9 +182,35 @@ function handleGlobalClick(e: MouseEvent) {
   }
 }
 
+// Feed 图标相关
+const { iconSrcFor, handleFeedIconLoad, handleFeedIconError, isFeedIconBroken, isFeedIconLoaded, getFeedColor, getFeedInitial } = useFeedIcons()
+
+// 检查图标是否有效（非 1x1 占位符）
+function checkIconValidity(e?: Event) {
+  const img = e ? (e.target as HTMLImageElement) : iconImgRef.value
+  if (!img) return
+  
+  const iconUrl = iconSrcFor(props.feed.favicon_url)
+  if (img.naturalWidth <= 1 || img.naturalHeight <= 1) {
+    // 1x1 占位符，标记为损坏
+    handleFeedIconError(props.feed.id, iconUrl)
+  } else {
+    // 有效图片
+    handleFeedIconLoad(props.feed.id, iconUrl)
+  }
+}
+
 onMounted(() => {
   document.addEventListener('click', handleGlobalClick)
   window.addEventListener(CLOSE_ALL_MENUS_EVENT, handleCloseAllMenus)
+  
+  // 检查已缓存加载的图标是否有效
+  nextTick(() => {
+    const img = iconImgRef.value
+    if (img && img.complete) {
+      checkIconValidity()
+    }
+  })
 })
 
 onUnmounted(() => {
@@ -189,7 +218,7 @@ onUnmounted(() => {
   window.removeEventListener(CLOSE_ALL_MENUS_EVENT, handleCloseAllMenus)
 })
 
-const { iconSrcFor, handleFeedIconLoad, handleFeedIconError, isFeedIconBroken, isFeedIconLoaded, getFeedColor, getFeedInitial } = useFeedIcons()
+
 
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
@@ -233,91 +262,108 @@ function getFeedRefreshTooltip(_feed: Feed): string {
 
 <template>
   <div
-    class="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[0_6px_14px_rgba(15,17,21,0.05)] transition-all duration-200 my-1 mx-2 group"
-    :class="{ 'border-[var(--accent)] bg-[rgba(255,122,24,0.08)] shadow-[0_14px_28px_rgba(255,122,24,0.15)]': active, 'hover:border-[rgba(255,122,24,0.4)] hover:shadow-[0_12px_24px_rgba(15,17,21,0.1)] hover:-translate-y-px': !active }"
+    class="flex items-center gap-2.5 px-2.5 py-2 mb-1 rounded-lg cursor-pointer transition-all duration-200 group relative select-none"
+    :class="{ 
+      'bg-gradient-to-b from-[rgba(255,122,24,0.18)] via-[rgba(255,122,24,0.12)] to-[rgba(255,122,24,0.18)] shadow-[inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.05),0_2px_8px_rgba(255,122,24,0.2)] c-[var(--accent)] border border-[rgba(255,122,24,0.3)]': active, 
+      'bg-gradient-to-b from-white via-[#fafafa] to-[#f5f5f5] dark:from-[rgba(255,255,255,0.06)] dark:via-[rgba(255,255,255,0.04)] dark:to-[rgba(255,255,255,0.02)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),inset_0_-1px_0_rgba(0,0,0,0.03),0_1px_2px_rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.06)] dark:border-[rgba(255,255,255,0.08)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_3px_8px_rgba(0,0,0,0.08)] hover:border-[rgba(0,0,0,0.12)] text-[var(--text-primary)]': !active 
+    }"
+    @click="emit('select', feed.id)"
     @contextmenu="handleContextMenu"
   >
-    <button class="flex-1 min-w-0 border-none bg-transparent text-left flex items-center gap-3 p-0 c-[var(--text-primary)] cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--accent)] outline-offset-2" @click="emit('select', feed.id)">
-      <div
-        class="w-[34px] h-[34px] rounded-[10px] overflow-hidden inline-flex items-center justify-center shrink-0 bg-[rgba(255,255,255,0.1)] c-white font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)] transition-transform duration-200 group-hover:scale-103 group-hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.25)]"
-        :style="{ backgroundColor: getFeedColor(feed.id) }"
-        aria-hidden="true"
+    <!-- Icon -->
+    <div
+      class="w-5.5 h-5.5 rounded-md overflow-hidden shrink-0 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]"
+      :style="{ 
+        backgroundColor: (!isFeedIconBroken(feed) && isFeedIconLoaded(iconSrcFor(feed?.favicon_url))) 
+          ? (active ? 'rgba(255,122,24,0.1)' : 'transparent') 
+          : getFeedColor(feed.id) 
+      }"
+      aria-hidden="true"
+    >
+      <img
+        ref="iconImgRef"
+        v-show="!isFeedIconBroken(feed) && isFeedIconLoaded(iconSrcFor(feed?.favicon_url))"
+        :src="iconSrcFor(feed.favicon_url) || undefined"
+        :alt="`${feed.title || feed.url} 图标`"
+        loading="lazy"
+        decoding="async"
+        @load="checkIconValidity"
+        @error="handleFeedIconError(feed.id, iconSrcFor(feed.favicon_url))"
+        class="w-full h-full object-contain"
+      />
+      <span
+        class="text-[10px] uppercase text-white font-bold leading-none"
+        v-show="isFeedIconBroken(feed) || !isFeedIconLoaded(iconSrcFor(feed?.favicon_url))"
       >
-        <img
-          v-show="!isFeedIconBroken(feed) && isFeedIconLoaded(iconSrcFor(feed?.favicon_url))"
-          :src="iconSrcFor(feed.favicon_url) || undefined"
-          :alt="`${feed.title || feed.url} 图标`"
-          loading="lazy"
-          decoding="async"
-          @load="handleFeedIconLoad(feed.id, iconSrcFor(feed.favicon_url))"
-          @error="handleFeedIconError(feed.id, iconSrcFor(feed.favicon_url))"
-          class="w-[calc(100%-4px)] h-[calc(100%-4px)] object-contain bg-[rgba(255,255,255,0.8)] rounded-lg block p-[2px]"
-        />
+        {{ getFeedInitial(displayName) }}
+      </span>
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+      <div class="flex items-center justify-between">
+        <span class="text-[13px] truncate font-medium leading-tight">{{ displayName }}</span>
         <span
-          class="text-[0.78rem] uppercase tracking-wide"
-          v-show="isFeedIconBroken(feed) || !isFeedIconLoaded(iconSrcFor(feed?.favicon_url))"
+          v-if="feed.unread_count && !isEditing"
+          class="min-w-[1.25rem] h-4 px-1 rounded-full bg-[rgba(15,17,21,0.08)] dark:bg-[rgba(255,255,255,0.1)] flex items-center justify-center text-[10px] font-medium transition-colors"
+          :class="{ 'bg-[var(--accent)] text-white': active }"
+          :title="isDateFilterActive ? `仅统计${timeFilterLabel}内的未读文章` : '全部未读文章'"
         >
-          {{ getFeedInitial(displayName) }}
+          {{ feed.unread_count }}
         </span>
       </div>
-      <div class="flex-1 flex flex-col gap-1 overflow-hidden">
-        <span class="font-semibold text-[13px] whitespace-nowrap overflow-hidden text-ellipsis">{{ displayName }}</span>
-        <span class="text-[11px] c-[#8a90a3] whitespace-nowrap overflow-hidden text-ellipsis op-80" v-if="!isEditing">{{ feed.url }}</span>
-        <div class="flex items-center gap-2 c-[var(--text-secondary)] text-[11px]" v-if="!isEditing">
-          <span class="last-checked" :title="getFeedRefreshTooltip(feed)">
-            <span class="inline-block w-1.5 h-1.5 rounded-full mr-1.5 bg-[var(--border-color)]" :class="{ 'bg-[#2ec4b6]': getFeedRefreshStatus(feed) === 'ok', 'bg-[#ff6b6b]': getFeedRefreshStatus(feed) === 'due', 'bg-[#9aa0a6]': getFeedRefreshStatus(feed) === 'never' }"></span>
-            {{ formatLastChecked(feed.last_checked_at) }}
-          </span>
-        </div>
-        <div v-else class="mt-1">
-          <input
-            :value="editingGroupName"
-            @input="emit('update:editingGroupName', ($event.target as HTMLInputElement).value)"
-            @click.stop
-            placeholder="分组名称"
-            class="w-full px-2 py-1 border border-[var(--border-color)] rounded-md text-xs bg-[var(--bg-surface)] c-[var(--text-primary)]"
-          />
-        </div>
+      
+      <!-- Editing Input -->
+      <div v-if="isEditing" class="mt-1" @click.stop>
+        <input
+          :value="editingGroupName"
+          @input="emit('update:editingGroupName', ($event.target as HTMLInputElement).value)"
+          placeholder="分组名称"
+          class="w-full px-1.5 py-0.5 border border-[var(--active-border)] rounded text-xs bg-[var(--bg-canvas)] text-[var(--text-primary)] focus:border-[var(--accent)] outline-none"
+          @keyup.enter="emit('save-edit', feed.id, editingGroupName)"
+          @keyup.esc="emit('cancel-edit')"
+        />
       </div>
-      <span
-        class="min-w-6 h-6 rounded-full bg-[rgba(15,17,21,0.08)] grid place-items-center text-xs"
-        v-if="feed.unread_count"
-        :title="isDateFilterActive ? `仅统计${timeFilterLabel}内的未读文章` : '全部未读文章'"
-      >
-        {{ feed.unread_count }}
-      </span>
-    </button>
-    <div class="flex gap-1.5 shrink-0" @click.stop>
+    </div>
+
+    <!-- Hover Actions (Absolute positioned to save space/layout shift) -->
+    <div 
+      v-if="!isEditing"
+      class="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-surface)] pl-2 shadow-[-10px_0_10px_-5px_var(--bg-surface)]"
+      :class="{ 'bg-transparent shadow-none': active }"
+      @click.stop
+    >
       <button
-        v-if="isEditing"
-        @click="emit('save-edit', feed.id, editingGroupName)"
-        class="border border-[var(--border-color)] bg-[var(--bg-surface)] p-[6px_10px] rounded-lg cursor-pointer text-[13px] transition-all c-[var(--text-primary)] hover:bg-[#34c759] hover:c-white hover:border-[var(--accent)] hover:-translate-y-px"
-        title="保存"
-      >
-        ✓
-      </button>
-      <button
-        v-if="isEditing"
-        @click="emit('cancel-edit')"
-        class="border border-[var(--border-color)] bg-[var(--bg-surface)] p-[6px_10px] rounded-lg cursor-pointer text-[13px] transition-all c-[var(--text-primary)] hover:bg-[#8e8e93] hover:c-white hover:border-[var(--accent)] hover:-translate-y-px"
-        title="取消"
-      >
-        ✕
-      </button>
-      <button
-        v-if="!isEditing"
         @click="emit('start-edit', feed.id, feed.group_name)"
-        class="border border-[var(--border-color)] bg-[var(--bg-surface)] p-[6px_10px] rounded-lg cursor-pointer text-[13px] transition-all c-[var(--text-primary)] hover:bg-[#007aff] hover:c-white hover:border-[var(--accent)] hover:-translate-y-px"
+        class="p-1 rounded hover:bg-[rgba(0,0,0,0.05)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         title="编辑"
       >
-        ✎
+        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
       </button>
       <button
         @click="emit('delete', feed.id)"
-        class="border border-[var(--border-color)] bg-[var(--bg-surface)] p-[6px_10px] rounded-lg cursor-pointer text-[13px] transition-all c-[var(--text-primary)] hover:bg-[#ff3b30] hover:c-white hover:border-[var(--accent)] hover:-translate-y-px"
+        class="p-1 rounded hover:bg-[rgba(255,59,48,0.1)] text-[var(--text-secondary)] hover:text-[#ff3b30] transition-colors"
         title="删除"
       >
-        🗑
+        <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </button>
+    </div>
+
+    <!-- Edit Actions -->
+    <div v-else class="flex gap-1 ml-2" @click.stop>
+      <button
+        @click="emit('save-edit', feed.id, editingGroupName)"
+        class="p-1 rounded hover:bg-[rgba(52,199,89,0.1)] text-[#34c759]"
+        title="保存"
+      >
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+      <button
+        @click="emit('cancel-edit')"
+        class="p-1 rounded hover:bg-[rgba(142,142,147,0.1)] text-[#8e8e93]"
+        title="取消"
+      >
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
   </div>

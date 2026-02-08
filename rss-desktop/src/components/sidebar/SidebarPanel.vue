@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFeedStore } from '../../stores/feedStore'
 import { useFavoritesStore } from '../../stores/favoritesStore'
@@ -10,6 +10,8 @@ import OpmlActions from './OpmlActions.vue'
 import FavoritesSection from './FavoritesSection.vue'
 import FeedGroup from './FeedGroup.vue'
 import ViewTypeNav from './ViewTypeNav.vue'
+import ConfirmModal from '../common/ConfirmModal.vue'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
 const props = defineProps<{
   // Header props
@@ -80,6 +82,16 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const feedStore = useFeedStore()
 const favoritesStore = useFavoritesStore()
+const showCreateGroupModal = ref(false)
+const newGroupName = ref('')
+const groupNameInput = ref<HTMLInputElement | null>(null)
+const {
+  show: confirmShow,
+  options: confirmOptions,
+  requestConfirm,
+  handleConfirm,
+  handleCancel
+} = useConfirmDialog()
 
 const feedMap = computed<Record<string, Feed>>(() => {
   return feedStore.feeds.reduce<Record<string, Feed>>((acc, feed) => {
@@ -93,14 +105,54 @@ const addFeedTargetGroupName = computed(() => {
   let targetGroupName = feedStore.activeGroupName
   if (!targetGroupName && feedStore.activeFeedId) {
     const activeFeed = feedStore.feeds.find((feed) => feed.id === feedStore.activeFeedId)
-    targetGroupName = activeFeed?.group_name
+    targetGroupName = activeFeed?.group_name ?? null
   }
   return targetGroupName
 })
 
+function createNewGroup() {
+  newGroupName.value = ''
+  showCreateGroupModal.value = true
+}
+
+function closeCreateGroupModal() {
+  showCreateGroupModal.value = false
+}
+
+function submitCreateGroup() {
+  const name = newGroupName.value.trim()
+  if (!name) return
+
+  feedStore.createGroup(name)
+  closeCreateGroupModal()
+  newGroupName.value = ''
+}
+
+async function handleDeleteGroup(groupName: string) {
+  const confirmMessage = feedStore.groupStats[groupName]?.feedCount === 0
+    ? t('groups.deleteConfirm')
+    : t('groups.deleteConfirmWithFeeds')
+
+  const confirmed = await requestConfirm({
+    title: t('groups.deleteGroup'),
+    message: confirmMessage,
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+    danger: true
+  })
+
+  if (!confirmed) return
+  feedStore.deleteGroup(groupName)
+}
+
 function isGroupCollapsed(groupName: string): boolean {
   return !!props.collapsedGroups[groupName]
 }
+
+watch(showCreateGroupModal, (visible) => {
+  if (!visible) return
+  nextTick(() => groupNameInput.value?.focus())
+})
 </script>
 
 <template>
@@ -143,13 +195,22 @@ function isGroupCollapsed(groupName: string): boolean {
 
     <div class="flex-1" v-show="!showFavoritesOnly">
       <!-- Group controls -->
-      <div class="flex gap-1.5 mb-2 px-1" v-if="feedStore.sortedGroupNames.length > 1">
-        <button @click="emit('expand-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-2 py-1 rounded-md text-[11px] cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlTitle')">
-          {{ t('common.expandAll') }}
+      <div class="flex gap-1.5 mb-2 px-1">
+        <button 
+          @click="createNewGroup"
+          class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-2 py-1 rounded-md text-[11px] cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" 
+          :title="t('groups.createGroup')"
+        >
+          {{ t('groups.createGroup') }}
         </button>
-        <button @click="emit('collapse-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-2 py-1 rounded-md text-[11px] cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlCollapseTitle')">
-          {{ t('common.collapseAll') }}
-        </button>
+        <template v-if="feedStore.sortedGroupNames.length > 1">
+          <button @click="emit('expand-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-2 py-1 rounded-md text-[11px] cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlTitle')">
+            {{ t('common.expandAll') }}
+          </button>
+          <button @click="emit('collapse-all')" class="border border-[rgba(15,17,21,0.1)] dark:border-[rgba(255,255,255,0.1)] bg-transparent c-[var(--text-secondary)] px-2 py-1 rounded-md text-[11px] cursor-pointer transition-all duration-200 hover:bg-[rgba(255,122,24,0.08)] hover:c-[var(--text-primary)] hover:border-[rgba(255,122,24,0.2)] dark:hover:bg-[rgba(255,122,24,0.15)] dark:hover:border-[rgba(255,122,24,0.3)]" :title="t('feeds.groupControlCollapseTitle')">
+            {{ t('common.collapseAll') }}
+          </button>
+        </template>
       </div>
 
       <!-- Feed groups -->
@@ -182,9 +243,70 @@ function isGroupCollapsed(groupName: string): boolean {
         @change-view-type="(feedId, viewType) => emit('change-view-type', feedId, viewType)"
         @move-to-group="(feedId, groupName) => emit('move-to-group', feedId, groupName)"
         @set-custom-title="(feedId, customTitle) => emit('set-custom-title', feedId, customTitle)"
+        @delete-group="handleDeleteGroup"
       />
     </div>
   </aside>
+
+  <Teleport to="body">
+    <div v-if="showCreateGroupModal" class="fixed inset-0 z-[10000] flex items-center justify-center">
+      <!-- Backdrop -->
+      <div class="absolute inset-0 bg-black/40" @click="closeCreateGroupModal"></div>
+
+      <!-- Modal -->
+      <div class="relative bg-[var(--bg-surface)] rounded-2xl shadow-2xl w-[360px] max-h-[80vh] overflow-hidden border border-[var(--border-color)]">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]">
+          <h3 class="font-semibold text-[15px]">{{ t('groups.createGroup') }}</h3>
+          <button @click="closeCreateGroupModal" class="p-1 hover:bg-[rgba(0,0,0,0.05)] rounded-md">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div class="p-4">
+          <input
+            ref="groupNameInput"
+            v-model="newGroupName"
+            :placeholder="t('groups.createGroupPrompt')"
+            class="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-transparent text-[13px] focus:border-[var(--accent)] outline-none"
+            @keyup.enter="submitCreateGroup"
+            @keyup.esc="closeCreateGroupModal"
+          />
+        </div>
+
+        <!-- Footer -->
+        <div class="border-t border-[var(--border-color)] p-3 flex justify-end gap-2">
+          <button
+            @click="closeCreateGroupModal"
+            class="px-3 py-2 rounded-lg text-[13px] c-[var(--text-secondary)] hover:bg-[rgba(0,0,0,0.05)]"
+          >
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            @click="submitCreateGroup"
+            :disabled="!newGroupName.trim()"
+            class="px-4 py-2 rounded-lg bg-[var(--accent)] c-white text-[13px] font-medium disabled:opacity-50"
+          >
+            {{ t('common.add') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <ConfirmModal
+    :show="confirmShow"
+    :title="confirmOptions.title || ''"
+    :message="confirmOptions.message"
+    :confirm-text="confirmOptions.confirmText"
+    :cancel-text="confirmOptions.cancelText"
+    :danger="confirmOptions.danger"
+    @confirm="handleConfirm"
+    @cancel="handleCancel"
+  />
 </template>
 
 <style scoped>

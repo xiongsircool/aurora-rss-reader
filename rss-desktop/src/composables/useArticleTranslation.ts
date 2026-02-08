@@ -151,7 +151,7 @@ export function useArticleTranslation(
     abortController.value = new AbortController()
 
     try {
-      const baseUrl = api.defaults.baseURL || 'http://127.0.0.1:15432/api'
+      const baseUrl = api.defaults.baseURL || '/api'
       const response = await fetch(`${baseUrl}/ai/translate-blocks`, {
         method: 'POST',
         headers: {

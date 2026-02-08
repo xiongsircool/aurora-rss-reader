@@ -11,6 +11,21 @@ import { userSettingsService } from '../services/userSettings.js';
 
 type CursorPayload = { t: string; id: string };
 
+// Leave headroom under SQLite's default 999-parameter limit.
+const SQLITE_IN_CLAUSE_CHUNK_SIZE = 900;
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 function entryPreviewSummary(entry: { summary?: string | null; content?: string | null }): string | null {
   return cleanHtmlText(entry.summary) || cleanHtmlText(entry.content);
 }
@@ -402,11 +417,17 @@ export async function entriesRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Entry IDs are required' });
     }
 
-    const placeholders = ids.map(() => '?').join(', ');
-    const sql = `UPDATE entries SET starred = 1 WHERE id IN (${placeholders})`;
-    const result = db.prepare(sql).run(...ids);
+    const idChunks = chunkArray(ids, SQLITE_IN_CLAUSE_CHUNK_SIZE);
+    let totalChanges = 0;
 
-    return { success: true, message: `Starred ${result.changes} entries`, starred_count: result.changes };
+    for (const chunk of idChunks) {
+      const placeholders = chunk.map(() => '?').join(', ');
+      const sql = `UPDATE entries SET starred = 1 WHERE id IN (${placeholders})`;
+      const result = db.prepare(sql).run(...chunk);
+      totalChanges += result.changes;
+    }
+
+    return { success: true, message: `Starred ${totalChanges} entries`, starred_count: totalChanges };
   });
 
   // POST /entries/bulk-unstar - Bulk unstar entries
@@ -418,11 +439,17 @@ export async function entriesRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Entry IDs are required' });
     }
 
-    const placeholders = ids.map(() => '?').join(', ');
-    const sql = `UPDATE entries SET starred = 0 WHERE id IN (${placeholders})`;
-    const result = db.prepare(sql).run(...ids);
+    const idChunks = chunkArray(ids, SQLITE_IN_CLAUSE_CHUNK_SIZE);
+    let totalChanges = 0;
 
-    return { success: true, message: `Unstarred ${result.changes} entries`, unstarred_count: result.changes };
+    for (const chunk of idChunks) {
+      const placeholders = chunk.map(() => '?').join(', ');
+      const sql = `UPDATE entries SET starred = 0 WHERE id IN (${placeholders})`;
+      const result = db.prepare(sql).run(...chunk);
+      totalChanges += result.changes;
+    }
+
+    return { success: true, message: `Unstarred ${totalChanges} entries`, unstarred_count: totalChanges };
   });
 
   // POST /entries/mark-read - Bulk mark as read
@@ -486,8 +513,11 @@ export async function entriesRoutes(app: FastifyInstance) {
     }
 
     const ids = rows.map((row) => row.id);
-    const placeholders = ids.map(() => '?').join(', ');
-    db.prepare(`UPDATE entries SET read = 1 WHERE id IN (${placeholders})`).run(...ids);
+    const idChunks = chunkArray(ids, SQLITE_IN_CLAUSE_CHUNK_SIZE);
+    for (const chunk of idChunks) {
+      const placeholders = chunk.map(() => '?').join(', ');
+      db.prepare(`UPDATE entries SET read = 1 WHERE id IN (${placeholders})`).run(...chunk);
+    }
 
     return {
       success: true,

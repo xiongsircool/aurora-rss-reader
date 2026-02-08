@@ -24,8 +24,10 @@ export interface Feed {
   id: string
   url: string
   title: string | null
+  custom_title: string | null
   group_name: string
   view_type: ViewType
+  ai_tagging_enabled?: number
   favicon_url: string | null
   unread_count: number
   last_checked_at: string | null

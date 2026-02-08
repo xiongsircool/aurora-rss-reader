@@ -36,10 +36,30 @@ function formatDate(dateStr: string | null) {
   return new Date(dateStr).toLocaleDateString()
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function highlightText(text: string, query: string) {
-  if (!query || !text) return text
-  const regex = new RegExp(`(${query})`, 'gi')
-  return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>')
+  const rawText = text || ''
+  const safeText = escapeHtml(rawText)
+  if (!query) return safeText
+  const escapedQuery = escapeRegExp(query)
+  try {
+    const regex = new RegExp(`(${escapedQuery})`, 'gi')
+    return safeText.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>')
+  } catch (error) {
+    return safeText
+  }
 }
 </script>
 

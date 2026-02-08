@@ -13,11 +13,13 @@ export interface Feed {
   id: string;
   url: string;
   title: string | null;
+  custom_title: string | null; // User-defined alias for the feed
   site_url: string | null;
   description: string | null;
   favicon_url: string | null;
   group_name: string;
   view_type: ViewType;
+  ai_tagging_enabled: number; // SQLite boolean (0/1)
   last_checked_at: string | null;
   last_error: string | null;
   update_interval_minutes: number;
@@ -107,13 +109,22 @@ export interface UserSettings {
   ai_auto_title_translation: number; // SQLite boolean (0/1)
   ai_title_display_mode: string;
   ai_translation_language: string;
+  ai_prompt_preference: string; // User custom preference for AI prompts
   language: string; // 'zh' | 'en' | 'ja' | 'ko'
   embedding_model: string;
   embedding_api_key: string;
   embedding_base_url: string;
+  // Smart tagging settings
+  tagging_api_key: string;
+  tagging_base_url: string;
+  tagging_model_name: string;
+  ai_auto_tagging: number; // SQLite boolean (0/1)
+  ai_auto_tagging_start_at: string | null;
+  tags_version: number;
   created_at: string;
   updated_at: string;
 }
+
 
 // Collection (multi-folder system)
 export interface Collection {
@@ -133,3 +144,38 @@ export interface CollectionEntry {
   added_at: string;
   note: string | null;
 }
+
+// User-defined tag for smart tagging
+export interface UserTag {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  sort_order: number;
+  enabled: number; // SQLite boolean (0/1)
+  created_at: string;
+  updated_at: string;
+}
+
+// Entry-Tag relationship
+export interface EntryTag {
+  entry_id: string;
+  tag_id: string;
+  is_manual: number; // SQLite boolean (0/1) - whether manually added
+  created_at: string;
+}
+
+// Entry analysis status for tracking AI tagging
+export interface EntryAnalysisStatus {
+  entry_id: string;
+  status: 'pending' | 'analyzed' | 'skipped';
+  analyzed_at: string | null;
+  tags_version: number;
+}
+
+// Analysis status type enum
+export const ANALYSIS_STATUS = {
+  PENDING: 'pending',
+  ANALYZED: 'analyzed',
+  SKIPPED: 'skipped',
+} as const;
