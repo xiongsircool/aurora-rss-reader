@@ -176,21 +176,28 @@ function parseDate(dateString: string | undefined, fallbackDate?: Date): string 
       return date.toISOString();
     }
 
+    const trimmed = dateString.trim();
+    const numericTimestamp = /^\d+$/.test(trimmed) ? Number(trimmed) : null;
+
     // Try common alternative formats
     const alternativeFormats = [
-      // Unix timestamp (seconds)
+      // Unix timestamp (milliseconds)
       () => {
-        const timestamp = parseInt(dateString, 10);
-        if (!isNaN(timestamp) && timestamp > 0) {
-          return new Date(timestamp * 1000);
+        if (numericTimestamp === null || !Number.isFinite(numericTimestamp)) {
+          return null;
+        }
+        if (trimmed.length >= 11) {
+          return new Date(numericTimestamp);
         }
         return null;
       },
-      // Unix timestamp (milliseconds)
+      // Unix timestamp (seconds)
       () => {
-        const timestamp = parseInt(dateString, 10);
-        if (!isNaN(timestamp) && timestamp > 1000000000000) {
-          return new Date(timestamp);
+        if (numericTimestamp === null || !Number.isFinite(numericTimestamp)) {
+          return null;
+        }
+        if (trimmed.length <= 10) {
+          return new Date(numericTimestamp * 1000);
         }
         return null;
       },

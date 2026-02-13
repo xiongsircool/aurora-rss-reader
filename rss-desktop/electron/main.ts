@@ -286,18 +286,19 @@ async function startBackend(): Promise<{ success: boolean; error?: string; path?
  * 停止后端服务
  */
 function stopBackend() {
-  if (!backendProcess) return
+  const processRef = backendProcess
+  if (!processRef) return
 
   console.log('🛑 停止后端服务...')
 
   try {
-    backendProcess.kill('SIGTERM')
+    processRef.kill('SIGTERM')
 
     // 如果5秒后还没退出，强制杀死
     setTimeout(() => {
-      if (backendProcess && !backendProcess.killed) {
+      if (processRef.exitCode === null) {
         console.warn('⚠️  强制终止后端进程')
-        backendProcess.kill('SIGKILL')
+        processRef.kill('SIGKILL')
       }
     }, 5000)
   } catch (error) {
@@ -513,11 +514,6 @@ app.whenReady().then(async () => {
     }
 
     loadRendererContent()
-
-    // 启动自动更新（生产环境，延迟 5 秒）
-    if (!isDev && win) {
-      setupAutoUpdater(win)
-    }
   } else {
     showStartupStatus('正在启动后端服务，请稍候...')
 

@@ -18,7 +18,7 @@ async function main() {
   try {
     // Initialize database
     initDatabase();
-    console.error("✅ Database initialized");
+    console.log("✅ Database initialized");
 
     // Create MCP server
     const server = new McpServer({
@@ -42,7 +42,7 @@ async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
 
-    console.error("🚀 Aurora MCP Server running on stdio");
+    console.log("🚀 Aurora MCP Server running on stdio");
   } catch (error: unknown) {
     console.error("❌ Failed to start MCP server:", error);
     process.exit(1);
