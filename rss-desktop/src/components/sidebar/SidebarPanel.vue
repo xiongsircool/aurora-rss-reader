@@ -16,8 +16,9 @@ import FeedGroup from './FeedGroup.vue'
 import ViewTypeNav from './ViewTypeNav.vue'
 import ConfirmModal from '../common/ConfirmModal.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import type { ViewMode } from '../../composables/useViewMode'
 
-export type ViewMode = 'feeds' | 'favorites' | 'collection' | 'tag'
+export type { ViewMode }
 
 const props = defineProps<{
   // Header props

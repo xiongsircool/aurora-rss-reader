@@ -5,6 +5,9 @@ import { useFeedStore } from '../stores/feedStore'
 import { useAIStore } from '../stores/aiStore'
 import { useFavoritesStore } from '../stores/favoritesStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useCollectionsStore } from '../stores/collectionsStore'
+import { useTagsStore } from '../stores/tagsStore'
+import { useSearchStore } from '../stores/searchStore'
 import { useI18n } from 'vue-i18n'
 import { useLanguage } from '../composables/useLanguage'
 import { useLayoutManager } from '../composables/useLayoutManager'
@@ -15,27 +18,23 @@ import { useFeedFilter } from '../composables/useFeedFilter'
 import { useAppSync } from '../composables/useAppSync'
 import { useFeedActions } from '../composables/useFeedActions'
 import { useArticleTranslation } from '../composables/useArticleTranslation'
-import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { useViewMode } from '../composables/useViewMode'
+import { useDetailsPanel } from '../composables/useDetailsPanel'
+import { useTimelineData } from '../composables/useTimelineData'
+import { useFeedManagement } from '../composables/useFeedManagement'
 
 import Toast from '../components/Toast.vue'
 import ConfirmModal from '../components/common/ConfirmModal.vue'
 import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
-import type { ViewMode } from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
 import DetailsPanel from '../components/details/DetailsPanel.vue'
-import type { Entry, Feed } from '../types'
-import { useCollectionsStore } from '../stores/collectionsStore'
-import { useTagsStore } from '../stores/tagsStore'
-import { useSearchStore } from '../stores/searchStore'
-import { collectionEntryToEntry, tagEntryToEntry, searchResultToEntry } from '../utils/entryAdapter'
+import type { Entry } from '../types'
 
 import { defineAsyncComponent } from 'vue'
 const SettingsModal = defineAsyncComponent(() => import('../components/SettingsModal.vue'))
 const AddToBookmarkGroupModal = defineAsyncComponent(() => import('../components/collections/AddToCollectionModal.vue'))
 
-
-
-
+// === Stores ===
 const store = useFeedStore()
 const aiStore = useAIStore()
 const favoritesStore = useFavoritesStore()
@@ -43,30 +42,10 @@ const settingsStore = useSettingsStore()
 const collectionsStore = useCollectionsStore()
 const tagsStore = useTagsStore()
 const searchStore = useSearchStore()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const { loadLanguage } = useLanguage()
 
-// Unified view mode
-const viewMode = ref<ViewMode>('feeds')
-const activeCollectionId = ref<string | null>(null)
-const activeTagId = ref<string | null>(null)
-const activeTagView = ref<'tag' | 'pending' | 'untagged' | null>(null)
-
-// AI Search state
-const aiSearchActive = ref(false)
-const aiSearchEnabled = computed(() => {
-  // Enable AI search toggle only if embedding/search API is configured
-  const config = aiStore.config
-  return !!(config?.embedding?.api_key || config?.embedding?.base_url)
-})
-const {
-  show: confirmShow,
-  options: confirmOptions,
-  requestConfirm,
-  handleConfirm,
-  handleCancel
-} = useConfirmDialog()
-// Initialize Composables
+// === Title Translation ===
 const {
   aiFeatures,
   titleTranslationLanguageLabel,
@@ -76,295 +55,51 @@ const {
   registerAutoRetryHandler,
   queueAutoTitleTranslation,
   requestTitleTranslation,
-  setupAutoTranslationWatcher
+  setupAutoTranslationWatcher,
 } = useTitleTranslation()
 
+// === Feed Filter ===
 const {
-    searchQuery,
-    filterMode,
-    dateRangeFilter,
-    filterLoading,
-    showFavoritesOnly,
-    selectedFavoriteFeed,
-    
-    filteredEntries,
-    isDateFilterActive,
-    timeFilterLabel,
-
-    debouncedApplyFilters,
-    applyFilters,
-    setupFilterWatchers,
-    selectFavoriteFeed: selectFavoriteFeedRaw,
-    backToAllFeeds: backToAllFeedsRaw
+  searchQuery,
+  filterMode,
+  dateRangeFilter,
+  filterLoading,
+  showFavoritesOnly,
+  selectedFavoriteFeed,
+  filteredEntries,
+  isDateFilterActive,
+  timeFilterLabel,
+  debouncedApplyFilters,
+  applyFilters,
+  setupFilterWatchers,
+  selectFavoriteFeed: selectFavoriteFeedRaw,
+  backToAllFeeds: backToAllFeedsRaw,
 } = useFeedFilter()
 
 const { handleToggleStar } = useFeedActions()
-
-// Setup Watchers
 setupFilterWatchers()
 
-// === View Mode Sync ===
-// Keep showFavoritesOnly in sync with viewMode
-watch(viewMode, (mode) => {
-  if (mode === 'favorites') {
-    showFavoritesOnly.value = true
-  } else {
-    showFavoritesOnly.value = false
-  }
-})
-
-// When the favorites toggle is used, sync back to viewMode
-watch(showFavoritesOnly, (val) => {
-  if (val && viewMode.value !== 'favorites') {
-    viewMode.value = 'favorites'
-  } else if (!val && viewMode.value === 'favorites') {
-    viewMode.value = 'feeds'
-  }
-})
-
-// Clear selected entry when switching view modes
-watch(viewMode, () => {
-  selectedFavoriteEntryId.value = null
-  isDetailsOpen.value = false
-})
-
-// === Collection Mode ===
-async function handleSelectCollection(collectionId: string) {
-  viewMode.value = 'collection'
-  activeCollectionId.value = collectionId
-  activeTagId.value = null
-  activeTagView.value = null
-  collectionsStore.selectCollection(collectionId)
-  await collectionsStore.fetchCollectionEntries(collectionId)
-}
-
-function handleToggleCollections() {
-  if (viewMode.value === 'collection') {
-    viewMode.value = 'feeds'
-    activeCollectionId.value = null
-  } else {
-    viewMode.value = 'collection'
-    activeTagId.value = null
-    activeTagView.value = null
-    // If a collection was previously selected, re-select it
-    if (collectionsStore.activeCollectionId) {
-      activeCollectionId.value = collectionsStore.activeCollectionId
-    }
-  }
-}
-
-// === Tag Mode ===
-async function handleSelectTag(tagId: string) {
-  viewMode.value = 'tag'
-  activeTagId.value = tagId
-  activeTagView.value = 'tag'
-  activeCollectionId.value = null
-  tagsStore.selectTag(tagId)
-  await tagsStore.fetchEntriesByTag(tagId, true)
-}
-
-async function handleSelectTagView(view: 'pending' | 'untagged') {
-  viewMode.value = 'tag'
-  activeTagId.value = null
-  activeTagView.value = view
-  activeCollectionId.value = null
-  tagsStore.setView(view)
-  if (view === 'pending') {
-    await tagsStore.fetchPendingEntries(true)
-  } else {
-    await tagsStore.fetchUntaggedEntries(true)
-  }
-}
-
-function handleToggleTags() {
-  if (viewMode.value === 'tag') {
-    viewMode.value = 'feeds'
-    activeTagId.value = null
-    activeTagView.value = null
-  } else {
-    viewMode.value = 'tag'
-    activeCollectionId.value = null
-    activeTagView.value = 'pending'
-    // Load tag data
-    tagsStore.fetchTags()
-    tagsStore.fetchStats()
-    tagsStore.fetchPendingEntries(true)
-  }
-}
-
-// === AI Search ===
-function handleToggleAISearch() {
-  aiSearchActive.value = !aiSearchActive.value
-  if (!aiSearchActive.value) {
-    // Exiting AI search mode
-    searchStore.clearSearch()
-  }
-}
-
-async function handleAISearch(query: string) {
-  if (!query.trim()) return
-  await searchStore.search(query, searchStore.searchType)
-}
-
-// === Unified Entries for Timeline ===
-const collectionEntriesAsEntry = computed<Entry[]>(() =>
-  collectionsStore.collectionEntries.map(collectionEntryToEntry)
-)
-const tagEntriesAsEntry = computed<Entry[]>(() =>
-  tagsStore.entries.map(tagEntryToEntry)
-)
-const searchEntriesAsEntry = computed<Entry[]>(() =>
-  searchStore.results.map(searchResultToEntry)
-)
-
-const unifiedEntries = computed<Entry[]>(() => {
-  // If AI search is active and has results, show those regardless of viewMode
-  if (aiSearchActive.value && searchStore.hasSearched) {
-    return searchEntriesAsEntry.value
-  }
-  switch (viewMode.value) {
-    case 'collection':
-      return collectionEntriesAsEntry.value
-    case 'tag':
-      return tagEntriesAsEntry.value
-    default:
-      return filteredEntries.value
-  }
-})
-
-const unifiedLoading = computed(() => {
-  if (aiSearchActive.value && searchStore.loading) return true
-  switch (viewMode.value) {
-    case 'collection':
-      return collectionsStore.loading
-    case 'tag':
-      return tagsStore.loading
-    default:
-      return store.loadingEntries
-  }
-})
-
-const summaryText = ref('')
-const summaryLoading = ref(false)
-const translationLanguage = ref('zh')
-const lastVisibleEntries = ref<Entry[]>([])
-const cleanupTitleTranslationAutoRetry = registerAutoRetryHandler((entryId, language) => {
-  if (!aiFeatures.value?.auto_title_translation) {
-    return
-  }
-  const entry = lastVisibleEntries.value.find((item) => item.id === entryId)
-  if (!entry) {
-    return
-  }
-  queueAutoTitleTranslation(entry, language)
-})
-
-const editingFeedId = ref<string | null>(null)
-const editingGroupName = ref('')
-
-const importLoading = ref(false)
-const showSettings = ref(false)
-const showBookmarkGroupModal = ref(false)
-const bookmarkGroupEntryId = ref<string | null>(null)
-
-const { showToast, toastMessage, toastType, showNotification } = useNotification()
-const { darkMode, toggleTheme, loadTheme } = useTheme()
-
-// 使用布局管理 composable
-const {
-  isDraggingLeft,
-  isDraggingRight,
-  logoSize,
-  detailsWidth,
-  viewportWidth,
-  layoutStyle,
-  handleMouseDownLeft,
-  handleMouseDownRight,
-  initLayout,
-  cleanupLayout,
-  resetLayout
-} = useLayoutManager()
-
-type DetailsPanelMode = 'docked' | 'click'
-type DetailsPresentation = 'docked' | 'drawer' | 'fullscreen'
-
-const DETAILS_FULLSCREEN_BREAKPOINT = 960
-const DETAILS_DRAWER_BREAKPOINT = 1200
-
-const detailsPanelMode = computed<DetailsPanelMode>(() => {
-  return settingsStore.settings.details_panel_mode === 'click' ? 'click' : 'docked'
-})
-
-const detailsPresentation = computed<DetailsPresentation>(() => {
-  const width = viewportWidth.value
-  if (width <= DETAILS_FULLSCREEN_BREAKPOINT) {
-    return 'fullscreen'
-  }
-  if (width <= DETAILS_DRAWER_BREAKPOINT) {
-    return 'drawer'
-  }
-  return detailsPanelMode.value === 'click' ? 'drawer' : 'docked'
-})
-
-const isDetailsOpen = ref(false)
-const timelineScroller = ref<HTMLElement | null>(null)
-const showBackToTop = ref(false)
-
-const isSingleColumn = computed(() => viewportWidth.value <= DETAILS_FULLSCREEN_BREAKPOINT)
-
-let previousBodyOverflow = ''
-let previousBodyPaddingRight = ''
-let bodyScrollLocked = false
-
-const collapsedGroups = computed<Record<string, boolean>>(() => {
-  const result: Record<string, boolean> = {}
-  store.collapsedGroups.forEach((groupName) => {
-    result[groupName] = true
-  })
-  return result
-})
-
-function toggleGroupCollapse(groupName: string) {
-  store.toggleGroupCollapse(groupName)
-}
-
-function expandAllGroups() {
-  store.expandAllGroups()
-}
-
-function collapseAllGroups() {
-  store.collapseAllGroups()
-}
-
-
-
-// Watch for store errors
-watch(() => store.errorMessage, (error) => {
-  if (error) {
-    showNotification(error, 'error')
-    setTimeout(() => {
-      store.errorMessage = null
-    }, 100)
-  }
-})
-
-// Watch for AI store errors
-watch(() => aiStore.error, (error) => {
-  if (error) {
-    showNotification(error, 'error')
-    setTimeout(() => {
-      aiStore.clearError()
-    }, 100)
-  }
-})
-
-
-
-
-// 收藏状态管理
+// === View Mode ===
 const selectedFavoriteEntryId = ref<string | null>(null)
-const selectedUnifiedEntryId = ref<string | null>(null)
+const {
+  viewMode,
+  activeCollectionId,
+  activeTagId,
+  activeTagView,
+  aiSearchActive,
+  aiSearchEnabled,
+  selectedUnifiedEntryId,
+  ensureFeedsMode,
+  handleSelectCollection,
+  handleToggleCollections,
+  handleSelectTag,
+  handleSelectTagView,
+  handleToggleTags,
+  handleToggleAISearch,
+  handleAISearch,
+} = useViewMode(showFavoritesOnly, selectedFavoriteEntryId)
 
+// === Entry Selection ===
 const currentSelectedEntry = computed<Entry | null>(() => {
   if (viewMode.value === 'collection') {
     if (!selectedUnifiedEntryId.value) return null
@@ -380,66 +115,147 @@ const currentSelectedEntry = computed<Entry | null>(() => {
   return store.selectedEntry
 })
 
-const showDetailsOverlay = computed(() => {
-  if (detailsPresentation.value === 'docked') {
-    return false
-  }
-  return isDetailsOpen.value && !!currentSelectedEntry.value
+// === Layout ===
+const {
+  isDraggingLeft,
+  isDraggingRight,
+  logoSize,
+  detailsWidth,
+  viewportWidth,
+  layoutStyle,
+  handleMouseDownLeft,
+  handleMouseDownRight,
+  initLayout,
+  cleanupLayout,
+  resetLayout,
+} = useLayoutManager()
+
+// === Details Panel ===
+const {
+  isDetailsOpen,
+  detailsPresentation,
+  showDetailsOverlay,
+  showBackToTopButton,
+  detailsOverlayStyle,
+  openDetails,
+  closeDetails,
+  unlockBodyScroll,
+  scrollToTop,
+  setupScrollListeners,
+  cleanupScrollListeners,
+} = useDetailsPanel(viewportWidth, detailsWidth, currentSelectedEntry)
+
+// Close details when switching view modes
+watch(viewMode, () => { isDetailsOpen.value = false })
+
+// === Timeline Data ===
+const {
+  collectionEntriesAsEntry,
+  tagEntriesAsEntry,
+  unifiedEntries,
+  unifiedLoading,
+  timelineTitle,
+  timelineSubtitle,
+  timelineHasMore,
+  timelineLoadingMore,
+  timelineViewType,
+  handleLoadMoreEntries,
+} = useTimelineData({
+  viewMode,
+  aiSearchActive,
+  showFavoritesOnly,
+  selectedFavoriteFeed,
+  activeTagId,
+  activeTagView,
+  filteredEntries,
 })
 
-const showBackToTopButton = computed(() => {
-  return isSingleColumn.value && showBackToTop.value && !showDetailsOverlay.value
+// === Feed Management ===
+const {
+  confirmShow,
+  confirmOptions,
+  handleConfirm,
+  handleCancel,
+  editingFeedId,
+  editingGroupName,
+  importLoading,
+  handleAddFeed,
+  handleDeleteFeed,
+  startEditFeed,
+  saveEditFeed,
+  cancelEdit,
+  handleExportOpml,
+  handleImportOpml,
+  reloadFeeds,
+  handleMarkAllAsRead,
+  handleMarkGroupAsRead,
+  handleMarkFeedAsRead,
+  handleSelectViewType,
+  handleChangeViewType,
+  handleMoveToGroup,
+  handleSetCustomTitle,
+} = useFeedManagement({
+  showFavoritesOnly,
+  filterMode,
+  dateRangeFilter,
+  isDateFilterActive,
+  applyFilters,
+  debouncedApplyFilters,
 })
 
-const detailsOverlayWidth = computed(() => {
-  if (detailsPresentation.value === 'fullscreen') {
-    return '100vw'
-  }
-  const maxWidth = Math.min(detailsWidth.value, Math.round(viewportWidth.value * 0.92))
-  return `${maxWidth}px`
+// === Notification & Theme ===
+const { showToast, toastMessage, toastType, showNotification } = useNotification()
+const { darkMode, toggleTheme, loadTheme } = useTheme()
+const showSettings = ref(false)
+const showBookmarkGroupModal = ref(false)
+const bookmarkGroupEntryId = ref<string | null>(null)
+
+// === Group collapse ===
+const collapsedGroups = computed<Record<string, boolean>>(() => {
+  const result: Record<string, boolean> = {}
+  store.collapsedGroups.forEach((groupName) => { result[groupName] = true })
+  return result
 })
 
-const detailsOverlayStyle = computed(() => ({
-  width: detailsOverlayWidth.value,
-  '--details-width': detailsOverlayWidth.value,
-}))
+function toggleGroupCollapse(groupName: string) { store.toggleGroupCollapse(groupName) }
+function expandAllGroups() { store.expandAllGroups() }
+function collapseAllGroups() { store.collapseAllGroups() }
 
-function getContentTextLength(html?: string | null): number {
-  if (!html) return 0
-  if (typeof DOMParser === 'undefined') {
-    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().length
+// === Store error watchers ===
+watch(() => store.errorMessage, (error) => {
+  if (error) {
+    showNotification(error, 'error')
+    setTimeout(() => { store.errorMessage = null }, 100)
   }
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  const text = doc.body?.textContent ?? ''
-  return text.replace(/\s+/g, ' ').trim().length
-}
+})
 
-function selectTranslationContent(entry: Entry | null): string | null {
-  if (!entry) return null
-  const candidates = [
-    { value: entry.readability_content, priority: 3 },
-    { value: entry.content, priority: 2 },
-    { value: entry.summary, priority: 1 },
-  ]
-
-  let best: { value: string; length: number; priority: number } | null = null
-
-  for (const candidate of candidates) {
-    if (!candidate.value) continue
-    const length = getContentTextLength(candidate.value)
-    if (!best || length > best.length || (length === best.length && candidate.priority > best.priority)) {
-      best = { value: candidate.value, length, priority: candidate.priority }
-    }
+watch(() => aiStore.error, (error) => {
+  if (error) {
+    showNotification(error, 'error')
+    setTimeout(() => { aiStore.clearError() }, 100)
   }
+})
 
-  if (best && best.length > 0) {
-    return best.value
+watch(() => favoritesStore.error, (error) => {
+  if (error) {
+    showNotification(error, 'error')
+    setTimeout(() => { favoritesStore.clearError() }, 100)
   }
+})
 
-  return entry.readability_content ?? entry.content ?? entry.summary ?? null
-}
+// === Summary & Full-text Translation ===
+const summaryText = ref('')
+const summaryLoading = ref(false)
+const translationLanguage = ref('zh')
+const lastVisibleEntries = ref<Entry[]>([])
 
-// 全文翻译相关状态
+const cleanupTitleTranslationAutoRetry = registerAutoRetryHandler((entryId, language) => {
+  if (!aiFeatures.value?.auto_title_translation) return
+  const entry = lastVisibleEntries.value.find((item) => item.id === entryId)
+  if (!entry) return
+  queueAutoTitleTranslation(entry, language)
+})
+
 const currentEntryId = computed(() => currentSelectedEntry.value?.id ?? null)
 const currentEntryContent = computed(() => selectTranslationContent(currentSelectedEntry.value ?? null))
 
@@ -455,25 +271,47 @@ const {
   toggleTranslation: toggleFullTextTranslationRaw,
 } = useArticleTranslation(currentEntryId, currentEntryContent, translationLanguage)
 
-// 翻译后的标题
 const translatedTitle = computed(() => {
   if (!currentSelectedEntry.value) return null
   return getTranslatedTitle(currentSelectedEntry.value.id, translationLanguage.value)
 })
 
+function getContentTextLength(html?: string | null): number {
+  if (!html) return 0
+  if (typeof DOMParser === 'undefined') {
+    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().length
+  }
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  return (doc.body?.textContent ?? '').replace(/\s+/g, ' ').trim().length
+}
 
-// 全文翻译（包含标题翻译）
+function selectTranslationContent(entry: Entry | null): string | null {
+  if (!entry) return null
+  const candidates = [
+    { value: entry.readability_content, priority: 3 },
+    { value: entry.content, priority: 2 },
+    { value: entry.summary, priority: 1 },
+  ]
+  let best: { value: string; length: number; priority: number } | null = null
+  for (const candidate of candidates) {
+    if (!candidate.value) continue
+    const length = getContentTextLength(candidate.value)
+    if (!best || length > best.length || (length === best.length && candidate.priority > best.priority)) {
+      best = { value: candidate.value, length, priority: candidate.priority }
+    }
+  }
+  if (best && best.length > 0) return best.value
+  return entry.readability_content ?? entry.content ?? entry.summary ?? null
+}
+
 async function handleFullTextTranslation() {
   const wasShowing = showFullTextTranslation.value
   toggleFullTextTranslationRaw()
-
-  // 如果是开启翻译，同时翻译标题
   if (!wasShowing && currentSelectedEntry.value) {
     await nextTick()
     if (fullTextTranslatableBlocks.value.length === 0) {
       showNotification(t('toast.translationNoText'), 'info')
     }
-
     try {
       await requestTitleTranslation(currentSelectedEntry.value.id, translationLanguage.value)
     } catch (error) {
@@ -482,53 +320,46 @@ async function handleFullTextTranslation() {
   }
 }
 
-const feedMap = computed<Record<string, Feed>>(() => {
-  return store.feeds.reduce<Record<string, Feed>>((acc, feed) => {
-    acc[feed.id] = feed
-    return acc
-  }, {})
-})
+async function handleSummary() {
+  if (!currentSelectedEntry.value) return
+  summaryLoading.value = true
+  try {
+    const summary = await store.requestSummary(currentSelectedEntry.value.id)
+    summaryText.value = summary.summary
+    showNotification(t('toast.summarySuccess'), 'success')
+  } catch {
+    showNotification(t('toast.summaryFailed'), 'error')
+  } finally {
+    summaryLoading.value = false
+  }
+}
 
-// 收藏相关函数
+// === Favorites ===
 async function loadFavoritesData(options: { includeEntries?: boolean; feedId?: string | null } = {}) {
   const includeEntries = options.includeEntries ?? false
   const targetFeedId = options.feedId ?? selectedFavoriteFeed.value
-
-  // Use settings store time field
   const filterTimeField = settingsStore.settings.time_field
-  // Use current date range filter if active
   const filterDateRange = isDateFilterActive.value ? dateRangeFilter.value : undefined
-
   try {
     if (includeEntries) {
       await favoritesStore.fetchStarredEntries(
-        targetFeedId || undefined, 
-        200, 
-        0, 
-        { dateRange: filterDateRange, timeField: filterTimeField }
+        targetFeedId || undefined, 200, 0,
+        { dateRange: filterDateRange, timeField: filterTimeField },
       )
       ensureFavoriteSelection()
     } else {
       await favoritesStore.fetchStarredStats()
     }
-  } catch (error) {
-    console.error('Failed to load favorites data:', error)
+  } catch {
     showNotification(t('toast.loadFavoritesFailed'), 'error')
   }
 }
 
-// Watch for date range changes to reload favorites if active
 watch(dateRangeFilter, () => {
-  if (showFavoritesOnly.value) {
-    loadFavoritesData({ includeEntries: true })
-  }
+  if (showFavoritesOnly.value) loadFavoritesData({ includeEntries: true })
 })
-
-// Watch for time field changes
 watch(() => settingsStore.settings.time_field, () => {
-    if (showFavoritesOnly.value) {
-        loadFavoritesData({ includeEntries: true })
-    }
+  if (showFavoritesOnly.value) loadFavoritesData({ includeEntries: true })
 })
 
 async function selectFavoriteFeed(feedId: string | null) {
@@ -550,413 +381,25 @@ function backToAllFeeds() {
 function ensureFavoriteSelection() {
   if (!showFavoritesOnly.value) return
   const entries = favoritesStore.starredEntries
-  if (!entries.length) {
-    selectedFavoriteEntryId.value = null
-    return
-  }
-  if (!selectedFavoriteEntryId.value || !entries.some((entry) => entry.id === selectedFavoriteEntryId.value)) {
+  if (!entries.length) { selectedFavoriteEntryId.value = null; return }
+  if (!selectedFavoriteEntryId.value || !entries.some(e => e.id === selectedFavoriteEntryId.value)) {
     selectedFavoriteEntryId.value = entries[0].id
   }
 }
 
-function openDetails() {
-  if (detailsPresentation.value === 'docked') {
-    return
-  }
-  isDetailsOpen.value = true
-}
-
-function closeDetails() {
-  isDetailsOpen.value = false
-}
-
-function lockBodyScroll() {
-  if (bodyScrollLocked || typeof document === 'undefined') return
-  const body = document.body
-  const root = document.documentElement
-  if (!body || !root) return
-  previousBodyOverflow = body.style.overflow
-  previousBodyPaddingRight = body.style.paddingRight
-  const scrollbarWidth = window.innerWidth - root.clientWidth
-  if (scrollbarWidth > 0) {
-    body.style.paddingRight = `${scrollbarWidth}px`
-  }
-  body.style.overflow = 'hidden'
-  bodyScrollLocked = true
-}
-
-function unlockBodyScroll() {
-  if (!bodyScrollLocked || typeof document === 'undefined') return
-  const body = document.body
-  if (!body) return
-  body.style.overflow = previousBodyOverflow
-  body.style.paddingRight = previousBodyPaddingRight
-  bodyScrollLocked = false
-}
-
-function updateBackToTopVisibility() {
-  if (typeof window === 'undefined') return
-  const windowTop = window.scrollY || 0
-  const scrollerTop = timelineScroller.value?.scrollTop ?? 0
-  showBackToTop.value = Math.max(windowTop, scrollerTop) > 320
-}
-
-function scrollToTop() {
-  timelineScroller.value?.scrollTo({ top: 0, behavior: 'smooth' })
-  if (typeof window !== 'undefined') {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-}
-
-function handleEntrySelect(entryId: string) {
-  if (viewMode.value === 'collection' || viewMode.value === 'tag') {
-    selectedUnifiedEntryId.value = entryId
-  } else if (showFavoritesOnly.value) {
-    selectedFavoriteEntryId.value = entryId
-  } else {
-    store.selectEntry(entryId)
-  }
-  openDetails()
-}
-
-function handleEntriesVisible(entries: Entry[]) {
-  lastVisibleEntries.value = entries
-  entries.forEach((entry) => {
-    queueAutoTitleTranslation(entry)
-  })
-}
-
-async function handleLoadMoreEntries() {
-  if (viewMode.value === 'tag' && tagsStore.hasMore) {
-    if (activeTagView.value === 'pending') {
-      await tagsStore.fetchPendingEntries()
-    } else if (activeTagView.value === 'untagged') {
-      await tagsStore.fetchUntaggedEntries()
-    } else if (activeTagId.value) {
-      await tagsStore.fetchEntriesByTag(activeTagId.value)
-    }
-    return
-  }
-  if (viewMode.value === 'collection' || showFavoritesOnly.value) {
-    return
-  }
-  await store.loadMoreEntries()
-}
-
-watch(
-  () => [aiFeatures.value?.auto_title_translation, aiFeatures.value?.translation_language],
-  ([autoEnabled]) => {
-    if (!autoEnabled || !lastVisibleEntries.value.length) {
-      return
-    }
-    lastVisibleEntries.value.forEach((entry) => {
-      queueAutoTitleTranslation(entry)
-    })
-  }
-)
-
-watch(detailsPresentation, (presentation) => {
-  if (presentation === 'docked') {
-    isDetailsOpen.value = false
-  }
-})
-
-watch(
-  () => currentSelectedEntry.value,
-  (entry) => {
-    if (!entry) {
-      isDetailsOpen.value = false
-    }
-  }
-)
-
-watch(
-  () => showDetailsOverlay.value,
-  (visible) => {
-    if (visible) {
-      lockBodyScroll()
-    } else {
-      unlockBodyScroll()
-    }
-  },
-  { immediate: true }
-)
-
-// Watch for favorites store errors
-watch(() => favoritesStore.error, (error) => {
-  if (error) {
-    showNotification(error, 'error')
-    setTimeout(() => {
-      favoritesStore.clearError()
-    }, 100)
-  }
-})
-
-onMounted(() => {
-  if (typeof window === 'undefined') return
-  window.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
-  nextTick(() => {
-    timelineScroller.value = document.querySelector('.timeline__list') as HTMLElement | null
-    timelineScroller.value?.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
-    updateBackToTopVisibility()
-  })
-})
-
-onUnmounted(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('scroll', updateBackToTopVisibility)
-  }
-  timelineScroller.value?.removeEventListener('scroll', updateBackToTopVisibility)
-})
-
-
-
-// Initialize App Sync
-const { initSync, cleanupSync } = useAppSync(
-    showFavoritesOnly,
-    async () => { await loadFavoritesData() },
-    dateRangeFilter
-)
-
-// Setup Auto Translation Watcher
-setupAutoTranslationWatcher()
-
-onMounted(async () => {
-  initLayout()
-  loadTheme()
-  store.loadCollapsedGroups()
-  store.loadCustomGroups()
-  try {
-    await settingsStore.fetchSettings()
-  } catch (error) {
-    // Continue with defaults/local storage when settings fetch fails.
-  }
-  await loadLanguage()
-  await aiStore.fetchConfig()
-
-  dateRangeFilter.value = settingsStore.settings.default_date_range
-  loadFavoritesData()
-
-  const initialDateRange = settingsStore.settings.enable_date_filter ? dateRangeFilter.value : undefined
-  const initialTimeField = settingsStore.settings.time_field
-
-  await store.fetchFeeds({
-     dateRange: initialDateRange,
-     timeField: initialTimeField
-  })
-  await store.fetchEntries({
-     dateRange: initialDateRange,
-     timeField: initialTimeField
-  })
-
-  // Initialize collections and tags data for sidebar
-  collectionsStore.fetchCollections()
-  tagsStore.fetchTags()
-  tagsStore.fetchStats()
-
-  initSync()
-})
-
-onUnmounted(() => {
-  cleanupTitleTranslationAutoRetry()
-  cleanupLayout()
-  cleanupSync()
-  unlockBodyScroll()
-})
-
-watch(
-  () => currentSelectedEntry.value,
-  async (entry) => {
-    if (!entry) {
-      summaryText.value = ''
-      return
-    }
-    const cached = store.summaryCache[entry.id]
-    summaryText.value = cached?.summary ?? ''
-
-    // 自动生成摘要逻辑
-    if (aiFeatures.value?.auto_summary && !cached?.summary) {
-      // 如果启用了自动摘要且没有缓存摘要，则自动生成
-      try {
-        summaryLoading.value = true
-        const summary = await store.requestSummary(entry.id)
-        summaryText.value = summary.summary
-      } catch (error) {
-        console.error('自动生成摘要失败:', error)
-      } finally {
-        summaryLoading.value = false
-      }
-    }
-
-    if (!entry.read) {
-      await store.toggleEntryState(entry, { read: true })
-    }
-
-  },
-  { immediate: true },
-)
-
-watch(
-  () => translationLanguage.value,
-  async (newLanguage, oldLanguage) => {
-    if (newLanguage === oldLanguage) {
-      return
-    }
-
-    if (!currentSelectedEntry.value) {
-      return
-    }
-
-    if (!showFullTextTranslation.value) {
-      return
-    }
-
-    try {
-      await requestTitleTranslation(currentSelectedEntry.value.id, newLanguage)
-    } catch (error) {
-      console.warn('Title translation failed:', error)
-    }
-  }
-)
-
-
-
-
-
-async function handleFeedClick(feedId: string) {
-  if (viewMode.value !== 'feeds') {
-    viewMode.value = 'feeds'
-    activeCollectionId.value = null
-    activeTagId.value = null
-    activeTagView.value = null
-    selectedUnifiedEntryId.value = null
-  }
-  store.selectFeed(feedId)
-  await store.fetchEntries({ feedId })
-}
-
-const timelineTitle = computed(() => {
-  // Ensure reactivity to locale changes
-  locale.value
-
-  // AI Search mode
-  if (aiSearchActive.value && searchStore.hasSearched) {
-    return t('search.resultsCount', { count: searchStore.results.length })
-  }
-
-  // Collection mode
-  if (viewMode.value === 'collection') {
-    const collection = collectionsStore.activeCollection
-    return collection ? collection.name : t('collections.title')
-  }
-
-  // Tag mode
-  if (viewMode.value === 'tag') {
-    if (activeTagView.value === 'pending') return t('tags.pending')
-    if (activeTagView.value === 'untagged') return t('tags.untagged')
-    const tag = tagsStore.selectedTag
-    return tag ? tag.name : t('tags.title')
-  }
-
-  if (showFavoritesOnly.value) {
-    if (selectedFavoriteFeed.value) {
-       const feed = feedMap.value[selectedFavoriteFeed.value]
-       return feed ? (feed.title || feed.url) : t('groups.myFavorites')
-    }
-    return t('groups.myFavorites')
-  }
-  if (store.activeFeedId) {
-    // getFeedById might be missing in store, safe fallback
-    const feed = store.feeds.find(f => f.id === store.activeFeedId)
-    return feed ? (feed.title || feed.url) : t('navigation.allFeeds')
-  }
-  if (store.activeGroupName) {
-    return store.activeGroupName
-  }
-  return t('navigation.allFeeds')
-})
-
-const timelineHasMore = computed(() => {
-  if (viewMode.value === 'collection') return false
-  if (viewMode.value === 'tag') return tagsStore.hasMore
-  return (!showFavoritesOnly.value && store.entriesHasMore === true) || false
-})
-const timelineLoadingMore = computed(() => {
-  if (viewMode.value === 'collection') return false
-  if (viewMode.value === 'tag') return false
-  return (!showFavoritesOnly.value && store.entriesLoadingMore === true) || false
-})
-
-const timelineSubtitle = computed(() => {
-  return `${unifiedEntries.value.length} Articles`
-})
-
-// Get current view type from store (used for view type filtering mode)
-const timelineViewType = computed(() => {
-  // When filtering by view type (no specific feed/group selected)
-  if (!store.activeFeedId && !store.activeGroupName) {
-    return store.activeViewType
-  }
-  // When viewing a specific feed, use that feed's view type
-  if (store.activeFeedId) {
-    const feed = store.feeds.find(f => f.id === store.activeFeedId)
-    return feed?.view_type || 'articles'
-  }
-  // When viewing a group, keep the current active view type
-  if (store.activeGroupName) {
-    return store.activeViewType
-  }
-  // Default to articles
-  return 'articles'
-})
-
-async function handleAddFeed(url: string) {
-  if (!url) return
-  try {
-    let targetGroupName: string | null | undefined
-    if (!showFavoritesOnly.value) {
-      targetGroupName = store.activeGroupName
-      if (!targetGroupName && store.activeFeedId) {
-        const activeFeed = store.feeds.find((feed) => feed.id === store.activeFeedId)
-        targetGroupName = activeFeed?.group_name
-      }
-    }
-    await store.addFeed(url, { groupName: targetGroupName })
-    showNotification(t('feeds.addSuccess'), 'success')
-  } catch (error) {
-    showNotification(t('feeds.addFailed'), 'error')
-  }
-}
-
-async function handleSummary() {
-  if (!currentSelectedEntry.value) return
-  summaryLoading.value = true
-  try {
-    const summary = await store.requestSummary(currentSelectedEntry.value.id)
-    summaryText.value = summary.summary
-    showNotification(t('toast.summarySuccess'), 'success')
-  } catch (error) {
-    showNotification(t('toast.summaryFailed'), 'error')
-  } finally {
-    summaryLoading.value = false
-  }
-}
-
-
-
+// === Star / Read / Context menu ===
 async function toggleStar() {
   await handleToggleStar(currentSelectedEntry.value, showFavoritesOnly.value, async () => {
     await loadFavoritesData({ includeEntries: true })
   })
 }
 
-async function toggleStarFromList(entry: any) {
+async function toggleStarFromList(entry: Entry) {
   await handleToggleStar(entry, showFavoritesOnly.value, async () => {
     await loadFavoritesData({ includeEntries: true })
   })
 }
 
-// Right-click menu handlers
 function handleAddToBookmarkGroup(entry: Entry) {
   bookmarkGroupEntryId.value = entry.id
   showBookmarkGroupModal.value = true
@@ -974,9 +417,7 @@ function handleCopyLink(entry: Entry) {
 }
 
 function handleOpenExternal(entry: Entry) {
-  if (entry.url) {
-    window.open(entry.url, '_blank')
-  }
+  if (entry.url) window.open(entry.url, '_blank')
 }
 
 function normalizeExternalUrl(raw: string): string | null {
@@ -989,277 +430,152 @@ function normalizeExternalUrl(raw: string): string | null {
 
 async function openExternal(url?: string | null) {
   if (!url) return
-
   const normalizedUrl = normalizeExternalUrl(url)
   if (!normalizedUrl) return
-
   const mode = settingsStore.settings.open_original_mode ?? 'system'
   const ipc = window.ipcRenderer
-
   if (ipc?.invoke) {
     try {
-      const result = await ipc.invoke('open-external', { url: normalizedUrl, mode }) as { success?: boolean; error?: string }
-      if (result?.success) {
-        return
-      }
-    } catch (error) {
-      // Fallback to window.open on error
-    }
+      const result = await ipc.invoke('open-external', { url: normalizedUrl, mode }) as { success?: boolean }
+      if (result?.success) return
+    } catch { /* fallback */ }
   }
-
-  // Fallback to window.open
   window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
 }
 
+// === Feed / Group clicks ===
+async function handleFeedClick(feedId: string) {
+  ensureFeedsMode()
+  store.selectFeed(feedId)
+  await store.fetchEntries({ feedId })
+}
+
 async function handleGroupClick(groupName: string) {
-  if (viewMode.value !== 'feeds') {
-    viewMode.value = 'feeds'
-    activeCollectionId.value = null
-    activeTagId.value = null
-    activeTagView.value = null
-    selectedUnifiedEntryId.value = null
-  }
+  ensureFeedsMode()
   store.selectGroup(groupName)
   await store.fetchEntries({ groupName })
 }
 
 async function handleGroupRowClick(groupName: string) {
-  if (viewMode.value !== 'feeds') {
-    viewMode.value = 'feeds'
-    activeCollectionId.value = null
-    activeTagId.value = null
-    activeTagView.value = null
-    selectedUnifiedEntryId.value = null
-  }
+  ensureFeedsMode()
   store.toggleGroupCollapse(groupName)
   store.selectGroup(groupName)
   await store.fetchEntries({ groupName })
 }
 
-async function handleDeleteFeed(feedId: string) {
-  const confirmed = await requestConfirm({
-    title: t('feeds.deleteFeed'),
-    message: t('feeds.deleteConfirm'),
-    confirmText: t('common.delete'),
-    cancelText: t('common.cancel'),
-    danger: true
-  })
-  if (!confirmed) return
-  try {
-    await store.deleteFeed(feedId)
-    showNotification(t('feeds.deleteSuccess'), 'success')
-  } catch (error) {
-    showNotification(t('feeds.deleteFailed'), 'error')
+// === Entry selection & visible entries ===
+function handleEntrySelect(entryId: string) {
+  if (viewMode.value === 'collection' || viewMode.value === 'tag') {
+    selectedUnifiedEntryId.value = entryId
+  } else if (showFavoritesOnly.value) {
+    selectedFavoriteEntryId.value = entryId
+  } else {
+    store.selectEntry(entryId)
   }
+  openDetails()
 }
 
-function startEditFeed(feedId: string, currentGroup: string) {
-  editingFeedId.value = feedId
-  editingGroupName.value = currentGroup
+function handleEntriesVisible(entries: Entry[]) {
+  lastVisibleEntries.value = entries
+  entries.forEach((entry) => queueAutoTitleTranslation(entry))
 }
 
-async function saveEditFeed(feedId: string) {
-  try {
-    await store.updateFeed(feedId, { group_name: editingGroupName.value })
-    editingFeedId.value = null
-    showNotification(t('feeds.updateSuccess'), 'success')
-  } catch (error) {
-    showNotification(t('feeds.updateFailed'), 'error')
-  }
-}
+// === Auto-translation watchers ===
+watch(
+  () => [aiFeatures.value?.auto_title_translation, aiFeatures.value?.translation_language],
+  ([autoEnabled]) => {
+    if (!autoEnabled || !lastVisibleEntries.value.length) return
+    lastVisibleEntries.value.forEach((entry) => queueAutoTitleTranslation(entry))
+  },
+)
 
-function cancelEdit() {
-  editingFeedId.value = null
-}
-
-async function handleExportOpml() {
-  try {
-    await store.exportOpml()
-    showNotification(t('opml.exportSuccess'), 'success')
-  } catch (error) {
-    showNotification(t('opml.exportFailed'), 'error')
-  }
-}
-
-
-
-async function handleImportOpml(file: File) {
-  if (!file) return
-
-  importLoading.value = true
-  try {
-    const result = await store.importOpml(file)
-    showNotification(
-      t('opml.importSuccess', { imported: result.imported, skipped: result.skipped }),
-      'success'
-    )
-  } catch (error) {
-    showNotification(t('opml.importFailed'), 'error')
-  } finally {
-    importLoading.value = false
-  }
-}
-
-function reloadFeeds() {
-  // Try to use debounced apply filters if available, else fetch
-   // Since debouncedApplyFilters is defined in scope but typescript might not see it if I don't use it.
-   // I'll assume applyFilters is available
-   if (typeof debouncedApplyFilters === 'function') {
-      debouncedApplyFilters({ refreshFeeds: true })
-   } else {
-      store.fetchFeeds() // fallback
-   }
-}
-
-// 一键已读处理
-async function handleMarkAllAsRead() {
-  const markAsReadRange = settingsStore.settings.mark_as_read_range
-  const timeField = settingsStore.settings.time_field
-  
-  // 确认对话框
-  const confirmed = await requestConfirm({
-    title: t('articles.markAsRead'),
-    message: t('articles.markAsReadConfirmAll'),
-    confirmText: t('common.confirm'),
-    cancelText: t('common.cancel')
-  })
-  if (!confirmed) return
-  
-  try {
-    // 根据设置确定时间范围
-    // 'all' 或 'current' 表示标记所有未读
-    // '3d', '7d', '30d' 表示标记 X 天之前的文章
-    const olderThan = (markAsReadRange === 'all' || markAsReadRange === 'current') 
-      ? undefined 
-      : markAsReadRange
-    
-    const result = await store.markAsRead({
-      feedId: store.activeFeedId ?? undefined,
-      groupName: store.activeGroupName ?? undefined,
-      olderThan,
-      timeField
-    })
-    
-    if (result.marked_count > 0) {
-      showNotification(t('articles.markAsReadSuccess', { count: result.marked_count }), 'success')
-      // 刷新列表
-      await applyFilters()
-    } else {
-      showNotification(t('articles.markAsReadEmpty'), 'info')
+// === Entry change watchers ===
+watch(
+  () => currentSelectedEntry.value,
+  async (entry) => {
+    if (!entry) { summaryText.value = ''; return }
+    const cached = store.summaryCache[entry.id]
+    summaryText.value = cached?.summary ?? ''
+    if (aiFeatures.value?.auto_summary && !cached?.summary) {
+      try {
+        summaryLoading.value = true
+        const summary = await store.requestSummary(entry.id)
+        summaryText.value = summary.summary
+      } catch (error) {
+        console.error('Auto summary failed:', error)
+      } finally {
+        summaryLoading.value = false
+      }
     }
-  } catch (error) {
-    console.error('Mark as read failed:', error)
-    showNotification(t('articles.markAsReadFailed'), 'error')
-  }
-}
+    if (!entry.read) await store.toggleEntryState(entry, { read: true })
+  },
+  { immediate: true },
+)
 
-// 分组级别一键已读
-async function handleMarkGroupAsRead(groupName: string) {
-  const markAsReadRange = settingsStore.settings.mark_as_read_range
-  const timeField = settingsStore.settings.time_field
-  
-  try {
-    const olderThan = (markAsReadRange === 'all' || markAsReadRange === 'current') 
-      ? undefined 
-      : markAsReadRange
-    
-    const result = await store.markAsRead({
-      groupName,
-      olderThan,
-      timeField
-    })
-    
-    if (result.marked_count > 0) {
-      showNotification(t('articles.markAsReadSuccess', { count: result.marked_count }), 'success')
-      await applyFilters()
-    } else {
-      showNotification(t('articles.markAsReadEmpty'), 'info')
+watch(
+  () => translationLanguage.value,
+  async (newLang, oldLang) => {
+    if (newLang === oldLang || !currentSelectedEntry.value || !showFullTextTranslation.value) return
+    try {
+      await requestTitleTranslation(currentSelectedEntry.value.id, newLang)
+    } catch (error) {
+      console.warn('Title translation failed:', error)
     }
-  } catch (error) {
-    console.error('Mark group as read failed:', error)
-    showNotification(t('articles.markAsReadFailed'), 'error')
-  }
-}
+  },
+)
 
-// 订阅级别一键已读
-async function handleMarkFeedAsRead(feedId: string) {
-  const markAsReadRange = settingsStore.settings.mark_as_read_range
-  const timeField = settingsStore.settings.time_field
-  
-  try {
-    const olderThan = (markAsReadRange === 'all' || markAsReadRange === 'current') 
-      ? undefined 
-      : markAsReadRange
-    
-    const result = await store.markAsRead({
-      feedId,
-      olderThan,
-      timeField
-    })
-    
-    if (result.marked_count > 0) {
-      showNotification(t('articles.markAsReadSuccess', { count: result.marked_count }), 'success')
-      await applyFilters()
-    } else {
-      showNotification(t('articles.markAsReadEmpty'), 'info')
-    }
-  } catch (error) {
-    console.error('Mark feed as read failed:', error)
-    showNotification(t('articles.markAsReadFailed'), 'error')
-  }
-}
+// === App Sync ===
+const { initSync, cleanupSync } = useAppSync(
+  showFavoritesOnly,
+  async () => { await loadFavoritesData() },
+  dateRangeFilter,
+)
+setupAutoTranslationWatcher()
 
-// 切换视图类型
-async function handleSelectViewType(viewType: string) {
-  store.selectViewType(viewType as any)
-  await store.fetchEntries({
-    viewType: viewType as any,
-    unreadOnly: filterMode.value === 'unread',
-    dateRange: dateRangeFilter.value,
-    timeField: settingsStore.settings.time_field,
-  })
-}
+// === Lifecycle ===
+onMounted(async () => {
+  initLayout()
+  loadTheme()
+  store.loadCollapsedGroups()
+  store.loadCustomGroups()
+  try { await settingsStore.fetchSettings() } catch { /* continue with defaults */ }
+  await loadLanguage()
+  await aiStore.fetchConfig()
 
-// 修改订阅源的视图类型
-async function handleChangeViewType(feedId: string, viewType: string) {
-  try {
-    await store.updateFeedViewType(feedId, viewType as any)
-    showNotification(t('feeds.viewTypeChanged'), 'success')
-  } catch (error) {
-    console.error('Change view type failed:', error)
-    showNotification(t('feeds.viewTypeChangeFailed'), 'error')
-  }
-}
+  dateRangeFilter.value = settingsStore.settings.default_date_range
+  loadFavoritesData()
 
-// 移动订阅源到指定分组
-async function handleMoveToGroup(feedId: string, groupName: string) {
-  try {
-    await store.updateFeed(feedId, { group_name: groupName })
-    showNotification(t('feeds.moveToGroupSuccess'), 'success')
-  } catch (error) {
-    console.error('Move to group failed:', error)
-    showNotification(t('feeds.moveToGroupFailed'), 'error')
-  }
-}
+  const initialDateRange = settingsStore.settings.enable_date_filter ? dateRangeFilter.value : undefined
+  const initialTimeField = settingsStore.settings.time_field
 
-// 设置订阅源别名
-async function handleSetCustomTitle(feedId: string, customTitle: string | null) {
-  try {
-    await store.updateFeed(feedId, { custom_title: customTitle })
-    showNotification(t('feeds.aliasSetSuccess'), 'success')
-  } catch (error) {
-    console.error('Set custom title failed:', error)
-    showNotification(t('feeds.aliasSetFailed'), 'error')
-  }
-}
+  await store.fetchFeeds({ dateRange: initialDateRange, timeField: initialTimeField })
+  await store.fetchEntries({ dateRange: initialDateRange, timeField: initialTimeField })
+
+  collectionsStore.fetchCollections()
+  tagsStore.fetchTags()
+  tagsStore.fetchStats()
+  initSync()
+})
+
+onMounted(() => {
+  nextTick(() => setupScrollListeners())
+})
+
+onUnmounted(() => {
+  cleanupTitleTranslationAutoRetry()
+  cleanupLayout()
+  cleanupSync()
+  unlockBodyScroll()
+  cleanupScrollListeners()
+})
 </script>
 
 <template>
-  <Toast 
-    :show="showToast" 
-    :message="toastMessage" 
-    :type="toastType" 
-    @close="showToast = false" 
+  <Toast
+    :show="showToast"
+    :message="toastMessage"
+    :type="toastType"
+    @close="showToast = false"
   />
   <ConfirmModal
     :show="confirmShow"
@@ -1292,17 +608,13 @@ async function handleSetCustomTitle(feedId: string, customTitle: string | null) 
       :dark-mode="darkMode"
       :adding-feed="store.addingFeed"
       :import-loading="importLoading"
-
       :show-favorites-only="showFavoritesOnly"
       :selected-favorite-feed="selectedFavoriteFeed"
-
       :view-mode="viewMode"
       :active-collection-id="activeCollectionId"
       :active-tag-id="activeTagId"
       :active-tag-view="activeTagView"
-
       :collapsed-groups="collapsedGroups"
-
       :editing-feed-id="editingFeedId"
       :editing-group-name="editingGroupName"
       :is-date-filter-active="isDateFilterActive"
@@ -1478,6 +790,7 @@ async function handleSetCustomTitle(feedId: string, customTitle: string | null) 
     </svg>
   </button>
 </template>
+
 <style scoped>
 .app-shell {
   display: flex;
@@ -1486,7 +799,6 @@ async function handleSetCustomTitle(feedId: string, customTitle: string | null) 
   color: var(--text-primary);
   position: relative;
   max-width: 100vw;
-  /* 顶层容器不滚动，交给内部列滚动，避免多重滚动条 */
   overflow: hidden;
   height: 100vh;
   align-items: stretch;
@@ -1494,7 +806,6 @@ async function handleSetCustomTitle(feedId: string, customTitle: string | null) 
   --details-width: 420px;
 }
 
-/* 分隔器样式 */
 .resizer {
   width: 3px;
   background: rgba(15, 17, 21, 0.1);
@@ -1655,7 +966,7 @@ async function handleSetCustomTitle(feedId: string, customTitle: string | null) 
     height: auto;
     overflow: visible;
   }
-  
+
   .resizer {
     display: none;
   }

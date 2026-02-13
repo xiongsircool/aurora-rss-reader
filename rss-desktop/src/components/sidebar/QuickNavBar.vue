@@ -5,7 +5,7 @@ import { useFavoritesStore } from '../../stores/favoritesStore'
 import { useCollectionsStore } from '../../stores/collectionsStore'
 import { useTagsStore } from '../../stores/tagsStore'
 
-import type { ViewMode } from './SidebarPanel.vue'
+import type { ViewMode } from '../../composables/useViewMode'
 
 defineProps<{
   viewMode: ViewMode

@@ -30,13 +30,6 @@ interface SSEProgressEvent {
   cached: number
 }
 
-interface SSEDoneEvent {
-  total: number
-  success: number
-  failed: number
-  cached: number
-}
-
 /**
  * 创建文章翻译 composable
  */
@@ -262,9 +255,7 @@ export function useArticleTranslation(
       }
 
       case 'done': {
-        const doneData = data as SSEDoneEvent
         progress.value = 100
-        console.log('Translation done:', doneData)
         break
       }
     }

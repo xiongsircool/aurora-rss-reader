@@ -2,8 +2,16 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import api from '../api/client'
 import type { Entry, EntryPage, Feed, SummaryResult, ViewType } from '../types'
+import { useFeedGroups } from './feedGroups'
+import {
+  parseOlderThan,
+  shouldMarkEntryRead,
+  type MarkAsReadOptions,
+  type MarkAsReadResult,
+} from './feedMarkAsRead'
 
 export const useFeedStore = defineStore('feed', () => {
+  // === Core State ===
   const feeds = ref<Feed[]>([])
   const entries = ref<Entry[]>([])
   const activeFeedId = ref<string | null>(null)
@@ -15,8 +23,6 @@ export const useFeedStore = defineStore('feed', () => {
   const addingFeed = ref(false)
   const summaryCache = ref<Record<string, SummaryResult>>({})
   const errorMessage = ref<string | null>(null)
-  const collapsedGroups = ref<Set<string>>(new Set())
-  const customGroups = ref<Set<string>>(new Set())
   const lastFeedFilters = ref<{ dateRange?: string; timeField?: string } | null>(null)
   const lastEntryFilters = ref<{ unreadOnly?: boolean; dateRange?: string; timeField?: string } | null>(null)
   const entriesCursor = ref<string | null>(null)
@@ -25,78 +31,42 @@ export const useFeedStore = defineStore('feed', () => {
   const entriesQueryKey = ref('')
 
   const selectedEntry = computed(() =>
-    entries.value.find((entry) => entry.id === selectedEntryId.value) ?? null
+    entries.value.find((entry) => entry.id === selectedEntryId.value) ?? null,
   )
 
-  // 当前类型下的订阅源
-  const filteredFeeds = computed(() => {
-    return feeds.value.filter(f => f.view_type === activeViewType.value)
-  })
+  // === View Type Computed ===
+  const filteredFeeds = computed(() => feeds.value.filter(f => f.view_type === activeViewType.value))
 
-  // 各类型的统计
   const viewTypeStats = computed(() => {
     const stats: Record<string, { count: number; unread: number }> = {}
-    const types = ['articles', 'social', 'pictures', 'videos', 'audio', 'notifications']
+    const types: ViewType[] = ['articles', 'social', 'pictures', 'videos', 'audio', 'notifications']
     types.forEach(type => {
       const typeFeeds = feeds.value.filter(f => f.view_type === type)
       stats[type] = {
         count: typeFeeds.length,
-        unread: typeFeeds.reduce((sum, f) => sum + (f.unread_count || 0), 0)
+        unread: typeFeeds.reduce((sum, f) => sum + (f.unread_count || 0), 0),
       }
     })
     return stats
   })
 
-  // 分组相关的计算属性（基于当前类型过滤后的订阅源）
-  const groupedFeeds = computed(() => {
-    const groups: Record<string, Feed[]> = {}
+  // === Group Management (delegated) ===
+  const {
+    collapsedGroups,
+    groupedFeeds,
+    groupStats,
+    sortedGroupNames,
+    toggleGroupCollapse,
+    isGroupCollapsed,
+    expandAllGroups,
+    collapseAllGroups,
+    loadCollapsedGroups,
+    loadCustomGroups,
+    createGroup,
+    deleteGroup,
+  } = useFeedGroups(filteredFeeds)
 
-    // 将当前类型的feeds按分组归类
-    filteredFeeds.value.forEach(feed => {
-      const groupName = feed.group_name || '未分组'
-      if (!groups[groupName]) {
-        groups[groupName] = []
-      }
-      groups[groupName].push(feed)
-    })
-
-    // 确保自定义分组也被包含进去（即便是空的）
-    customGroups.value.forEach(groupName => {
-      if (!groups[groupName]) {
-        groups[groupName] = []
-      }
-    })
-
-    // 对每个分组内的feeds按名称排序
-    Object.keys(groups).forEach(groupName => {
-      groups[groupName].sort((a, b) => (a.title || a.url).localeCompare(b.title || b.url))
-    })
-
-    return groups
-  })
-
-  const groupStats = computed(() => {
-    const stats: Record<string, { feedCount: number; unreadCount: number }> = {}
-
-    Object.entries(groupedFeeds.value).forEach(([groupName, groupFeeds]) => {
-      const feedCount = groupFeeds.length
-      const unreadCount = groupFeeds.reduce((sum, feed) => sum + (feed.unread_count || 0), 0)
-      stats[groupName] = { feedCount, unreadCount }
-    })
-
-    return stats
-  })
-
-  const sortedGroupNames = computed(() => {
-    const groups = Object.keys(groupedFeeds.value)
-    return groups.sort((a, b) => {
-      // 未分组放在最后
-      if (a === '未分组') return 1
-      if (b === '未分组') return -1
-      return a.localeCompare(b)
-    })
-  })
-
+  // === Entries Query Key ===
   function buildEntriesQueryKey(params: {
     feedId: string | null
     groupName: string | null
@@ -117,7 +87,7 @@ export const useFeedStore = defineStore('feed', () => {
 
   function mergeEntries(existing: Entry[], incoming: Entry[]) {
     if (!incoming.length) return existing
-    const seen = new Set(existing.map((entry) => entry.id))
+    const seen = new Set(existing.map(e => e.id))
     const merged = existing.slice()
     for (const entry of incoming) {
       if (!seen.has(entry.id)) {
@@ -127,6 +97,8 @@ export const useFeedStore = defineStore('feed', () => {
     }
     return merged
   }
+
+  // === Feed CRUD ===
 
   async function fetchFeeds(options?: { dateRange?: string; timeField?: string }) {
     loadingFeeds.value = true
@@ -149,7 +121,6 @@ export const useFeedStore = defineStore('feed', () => {
 
       const { data } = await api.get<Feed[]>('/feeds', { params })
       feeds.value = data
-      // 不再自动选择订阅源，让用户通过视图类型导航来浏览内容
     } catch (error) {
       console.error(error)
       errorMessage.value = '加载订阅列表失败'
@@ -163,15 +134,10 @@ export const useFeedStore = defineStore('feed', () => {
     addingFeed.value = true
     try {
       const payload: { url: string; group_name?: string; view_type?: string } = { url }
-      if (options?.groupName) {
-        payload.group_name = options.groupName
-      }
-      // 使用当前选中的类型作为新订阅的类型
+      if (options?.groupName) payload.group_name = options.groupName
       payload.view_type = options?.viewType ?? activeViewType.value
       const { data } = await api.post<Feed>('/feeds', payload)
       feeds.value = [data, ...feeds.value]
-      // 不再自动选择新添加的订阅源，保持当前视图类型模式
-      // 保留当前的过滤器状态
       await fetchEntries({
         unreadOnly: lastEntryFilters.value?.unreadOnly,
         dateRange: lastEntryFilters.value?.dateRange,
@@ -185,72 +151,10 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  async function refreshActiveFeed() {
-    // 如果是分组模式，刷新该分组下的所有订阅源
-    if (activeGroupName.value) {
-      const groupFeeds = groupedFeeds.value[activeGroupName.value] || []
-      for (const feed of groupFeeds) {
-        // 并行触发刷新，不等待逐个完成
-        api.post(`/feeds/${feed.id}/refresh`).catch(err => {
-          console.error(err)
-        })
-      }
-
-      // 分组刷新可能耗时较长，这里给一个简单的延迟反馈
-      setTimeout(() => {
-        fetchFeeds()
-        fetchEntries({
-          groupName: activeGroupName.value!,
-          unreadOnly: lastEntryFilters.value?.unreadOnly,
-          dateRange: lastEntryFilters.value?.dateRange,
-          timeField: lastEntryFilters.value?.timeField,
-        })
-      }, 2000)
-      return
-    }
-
-    // 单个订阅源模式
-    const feedId = activeFeedId.value
-    if (!feedId) return
-
-    // 获取刷新前的状态，用于对比
-    const oldFeed = feeds.value.find(f => f.id === feedId)
-    const oldTime = oldFeed?.last_checked_at
-
-    try {
-      await api.post(`/feeds/${feedId}/refresh`)
-
-      // 轮询检查状态更新（最多尝试 5 次，每次 1 秒）
-      let attempts = 0
-      const checkInterval = setInterval(async () => {
-        attempts++
-
-        // 仅重新获取订阅列表来检查时间戳（轻量）
-        await fetchFeeds()
-        const newFeed = feeds.value.find(f => f.id === feedId)
-
-        // 如果时间变了，或者超过最大尝试次数，停止轮询
-        if (newFeed?.last_checked_at !== oldTime || attempts >= 5) {
-          clearInterval(checkInterval)
-          // 刷新完成后，同时更新文章列表
-          await fetchEntries({
-            unreadOnly: lastEntryFilters.value?.unreadOnly,
-            dateRange: lastEntryFilters.value?.dateRange,
-            timeField: lastEntryFilters.value?.timeField,
-          })
-        }
-      }, 1000)
-    } catch (err) {
-      console.error(err)
-      errorMessage.value = '刷新失败'
-    }
-  }
-
   async function deleteFeed(feedId: string) {
     try {
       await api.delete(`/feeds/${feedId}`)
-      feeds.value = feeds.value.filter((f) => f.id !== feedId)
-      // 如果删除的是当前选中的订阅源，清除选择并清空文章列表
+      feeds.value = feeds.value.filter(f => f.id !== feedId)
       if (activeFeedId.value === feedId) {
         activeFeedId.value = null
         entries.value = []
@@ -264,11 +168,8 @@ export const useFeedStore = defineStore('feed', () => {
   async function updateFeed(feedId: string, updates: { group_name?: string; custom_title?: string | null; ai_tagging_enabled?: boolean }) {
     try {
       const { data } = await api.patch<Feed>(`/feeds/${feedId}`, updates)
-      const index = feeds.value.findIndex((f) => f.id === feedId)
-      if (index !== -1) {
-        feeds.value[index] = data
-      }
-      // 统一刷新订阅列表，确保未读统计与当前筛选条件一致
+      const index = feeds.value.findIndex(f => f.id === feedId)
+      if (index !== -1) feeds.value[index] = data
       await fetchFeeds()
     } catch (error) {
       console.error(error)
@@ -279,10 +180,8 @@ export const useFeedStore = defineStore('feed', () => {
   async function updateFeedTagging(feedId: string, enabled: boolean) {
     try {
       const { data } = await api.patch<Feed>(`/feeds/${feedId}`, { ai_tagging_enabled: enabled })
-      const index = feeds.value.findIndex((f) => f.id === feedId)
-      if (index !== -1) {
-        feeds.value[index] = data
-      }
+      const index = feeds.value.findIndex(f => f.id === feedId)
+      if (index !== -1) feeds.value[index] = data
     } catch (error) {
       console.error(error)
       errorMessage.value = '更新订阅失败'
@@ -291,23 +190,64 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function bulkUpdateFeedTagging(feedIds: string[], enabled: boolean) {
     if (feedIds.length === 0) return
-    for (const id of feedIds) {
-      await updateFeedTagging(id, enabled)
-    }
+    for (const id of feedIds) await updateFeedTagging(id, enabled)
   }
 
   async function updateFeedViewType(feedId: string, viewType: ViewType) {
     try {
       const { data } = await api.patch<Feed>(`/feeds/${feedId}`, { view_type: viewType })
-      const index = feeds.value.findIndex((f) => f.id === feedId)
-      if (index !== -1) {
-        feeds.value[index] = data
-      }
+      const index = feeds.value.findIndex(f => f.id === feedId)
+      if (index !== -1) feeds.value[index] = data
     } catch (error) {
       console.error(error)
       errorMessage.value = '更新订阅类型失败'
     }
   }
+
+  async function refreshActiveFeed() {
+    if (activeGroupName.value) {
+      const groupFeeds = groupedFeeds.value[activeGroupName.value] || []
+      for (const feed of groupFeeds) {
+        api.post(`/feeds/${feed.id}/refresh`).catch(err => console.error(err))
+      }
+      setTimeout(() => {
+        fetchFeeds()
+        fetchEntries({
+          groupName: activeGroupName.value!,
+          unreadOnly: lastEntryFilters.value?.unreadOnly,
+          dateRange: lastEntryFilters.value?.dateRange,
+          timeField: lastEntryFilters.value?.timeField,
+        })
+      }, 2000)
+      return
+    }
+    const feedId = activeFeedId.value
+    if (!feedId) return
+    const oldFeed = feeds.value.find(f => f.id === feedId)
+    const oldTime = oldFeed?.last_checked_at
+    try {
+      await api.post(`/feeds/${feedId}/refresh`)
+      let attempts = 0
+      const checkInterval = setInterval(async () => {
+        attempts++
+        await fetchFeeds()
+        const newFeed = feeds.value.find(f => f.id === feedId)
+        if (newFeed?.last_checked_at !== oldTime || attempts >= 5) {
+          clearInterval(checkInterval)
+          await fetchEntries({
+            unreadOnly: lastEntryFilters.value?.unreadOnly,
+            dateRange: lastEntryFilters.value?.dateRange,
+            timeField: lastEntryFilters.value?.timeField,
+          })
+        }
+      }, 1000)
+    } catch (err) {
+      console.error(err)
+      errorMessage.value = '刷新失败'
+    }
+  }
+
+  // === Entries ===
 
   async function fetchEntries(options?: {
     feedId?: string
@@ -322,8 +262,6 @@ export const useFeedStore = defineStore('feed', () => {
     const targetFeed = options?.feedId ?? activeFeedId.value
     const targetGroup = options?.groupName ?? activeGroupName.value
     const targetViewType = options?.viewType ?? (!targetFeed && !targetGroup ? activeViewType.value : null)
-
-    // 如果既没有feed也没有group也没有viewType，则返回
     if (!targetFeed && !targetGroup && !targetViewType) return
 
     const hasUnreadOnly = options && Object.prototype.hasOwnProperty.call(options, 'unreadOnly')
@@ -363,31 +301,14 @@ export const useFeedStore = defineStore('feed', () => {
 
     try {
       const params: Record<string, string | number | boolean> = {}
+      if (targetFeed) params.feed_id = targetFeed
+      else if (targetGroup) params.group_name = targetGroup
+      else if (targetViewType) params.view_type = targetViewType
 
-      // 优先使用 feedId，其次使用 groupName，最后使用 viewType
-      if (targetFeed) {
-        params.feed_id = targetFeed
-      } else if (targetGroup) {
-        params.group_name = targetGroup
-      } else if (targetViewType) {
-        params.view_type = targetViewType
-      }
-
-      if (mergedFilters.unreadOnly) {
-        params.unread_only = true
-      }
-
-      if (mergedFilters.dateRange && mergedFilters.dateRange !== 'all') {
-        params.date_range = mergedFilters.dateRange
-      }
-
-      if (mergedFilters.timeField) {
-        params.time_field = mergedFilters.timeField
-      }
-
-      if (shouldAppend && entriesCursor.value) {
-        params.cursor = entriesCursor.value
-      }
+      if (mergedFilters.unreadOnly) params.unread_only = true
+      if (mergedFilters.dateRange && mergedFilters.dateRange !== 'all') params.date_range = mergedFilters.dateRange
+      if (mergedFilters.timeField) params.time_field = mergedFilters.timeField
+      if (shouldAppend && entriesCursor.value) params.cursor = entriesCursor.value
 
       const { data } = await api.get<EntryPage>('/entries', { params })
       const pageItems = data.items ?? []
@@ -397,7 +318,7 @@ export const useFeedStore = defineStore('feed', () => {
 
       if (!shouldAppend) {
         if (entries.value.length > 0) {
-          const defaultEntry = entries.value.find((entry) => entry.id === selectedEntryId.value) ?? entries.value[0]
+          const defaultEntry = entries.value.find(e => e.id === selectedEntryId.value) ?? entries.value[0]
           selectedEntryId.value = defaultEntry.id
         } else {
           selectedEntryId.value = null
@@ -407,11 +328,8 @@ export const useFeedStore = defineStore('feed', () => {
       console.error(error)
       errorMessage.value = '加载文章失败'
     } finally {
-      if (shouldAppend) {
-        entriesLoadingMore.value = false
-      } else {
-        loadingEntries.value = false
-      }
+      if (shouldAppend) entriesLoadingMore.value = false
+      else loadingEntries.value = false
     }
   }
 
@@ -419,16 +337,18 @@ export const useFeedStore = defineStore('feed', () => {
     return fetchEntries({ append: true })
   }
 
+  // === Selection ===
+
   function selectFeed(id: string) {
     if (activeFeedId.value === id) return
     activeFeedId.value = id
-    activeGroupName.value = null  // 清除分组选择
+    activeGroupName.value = null
   }
 
   function selectGroup(groupName: string) {
     if (activeGroupName.value === groupName) return
     activeGroupName.value = groupName
-    activeFeedId.value = null  // 清除单个订阅源选择
+    activeFeedId.value = null
   }
 
   function selectViewType(viewType: ViewType) {
@@ -442,12 +362,11 @@ export const useFeedStore = defineStore('feed', () => {
     selectedEntryId.value = entryId
   }
 
+  // === Entry State ===
+
   function adjustFeedUnreadCount(feedId: string, delta: number) {
-    const feed = feeds.value.find((f) => f.id === feedId)
-    if (feed) {
-      const next = Math.max(0, (feed.unread_count || 0) + delta)
-      feed.unread_count = next
-    }
+    const feed = feeds.value.find(f => f.id === feedId)
+    if (feed) feed.unread_count = Math.max(0, (feed.unread_count || 0) + delta)
   }
 
   async function toggleEntryState(entry: Entry, state: Partial<Pick<Entry, 'read' | 'starred'>>) {
@@ -456,7 +375,6 @@ export const useFeedStore = defineStore('feed', () => {
       await api.patch<Entry>(`/entries/${entry.id}`, state)
       entry.read = state.read ?? entry.read
       entry.starred = state.starred ?? entry.starred
-
       if (state.read !== undefined && previousRead !== entry.read) {
         adjustFeedUnreadCount(entry.feed_id, entry.read ? -1 : 1)
       }
@@ -467,16 +385,14 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
+  // === AI ===
+
   async function requestSummary(entryId: string, language = 'zh') {
-    if (summaryCache.value[entryId]) {
-      return summaryCache.value[entryId]
-    }
+    if (summaryCache.value[entryId]) return summaryCache.value[entryId]
     const { data } = await api.post<SummaryResult>('/ai/summary', {
       entry_id: entryId,
       language,
-    }, {
-      timeout: 90000, // 90 seconds for summary generation
-    })
+    }, { timeout: 90000 })
     summaryCache.value[entryId] = data
     return data
   }
@@ -485,14 +401,11 @@ export const useFeedStore = defineStore('feed', () => {
     const { data } = await api.post<{ entry_id: string; title: string; language: string }>('/ai/translate-title', {
       entry_id: entryId,
       language,
-    }, {
-      timeout: 30000, // 30 seconds for title translation
-    })
-    return {
-      title: data.title,
-      language: data.language
-    }
+    }, { timeout: 30000 })
+    return { title: data.title, language: data.language }
   }
+
+  // === OPML ===
 
   async function exportOpml() {
     try {
@@ -519,9 +432,7 @@ export const useFeedStore = defineStore('feed', () => {
       const { data } = await api.post<{ imported: number; skipped: number; errors: string[] }>(
         '/opml/import',
         formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        }
+        { headers: { 'Content-Type': 'multipart/form-data' } },
       )
       await fetchFeeds()
       return data
@@ -532,100 +443,7 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  // 分组管理方法
-  function toggleGroupCollapse(groupName: string) {
-    if (collapsedGroups.value.has(groupName)) {
-      collapsedGroups.value.delete(groupName)
-    } else {
-      collapsedGroups.value.add(groupName)
-    }
-    // 保存到localStorage
-    localStorage.setItem('collapsedGroups', JSON.stringify([...collapsedGroups.value]))
-  }
-
-  function isGroupCollapsed(groupName: string) {
-    return collapsedGroups.value.has(groupName)
-  }
-
-  function expandAllGroups() {
-    collapsedGroups.value.clear()
-    localStorage.removeItem('collapsedGroups')
-  }
-
-  function collapseAllGroups() {
-    collapsedGroups.value = new Set(sortedGroupNames.value)
-    localStorage.setItem('collapsedGroups', JSON.stringify([...collapsedGroups.value]))
-  }
-
-  function loadCollapsedGroups() {
-    const saved = localStorage.getItem('collapsedGroups')
-    if (saved) {
-      try {
-        collapsedGroups.value = new Set(JSON.parse(saved))
-      } catch (e) {
-        console.error('Failed to load collapsed groups:', e)
-      }
-    }
-  }
-
-  // 一键已读接口
-  interface MarkAsReadOptions {
-    feedId?: string
-    groupName?: string
-    olderThan?: string  // 标记多少天之前的文章为已读
-    timeField?: string
-  }
-
-  interface MarkAsReadResult {
-    success: boolean
-    message: string
-    marked_count: number
-    feed_counts: Record<string, number>
-  }
-
-  function parseOlderThan(olderThan?: string | null): Date | null {
-    if (!olderThan) return null
-    if (olderThan === 'all' || olderThan === 'current') return null
-    const match = olderThan.match(/^(\d+)([hdmy])$/)
-    const now = Date.now()
-    if (!match) {
-      return new Date(now - 30 * 24 * 60 * 60 * 1000)
-    }
-    const value = Number(match[1])
-    const unit = match[2]
-    const hourMs = 60 * 60 * 1000
-    const dayMs = 24 * hourMs
-    let deltaMs = dayMs * 30
-    if (unit === 'h') deltaMs = value * hourMs
-    if (unit === 'd') deltaMs = value * dayMs
-    if (unit === 'm') deltaMs = value * dayMs * 30
-    if (unit === 'y') deltaMs = value * dayMs * 365
-    return new Date(now - deltaMs)
-  }
-
-  function parseEntryDate(value?: string | null): Date | null {
-    if (!value) return null
-    const parsed = new Date(value)
-    return Number.isNaN(parsed.getTime()) ? null : parsed
-  }
-
-  function shouldMarkEntryRead(entry: Entry, cutoff: Date | null, timeField: string, feedId?: string) {
-    if (feedId && entry.feed_id !== feedId) {
-      return false
-    }
-    if (!cutoff) {
-      return true
-    }
-    const insertedAt = parseEntryDate(entry.inserted_at)
-    if (timeField === 'published_at') {
-      const publishedAt = parseEntryDate(entry.published_at)
-      if (publishedAt) {
-        return publishedAt <= cutoff
-      }
-      return insertedAt ? insertedAt <= cutoff : false
-    }
-    return insertedAt ? insertedAt <= cutoff : false
-  }
+  // === Mark as Read ===
 
   async function markAsRead(options: MarkAsReadOptions = {}): Promise<MarkAsReadResult> {
     try {
@@ -633,17 +451,13 @@ export const useFeedStore = defineStore('feed', () => {
         feed_id: options.feedId ?? null,
         group_name: options.groupName ?? null,
         older_than: options.olderThan ?? null,
-        time_field: options.timeField ?? 'inserted_at'
+        time_field: options.timeField ?? 'inserted_at',
       })
-
-      // 更新本地的未读计数
       if (data.feed_counts) {
-        Object.entries(data.feed_counts).forEach(([feedId, count]) => {
-          adjustFeedUnreadCount(feedId, -count)
+        Object.entries(data.feed_counts).forEach(([fid, count]) => {
+          adjustFeedUnreadCount(fid, -count)
         })
       }
-
-      // 更新本地 entries 的已读状态
       const cutoff = parseOlderThan(options.olderThan)
       const timeField = options.timeField ?? 'inserted_at'
       entries.value.forEach(entry => {
@@ -651,7 +465,6 @@ export const useFeedStore = defineStore('feed', () => {
           entry.read = true
         }
       })
-
       return data
     } catch (error) {
       console.error('Mark as read failed:', error)
@@ -659,50 +472,8 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  function loadCustomGroups() {
-    const saved = localStorage.getItem('customGroups')
-    if (saved) {
-      try {
-        customGroups.value = new Set(JSON.parse(saved))
-      } catch (e) {
-        console.error('Failed to load custom groups:', e)
-      }
-    }
-  }
-
-  function saveCustomGroups() {
-    localStorage.setItem('customGroups', JSON.stringify([...customGroups.value]))
-  }
-
-  function createGroup(name: string) {
-    if (!name || name.trim() === '') return
-
-    const trimmedName = name.trim()
-
-    // 如果已有同名custom group，无需再次添加
-    if (customGroups.value.has(trimmedName)) return
-
-    // 检查是否与现有的feeds分组名称冲突
-    const existingGroupNames = Object.keys(groupedFeeds.value)
-    if (existingGroupNames.includes(trimmedName)) {
-      // 如果该分组已经在feeds中存在（即已有订阅源），则无需作为custom group添加
-      return
-    }
-
-    customGroups.value.add(trimmedName)
-    saveCustomGroups()
-  }
-
-  function deleteGroup(name: string) {
-    customGroups.value.delete(name)
-    saveCustomGroups()
-  }
-
-  // 初始化时加载保存的数据
-  loadCollapsedGroups()
-  loadCustomGroups()
-
   return {
+    // State
     feeds,
     entries,
     selectedEntry,
@@ -716,15 +487,15 @@ export const useFeedStore = defineStore('feed', () => {
     addingFeed,
     errorMessage,
     summaryCache,
-    // 分组相关属性
+    // Group (delegated)
     groupedFeeds,
     groupStats,
     sortedGroupNames,
     collapsedGroups,
-    // 类型相关属性
+    // View type
     filteredFeeds,
     viewTypeStats,
-    // 方法
+    // Feed CRUD
     fetchFeeds,
     fetchEntries,
     loadMoreEntries,
@@ -744,16 +515,16 @@ export const useFeedStore = defineStore('feed', () => {
     requestTitleTranslation,
     exportOpml,
     importOpml,
-    // 分组管理方法
+    // Group management
     toggleGroupCollapse,
     isGroupCollapsed,
     expandAllGroups,
     collapseAllGroups,
     loadCollapsedGroups,
-    // 一键已读方法
-    markAsRead,
     loadCustomGroups,
-    // 自定义分组管理
+    // Mark as read
+    markAsRead,
+    // Custom groups
     createGroup,
     deleteGroup,
   }
