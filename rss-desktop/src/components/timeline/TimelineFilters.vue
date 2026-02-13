@@ -1,33 +1,69 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-defineProps<{
+const props = defineProps<{
   searchQuery: string
   filterMode: 'all' | 'unread' | 'starred'
   dateRangeFilter: string
   filterLoading: boolean
   enableDateFilter: boolean
+  aiSearchEnabled?: boolean
+  aiSearchActive?: boolean
+  aiSearchLoading?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update:searchQuery', value: string): void
   (e: 'update:filterMode', value: 'all' | 'unread' | 'starred'): void
   (e: 'update:dateRangeFilter', value: string): void
+  (e: 'toggle-ai-search'): void
+  (e: 'ai-search', query: string): void
 }>()
 
 const { t } = useI18n()
+
+function handleSearchKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter' && props.aiSearchActive && props.searchQuery.trim()) {
+    emit('ai-search', props.searchQuery.trim())
+  }
+}
 </script>
 
 <template>
   <div class="px-4 py-2.5 border-b border-[var(--border-color)] flex flex-col gap-2.5 flex-none">
     <div class="flex items-center gap-2.5 flex-wrap w-full justify-between">
-      <input
-        :value="searchQuery"
-        @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
-        type="search"
-        :placeholder="t('articles.searchPlaceholder')"
-        class="px-3.5 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-surface)] c-[var(--text-primary)] transition-colors duration-200 transition-shadow duration-200 flex-[2_1_240px] min-w-200px focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_rgba(255,122,24,0.18)]"
-      />
+      <div class="flex-[2_1_240px] min-w-200px relative">
+        <input
+          :value="searchQuery"
+          @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
+          @keydown="handleSearchKeydown"
+          type="search"
+          :placeholder="aiSearchActive ? t('search.placeholder') : t('articles.searchPlaceholder')"
+          class="w-full px-3.5 py-2.5 border rounded-lg text-sm bg-[var(--bg-surface)] c-[var(--text-primary)] transition-colors duration-200 transition-shadow duration-200 focus:outline-none focus:shadow-[0_0_0_2px_rgba(255,122,24,0.18)]"
+          :class="aiSearchActive
+            ? 'border-[#8b5cf6] focus:border-[#8b5cf6] focus:shadow-[0_0_0_2px_rgba(139,92,246,0.18)] pr-20'
+            : 'border-[var(--border-color)] focus:border-[var(--accent)]'"
+        />
+        <!-- AI Search Toggle -->
+        <button
+          v-if="aiSearchEnabled"
+          @click="emit('toggle-ai-search')"
+          class="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all"
+          :class="aiSearchActive
+            ? 'bg-[#8b5cf6] c-white shadow-sm'
+            : 'bg-[var(--bg-base)] c-[var(--text-tertiary)] hover:c-[var(--text-primary)] border border-[var(--border-color)]'"
+          :title="aiSearchActive ? t('search.title') : t('search.title')"
+        >
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+          AI
+        </button>
+        <!-- AI search loading indicator -->
+        <div v-if="aiSearchLoading" class="absolute right-14 top-1/2 -translate-y-1/2">
+          <div class="animate-spin w-4 h-4 border-2 border-[#8b5cf6] border-t-transparent rounded-full"></div>
+        </div>
+      </div>
       <div class="flex gap-2 flex-[1_1_220px] justify-end mb-0">
         <button
           v-for="mode in ['all', 'unread', 'starred'] as const"

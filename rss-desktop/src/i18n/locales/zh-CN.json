@@ -431,6 +431,12 @@
     "aiConfigSaveFailed": "AI配置保存失败",
     "settingsSaveFailed": "保存设置失败"
   },
+  "sidebar": {
+    "compact": "紧凑侧边栏",
+    "expanded": "展开侧边栏",
+    "addFeed": "添加订阅",
+    "moreActions": "更多操作"
+  },
   "layout": {
     "themeToggleTitle": "切换到浅色模式",
     "themeToggleTitleDark": "切换到深色模式",
@@ -509,14 +515,7 @@
     "groupCount": "{n} 个书签组"
   },
   "workspace": {
-    "title": "功能工作台",
-    "backToReader": "返回阅读器",
-    "collections": "书签组",
-    "search": "智能搜索",
-    "blog": "博客生成",
-    "share": "分享",
-    "stats": "统计",
-    "tags": "智能标签"
+    "title": "功能工作台"
   },
   "search": {
     "title": "智能搜索",

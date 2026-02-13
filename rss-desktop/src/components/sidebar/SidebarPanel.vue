@@ -1,17 +1,23 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFeedStore } from '../../stores/feedStore'
 import { useFavoritesStore } from '../../stores/favoritesStore'
 import type { Feed, ViewType } from '../../types'
 import SidebarHeader from './SidebarHeader.vue'
 import AddFeedForm from './AddFeedForm.vue'
+import AddFeedPopover from './AddFeedPopover.vue'
 import OpmlActions from './OpmlActions.vue'
 import FavoritesSection from './FavoritesSection.vue'
+import CollectionsSection from './CollectionsSection.vue'
+import TagsSection from './TagsSection.vue'
+import QuickNavBar from './QuickNavBar.vue'
 import FeedGroup from './FeedGroup.vue'
 import ViewTypeNav from './ViewTypeNav.vue'
 import ConfirmModal from '../common/ConfirmModal.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+
+export type ViewMode = 'feeds' | 'favorites' | 'collection' | 'tag'
 
 const props = defineProps<{
   // Header props
@@ -25,6 +31,12 @@ const props = defineProps<{
   // Favorites
   showFavoritesOnly: boolean
   selectedFavoriteFeed: string | null
+  
+  // View mode
+  viewMode: ViewMode
+  activeCollectionId: string | null
+  activeTagId: string | null
+  activeTagView: 'tag' | 'pending' | 'untagged' | null
   
   // Feed list
   collapsedGroups: Record<string, boolean>
@@ -77,6 +89,16 @@ const emit = defineEmits<{
 
   // Custom title
   (e: 'set-custom-title', feedId: string, customTitle: string | null): void
+
+  // Collections
+  (e: 'toggle-collections'): void
+  (e: 'select-collection', id: string): void
+  
+  // Tags
+  (e: 'toggle-tags'): void
+  (e: 'select-tag', id: string): void
+  (e: 'select-tag-view', view: 'pending' | 'untagged'): void
+  (e: 'open-tag-settings'): void
 }>()
 
 const { t } = useI18n()
@@ -92,6 +114,72 @@ const {
   handleConfirm,
   handleCancel
 } = useConfirmDialog()
+
+// --- Compact mode state ---
+const sidebarCompact = ref(localStorage.getItem('sidebar-compact') === 'true')
+const showAddFeedPopover = ref(false)
+const showMoreMenu = ref(false)
+const moreMenuRef = ref<HTMLElement | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+watch(sidebarCompact, (val) => {
+  localStorage.setItem('sidebar-compact', String(val))
+})
+
+function toggleCompact() {
+  sidebarCompact.value = !sidebarCompact.value
+  // Close any open popovers when switching modes
+  showAddFeedPopover.value = false
+  showMoreMenu.value = false
+}
+
+function handleMoreMenuClickOutside(e: MouseEvent) {
+  if (moreMenuRef.value && !moreMenuRef.value.contains(e.target as Node)) {
+    showMoreMenu.value = false
+  }
+}
+
+function handleMoreMenuKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') showMoreMenu.value = false
+}
+
+watch(showMoreMenu, (visible) => {
+  if (visible) {
+    document.addEventListener('mousedown', handleMoreMenuClickOutside)
+    document.addEventListener('keydown', handleMoreMenuKeydown)
+  } else {
+    document.removeEventListener('mousedown', handleMoreMenuClickOutside)
+    document.removeEventListener('keydown', handleMoreMenuKeydown)
+  }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleMoreMenuClickOutside)
+  document.removeEventListener('keydown', handleMoreMenuKeydown)
+})
+
+function handleMoreExport() {
+  showMoreMenu.value = false
+  emit('export-opml')
+}
+
+function handleMoreImport() {
+  showMoreMenu.value = false
+  fileInputRef.value?.click()
+}
+
+function handleFileInputChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  emit('import-opml', file)
+  if (target) target.value = ''
+}
+
+// --- Existing logic ---
+const showFeedsArea = computed(() => props.viewMode === 'feeds' || props.viewMode === 'favorites')
+const collectionsExpanded = computed(() => props.viewMode === 'collection')
+const tagsExpanded = computed(() => props.viewMode === 'tag')
 
 const feedMap = computed<Record<string, Feed>>(() => {
   return feedStore.feeds.reduce<Record<string, Feed>>((acc, feed) => {
@@ -156,44 +244,137 @@ watch(showCreateGroupModal, (visible) => {
 </script>
 
 <template>
-  <aside class="flex flex-col border-r border-[var(--border-color)] p-[24px_16px] bg-[var(--bg-surface)] shrink-0 min-w-180px box-border max-h-screen overflow-y-auto min-h-0 w-[var(--sidebar-width,280px)] transition-[width] duration-160 ease-out sidebar lt-md:w-full! lt-md:h-auto lt-md:max-h-none lt-md:border-r-0 lt-md:border-b lt-md:overflow-visible">
-    <SidebarHeader
-      :logo-size="logoSize"
-      :dark-mode="darkMode"
-      @toggle-theme="emit('toggle-theme')"
-      @open-settings="emit('open-settings')"
-      @reset-layout="emit('reset-layout')"
-    />
+  <aside class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-surface)] shrink-0 min-w-180px box-border max-h-screen overflow-y-auto min-h-0 w-[var(--sidebar-width,280px)] transition-[width] duration-160 ease-out sidebar lt-md:w-full! lt-md:h-auto lt-md:max-h-none lt-md:border-r-0 lt-md:border-b lt-md:overflow-visible" :class="sidebarCompact ? 'p-[12px_12px]' : 'p-[24px_16px]'">
     
-    <AddFeedForm
-      :adding-feed="addingFeed"
-      :target-group-name="addFeedTargetGroupName"
-      @add-feed="emit('add-feed', $event)"
-    />
-    
-    <OpmlActions
-      :import-loading="importLoading"
-      @export="emit('export-opml')"
-      @import="emit('import-opml', $event)"
-    />
-    
-    <FavoritesSection
-      :total-starred="favoritesStore.totalStarred"
-      :grouped-stats="favoritesStore.groupedStats"
-      :show-favorites-only="showFavoritesOnly"
-      :selected-favorite-feed="selectedFavoriteFeed"
-      :feed-map="feedMap"
-      @toggle-favorites="emit('toggle-favorites')"
-      @select-feed="emit('select-favorite-feed', $event)"
-    />
+    <!-- ============ COMPACT MODE ============ -->
+    <template v-if="sidebarCompact">
+      <div class="relative">
+        <SidebarHeader
+          :logo-size="28"
+          :dark-mode="darkMode"
+          :compact="true"
+          @toggle-theme="emit('toggle-theme')"
+          @open-settings="emit('open-settings')"
+          @reset-layout="emit('reset-layout')"
+          @toggle-compact="toggleCompact"
+          @open-add-feed="showAddFeedPopover = !showAddFeedPopover"
+          @open-more-menu="showMoreMenu = !showMoreMenu"
+        />
 
-    <!-- View Type Navigation -->
+        <!-- Add Feed Popover -->
+        <AddFeedPopover
+          v-if="showAddFeedPopover"
+          :adding-feed="addingFeed"
+          :target-group-name="addFeedTargetGroupName"
+          @add-feed="emit('add-feed', $event); showAddFeedPopover = false"
+          @close="showAddFeedPopover = false"
+        />
+
+        <!-- More Menu Dropdown -->
+        <div
+          v-if="showMoreMenu"
+          ref="moreMenuRef"
+          class="absolute right-0 top-full mt-1 z-50 min-w-[160px] py-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[0_8px_24px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.2)]"
+        >
+          <button
+            @click="handleMoreExport"
+            class="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left bg-transparent border-none c-[var(--text-primary)] cursor-pointer transition-colors hover:bg-[rgba(255,122,24,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)]"
+          >
+            <svg class="w-4 h-4 shrink-0 c-[var(--text-tertiary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            {{ t('opml.export') }}
+          </button>
+          <button
+            @click="handleMoreImport"
+            :disabled="importLoading"
+            class="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left bg-transparent border-none c-[var(--text-primary)] cursor-pointer transition-colors hover:bg-[rgba(255,122,24,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] disabled:op-50 disabled:cursor-not-allowed"
+          >
+            <svg class="w-4 h-4 shrink-0 c-[var(--text-tertiary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            {{ importLoading ? t('toast.importing') : t('opml.import') }}
+          </button>
+        </div>
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept=".opml,.xml"
+          @change="handleFileInputChange"
+          class="hidden"
+        />
+      </div>
+
+      <!-- QuickNavBar: compact pills for Favorites/Collections/Tags -->
+      <QuickNavBar
+        :view-mode="viewMode"
+        @toggle-favorites="emit('toggle-favorites')"
+        @toggle-collections="emit('toggle-collections')"
+        @toggle-tags="emit('toggle-tags')"
+      />
+    </template>
+
+    <!-- ============ EXPANDED MODE ============ -->
+    <template v-else>
+      <SidebarHeader
+        :logo-size="logoSize"
+        :dark-mode="darkMode"
+        :compact="false"
+        @toggle-theme="emit('toggle-theme')"
+        @open-settings="emit('open-settings')"
+        @reset-layout="emit('reset-layout')"
+        @toggle-compact="toggleCompact"
+        @open-add-feed="() => {}"
+        @open-more-menu="() => {}"
+      />
+      
+      <AddFeedForm
+        :adding-feed="addingFeed"
+        :target-group-name="addFeedTargetGroupName"
+        @add-feed="emit('add-feed', $event)"
+      />
+      
+      <OpmlActions
+        :import-loading="importLoading"
+        @export="emit('export-opml')"
+        @import="emit('import-opml', $event)"
+      />
+      
+      <FavoritesSection
+        :total-starred="favoritesStore.totalStarred"
+        :grouped-stats="favoritesStore.groupedStats"
+        :show-favorites-only="showFavoritesOnly"
+        :selected-favorite-feed="selectedFavoriteFeed"
+        :feed-map="feedMap"
+        @toggle-favorites="emit('toggle-favorites')"
+        @select-feed="emit('select-favorite-feed', $event)"
+      />
+
+      <CollectionsSection
+        :expanded="collectionsExpanded"
+        :active-collection-id="activeCollectionId"
+        @toggle="emit('toggle-collections')"
+        @select-collection="emit('select-collection', $event)"
+      />
+
+      <TagsSection
+        :expanded="tagsExpanded"
+        :active-tag-id="activeTagId"
+        :active-tag-view="activeTagView"
+        @toggle="emit('toggle-tags')"
+        @select-tag="emit('select-tag', $event)"
+        @select-tag-view="emit('select-tag-view', $event)"
+        @open-tag-settings="emit('open-tag-settings')"
+      />
+    </template>
+
+    <!-- Shared: View Type Navigation + Feed Groups (both modes) -->
     <ViewTypeNav
-      v-show="!showFavoritesOnly"
+      v-show="showFeedsArea && !showFavoritesOnly"
       @select="emit('select-view-type', $event)"
     />
 
-    <div class="flex-1" v-show="!showFavoritesOnly">
+    <div class="flex-1" v-show="showFeedsArea && !showFavoritesOnly">
       <!-- Group controls -->
       <div class="flex gap-1.5 mb-2 px-1">
         <button 
@@ -310,7 +491,7 @@ watch(showCreateGroupModal, (visible) => {
 </template>
 
 <style scoped>
-/* Migrated to UnoCSS - Scrollbar styles remain */
+/* Scrollbar styles */
 .sidebar::-webkit-scrollbar { width: 8px; }
 .sidebar::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.18); border-radius: 8px; }
 .sidebar:hover::-webkit-scrollbar-thumb { background: rgba(15, 17, 21, 0.28); }

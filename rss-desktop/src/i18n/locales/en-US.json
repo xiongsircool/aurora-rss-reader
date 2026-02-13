@@ -427,6 +427,12 @@
     "aiConfigSaveFailed": "AI configuration save failed",
     "settingsSaveFailed": "Settings save failed"
   },
+  "sidebar": {
+    "compact": "Compact sidebar",
+    "expanded": "Expand sidebar",
+    "addFeed": "Add Feed",
+    "moreActions": "More actions"
+  },
   "layout": {
     "themeToggleTitle": "Switch to Light Mode",
     "themeToggleTitleDark": "Switch to Dark Mode",
@@ -505,14 +511,7 @@
     "groupCount": "{n} collections"
   },
   "workspace": {
-    "title": "Workspace",
-    "backToReader": "Back to Reader",
-    "collections": "Bookmark Groups",
-    "search": "Smart Search",
-    "blog": "Blog Generator",
-    "share": "Share",
-    "stats": "Statistics",
-    "tags": "Smart Tags"
+    "title": "Workspace"
   },
   "search": {
     "title": "Smart Search",

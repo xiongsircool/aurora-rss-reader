@@ -45,6 +45,11 @@ const props = defineProps<{
   getTranslatedTitle: (entryId: string) => string | null
   isTranslationLoading: (entryId: string) => boolean
   isTranslationFailed: (entryId: string) => boolean
+
+  // AI Search
+  aiSearchEnabled?: boolean
+  aiSearchActive?: boolean
+  aiSearchLoading?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -62,6 +67,8 @@ const emit = defineEmits<{
   (e: 'mark-all-read'): void
   (e: 'entries-visible', entries: Entry[]): void
   (e: 'load-more'): void
+  (e: 'toggle-ai-search'): void
+  (e: 'ai-search', query: string): void
 }>()
 
 const { t } = useI18n()
@@ -177,9 +184,14 @@ function handleVisibleUpdate(
       :date-range-filter="dateRangeFilter"
       :filter-loading="filterLoading"
       :enable-date-filter="enableDateFilter"
+      :ai-search-enabled="aiSearchEnabled"
+      :ai-search-active="aiSearchActive"
+      :ai-search-loading="aiSearchLoading"
       @update:search-query="emit('update:searchQuery', $event)"
       @update:filter-mode="emit('update:filterMode', $event)"
       @update:date-range-filter="emit('update:dateRangeFilter', $event)"
+      @toggle-ai-search="emit('toggle-ai-search')"
+      @ai-search="emit('ai-search', $event)"
     />
     
     <section

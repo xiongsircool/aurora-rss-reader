@@ -3,11 +3,8 @@ import AppHome from '../views/AppHome.vue'
 
 const routes = [
   { path: '/', name: 'home', component: AppHome },
-  {
-    path: '/workspace',
-    name: 'workspace',
-    component: () => import('../views/WorkspaceView.vue')
-  },
+  // Redirect old workspace route to home
+  { path: '/workspace', redirect: '/' },
 ]
 
 const router = createRouter({

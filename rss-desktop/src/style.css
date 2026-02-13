@@ -144,3 +144,15 @@ textarea::placeholder {
 :root.dark * {
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
+
+/* 功能工作台：侧栏与主内容区分界线（全局生效，确保可见） */
+.workspace-shell .workspace-nav,
+.workspace-shell .workspace-sidebar-panel {
+  border-right: 2px solid rgba(15, 17, 21, 0.22) !important;
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.1);
+}
+:root.dark .workspace-shell .workspace-nav,
+:root.dark .workspace-shell .workspace-sidebar-panel {
+  border-right-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.45);
+}
