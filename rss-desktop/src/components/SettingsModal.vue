@@ -279,7 +279,7 @@ async function saveSettings() {
           <!-- Scrollable Content -->
           <div class="flex-1 overflow-y-auto p-6 md:p-8 scroll-smooth">
             <Transition name="fade" mode="out-in">
-              <div :key="activeCategory" class="max-w-3xl mx-auto space-y-6">
+              <div :key="activeCategory" class="max-w-2xl mx-auto space-y-6">
                 
                 <!-- General Section -->
                 <div v-if="activeCategory === 'general'" class="space-y-6">
@@ -335,18 +335,21 @@ async function saveSettings() {
                   <div class="setting-group">
                     <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.aiConfig') }}</h3>
                     <SettingsAIConfig
+                      v-model:globalConfig="localConfig.global"
                       v-model:summaryConfig="localConfig.summary"
                       v-model:translationConfig="localConfig.translation"
                       v-model:taggingConfig="localConfig.tagging"
                       v-model:embeddingConfig="localConfig.embedding"
+                      :globalTesting="aiConfig.globalTesting.value"
+                      :globalTestResult="aiConfig.globalTestResult.value"
                       :serviceTesting="aiConfig.serviceTesting.value"
                       :serviceTestResult="aiConfig.serviceTestResult.value"
                       :rebuildingVectors="aiConfig.rebuildingVectors.value"
                       :rebuildResult="aiConfig.rebuildResult.value"
                       :mcpTesting="aiConfig.mcpTesting.value"
                       :mcpTestResult="aiConfig.mcpTestResult.value"
+                      @testGlobalConnection="aiConfig.testGlobalConnection"
                       @testConnection="aiConfig.testConnection"
-                      @copySummaryToTranslation="aiConfig.copySummaryToTranslation"
                       @rebuildVectors="aiConfig.rebuildVectors"
                       @testMcp="aiConfig.testMcp"
                     />

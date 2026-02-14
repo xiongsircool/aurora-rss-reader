@@ -16,6 +16,10 @@ export function useAIConfigSettings(
     const aiStore = useAIStore()
     const { t } = useI18n()
 
+    // Global config test state
+    const globalTesting = ref(false)
+    const globalTestResult = ref<TestResult | null>(null)
+
     const serviceTesting = ref<Record<AIServiceKey, boolean>>({
         summary: false,
         translation: false,
@@ -30,10 +34,60 @@ export function useAIConfigSettings(
         embedding: null
     })
 
+    async function testGlobalConnection() {
+        const globalCfg = localConfig.value.global
+        if (!globalCfg.api_key || !globalCfg.base_url || !globalCfg.model_name) {
+            globalTestResult.value = { success: false, message: '请先完善 API 配置' }
+            return
+        }
+
+        globalTesting.value = true
+        globalTestResult.value = null
+
+        try {
+            const success = await aiStore.testGlobalConnection({
+                api_key: globalCfg.api_key,
+                base_url: globalCfg.base_url,
+                model_name: globalCfg.model_name,
+            })
+            globalTestResult.value = {
+                success,
+                message: success ? '连接测试成功！' : aiStore.error || '连接测试失败'
+            }
+        } catch (error) {
+            globalTestResult.value = { success: false, message: '连接测试失败' }
+        } finally {
+            globalTesting.value = false
+        }
+    }
+
+    // Embedding always uses its own config (not a chat/LLM model)
+    const alwaysCustomServices: AIServiceKey[] = ['embedding']
+
     async function testConnection(service: AIServiceKey) {
         const serviceConfig = localConfig.value[service]
-        if (!serviceConfig.api_key || !serviceConfig.base_url || !serviceConfig.model_name) {
-            serviceTestResult.value[service] = { success: false, message: '请先完善API配置' }
+        const isAlwaysCustom = alwaysCustomServices.includes(service)
+
+        // Determine which config to test: custom or global
+        let testApiKey: string
+        let testBaseUrl: string
+        let testModelName: string
+
+        if (isAlwaysCustom || serviceConfig.use_custom) {
+            testApiKey = serviceConfig.api_key
+            testBaseUrl = serviceConfig.base_url
+            testModelName = serviceConfig.model_name
+        } else {
+            testApiKey = localConfig.value.global.api_key
+            testBaseUrl = localConfig.value.global.base_url
+            testModelName = localConfig.value.global.model_name
+        }
+
+        if (!testApiKey || !testBaseUrl || !testModelName) {
+            serviceTestResult.value[service] = {
+                success: false,
+                message: (isAlwaysCustom || serviceConfig.use_custom) ? '请先完善服务专属 API 配置' : '请先完善全局默认 API 配置'
+            }
             return
         }
 
@@ -41,7 +95,11 @@ export function useAIConfigSettings(
         serviceTestResult.value[service] = null
 
         try {
-            const success = await aiStore.testConnection(service, serviceConfig)
+            const success = await aiStore.testConnection(service, {
+                api_key: testApiKey,
+                base_url: testBaseUrl,
+                model_name: testModelName,
+            })
             serviceTestResult.value[service] = {
                 success,
                 message: success ? '连接测试成功！' : aiStore.error || '连接测试失败'
@@ -53,12 +111,8 @@ export function useAIConfigSettings(
         }
     }
 
-    function copySummaryToTranslation() {
-        localConfig.value.translation = { ...localConfig.value.summary }
-        serviceTestResult.value.translation = null
-    }
-
     function resetTestResults() {
+        globalTestResult.value = null
         serviceTestResult.value.summary = null
         serviceTestResult.value.translation = null
         serviceTestResult.value.tagging = null
@@ -148,10 +202,12 @@ export function useAIConfigSettings(
     }
 
     return {
+        globalTesting,
+        globalTestResult,
+        testGlobalConnection,
         serviceTesting,
         serviceTestResult,
         testConnection,
-        copySummaryToTranslation,
         resetTestResults,
         rebuildingVectors,
         rebuildResult,

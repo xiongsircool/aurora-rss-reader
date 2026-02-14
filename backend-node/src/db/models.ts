@@ -99,6 +99,17 @@ export interface UserSettings {
   max_auto_title_translations: number;
   mark_as_read_range: string;
   details_panel_mode: string; // 'docked' | 'click'
+  // Global default AI configuration
+  default_ai_provider: string; // Provider preset ID (e.g. 'openai', 'deepseek', 'gemini')
+  default_ai_api_key: string;
+  default_ai_base_url: string;
+  default_ai_model: string;
+  // Per-service custom override flags (0=use global, 1=use custom)
+  summary_use_custom: number;
+  translation_use_custom: number;
+  tagging_use_custom: number;
+  embedding_use_custom: number;
+  // Per-service custom configurations (used when *_use_custom = 1)
   summary_api_key: string;
   summary_base_url: string;
   summary_model_name: string;
@@ -145,6 +156,13 @@ export interface CollectionEntry {
   note: string | null;
 }
 
+// Rule matching condition for tag-based filtering
+export interface TagMatchRule {
+  keywords: string[];       // e.g. ["AI", "LLM"]
+  operator: 'AND' | 'OR';  // relationship between keywords in this group
+  exclude: string[];        // NOT keywords
+}
+
 // User-defined tag for smart tagging
 export interface UserTag {
   id: string;
@@ -153,6 +171,8 @@ export interface UserTag {
   color: string;
   sort_order: number;
   enabled: number; // SQLite boolean (0/1)
+  match_mode: 'ai' | 'rule' | 'both'; // matching strategy
+  match_rules: string | null; // JSON: TagMatchRule[]
   created_at: string;
   updated_at: string;
 }

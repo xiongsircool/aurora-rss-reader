@@ -37,7 +37,7 @@ const props = defineProps<{
   viewMode: ViewMode
   activeCollectionId: string | null
   activeTagId: string | null
-  activeTagView: 'tag' | 'pending' | 'untagged' | null
+  activeTagView: 'tag' | 'pending' | 'untagged' | 'digest' | null
   
   // Feed list
   collapsedGroups: Record<string, boolean>
@@ -98,7 +98,7 @@ const emit = defineEmits<{
   // Tags
   (e: 'toggle-tags'): void
   (e: 'select-tag', id: string): void
-  (e: 'select-tag-view', view: 'pending' | 'untagged'): void
+  (e: 'select-tag-view', view: 'pending' | 'untagged' | 'digest'): void
   (e: 'open-tag-settings'): void
 }>()
 
@@ -312,6 +312,37 @@ watch(showCreateGroupModal, (visible) => {
         @toggle-favorites="emit('toggle-favorites')"
         @toggle-collections="emit('toggle-collections')"
         @toggle-tags="emit('toggle-tags')"
+      />
+
+      <!-- Compact mode: show expanded sections for collections/tags when active -->
+      <FavoritesSection
+        v-if="viewMode === 'favorites'"
+        :total-starred="favoritesStore.totalStarred"
+        :grouped-stats="favoritesStore.groupedStats"
+        :show-favorites-only="showFavoritesOnly"
+        :selected-favorite-feed="selectedFavoriteFeed"
+        :feed-map="feedMap"
+        @toggle-favorites="emit('toggle-favorites')"
+        @select-feed="emit('select-favorite-feed', $event)"
+      />
+
+      <CollectionsSection
+        v-if="viewMode === 'collection'"
+        :expanded="true"
+        :active-collection-id="activeCollectionId"
+        @toggle="emit('toggle-collections')"
+        @select-collection="emit('select-collection', $event)"
+      />
+
+      <TagsSection
+        v-if="viewMode === 'tag'"
+        :expanded="true"
+        :active-tag-id="activeTagId"
+        :active-tag-view="activeTagView"
+        @toggle="emit('toggle-tags')"
+        @select-tag="emit('select-tag', $event)"
+        @select-tag-view="emit('select-tag-view', $event)"
+        @open-tag-settings="emit('open-tag-settings')"
       />
     </template>
 

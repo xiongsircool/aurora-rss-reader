@@ -17,6 +17,8 @@ import {
     incrementTagsVersion,
     initTaggingClient,
 } from '../services/tagging.js';
+import { runRuleMatchingForEntry } from '../services/ruleMatching.js';
+import { TagMatchRule } from '../db/models.js';
 import { getDatabase } from '../db/session.js';
 
 const tagsRoutes: FastifyPluginAsync = async (app) => {
@@ -40,9 +42,15 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
      * POST /tags - Create a new tag
      */
     app.post<{
-        Body: { name: string; description?: string; color?: string };
+        Body: {
+            name: string;
+            description?: string;
+            color?: string;
+            match_mode?: 'ai' | 'rule' | 'both';
+            match_rules?: TagMatchRule[];
+        };
     }>('/tags', async (request, reply) => {
-        const { name, description, color } = request.body;
+        const { name, description, color, match_mode, match_rules } = request.body;
 
         if (!name || !name.trim()) {
             return reply.status(400).send({ error: '标签名称不能为空' });
@@ -58,6 +66,8 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             name: name.trim(),
             description: description?.trim() || null,
             color: color || '#3b82f6',
+            match_mode: match_mode || 'ai',
+            match_rules: match_rules ? JSON.stringify(match_rules) : null,
         });
 
         // Increment version for new tag
@@ -71,10 +81,17 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
      */
     app.patch<{
         Params: { id: string };
-        Body: { name?: string; description?: string; color?: string; enabled?: boolean };
+        Body: {
+            name?: string;
+            description?: string;
+            color?: string;
+            enabled?: boolean;
+            match_mode?: 'ai' | 'rule' | 'both';
+            match_rules?: TagMatchRule[];
+        };
     }>('/tags/:id', async (request, reply) => {
         const { id } = request.params;
-        const { name, description, color, enabled } = request.body;
+        const { name, description, color, enabled, match_mode, match_rules } = request.body;
 
         const existing = tagRepo.findById(id);
         if (!existing) {
@@ -96,6 +113,8 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             description: nextDescription,
             color,
             enabled,
+            match_mode,
+            match_rules: match_rules !== undefined ? JSON.stringify(match_rules) : undefined,
         });
 
         const enabledChanged =
@@ -103,7 +122,9 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
         const shouldBumpVersion =
             (nextName !== undefined && nextName !== existing.name) ||
             (nextDescription !== undefined && nextDescription !== existing.description) ||
-            enabledChanged;
+            enabledChanged ||
+            (match_mode !== undefined && match_mode !== existing.match_mode) ||
+            (match_rules !== undefined);
 
         if (shouldBumpVersion) {
             incrementTagsVersion();
@@ -187,10 +208,10 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
      */
     app.get<{
         Params: { id: string };
-        Querystring: { limit?: string; cursor?: string };
+        Querystring: { limit?: string; cursor?: string; date_range?: string; time_field?: string };
     }>('/tags/:id/entries', async (request, reply) => {
         const { id } = request.params;
-        const { limit, cursor } = request.query;
+        const { limit, cursor, date_range, time_field } = request.query;
 
         const tag = tagRepo.findById(id);
         if (!tag) {
@@ -200,6 +221,8 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
         const result = entryTagRepo.getEntriesByTagId(id, {
             limit: limit ? parseInt(limit, 10) : 50,
             cursor,
+            date_range,
+            time_field,
         });
 
         return result;
@@ -222,14 +245,16 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
      * GET /ai/tags/pending - Get pending entries
      */
     app.get<{
-        Querystring: { limit?: string; cursor?: string };
+        Querystring: { limit?: string; cursor?: string; date_range?: string; time_field?: string };
     }>('/ai/tags/pending', async (request) => {
-        const { limit, cursor } = request.query;
+        const { limit, cursor, date_range, time_field } = request.query;
         const config = getTaggingConfig();
         const result = analysisRepo.getPendingEntries({
             limit: limit ? parseInt(limit, 10) : 50,
             cursor,
             startAt: config.autoTaggingStartAt || undefined,
+            date_range,
+            time_field,
         });
         return result;
     });
@@ -238,14 +263,16 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
      * GET /ai/tags/untagged - Get analyzed entries without tags
      */
     app.get<{
-        Querystring: { limit?: string; cursor?: string };
+        Querystring: { limit?: string; cursor?: string; date_range?: string; time_field?: string };
     }>('/ai/tags/untagged', async (request) => {
-        const { limit, cursor } = request.query;
+        const { limit, cursor, date_range, time_field } = request.query;
         const config = getTaggingConfig();
         const result = analysisRepo.getEntriesWithoutTags({
             limit: limit ? parseInt(limit, 10) : 50,
             cursor,
             startAt: config.autoTaggingStartAt || undefined,
+            date_range,
+            time_field,
         });
         return result;
     });
@@ -263,73 +290,99 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
         }
 
         // Get enabled tags
-        const tags = tagRepo.findAllEnabled();
-        if (tags.length === 0) {
+        const allTags = tagRepo.findAllEnabled();
+        if (allTags.length === 0) {
             return reply.status(400).send({ error: '请先创建至少一个标签' });
         }
 
+        // Separate tags by matching mode
+        const ruleTags = allTags.filter(
+            (t) => (t.match_mode === 'rule' || t.match_mode === 'both') && t.match_rules
+        );
+        const aiTags = allTags.filter(
+            (t) => t.match_mode === 'ai' || t.match_mode === 'both'
+        );
+
         // Get current tags version and validate config
         const config = getTaggingConfig();
-        if (!config.apiKey || !config.baseUrl || !config.modelName) {
-            return reply.status(400).send({ error: 'AI 配置不完整' });
+        const aiAvailable = aiTags.length > 0 && config.apiKey && config.baseUrl && config.modelName;
+
+        // If no rule tags and AI not available, return error
+        if (ruleTags.length === 0 && !aiAvailable) {
+            return reply.status(400).send({ error: 'AI 配置不完整且无规则标签' });
         }
+
         const tagsVersion = config.tagsVersion;
 
-	        const results: Array<{
-	            entryId: string;
-	            success: boolean;
-	            tagIds: string[];
-	            tagNames: string[];
-	            error?: string;
-	        }> = [];
+        const results: Array<{
+            entryId: string;
+            success: boolean;
+            tagIds: string[];
+            tagNames: string[];
+            error?: string;
+        }> = [];
 
         for (const entryId of entryIds) {
-	            const entry = entryRepo.findById(entryId);
-	            if (!entry) {
-	                results.push({ entryId, success: false, tagIds: [], tagNames: [], error: '文章不存在' });
-	                continue;
-	            }
+            const entry = entryRepo.findById(entryId);
+            if (!entry) {
+                results.push({ entryId, success: false, tagIds: [], tagNames: [], error: '文章不存在' });
+                continue;
+            }
 
-            // Analyze entry
-            const analysisResult = await analyzeEntryTags(
-                {
-                    title: entry.title || '',
-                    summary: entry.summary,
-                    content: entry.content,
-                },
-                tags
-            );
+            const matchedTagIds = new Set<string>();
 
-	            if (analysisResult.success) {
-	                // Clear existing AI-assigned tags (keep manual ones)
-	                // Actually, we'll replace all tags since re-analysis is explicit
-	                entryTagRepo.removeAllTags(entryId);
+            // Step 1: Rule matching (instant)
+            if (ruleTags.length > 0) {
+                const ruleMatched = runRuleMatchingForEntry(
+                    { title: entry.title || '', summary: entry.summary },
+                    ruleTags
+                );
+                for (const id of ruleMatched) matchedTagIds.add(id);
+            }
 
-	                // Add matched tags
-	                if (analysisResult.tagIds.length > 0) {
-	                    entryTagRepo.addTags(entryId, analysisResult.tagIds, false); // is_manual = false
-	                }
+            // Step 2: AI matching
+            let aiError: string | undefined;
+            if (aiAvailable) {
+                const analysisResult = await analyzeEntryTags(
+                    {
+                        title: entry.title || '',
+                        summary: entry.summary,
+                        content: entry.content,
+                    },
+                    aiTags
+                );
 
-	                // Update analysis status
-	                analysisRepo.updateStatus(entryId, 'analyzed', tagsVersion);
-	            }
+                if (analysisResult.success) {
+                    for (const id of analysisResult.tagIds) matchedTagIds.add(id);
+                } else {
+                    aiError = analysisResult.error;
+                }
+            }
 
-	            const tagNames = analysisResult.tagIds
-	                .map((tagId) => tags.find((t) => t.id === tagId)?.name)
-	                .filter((name): name is string => !!name);
+            // Save merged results
+            const allMatchedIds = Array.from(matchedTagIds);
+            entryTagRepo.removeAllTags(entryId);
+            if (allMatchedIds.length > 0) {
+                entryTagRepo.addTags(entryId, allMatchedIds, false);
+            }
+            analysisRepo.updateStatus(entryId, 'analyzed', tagsVersion);
 
-	            results.push({
-	                entryId,
-	                success: analysisResult.success,
-	                tagIds: analysisResult.tagIds,
-	                tagNames,
-	                error: analysisResult.error,
-	            });
-	        }
+            const tagNames = allMatchedIds
+                .map((tagId) => allTags.find((t) => t.id === tagId)?.name)
+                .filter((name): name is string => !!name);
 
-	        // Calculate summary
-	        const successCount = results.filter((r) => r.success).length;
-	        const taggedCount = results.filter((r) => r.success && r.tagIds.length > 0).length;
+            results.push({
+                entryId,
+                success: true,
+                tagIds: allMatchedIds,
+                tagNames,
+                error: aiError,
+            });
+        }
+
+        // Calculate summary
+        const successCount = results.filter((r) => r.success).length;
+        const taggedCount = results.filter((r) => r.success && r.tagIds.length > 0).length;
 
         return {
             results,
@@ -622,7 +675,7 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             // Simple test with a dummy request
             const result = await analyzeEntryTags(
                 { title: '测试文章标题', summary: '这是一个测试摘要。' },
-                [{ id: 'test', name: '测试标签', description: '测试描述', color: '#3b82f6', sort_order: 0, enabled: 1, created_at: '', updated_at: '' }]
+                [{ id: 'test', name: '测试标签', description: '测试描述', color: '#3b82f6', sort_order: 0, enabled: 1, match_mode: 'ai', match_rules: null, created_at: '', updated_at: '' }]
             );
 
             if (result.success) {
@@ -634,6 +687,259 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             const errorMessage = error instanceof Error ? error.message : '未知错误';
             return reply.status(500).send({ error: errorMessage });
         }
+    });
+
+    // ==================== Information Aggregation ====================
+
+    /**
+     * GET /tags/filter - Multi-tag combo filter (intersection / union)
+     */
+    app.get<{
+        Querystring: { ids: string; mode?: string; limit?: string; cursor?: string };
+    }>('/tags/filter', async (request, reply) => {
+        const { ids, mode, limit, cursor } = request.query;
+
+        if (!ids) {
+            return reply.status(400).send({ error: '请提供标签ID列表' });
+        }
+
+        const tagIds = ids.split(',').filter(Boolean);
+        if (tagIds.length === 0) {
+            return reply.status(400).send({ error: '请提供有效的标签ID' });
+        }
+
+        const filterMode = mode === 'and' ? 'and' : 'or';
+        const safeLimit = Math.max(1, Math.min(parseInt(limit || '50', 10) || 50, 200));
+        const db = getDatabase();
+
+        const placeholders = tagIds.map(() => '?').join(',');
+        const params: (string | number)[] = [...tagIds];
+
+        let sql: string;
+
+        if (filterMode === 'and') {
+            // Intersection: entries that have ALL specified tags
+            sql = `
+                SELECT e.*, f.title as feed_title
+                FROM entries e
+                LEFT JOIN feeds f ON e.feed_id = f.id
+                WHERE e.id IN (
+                    SELECT entry_id FROM entry_tags
+                    WHERE tag_id IN (${placeholders})
+                    GROUP BY entry_id
+                    HAVING COUNT(DISTINCT tag_id) = ?
+                )
+            `;
+            params.push(tagIds.length);
+        } else {
+            // Union: entries that have ANY of the specified tags
+            sql = `
+                SELECT DISTINCT e.*, f.title as feed_title
+                FROM entries e
+                LEFT JOIN feeds f ON e.feed_id = f.id
+                INNER JOIN entry_tags et ON e.id = et.entry_id
+                WHERE et.tag_id IN (${placeholders})
+            `;
+        }
+
+        if (cursor) {
+            sql += ` AND e.inserted_at < ?`;
+            params.push(cursor);
+        }
+
+        sql += ` ORDER BY e.inserted_at DESC LIMIT ?`;
+        params.push(safeLimit + 1);
+
+        const rows = db.prepare(sql).all(...params) as any[];
+        const hasMore = rows.length > safeLimit;
+        const items = hasMore ? rows.slice(0, safeLimit) : rows;
+        const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].inserted_at : null;
+
+        return { items, nextCursor, hasMore };
+    });
+
+    /**
+     * GET /tags/:id/timeline - Topic timeline grouped by period
+     */
+    app.get<{
+        Params: { id: string };
+        Querystring: { group_by?: string; limit?: string };
+    }>('/tags/:id/timeline', async (request, reply) => {
+        const { id } = request.params;
+        const { group_by, limit } = request.query;
+
+        const tag = tagRepo.findById(id);
+        if (!tag) {
+            return reply.status(404).send({ error: '标签不存在' });
+        }
+
+        const groupBy = group_by === 'month' ? 'month' : 'week';
+        const safeLimit = Math.max(1, Math.min(parseInt(limit || '20', 10) || 20, 52));
+        const db = getDatabase();
+
+        // Group format based on period type
+        const dateFormat = groupBy === 'month'
+            ? "strftime('%Y-%m', e.published_at)"
+            : "strftime('%Y-W%W', e.published_at)";
+
+        const sql = `
+            SELECT
+                ${dateFormat} as period,
+                COUNT(*) as count,
+                MIN(e.published_at) as period_start,
+                MAX(e.published_at) as period_end
+            FROM entries e
+            INNER JOIN entry_tags et ON e.id = et.entry_id
+            WHERE et.tag_id = ?
+                AND e.published_at IS NOT NULL
+            GROUP BY period
+            ORDER BY period DESC
+            LIMIT ?
+        `;
+
+        const periods = db.prepare(sql).all(id, safeLimit) as Array<{
+            period: string;
+            count: number;
+            period_start: string;
+            period_end: string;
+        }>;
+
+        // For each period, fetch up to 5 representative entries
+        const result = periods.map((p) => {
+            const entriesSql = `
+                SELECT e.id, e.title, e.url, e.published_at, e.summary, f.title as feed_title
+                FROM entries e
+                INNER JOIN entry_tags et ON e.id = et.entry_id
+                LEFT JOIN feeds f ON e.feed_id = f.id
+                WHERE et.tag_id = ?
+                    AND ${dateFormat} = ?
+                ORDER BY e.published_at DESC
+                LIMIT 5
+            `;
+            const entries = db.prepare(entriesSql).all(id, p.period) as any[];
+            return {
+                period: p.period,
+                count: p.count,
+                period_start: p.period_start,
+                period_end: p.period_end,
+                entries,
+            };
+        });
+
+        return { groupBy, items: result };
+    });
+
+    /**
+     * GET /digest - Daily/weekly digest grouped by tag
+     */
+    app.get<{
+        Querystring: { period?: string };
+    }>('/digest', async (request) => {
+        const { period } = request.query;
+        const db = getDatabase();
+
+        // Calculate the start date based on period
+        const now = new Date();
+        let startDate: string;
+        if (period === 'week') {
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            startDate = weekAgo.toISOString();
+        } else {
+            // Default: today
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            startDate = todayStart.toISOString();
+        }
+
+        // Get all tags with recent entries
+        const allTags = tagRepo.getAllWithEntryCounts();
+        const result: Array<{
+            tag: typeof allTags[number];
+            recentCount: number;
+            entries: any[];
+        }> = [];
+
+        for (const tag of allTags) {
+            const sql = `
+                SELECT e.id, e.title, e.url, e.published_at, e.summary, f.title as feed_title
+                FROM entries e
+                INNER JOIN entry_tags et ON e.id = et.entry_id
+                LEFT JOIN feeds f ON e.feed_id = f.id
+                WHERE et.tag_id = ?
+                    AND e.inserted_at >= ?
+                ORDER BY e.inserted_at DESC
+                LIMIT 5
+            `;
+            const entries = db.prepare(sql).all(tag.id, startDate) as any[];
+
+            const countSql = `
+                SELECT COUNT(*) as count
+                FROM entry_tags et
+                INNER JOIN entries e ON et.entry_id = e.id
+                WHERE et.tag_id = ? AND e.inserted_at >= ?
+            `;
+            const countResult = db.prepare(countSql).get(tag.id, startDate) as { count: number };
+
+            if (countResult.count > 0) {
+                result.push({
+                    tag,
+                    recentCount: countResult.count,
+                    entries,
+                });
+            }
+        }
+
+        // Sort by recent count descending
+        result.sort((a, b) => b.recentCount - a.recentCount);
+
+        return {
+            period: period || 'today',
+            startDate,
+            items: result,
+        };
+    });
+
+    /**
+     * GET /tags/:id/related - Get related tags by co-occurrence
+     */
+    app.get<{
+        Params: { id: string };
+        Querystring: { limit?: string };
+    }>('/tags/:id/related', async (request, reply) => {
+        const { id } = request.params;
+        const { limit } = request.query;
+
+        const tag = tagRepo.findById(id);
+        if (!tag) {
+            return reply.status(404).send({ error: '标签不存在' });
+        }
+
+        const safeLimit = Math.max(1, Math.min(parseInt(limit || '5', 10) || 5, 20));
+        const db = getDatabase();
+
+        // Find tags that frequently co-occur on the same entries
+        const sql = `
+            SELECT
+                t.id, t.name, t.color, t.description,
+                COUNT(*) as overlap_count
+            FROM entry_tags et1
+            INNER JOIN entry_tags et2 ON et1.entry_id = et2.entry_id AND et1.tag_id != et2.tag_id
+            INNER JOIN user_tags t ON et2.tag_id = t.id
+            WHERE et1.tag_id = ?
+                AND t.enabled = 1
+            GROUP BY t.id
+            ORDER BY overlap_count DESC
+            LIMIT ?
+        `;
+
+        const related = db.prepare(sql).all(id, safeLimit) as Array<{
+            id: string;
+            name: string;
+            color: string;
+            description: string | null;
+            overlap_count: number;
+        }>;
+
+        return { items: related };
     });
 };
 

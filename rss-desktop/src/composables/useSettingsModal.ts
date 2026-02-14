@@ -2,7 +2,15 @@ import { ref, watch } from 'vue'
 import { useAIStore } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 
+export interface LocalGlobalConfig {
+    provider: string
+    api_key: string
+    base_url: string
+    model_name: string
+}
+
 export interface LocalServiceConfig {
+    use_custom: boolean
     api_key: string
     base_url: string
     model_name: string
@@ -17,6 +25,7 @@ export interface LocalFeatureConfig {
 }
 
 export interface LocalConfig {
+    global: LocalGlobalConfig
     summary: LocalServiceConfig
     translation: LocalServiceConfig
     tagging: LocalServiceConfig
@@ -24,10 +33,18 @@ export interface LocalConfig {
     features: LocalFeatureConfig
 }
 
-const createLocalServiceConfig = (): LocalServiceConfig => ({
+const createLocalGlobalConfig = (): LocalGlobalConfig => ({
+    provider: '',
     api_key: '',
-    base_url: 'https://open.bigmodel.cn/api/paas/v4/',
-    model_name: 'glm-4-flash'
+    base_url: '',
+    model_name: ''
+})
+
+const createLocalServiceConfig = (): LocalServiceConfig => ({
+    use_custom: false,
+    api_key: '',
+    base_url: '',
+    model_name: ''
 })
 
 const createLocalFeatureConfig = (): LocalFeatureConfig => ({
@@ -43,6 +60,7 @@ export function useSettingsModal() {
     const settingsStore = useSettingsStore()
 
     const localConfig = ref<LocalConfig>({
+        global: createLocalGlobalConfig(),
         summary: createLocalServiceConfig(),
         translation: createLocalServiceConfig(),
         tagging: createLocalServiceConfig(),
@@ -51,35 +69,42 @@ export function useSettingsModal() {
     })
 
     function syncFromStore() {
+        const global = aiStore.config.global || {}
         const summary = aiStore.config.summary || {}
         const translation = aiStore.config.translation || {}
         const tagging = aiStore.config.tagging || {}
         const embedding = aiStore.config.embedding || {}
         const features = aiStore.config.features || {}
 
+        localConfig.value.global = {
+            provider: (global as any).provider ?? localConfig.value.global.provider,
+            api_key: (global as any).api_key ?? localConfig.value.global.api_key,
+            base_url: (global as any).base_url ?? localConfig.value.global.base_url,
+            model_name: (global as any).model_name ?? localConfig.value.global.model_name,
+        }
         localConfig.value.summary = {
-            ...localConfig.value.summary,
+            use_custom: (summary as any).use_custom ?? localConfig.value.summary.use_custom,
             api_key: summary.api_key ?? localConfig.value.summary.api_key,
             base_url: summary.base_url ?? localConfig.value.summary.base_url,
-            model_name: summary.model_name ?? localConfig.value.summary.model_name
+            model_name: summary.model_name ?? localConfig.value.summary.model_name,
         }
         localConfig.value.translation = {
-            ...localConfig.value.translation,
+            use_custom: (translation as any).use_custom ?? localConfig.value.translation.use_custom,
             api_key: translation.api_key ?? localConfig.value.translation.api_key,
             base_url: translation.base_url ?? localConfig.value.translation.base_url,
-            model_name: translation.model_name ?? localConfig.value.translation.model_name
+            model_name: translation.model_name ?? localConfig.value.translation.model_name,
         }
         localConfig.value.tagging = {
-            ...localConfig.value.tagging,
+            use_custom: (tagging as any).use_custom ?? localConfig.value.tagging.use_custom,
             api_key: tagging.api_key ?? localConfig.value.tagging.api_key,
             base_url: tagging.base_url ?? localConfig.value.tagging.base_url,
-            model_name: tagging.model_name ?? localConfig.value.tagging.model_name
+            model_name: tagging.model_name ?? localConfig.value.tagging.model_name,
         }
         localConfig.value.embedding = {
-            ...localConfig.value.embedding,
+            use_custom: (embedding as any).use_custom ?? localConfig.value.embedding.use_custom,
             api_key: embedding.api_key ?? localConfig.value.embedding.api_key,
             base_url: embedding.base_url ?? localConfig.value.embedding.base_url,
-            model_name: embedding.model_name ?? localConfig.value.embedding.model_name
+            model_name: embedding.model_name ?? localConfig.value.embedding.model_name,
         }
         localConfig.value.features = {
             ...localConfig.value.features,
@@ -111,6 +136,7 @@ export function useSettingsModal() {
 
     async function saveAIConfig() {
         const success = await aiStore.updateConfig({
+            global: { ...localConfig.value.global },
             summary: { ...localConfig.value.summary },
             translation: { ...localConfig.value.translation },
             tagging: { ...localConfig.value.tagging },

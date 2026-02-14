@@ -29,6 +29,7 @@ export function useFeedFilter() {
     const showFavoritesOnly = ref(false)
     const selectedFavoriteFeed = ref<string | null>(null)
     const lastActiveFeedId = ref<string | null>(null)
+    const autoForcedStarredFromFavorites = ref(false)
 
     // Computed
     const isDateFilterActive = computed(
@@ -149,7 +150,18 @@ export function useFeedFilter() {
 
         // Watch filter mode
         watch(filterMode, () => {
+            if (filterMode.value !== 'starred') {
+                autoForcedStarredFromFavorites.value = false
+            }
             debouncedApplyFilters()
+        })
+
+        // Leaving favorites mode should not keep the auto-forced starred filter.
+        watch(showFavoritesOnly, (val) => {
+            if (!val && autoForcedStarredFromFavorites.value && filterMode.value === 'starred') {
+                filterMode.value = 'all'
+                autoForcedStarredFromFavorites.value = false
+            }
         })
 
         // Watch date range
@@ -168,12 +180,14 @@ export function useFeedFilter() {
 
     // Helper to switch to Favorites mode
     async function selectFavoriteFeed(feedId: string | null, loadFavoritesData: (opts: any) => Promise<void>) {
-        if (!showFavoritesOnly.value) {
+        const enteringFavorites = !showFavoritesOnly.value
+        if (enteringFavorites) {
             lastActiveFeedId.value = store.activeFeedId
+            filterMode.value = 'starred' // Keep favorites mode default focused on starred semantics.
+            autoForcedStarredFromFavorites.value = true
         }
         selectedFavoriteFeed.value = feedId
         showFavoritesOnly.value = true
-        filterMode.value = 'starred' // Auto-set filter mode for UI consistency if needed
         await loadFavoritesData({ includeEntries: true, feedId })
     }
 
@@ -182,6 +196,7 @@ export function useFeedFilter() {
         selectedFavoriteFeed.value = null
         selectedFavoriteEntryId.value = null
         filterMode.value = 'all'
+        autoForcedStarredFromFavorites.value = false
 
         if (lastActiveFeedId.value) {
             store.selectFeed(lastActiveFeedId.value)

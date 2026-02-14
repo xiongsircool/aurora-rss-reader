@@ -1,5 +1,6 @@
 import { getDatabase } from '../session.js';
 import { EntryAnalysisStatus, Entry, ANALYSIS_STATUS } from '../models.js';
+import { normalizeTimeField, parseRelativeTime } from '../../utils/dateRange.js';
 
 export interface AnalysisStats {
     pending: number;
@@ -98,12 +99,20 @@ export class AnalysisStatusRepository {
     /**
      * Get pending entries (not yet analyzed)
      */
-    getPendingEntries(options: { limit?: number; cursor?: string; startAt?: string } = {}): {
+    getPendingEntries(options: {
+        limit?: number;
+        cursor?: string;
+        startAt?: string;
+        date_range?: string;
+        time_field?: string;
+    } = {}): {
         items: Entry[];
         nextCursor: string | null;
         hasMore: boolean;
     } {
         const limit = options.limit ?? 50;
+        const timeField = normalizeTimeField(options.time_field);
+        const cutoff = parseRelativeTime(options.date_range);
 
         // Get entries that either have 'pending' status or don't have a status record yet
         let query = `
@@ -122,6 +131,22 @@ export class AnalysisStatusRepository {
 	            query += ` AND e.inserted_at >= ?`;
 	            params.push(options.startAt);
 	        }
+
+            if (cutoff) {
+                const cutoffIso = cutoff.toISOString();
+                if (timeField === 'published_at') {
+                    const nowIso = new Date().toISOString();
+                    query += `
+            AND (
+              (e.published_at IS NOT NULL AND e.published_at <= ? AND e.published_at >= ?)
+              OR (e.published_at IS NULL AND e.inserted_at >= ?)
+            )`;
+                    params.push(nowIso, cutoffIso, cutoffIso);
+                } else {
+                    query += ` AND e.inserted_at >= ?`;
+                    params.push(cutoffIso);
+                }
+            }
 
 	        if (options.cursor) {
 	            query += ` AND e.inserted_at < ?`;
@@ -144,12 +169,20 @@ export class AnalysisStatusRepository {
     /**
      * Get analyzed entries with no tags
      */
-    getEntriesWithoutTags(options: { limit?: number; cursor?: string; startAt?: string } = {}): {
+    getEntriesWithoutTags(options: {
+        limit?: number;
+        cursor?: string;
+        startAt?: string;
+        date_range?: string;
+        time_field?: string;
+    } = {}): {
         items: Entry[];
         nextCursor: string | null;
         hasMore: boolean;
     } {
         const limit = options.limit ?? 50;
+        const timeField = normalizeTimeField(options.time_field);
+        const cutoff = parseRelativeTime(options.date_range);
 
         let query = `
       SELECT e.*, f.title as feed_title
@@ -168,6 +201,22 @@ export class AnalysisStatusRepository {
 	            query += ` AND e.inserted_at >= ?`;
 	            params.push(options.startAt);
 	        }
+
+            if (cutoff) {
+                const cutoffIso = cutoff.toISOString();
+                if (timeField === 'published_at') {
+                    const nowIso = new Date().toISOString();
+                    query += `
+            AND (
+              (e.published_at IS NOT NULL AND e.published_at <= ? AND e.published_at >= ?)
+              OR (e.published_at IS NULL AND e.inserted_at >= ?)
+            )`;
+                    params.push(nowIso, cutoffIso, cutoffIso);
+                } else {
+                    query += ` AND e.inserted_at >= ?`;
+                    params.push(cutoffIso);
+                }
+            }
 
 	        if (options.cursor) {
 	            query += ` AND e.inserted_at < ?`;

@@ -2,19 +2,22 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTagsStore } from '../../stores/tagsStore'
+import type { TagMatchRule } from '../../stores/tagsStore'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import ConfirmModal from '../common/ConfirmModal.vue'
+import RuleBuilderModal from '../tags/RuleBuilderModal.vue'
+import RelatedTags from '../tags/RelatedTags.vue'
 
 defineProps<{
   expanded: boolean
   activeTagId: string | null
-  activeTagView: 'tag' | 'pending' | 'untagged' | null
+  activeTagView: 'tag' | 'pending' | 'untagged' | 'digest' | null
 }>()
 
 const emit = defineEmits<{
   (e: 'toggle'): void
   (e: 'select-tag', id: string): void
-  (e: 'select-tag-view', view: 'pending' | 'untagged'): void
+  (e: 'select-tag-view', view: 'pending' | 'untagged' | 'digest'): void
   (e: 'open-tag-settings'): void
 }>()
 
@@ -32,28 +35,56 @@ const showCreateInput = ref(false)
 const newTagName = ref('')
 const newTagDescription = ref('')
 const newTagColor = ref('#8b5cf6')
+const newTagMatchMode = ref<'ai' | 'rule' | 'both'>('ai')
+const newTagMatchRules = ref<TagMatchRule[]>([])
+const showRuleBuilder = ref(false)
+
 const editingId = ref<string | null>(null)
 const editName = ref('')
+
+// For full editing (match mode + rules) of existing tags
+const editingFullId = ref<string | null>(null)
+const editFullMatchMode = ref<'ai' | 'rule' | 'both'>('ai')
+const editFullMatchRules = ref<TagMatchRule[]>([])
+const showEditRuleBuilder = ref(false)
 
 const presetColors = [
   '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b',
   '#f43f5e', '#ec4899', '#6366f1', '#ff7a18'
 ]
 
+const matchModeOptions: Array<{ value: 'ai' | 'rule' | 'both'; labelKey: string }> = [
+  { value: 'rule', labelKey: 'tags.matchModeRule' },
+  { value: 'ai', labelKey: 'tags.matchModeAI' },
+  { value: 'both', labelKey: 'tags.matchModeBoth' },
+]
+
 const tags = computed(() => tagsStore.tags)
 const pendingCount = computed(() => tagsStore.stats.pending)
+
+function resetCreateForm() {
+  newTagName.value = ''
+  newTagDescription.value = ''
+  newTagColor.value = '#8b5cf6'
+  newTagMatchMode.value = 'ai'
+  newTagMatchRules.value = []
+  showCreateInput.value = false
+}
 
 async function handleCreate() {
   if (!newTagName.value.trim()) return
   await tagsStore.createTag({
     name: newTagName.value.trim(),
     description: newTagDescription.value.trim() || undefined,
-    color: newTagColor.value
+    color: newTagColor.value,
+    match_mode: newTagMatchMode.value,
+    match_rules: newTagMatchRules.value.length > 0 ? newTagMatchRules.value : undefined,
   })
-  newTagName.value = ''
-  newTagDescription.value = ''
-  newTagColor.value = '#8b5cf6'
-  showCreateInput.value = false
+  resetCreateForm()
+}
+
+function handleSaveNewRules(rules: TagMatchRule[]) {
+  newTagMatchRules.value = rules
 }
 
 function startEdit(id: string, name: string) {
@@ -66,6 +97,30 @@ async function handleEdit() {
   await tagsStore.updateTag(editingId.value, { name: editName.value.trim() })
   editingId.value = null
   editName.value = ''
+}
+
+function startFullEdit(tag: { id: string; match_mode: string; match_rules: string | null }) {
+  editingFullId.value = tag.id
+  editFullMatchMode.value = (tag.match_mode as 'ai' | 'rule' | 'both') || 'ai'
+  try {
+    editFullMatchRules.value = tag.match_rules ? JSON.parse(tag.match_rules) : []
+  } catch {
+    editFullMatchRules.value = []
+  }
+}
+
+async function saveFullEdit() {
+  if (!editingFullId.value) return
+  await tagsStore.updateTag(editingFullId.value, {
+    match_mode: editFullMatchMode.value,
+    match_rules: editFullMatchRules.value.length > 0 ? editFullMatchRules.value : undefined,
+  })
+  editingFullId.value = null
+  editFullMatchRules.value = []
+}
+
+function handleSaveEditRules(rules: TagMatchRule[]) {
+  editFullMatchRules.value = rules
 }
 
 async function handleDelete(id: string) {
@@ -83,16 +138,15 @@ async function handleDelete(id: string) {
 
 async function handleAnalyzeAll() {
   if (pendingCount.value === 0) return
-  // Fetch pending entries first, then analyze
   await tagsStore.fetchPendingEntries(true)
   const ids = tagsStore.entries.map(e => e.id)
   if (ids.length > 0) {
     await tagsStore.analyzeEntries(ids)
-    // Refresh data
     await tagsStore.fetchStats()
     await tagsStore.fetchTags()
   }
 }
+
 </script>
 
 <template>
@@ -127,8 +181,18 @@ async function handleAnalyzeAll() {
 
     <!-- Expanded Content -->
     <div v-show="expanded" class="ml-1 mt-1">
-      <!-- Special Views: Pending & Untagged -->
+      <!-- Special Views: Digest, Pending & Untagged -->
       <div class="mb-2 space-y-0.5">
+        <button
+          @click="emit('select-tag-view', 'digest')"
+          class="w-full flex items-center gap-2 px-2.5 py-1.5 bg-transparent border border-transparent rounded-md text-left cursor-pointer transition-all duration-200 text-[12px] hover:bg-[rgba(139,92,246,0.08)] hover:border-[rgba(139,92,246,0.15)] dark:hover:bg-[rgba(139,92,246,0.15)]"
+          :class="{ 'bg-[rgba(139,92,246,0.15)] border-[rgba(139,92,246,0.3)] c-[#8b5cf6]! dark:bg-[rgba(139,92,246,0.25)]': activeTagView === 'digest' }"
+        >
+          <svg class="w-3.5 h-3.5 shrink-0 c-[var(--text-tertiary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+          </svg>
+          <span class="flex-1 c-[var(--text-secondary)]">{{ t('tags.digest') }}</span>
+        </button>
         <button
           @click="emit('select-tag-view', 'pending')"
           class="w-full flex items-center gap-2 px-2.5 py-1.5 bg-transparent border border-transparent rounded-md text-left cursor-pointer transition-all duration-200 text-[12px] hover:bg-[rgba(139,92,246,0.08)] hover:border-[rgba(139,92,246,0.15)] dark:hover:bg-[rgba(139,92,246,0.15)]"
@@ -190,15 +254,45 @@ async function handleAnalyzeAll() {
           <input
             v-model="newTagName"
             :placeholder="t('tags.namePlaceholder')"
-            class="w-full px-2 py-1 text-[12px] rounded border border-[var(--border-color)] bg-[var(--bg-surface)] focus:border-[#8b5cf6] outline-none"
+            class="w-full px-2 py-1 text-[12px] rounded border border-[var(--border-color)] bg-[var(--bg-surface)] focus:border-[#8b5cf6] outline-none c-[var(--text-primary)]"
             @keyup.enter="handleCreate"
-            @keyup.escape="showCreateInput = false"
+            @keyup.escape="resetCreateForm"
           />
           <input
             v-model="newTagDescription"
             :placeholder="t('tags.descriptionPlaceholder')"
-            class="w-full px-2 py-1 text-[11px] rounded border border-[var(--border-color)] bg-[var(--bg-surface)] focus:border-[#8b5cf6] outline-none"
+            class="w-full px-2 py-1 text-[11px] rounded border border-[var(--border-color)] bg-[var(--bg-surface)] focus:border-[#8b5cf6] outline-none c-[var(--text-primary)]"
           />
+          <!-- Match Mode Selector -->
+          <div class="flex items-center gap-1">
+            <button
+              v-for="opt in matchModeOptions"
+              :key="opt.value"
+              @click="newTagMatchMode = opt.value"
+              class="px-2 py-0.5 text-[10px] font-medium rounded-md transition-all border"
+              :class="newTagMatchMode === opt.value
+                ? 'bg-[rgba(139,92,246,0.15)] c-[#8b5cf6] border-[rgba(139,92,246,0.3)]'
+                : 'bg-transparent c-[var(--text-tertiary)] border-transparent hover:bg-[rgba(0,0,0,0.03)] dark:hover:bg-[rgba(255,255,255,0.05)]'"
+            >
+              {{ t(opt.labelKey) }}
+            </button>
+          </div>
+          <!-- Rule Builder Trigger -->
+          <div v-if="newTagMatchMode === 'rule' || newTagMatchMode === 'both'" class="flex items-center gap-1.5">
+            <button
+              @click="showRuleBuilder = true"
+              class="flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-dashed border-[var(--border-color)] c-[var(--text-secondary)] hover:border-[rgba(139,92,246,0.3)] hover:c-[#8b5cf6] transition-all"
+            >
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>
+              </svg>
+              {{ newTagMatchRules.length > 0 ? t('tags.editRules') : t('tags.addRules') }}
+            </button>
+            <span v-if="newTagMatchRules.length > 0" class="text-[10px] c-[var(--text-tertiary)]">
+              {{ newTagMatchRules.reduce((s, r) => s + r.keywords.length, 0) }} {{ t('tags.ruleKeywordsCount') }}
+            </span>
+          </div>
+          <!-- Colors -->
           <div class="flex items-center gap-1.5">
             <button
               v-for="color in presetColors"
@@ -210,7 +304,7 @@ async function handleAnalyzeAll() {
             />
           </div>
           <div class="flex justify-end gap-1.5">
-            <button @click="showCreateInput = false" class="px-2 py-1 text-[11px] c-[var(--text-tertiary)] hover:c-[var(--text-primary)]">
+            <button @click="resetCreateForm" class="px-2 py-1 text-[11px] c-[var(--text-tertiary)] hover:c-[var(--text-primary)]">
               {{ t('common.cancel') }}
             </button>
             <button
@@ -252,11 +346,21 @@ async function handleAnalyzeAll() {
             </button>
           </template>
 
-          <!-- Normal Mode -->
-          <template v-else>
+          <!-- Normal Mode (not inline name editing, not full editing) -->
+          <template v-else-if="editingFullId !== tag.id">
             <!-- Color indicator -->
             <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: tag.color }"></span>
             <span class="flex-1 truncate font-medium">{{ tag.name }}</span>
+            <!-- Match mode badge -->
+            <span
+              v-if="tag.match_mode && tag.match_mode !== 'ai'"
+              class="text-[9px] px-1 py-0 rounded font-medium shrink-0"
+              :class="tag.match_mode === 'rule'
+                ? 'bg-[rgba(249,115,22,0.12)] c-[#f97316]'
+                : 'bg-[rgba(59,130,246,0.12)] c-[#3b82f6]'"
+            >
+              {{ tag.match_mode === 'rule' ? 'R' : 'R+AI' }}
+            </span>
             <span
               v-if="tag.entry_count"
               class="text-[10px] px-1 py-0 rounded-md font-medium tabular-nums"
@@ -267,6 +371,15 @@ async function handleAnalyzeAll() {
 
             <!-- Hover Actions -->
             <div class="hidden group-hover:flex items-center gap-0.5 ml-0.5">
+              <button
+                @click.stop="startFullEdit(tag)"
+                class="p-0.5 rounded opacity-50 hover:opacity-100 hover:bg-[rgba(0,0,0,0.05)] transition-all"
+                :title="t('tags.editMatchMode')"
+              >
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>
+                </svg>
+              </button>
               <button
                 @click.stop="startEdit(tag.id, tag.name)"
                 class="p-0.5 rounded opacity-50 hover:opacity-100 hover:bg-[rgba(0,0,0,0.05)] transition-all"
@@ -288,8 +401,56 @@ async function handleAnalyzeAll() {
               </button>
             </div>
           </template>
+
+          <!-- Full Edit Mode (match mode + rules) -->
+          <template v-else>
+            <div @click.stop class="w-full space-y-2 py-1">
+              <div class="flex items-center gap-1">
+                <button
+                  v-for="opt in matchModeOptions"
+                  :key="opt.value"
+                  @click="editFullMatchMode = opt.value"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded-md transition-all border"
+                  :class="editFullMatchMode === opt.value
+                    ? 'bg-[rgba(139,92,246,0.15)] c-[#8b5cf6] border-[rgba(139,92,246,0.3)]'
+                    : 'bg-transparent c-[var(--text-tertiary)] border-transparent hover:bg-[rgba(0,0,0,0.03)] dark:hover:bg-[rgba(255,255,255,0.05)]'"
+                >
+                  {{ t(opt.labelKey) }}
+                </button>
+              </div>
+              <div v-if="editFullMatchMode === 'rule' || editFullMatchMode === 'both'" class="flex items-center gap-1.5">
+                <button
+                  @click="showEditRuleBuilder = true"
+                  class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-md border border-dashed border-[var(--border-color)] c-[var(--text-secondary)] hover:border-[rgba(139,92,246,0.3)] hover:c-[#8b5cf6] transition-all"
+                >
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>
+                  </svg>
+                  {{ editFullMatchRules.length > 0 ? t('tags.editRules') : t('tags.addRules') }}
+                </button>
+                <span v-if="editFullMatchRules.length > 0" class="text-[9px] c-[var(--text-tertiary)]">
+                  {{ editFullMatchRules.reduce((s: number, r: TagMatchRule) => s + r.keywords.length, 0) }} {{ t('tags.ruleKeywordsCount') }}
+                </span>
+              </div>
+              <div class="flex justify-end gap-1.5">
+                <button @click.stop="editingFullId = null" class="px-2 py-0.5 text-[10px] c-[var(--text-tertiary)] hover:c-[var(--text-primary)]">
+                  {{ t('common.cancel') }}
+                </button>
+                <button @click.stop="saveFullEdit" class="px-2 py-0.5 text-[10px] font-medium rounded bg-[#8b5cf6] c-white hover:opacity-90">
+                  {{ t('common.save') }}
+                </button>
+              </div>
+            </div>
+          </template>
         </button>
       </div>
+
+      <!-- Related Tags (shown when a tag is selected) -->
+      <RelatedTags
+        v-if="activeTagId"
+        :tag-id="activeTagId"
+        @select-tag="emit('select-tag', $event)"
+      />
     </div>
   </div>
 
@@ -302,5 +463,21 @@ async function handleAnalyzeAll() {
     :danger="confirmOptions.danger"
     @confirm="handleConfirm"
     @cancel="handleCancel"
+  />
+
+  <!-- Rule Builder for creating new tag -->
+  <RuleBuilderModal
+    :show="showRuleBuilder"
+    :rules="newTagMatchRules"
+    @close="showRuleBuilder = false"
+    @save="handleSaveNewRules"
+  />
+
+  <!-- Rule Builder for editing existing tag -->
+  <RuleBuilderModal
+    :show="showEditRuleBuilder"
+    :rules="editFullMatchRules"
+    @close="showEditRuleBuilder = false"
+    @save="handleSaveEditRules"
   />
 </template>

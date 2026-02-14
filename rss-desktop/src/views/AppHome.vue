@@ -27,6 +27,8 @@ import Toast from '../components/Toast.vue'
 import ConfirmModal from '../components/common/ConfirmModal.vue'
 import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
+import TimelineHeader from '../components/timeline/TimelineHeader.vue'
+import DigestView from '../components/tags/DigestView.vue'
 import DetailsPanel from '../components/details/DetailsPanel.vue'
 import type { Entry } from '../types'
 
@@ -97,7 +99,10 @@ const {
   handleToggleTags,
   handleToggleAISearch,
   handleAISearch,
-} = useViewMode(showFavoritesOnly, selectedFavoriteEntryId)
+} = useViewMode(showFavoritesOnly, selectedFavoriteEntryId, {
+  dateRangeFilter,
+  isDateFilterActive,
+})
 
 // === Entry Selection ===
 const currentSelectedEntry = computed<Entry | null>(() => {
@@ -168,6 +173,8 @@ const {
   activeTagId,
   activeTagView,
   filteredEntries,
+  dateRangeFilter,
+  isDateFilterActive,
 })
 
 // === Feed Management ===
@@ -355,11 +362,36 @@ async function loadFavoritesData(options: { includeEntries?: boolean; feedId?: s
   }
 }
 
+// When entering favorites mode, load starred entries
+watch(showFavoritesOnly, async (val) => {
+  if (val) {
+    await loadFavoritesData({ includeEntries: true })
+  }
+})
+
 watch(dateRangeFilter, () => {
   if (showFavoritesOnly.value) loadFavoritesData({ includeEntries: true })
+  if (viewMode.value === 'tag') {
+    const tagOptions = {
+      dateRange: isDateFilterActive.value ? dateRangeFilter.value : undefined,
+      timeField: settingsStore.settings.time_field,
+    }
+    if (activeTagView.value === 'pending') tagsStore.fetchPendingEntries(true, tagOptions)
+    else if (activeTagView.value === 'untagged') tagsStore.fetchUntaggedEntries(true, tagOptions)
+    else if (activeTagId.value) tagsStore.fetchEntriesByTag(activeTagId.value, true, tagOptions)
+  }
 })
 watch(() => settingsStore.settings.time_field, () => {
   if (showFavoritesOnly.value) loadFavoritesData({ includeEntries: true })
+  if (viewMode.value === 'tag') {
+    const tagOptions = {
+      dateRange: isDateFilterActive.value ? dateRangeFilter.value : undefined,
+      timeField: settingsStore.settings.time_field,
+    }
+    if (activeTagView.value === 'pending') tagsStore.fetchPendingEntries(true, tagOptions)
+    else if (activeTagView.value === 'untagged') tagsStore.fetchUntaggedEntries(true, tagOptions)
+    else if (activeTagId.value) tagsStore.fetchEntriesByTag(activeTagId.value, true, tagOptions)
+  }
 })
 
 async function selectFavoriteFeed(feedId: string | null) {
@@ -659,7 +691,27 @@ onUnmounted(() => {
       :title="t('layout.leftResizeTitle')"
     ></div>
 
+    <!-- Digest view (tag mode: 今日/本周 简报) -->
+    <template v-if="viewMode === 'tag' && activeTagView === 'digest'">
+      <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden">
+        <TimelineHeader
+          :title="timelineTitle"
+          :subtitle="timelineSubtitle"
+          :show-favorites-only="false"
+          @refresh="reloadFeeds"
+          @back-to-feeds="backToAllFeeds"
+        />
+        <div class="flex-1 overflow-y-auto p-4">
+          <DigestView
+            @select-entry="handleEntrySelect"
+            @select-tag="handleSelectTag"
+          />
+        </div>
+      </main>
+    </template>
+
     <TimelinePanel
+      v-else
       :title="timelineTitle"
       :subtitle="timelineSubtitle"
       :show-favorites-only="showFavoritesOnly"

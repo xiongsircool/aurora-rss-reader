@@ -7,6 +7,8 @@ export interface TagCreateInput {
     color?: string;
     sort_order?: number;
     enabled?: boolean;
+    match_mode?: 'ai' | 'rule' | 'both';
+    match_rules?: string | null; // JSON string
 }
 
 export interface TagUpdateInput {
@@ -15,6 +17,8 @@ export interface TagUpdateInput {
     color?: string;
     sort_order?: number;
     enabled?: boolean;
+    match_mode?: 'ai' | 'rule' | 'both';
+    match_rules?: string | null; // JSON string
 }
 
 export class TagRepository {
@@ -29,13 +33,15 @@ export class TagRepository {
             color: input.color ?? '#3b82f6',
             sort_order: input.sort_order ?? 0,
             enabled: input.enabled === false ? 0 : 1,
+            match_mode: input.match_mode ?? 'ai',
+            match_rules: input.match_rules ?? null,
             created_at: now,
             updated_at: now,
         };
 
         const stmt = this.db.prepare(`
-      INSERT INTO user_tags (id, name, description, color, sort_order, enabled, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO user_tags (id, name, description, color, sort_order, enabled, match_mode, match_rules, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
         stmt.run(
@@ -45,6 +51,8 @@ export class TagRepository {
             tag.color,
             tag.sort_order,
             tag.enabled,
+            tag.match_mode,
+            tag.match_rules,
             tag.created_at,
             tag.updated_at
         );
@@ -74,6 +82,30 @@ export class TagRepository {
         return stmt.all() as UserTag[];
     }
 
+    findEnabledByMatchMode(mode: 'ai' | 'rule' | 'both'): UserTag[] {
+        // Return tags that use the given mode: exact match or 'both'
+        const stmt = this.db.prepare(
+            'SELECT * FROM user_tags WHERE enabled = 1 AND (match_mode = ? OR match_mode = ?) ORDER BY sort_order ASC, created_at ASC'
+        );
+        return stmt.all(mode, 'both') as UserTag[];
+    }
+
+    findEnabledWithRules(): UserTag[] {
+        // Tags that have rule matching enabled (mode = 'rule' or 'both')
+        const stmt = this.db.prepare(
+            "SELECT * FROM user_tags WHERE enabled = 1 AND (match_mode = 'rule' OR match_mode = 'both') AND match_rules IS NOT NULL ORDER BY sort_order ASC, created_at ASC"
+        );
+        return stmt.all() as UserTag[];
+    }
+
+    findEnabledWithAI(): UserTag[] {
+        // Tags that have AI matching enabled (mode = 'ai' or 'both')
+        const stmt = this.db.prepare(
+            "SELECT * FROM user_tags WHERE enabled = 1 AND (match_mode = 'ai' OR match_mode = 'both') ORDER BY sort_order ASC, created_at ASC"
+        );
+        return stmt.all() as UserTag[];
+    }
+
     update(id: string, input: TagUpdateInput): UserTag | null {
         const existing = this.findById(id);
         if (!existing) return null;
@@ -86,11 +118,13 @@ export class TagRepository {
             color: input.color ?? existing.color,
             sort_order: input.sort_order ?? existing.sort_order,
             enabled: input.enabled !== undefined ? (input.enabled ? 1 : 0) : existing.enabled,
+            match_mode: input.match_mode ?? existing.match_mode,
+            match_rules: input.match_rules !== undefined ? input.match_rules : existing.match_rules,
             updated_at: now,
         };
 
         const stmt = this.db.prepare(`
-      UPDATE user_tags SET name = ?, description = ?, color = ?, sort_order = ?, enabled = ?, updated_at = ?
+      UPDATE user_tags SET name = ?, description = ?, color = ?, sort_order = ?, enabled = ?, match_mode = ?, match_rules = ?, updated_at = ?
       WHERE id = ?
     `);
         stmt.run(
@@ -99,6 +133,8 @@ export class TagRepository {
             updated.color,
             updated.sort_order,
             updated.enabled,
+            updated.match_mode,
+            updated.match_rules,
             updated.updated_at,
             id
         );

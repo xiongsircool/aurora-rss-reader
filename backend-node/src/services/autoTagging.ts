@@ -1,6 +1,7 @@
 /**
  * Auto tagging runner
  * Processes new entries in the background when auto-tagging is enabled.
+ * Supports dual-mode: rule-based matching (instant) + AI analysis.
  */
 
 import { getDatabase } from '../db/session.js';
@@ -10,6 +11,7 @@ import {
   TagRepository,
 } from '../db/repositories/index.js';
 import { analyzeEntryTags, getTaggingConfig, initTaggingClient } from './tagging.js';
+import { runRuleMatchingForEntry } from './ruleMatching.js';
 
 export interface AutoTaggingStats {
   processed: number;
@@ -27,9 +29,29 @@ export async function runAutoTaggingBatch(options: { limit?: number } = {}): Pro
     return stats;
   }
 
-  // Avoid busy loops when config is incomplete.
-  if (!config.apiKey || !config.baseUrl || !config.modelName) {
+  const tagRepo = new TagRepository();
+  const allTags = tagRepo.findAllEnabled();
+  if (allTags.length === 0) {
     return stats;
+  }
+
+  // Separate tags by matching mode
+  const ruleTags = allTags.filter(
+    (t) => (t.match_mode === 'rule' || t.match_mode === 'both') && t.match_rules
+  );
+  const aiTags = allTags.filter(
+    (t) => t.match_mode === 'ai' || t.match_mode === 'both'
+  );
+
+  // If only AI tags exist, we need a valid AI config
+  const hasRuleTags = ruleTags.length > 0;
+  const hasAiTags = aiTags.length > 0;
+
+  if (hasAiTags && (!config.apiKey || !config.baseUrl || !config.modelName)) {
+    // No valid AI config — can still process rule-only tags
+    if (!hasRuleTags) {
+      return stats;
+    }
   }
 
   // Ensure we don't auto-process historical entries by default.
@@ -40,14 +62,6 @@ export async function runAutoTaggingBatch(options: { limit?: number } = {}): Pro
     db.prepare(
       'UPDATE user_settings SET ai_auto_tagging_start_at = ?, updated_at = ? WHERE id = 1'
     ).run(now, now);
-    return stats;
-  }
-
-  initTaggingClient();
-
-  const tagRepo = new TagRepository();
-  const tags = tagRepo.findAllEnabled();
-  if (tags.length === 0) {
     return stats;
   }
 
@@ -77,26 +91,58 @@ export async function runAutoTaggingBatch(options: { limit?: number } = {}): Pro
     content: string | null;
   }>;
 
-  for (const entry of candidates) {
-    const result = await analyzeEntryTags(
-      {
-        title: entry.title || '',
-        summary: entry.summary,
-        content: entry.content,
-      },
-      tags
-    );
+  // Determine if AI is available for this batch
+  const aiAvailable = hasAiTags && config.apiKey && config.baseUrl && config.modelName;
+  if (aiAvailable) {
+    initTaggingClient();
+  }
 
-    if (!result.success) {
+  for (const entry of candidates) {
+    const matchedTagIds = new Set<string>();
+
+    // Step 1: Run rule matching (instant, no cost)
+    if (hasRuleTags) {
+      const ruleMatched = runRuleMatchingForEntry(
+        { title: entry.title || '', summary: entry.summary },
+        ruleTags
+      );
+      for (const id of ruleMatched) {
+        matchedTagIds.add(id);
+      }
+    }
+
+    // Step 2: Run AI matching
+    let aiFailed = false;
+    if (aiAvailable) {
+      const result = await analyzeEntryTags(
+        {
+          title: entry.title || '',
+          summary: entry.summary,
+          content: entry.content,
+        },
+        aiTags
+      );
+
+      if (result.success) {
+        for (const id of result.tagIds) {
+          matchedTagIds.add(id);
+        }
+      } else {
+        aiFailed = true;
+      }
+    }
+
+    // If AI failed and no rule matches, keep pending for retry
+    if (aiFailed && matchedTagIds.size === 0) {
       stats.failed += 1;
-      // Keep it pending so it can be retried.
       analysisRepo.updateStatus(entry.id, 'pending', config.tagsVersion);
       continue;
     }
 
+    // Step 3: Save merged results
     entryTagRepo.removeAllTags(entry.id);
-    if (result.tagIds.length > 0) {
-      entryTagRepo.addTags(entry.id, result.tagIds, false);
+    if (matchedTagIds.size > 0) {
+      entryTagRepo.addTags(entry.id, Array.from(matchedTagIds), false);
       stats.tagged += 1;
     } else {
       stats.untagged += 1;

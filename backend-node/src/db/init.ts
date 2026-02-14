@@ -128,6 +128,63 @@ function runMigrations(): void {
     db.exec(`ALTER TABLE user_settings ADD COLUMN ai_prompt_preference TEXT DEFAULT ''`);
     console.log('Migration completed: ai_prompt_preference column added');
   }
+
+  // Check if match_mode / match_rules columns exist in user_tags (dual-mode tagging)
+  const userTagsInfo = db.pragma('table_info(user_tags)') as Array<{ name: string }>;
+  const hasMatchMode = userTagsInfo.some((col) => col.name === 'match_mode');
+  if (!hasMatchMode) {
+    console.log('Running migration: Adding match_mode and match_rules columns to user_tags');
+    db.exec(`ALTER TABLE user_tags ADD COLUMN match_mode TEXT DEFAULT 'ai'`);
+    db.exec(`ALTER TABLE user_tags ADD COLUMN match_rules TEXT`);
+    console.log('Migration completed: match_mode and match_rules columns added');
+  }
+
+  // Check if global AI config columns exist in user_settings
+  // Refresh table info after previous migrations
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasDefaultAiProvider = tableInfo.some((col) => col.name === 'default_ai_provider');
+  if (!hasDefaultAiProvider) {
+    console.log('Running migration: Adding global AI config columns to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN default_ai_provider TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN default_ai_api_key TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN default_ai_base_url TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN default_ai_model TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN summary_use_custom INTEGER DEFAULT 0`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN translation_use_custom INTEGER DEFAULT 0`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tagging_use_custom INTEGER DEFAULT 0`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN embedding_use_custom INTEGER DEFAULT 0`);
+
+    // Auto-migrate: if summary config exists, promote it to global default
+    const existing = db.prepare('SELECT summary_api_key, summary_base_url, summary_model_name FROM user_settings WHERE id = 1').get() as {
+      summary_api_key: string;
+      summary_base_url: string;
+      summary_model_name: string;
+    } | undefined;
+
+    if (existing?.summary_api_key) {
+      db.prepare(`UPDATE user_settings SET
+        default_ai_api_key = ?,
+        default_ai_base_url = ?,
+        default_ai_model = ?
+        WHERE id = 1`
+      ).run(existing.summary_api_key, existing.summary_base_url, existing.summary_model_name);
+
+      // Check if translation/tagging have different configs — mark them as custom
+      const full = db.prepare('SELECT * FROM user_settings WHERE id = 1').get() as any;
+      if (full.translation_api_key && full.translation_api_key !== existing.summary_api_key) {
+        db.prepare('UPDATE user_settings SET translation_use_custom = 1 WHERE id = 1').run();
+      }
+      if (full.tagging_api_key && full.tagging_api_key !== existing.summary_api_key) {
+        db.prepare('UPDATE user_settings SET tagging_use_custom = 1 WHERE id = 1').run();
+      }
+      if (full.embedding_api_key) {
+        // Embedding almost always uses a different model, mark as custom
+        db.prepare('UPDATE user_settings SET embedding_use_custom = 1 WHERE id = 1').run();
+      }
+    }
+
+    console.log('Migration completed: global AI config columns added with auto-migration');
+  }
 }
 
 
@@ -255,12 +312,20 @@ export function initDatabase(): void {
       max_auto_title_translations INTEGER NOT NULL DEFAULT 10,
       mark_as_read_range TEXT NOT NULL DEFAULT 'current',
       details_panel_mode TEXT NOT NULL DEFAULT 'docked',
+      default_ai_provider TEXT NOT NULL DEFAULT '',
+      default_ai_api_key TEXT NOT NULL DEFAULT '',
+      default_ai_base_url TEXT NOT NULL DEFAULT '',
+      default_ai_model TEXT NOT NULL DEFAULT '',
+      summary_use_custom INTEGER NOT NULL DEFAULT 0,
+      translation_use_custom INTEGER NOT NULL DEFAULT 0,
+      tagging_use_custom INTEGER NOT NULL DEFAULT 0,
+      embedding_use_custom INTEGER NOT NULL DEFAULT 0,
       summary_api_key TEXT NOT NULL DEFAULT '',
-      summary_base_url TEXT NOT NULL DEFAULT 'https://open.bigmodel.cn/api/paas/v4/',
-      summary_model_name TEXT NOT NULL DEFAULT 'glm-4-flash',
+      summary_base_url TEXT NOT NULL DEFAULT '',
+      summary_model_name TEXT NOT NULL DEFAULT '',
       translation_api_key TEXT NOT NULL DEFAULT '',
-      translation_base_url TEXT NOT NULL DEFAULT 'https://open.bigmodel.cn/api/paas/v4/',
-      translation_model_name TEXT NOT NULL DEFAULT 'glm-4-flash',
+      translation_base_url TEXT NOT NULL DEFAULT '',
+      translation_model_name TEXT NOT NULL DEFAULT '',
       ai_auto_summary INTEGER NOT NULL DEFAULT 0,
       ai_auto_title_translation INTEGER NOT NULL DEFAULT 0,
       ai_title_display_mode TEXT NOT NULL DEFAULT 'original-first',
@@ -322,6 +387,8 @@ export function initDatabase(): void {
       color TEXT DEFAULT '#3b82f6',
       sort_order INTEGER DEFAULT 0,
       enabled INTEGER DEFAULT 1,
+      match_mode TEXT DEFAULT 'ai',
+      match_rules TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )

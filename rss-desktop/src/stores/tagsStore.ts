@@ -6,6 +6,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+export interface TagMatchRule {
+    keywords: string[]
+    operator: 'AND' | 'OR'
+    exclude: string[]
+}
+
 export interface UserTag {
     id: string
     name: string
@@ -13,6 +19,8 @@ export interface UserTag {
     color: string
     sort_order: number
     enabled: number
+    match_mode: 'ai' | 'rule' | 'both'
+    match_rules: string | null // JSON: TagMatchRule[]
     created_at: string
     updated_at: string
     entry_count?: number
@@ -93,7 +101,13 @@ export const useTagsStore = defineStore('tags', () => {
         }
     }
 
-    async function createTag(input: { name: string; description?: string; color?: string }) {
+    async function createTag(input: {
+        name: string
+        description?: string
+        color?: string
+        match_mode?: 'ai' | 'rule' | 'both'
+        match_rules?: TagMatchRule[]
+    }) {
         try {
             const res = await fetch(`${API_BASE}/tags`, {
                 method: 'POST',
@@ -113,7 +127,14 @@ export const useTagsStore = defineStore('tags', () => {
         }
     }
 
-    async function updateTag(id: string, input: { name?: string; description?: string; color?: string; enabled?: boolean }) {
+    async function updateTag(id: string, input: {
+        name?: string
+        description?: string
+        color?: string
+        enabled?: boolean
+        match_mode?: 'ai' | 'rule' | 'both'
+        match_rules?: TagMatchRule[]
+    }) {
         try {
             const res = await fetch(`${API_BASE}/tags/${id}`, {
                 method: 'PATCH',
@@ -154,7 +175,10 @@ export const useTagsStore = defineStore('tags', () => {
         }
     }
 
-    async function fetchPendingEntries(refresh = false) {
+    async function fetchPendingEntries(
+        refresh = false,
+        options: { dateRange?: string; timeField?: string } = {}
+    ) {
         if (refresh) {
             cursor.value = null
             entries.value = []
@@ -163,6 +187,12 @@ export const useTagsStore = defineStore('tags', () => {
         try {
             const params = new URLSearchParams({ limit: '50' })
             if (cursor.value) params.append('cursor', cursor.value)
+            if (options.dateRange && options.dateRange !== 'all') {
+                params.append('date_range', options.dateRange)
+            }
+            if (options.timeField) {
+                params.append('time_field', options.timeField)
+            }
 
             const res = await fetch(`${API_BASE}/ai/tags/pending?${params}`)
             const data = await res.json()
@@ -181,7 +211,10 @@ export const useTagsStore = defineStore('tags', () => {
         }
     }
 
-    async function fetchUntaggedEntries(refresh = false) {
+    async function fetchUntaggedEntries(
+        refresh = false,
+        options: { dateRange?: string; timeField?: string } = {}
+    ) {
         if (refresh) {
             cursor.value = null
             entries.value = []
@@ -190,6 +223,12 @@ export const useTagsStore = defineStore('tags', () => {
         try {
             const params = new URLSearchParams({ limit: '50' })
             if (cursor.value) params.append('cursor', cursor.value)
+            if (options.dateRange && options.dateRange !== 'all') {
+                params.append('date_range', options.dateRange)
+            }
+            if (options.timeField) {
+                params.append('time_field', options.timeField)
+            }
 
             const res = await fetch(`${API_BASE}/ai/tags/untagged?${params}`)
             const data = await res.json()
@@ -208,7 +247,11 @@ export const useTagsStore = defineStore('tags', () => {
         }
     }
 
-    async function fetchEntriesByTag(tagId: string, refresh = false) {
+    async function fetchEntriesByTag(
+        tagId: string,
+        refresh = false,
+        options: { dateRange?: string; timeField?: string } = {}
+    ) {
         if (refresh) {
             cursor.value = null
             entries.value = []
@@ -217,6 +260,12 @@ export const useTagsStore = defineStore('tags', () => {
         try {
             const params = new URLSearchParams({ limit: '50' })
             if (cursor.value) params.append('cursor', cursor.value)
+            if (options.dateRange && options.dateRange !== 'all') {
+                params.append('date_range', options.dateRange)
+            }
+            if (options.timeField) {
+                params.append('time_field', options.timeField)
+            }
 
             const res = await fetch(`${API_BASE}/tags/${tagId}/entries?${params}`)
             const data = await res.json()
@@ -383,6 +432,70 @@ export const useTagsStore = defineStore('tags', () => {
         }
     }
 
+    // === Information Aggregation APIs ===
+
+    async function fetchFilteredEntries(tagIds: string[], mode: 'and' | 'or' = 'or', refresh = false) {
+        if (refresh) {
+            cursor.value = null
+            entries.value = []
+        }
+        loading.value = true
+        try {
+            const params = new URLSearchParams({
+                ids: tagIds.join(','),
+                mode,
+                limit: '50',
+            })
+            if (cursor.value) params.append('cursor', cursor.value)
+            const res = await fetch(`${API_BASE}/tags/filter?${params}`)
+            const data = await res.json()
+            if (refresh) {
+                entries.value = data.items || []
+            } else {
+                entries.value = [...entries.value, ...(data.items || [])]
+            }
+            cursor.value = data.nextCursor
+            hasMore.value = data.hasMore
+        } catch (error) {
+            console.error('Failed to fetch filtered entries:', error)
+        } finally {
+            loading.value = false
+        }
+    }
+
+    async function fetchTimeline(tagId: string, groupBy: 'week' | 'month' = 'week'): Promise<any> {
+        try {
+            const params = new URLSearchParams({ group_by: groupBy, limit: '20' })
+            const res = await fetch(`${API_BASE}/tags/${tagId}/timeline?${params}`)
+            return await res.json()
+        } catch (error) {
+            console.error('Failed to fetch timeline:', error)
+            return { items: [] }
+        }
+    }
+
+    async function fetchDigest(period: 'today' | 'week' = 'today'): Promise<any> {
+        try {
+            const params = new URLSearchParams({ period })
+            const res = await fetch(`${API_BASE}/digest?${params}`)
+            return await res.json()
+        } catch (error) {
+            console.error('Failed to fetch digest:', error)
+            return { items: [] }
+        }
+    }
+
+    async function fetchRelatedTags(tagId: string): Promise<Array<{ id: string; name: string; color: string; overlap_count: number }>> {
+        try {
+            const res = await fetch(`${API_BASE}/tags/${tagId}/related`)
+            const data = await res.json()
+            return data.items || []
+        } catch (error) {
+            console.error('Failed to fetch related tags:', error)
+            return []
+        }
+    }
+
     return {
         // State
         tags,
@@ -417,5 +530,10 @@ export const useTagsStore = defineStore('tags', () => {
         testConfig,
         selectTag,
         setView,
+        // Aggregation
+        fetchFilteredEntries,
+        fetchTimeline,
+        fetchDigest,
+        fetchRelatedTags,
     }
 })

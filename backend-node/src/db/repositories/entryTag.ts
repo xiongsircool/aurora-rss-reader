@@ -1,5 +1,6 @@
 import { getDatabase } from '../session.js';
 import { EntryTag, UserTag, Entry } from '../models.js';
+import { normalizeTimeField, parseRelativeTime } from '../../utils/dateRange.js';
 
 export interface EntryWithTags extends Entry {
     tags: UserTag[];
@@ -93,9 +94,11 @@ export class EntryTagRepository {
      */
     getEntriesByTagId(
         tagId: string,
-        options: { limit?: number; cursor?: string } = {}
+        options: { limit?: number; cursor?: string; date_range?: string; time_field?: string } = {}
     ): { items: Entry[]; nextCursor: string | null; hasMore: boolean } {
         const limit = options.limit ?? 50;
+        const timeField = normalizeTimeField(options.time_field);
+        const cutoff = parseRelativeTime(options.date_range);
 
         let query = `
       SELECT e.*, f.title as feed_title
@@ -106,6 +109,22 @@ export class EntryTagRepository {
     `;
 
         const params: (string | number)[] = [tagId];
+
+        if (cutoff) {
+            const cutoffIso = cutoff.toISOString();
+            if (timeField === 'published_at') {
+                const nowIso = new Date().toISOString();
+                query += `
+      AND (
+        (e.published_at IS NOT NULL AND e.published_at <= ? AND e.published_at >= ?)
+        OR (e.published_at IS NULL AND e.inserted_at >= ?)
+      )`;
+                params.push(nowIso, cutoffIso, cutoffIso);
+            } else {
+                query += ` AND e.inserted_at >= ?`;
+                params.push(cutoffIso);
+            }
+        }
 
         if (options.cursor) {
             query += ` AND e.inserted_at < ?`;

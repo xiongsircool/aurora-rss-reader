@@ -25,6 +25,7 @@ export interface TaggingContent {
 
 /**
  * Initialize tagging client from user settings
+ * Uses custom tagging config if enabled, otherwise falls back to global default
  */
 export function initTaggingClient(): void {
     const db = getDatabase();
@@ -32,10 +33,21 @@ export function initTaggingClient(): void {
 
     if (!settings) return;
 
-    // If tagging-specific config exists, use it; otherwise fall back to summary config
-    const apiKey = settings.tagging_api_key || settings.summary_api_key;
-    const baseUrl = settings.tagging_base_url || settings.summary_base_url;
-    const modelName = settings.tagging_model_name || settings.summary_model_name;
+    let apiKey: string;
+    let baseUrl: string;
+    let modelName: string;
+
+    if (settings.tagging_use_custom === 1) {
+        // Use tagging-specific config
+        apiKey = settings.tagging_api_key || '';
+        baseUrl = settings.tagging_base_url || '';
+        modelName = settings.tagging_model_name || '';
+    } else {
+        // Use global default config
+        apiKey = settings.default_ai_api_key || '';
+        baseUrl = settings.default_ai_base_url || '';
+        modelName = settings.default_ai_model || '';
+    }
 
     if (apiKey && baseUrl && modelName) {
         taggingClient.configure({
@@ -227,10 +239,24 @@ export function getTaggingConfig(): {
         };
     }
 
+    let apiKey: string;
+    let baseUrl: string;
+    let modelName: string;
+
+    if (settings.tagging_use_custom === 1) {
+        apiKey = settings.tagging_api_key || '';
+        baseUrl = settings.tagging_base_url || '';
+        modelName = settings.tagging_model_name || '';
+    } else {
+        apiKey = settings.default_ai_api_key || '';
+        baseUrl = settings.default_ai_base_url || '';
+        modelName = settings.default_ai_model || '';
+    }
+
     return {
-        apiKey: settings.tagging_api_key || settings.summary_api_key || '',
-        baseUrl: settings.tagging_base_url || settings.summary_base_url || '',
-        modelName: settings.tagging_model_name || settings.summary_model_name || '',
+        apiKey,
+        baseUrl,
+        modelName,
         autoTagging: settings.ai_auto_tagging === 1,
         autoTaggingStartAt: settings.ai_auto_tagging_start_at || null,
         tagsVersion: settings.tags_version || 1,

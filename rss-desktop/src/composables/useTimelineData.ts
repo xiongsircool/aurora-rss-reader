@@ -11,6 +11,7 @@ import { useFeedStore } from '../stores/feedStore'
 import { useCollectionsStore } from '../stores/collectionsStore'
 import { useTagsStore } from '../stores/tagsStore'
 import { useSearchStore } from '../stores/searchStore'
+import { useSettingsStore } from '../stores/settingsStore'
 import { collectionEntryToEntry, tagEntryToEntry, searchResultToEntry } from '../utils/entryAdapter'
 import type { Entry, Feed } from '../types'
 import type { ViewMode } from './useViewMode'
@@ -21,8 +22,10 @@ export function useTimelineData(options: {
   showFavoritesOnly: Ref<boolean>
   selectedFavoriteFeed: Ref<string | null>
   activeTagId: Ref<string | null>
-  activeTagView: Ref<'tag' | 'pending' | 'untagged' | null>
+  activeTagView: Ref<'tag' | 'pending' | 'untagged' | 'digest' | null>
   filteredEntries: Ref<Entry[]>
+  dateRangeFilter: Ref<string>
+  isDateFilterActive: Ref<boolean>
 }) {
   const {
     viewMode,
@@ -32,12 +35,15 @@ export function useTimelineData(options: {
     activeTagId,
     activeTagView,
     filteredEntries,
+    dateRangeFilter,
+    isDateFilterActive,
   } = options
 
   const store = useFeedStore()
   const collectionsStore = useCollectionsStore()
   const tagsStore = useTagsStore()
   const searchStore = useSearchStore()
+  const settingsStore = useSettingsStore()
   const { t, locale } = useI18n()
 
   // === Entry adapters ===
@@ -99,6 +105,7 @@ export function useTimelineData(options: {
       return collection ? collection.name : t('collections.title')
     }
     if (viewMode.value === 'tag') {
+      if (activeTagView.value === 'digest') return t('tags.digest')
       if (activeTagView.value === 'pending') return t('tags.pending')
       if (activeTagView.value === 'untagged') return t('tags.untagged')
       const tag = tagsStore.selectedTag
@@ -122,6 +129,7 @@ export function useTimelineData(options: {
   })
 
   const timelineSubtitle = computed(() => {
+    if (viewMode.value === 'tag' && activeTagView.value === 'digest') return ''
     return `${unifiedEntries.value.length} Articles`
   })
 
@@ -154,12 +162,16 @@ export function useTimelineData(options: {
   // === Load more ===
   async function handleLoadMoreEntries() {
     if (viewMode.value === 'tag' && tagsStore.hasMore) {
+      const tagFilterOptions = {
+        dateRange: isDateFilterActive.value ? dateRangeFilter.value : undefined,
+        timeField: settingsStore.settings.time_field,
+      }
       if (activeTagView.value === 'pending') {
-        await tagsStore.fetchPendingEntries()
+        await tagsStore.fetchPendingEntries(false, tagFilterOptions)
       } else if (activeTagView.value === 'untagged') {
-        await tagsStore.fetchUntaggedEntries()
+        await tagsStore.fetchUntaggedEntries(false, tagFilterOptions)
       } else if (activeTagId.value) {
-        await tagsStore.fetchEntriesByTag(activeTagId.value)
+        await tagsStore.fetchEntriesByTag(activeTagId.value, false, tagFilterOptions)
       }
       return
     }
