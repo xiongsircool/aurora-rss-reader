@@ -23,24 +23,22 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.6 最新版本 | Latest Version
+### 🎉 v0.1.7 最新版本 | Latest Version
 
-**重大UI升级与新功能 | Major UI Enhancement & New Features**
+**信息简报智能化、标签流程优化与更新体验升级 | Digest Intelligence, Tag Workflow Polish & Update Experience**
 
-- 🎬 **媒体订阅支持** - 视频和图片订阅源优化显示布局
-- 🎧 **播客支持** - 音频播放器支持播客订阅
-- 📚 **Zotero 集成** - 学术文献一键发送到 Zotero，自动识别 DOI/PMID
-- 📁 **收藏夹功能** - 将文章整理到自定义书签组
-- 🖱️ **右键菜单增强** - 订阅源和文章的丰富右键操作
-- 🔬 **MCP 状态显示** - Model Context Protocol 服务器状态可视化
-- 🎨 **视图类型分类** - 自动识别博客、视频、图片、播客并优化显示
-- 🔍 **工作区高级检索** - 支持标签组和高级筛选的工作区检索功能
+- 🧠 **信息简报 2.0** - 支持 LLM 摘要历史、手动重生成、关键词展示、与界面语言一致
+- 🕒 **最新 + 本周模式** - 将“今日”优化为“最新”，避免无当日内容时标签消失
+- 🏷️ **分析全部修复** - 改为拉取待分类全量分页，不再只分析前端可见一页
+- 🧾 **摘要质量提升** - 提示词改为结论优先、事实密集、包含明确时间上下文
+- 🔄 **手动检查更新入口** - 设置 > 关于中新增“检查更新”按钮
+- 🧩 **侧边栏与标签交互优化** - 左侧操作与标签/简报联动体验增强
 
 ---
 
 Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + Fastify (Node.js) stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.6**
+**Current Version: v0.1.7**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -51,7 +49,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.6**
+**Current Version: v0.1.7**
 
 ### Features | 功能特色
 
@@ -122,6 +120,33 @@ chmod +x start.sh
 - **多平台支持** - Windows、macOS、Linux 全平台兼容
 
 ### 界面预览
+
+#### 🌟 v0.1.7 新增界面
+<div align="center">
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/智能标签和简约日报功能.png" alt="智能标签与信息简报升级" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>智能标签与信息简报升级</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/左侧键功能增强支持自定义别名修改分组.png" alt="左侧操作增强与分组别名" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>左侧操作增强与分组别名</figcaption>
+  </figure>
+</div>
+
+<div align="center">
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/左侧风格切换按钮.png" alt="左侧风格切换按钮" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>左侧风格切换按钮</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/左侧切换后风格.png" alt="切换后的左侧样式" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>切换后的左侧样式</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/通过新的字符串可以创建新的分组.png" alt="通过字符串快速创建分组" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>通过字符串快速创建分组</figcaption>
+  </figure>
+</div>
 
 #### 🎬 媒体订阅支持
 <div align="center">
@@ -242,9 +267,9 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `AuroraRSSReader-Mac-0.1.6-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.6-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.6-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.7-{x64,arm64}.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.7-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.7-x64.AppImage`
 
 ## 技术栈
 
@@ -267,7 +292,22 @@ aurora-rss-reader/
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.6 (当前版本 | Current Version) 🎉
+### v0.1.7 (当前版本 | Current Version) 🎉
+**信息简报智能化 + 标签流程稳定性修复 | Digest Intelligence + Tag Workflow Stabilization**
+
+#### ✨ 新增与优化 | New & Improved
+- **信息简报历史弹窗** - 支持摘要历史、关键词、触发来源展示
+- **摘要手动重生成** - 支持按当前语言手动生成并立即刷新
+- **最新/本周双模式** - “最新”模式避免当日无文时简报空白
+- **摘要提示词升级** - 结论优先、事实密集、减少空泛表达
+- **分析全部全量化** - 待分类分页全部拉取后再分析
+- **设置-关于手动检查更新** - 增加“检查更新”入口
+
+#### 🐞 稳定性修复 | Stability Fixes
+- **SSE/JSON 解析兼容** - 分析流式响应解析更稳
+- **分析全部循环保护** - 分页失败时避免无限循环
+
+### v0.1.6 (历史版本 | Previous Version)
 **重大UI升级与新功能 | Major UI Enhancement & New Features**
 
 #### ✨ 新增功能 | New Features

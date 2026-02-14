@@ -25,18 +25,16 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.1.6 Latest Release | 最新版本
+## 🎉 v0.1.7 Latest Release | 最新版本
 
-**Major UI Enhancement & New Features | 重大UI升级与新功能**
+**Digest Intelligence, Tag Workflow Polish & Update Experience | 信息简报智能化、标签流程优化与更新体验升级**
 
-- 🎬 **Media Feed Support** - Enhanced display for video and image feeds with optimized layouts
-- 🎧 **Podcast Support** - Audio player with enclosure support for podcast feeds
-- 📚 **Zotero Integration** - Send academic articles to Zotero with DOI/PMID auto-detection
-- 📁 **Collections Feature** - Organize articles into custom bookmark collections
-- 🖱️ **Enhanced Context Menu** - Rich right-click menu for feeds and entries
-- 🔬 **MCP Status Display** - Visual indicator for Model Context Protocol server status
-- 🎨 **View Type Classification** - Auto-detect and optimize display for blogs, videos, images, podcasts
-- 🔍 **Workspace Advanced Search** - Tag groups and advanced filtering in workspace
+- 🧠 **Digest 2.0** - LLM summaries with history, manual regenerate, language aligned with current UI locale
+- 🕒 **Latest + Week Modes** - Digest now supports `Latest` view so tags stay visible even when no items arrive today
+- 🏷️ **Tag Analyze-All Fix** - Analyze-all now loads full pending pages instead of only the currently visible subset
+- 🧾 **Summary Quality Upgrade** - Prompting tuned for conclusion-first, fact-dense output with explicit time context
+- 🔄 **Manual Update Check Entry** - Added update-check button in `Settings > About`
+- 🧩 **Sidebar & Tag UX Polish** - Better left-panel actions and smarter tag/digest interaction flow
 
 ---
 
@@ -44,7 +42,7 @@
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.6**
+**Current Version: v0.1.7**
 
 ## Key Features
 
@@ -69,6 +67,33 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 - **RSSHub Support** - Extend RSS feed coverage
 
 ## Interface Preview
+
+### v0.1.7 Highlights
+<div align="center">
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/智能标签和简约日报功能.png" alt="Smart tags and digest upgrades" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Smart Tags + Digest Upgrades</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/左侧键功能增强支持自定义别名修改分组.png" alt="Sidebar action enhancements" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Sidebar Actions & Group Alias Enhancements</figcaption>
+  </figure>
+</div>
+
+<div align="center">
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/左侧风格切换按钮.png" alt="Sidebar style switch button" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Sidebar Style Switch</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/左侧切换后风格.png" alt="Sidebar switched style" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Switched Sidebar Style</figcaption>
+  </figure>
+  <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
+    <img src="images/v0.1.7/通过新的字符串可以创建新的分组.png" alt="Create group by string" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Create Group via String Shortcut</figcaption>
+  </figure>
+</div>
 
 ### Media Feed Support
 <div align="center">
@@ -206,9 +231,9 @@ chmod +x build-release-app.sh
 ```
 
 Generated files:
-- macOS: `AuroraRSSReader-Mac-0.1.6-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.6-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.6-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.7-{x64,arm64}.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.7-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.7-x64.AppImage`
 
 ## 📋 Documentation | 文档
 
