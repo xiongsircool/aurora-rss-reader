@@ -250,6 +250,7 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 
 ### Short-term Plans (v0.2)
 - [ ] **Mobile Support** - Develop iOS and Android mobile applications
+- [ ] **AI labeling** - for every feed, we can use AI to label the feed by pre set labels.
 - [ ] **AI Daily Briefing** - Smart daily news summaries and personalized recommendations
 - [x] **Podcast Support** - Support for audio podcast subscription and playback ✅
 - [ ] **Reading Analytics** - Personal reading habits analysis and data visualization

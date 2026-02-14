@@ -19,15 +19,6 @@ interface VectorSearchResult extends RssVectorItem {
 let openaiClient: OpenAI | null = null;
 
 /**
- * Initialize Vector DB (sqlite-vss)
- * This is now handled in db/init.ts as part of the main database
- */
-export async function initVectorDB(): Promise<void> {
-    // Vector tables are created in db/init.ts
-    console.log('[Vector] Using sqlite-vss for vector storage');
-}
-
-/**
  * Get OpenAI Client based on user settings
  */
 async function getOpenAIClient(): Promise<OpenAI | null> {
@@ -349,4 +340,3 @@ export async function rebuildVectorDB(batchSize: number = 50): Promise<{
     console.log(`[Vector] Rebuild complete: ${processed} processed, ${failed} failed`);
     return { total, processed, failed };
 }
-

@@ -5,6 +5,7 @@ defineProps<{
   title: string
   subtitle: string
   showFavoritesOnly: boolean
+  canMarkAllRead?: boolean
   unreadCount?: number
 }>()
 
@@ -26,7 +27,7 @@ const { t } = useI18n()
     <div class="flex gap-2.5 flex-wrap items-center justify-end">
       <!-- Mark All as Read Button -->
       <button 
-        v-if="!showFavoritesOnly"
+        v-if="canMarkAllRead ?? !showFavoritesOnly"
         class="inline-flex items-center gap-1.5 border-none rounded-full px-2.5 py-1.5 bg-[linear-gradient(120deg,#34c759,#30d158)] c-white text-xs font-semibold tracking-wide cursor-pointer shadow-[0_6px_16px_rgba(52,199,89,0.3)] dark:shadow-[0_8px_20px_rgba(52,199,89,0.25)] transition-all duration-200 hover:-translate-y-0.25 hover:shadow-[0_8px_20px_rgba(52,199,89,0.4)] active:translate-y-0 active:shadow-[0_4px_12px_rgba(52,199,89,0.28)]"
         @click="emit('mark-all-read')"
         :title="t('articles.markAllAsRead')"

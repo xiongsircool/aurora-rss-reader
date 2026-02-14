@@ -25,7 +25,7 @@ function runMigrations(): void {
   const db = getDatabase();
 
   // Check if language column exists in user_settings
-  const tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  let tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
   const hasLanguageColumn = tableInfo.some((col) => col.name === 'language');
 
   if (!hasLanguageColumn) {
@@ -79,7 +79,114 @@ function runMigrations(): void {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_doi ON entries(doi)`);
     console.log('Migration completed: DOI/PMID columns added');
   }
+
+  // Check if custom_title column exists in feeds (for feed alias support)
+  const hasCustomTitle = feedsTableInfo.some((col) => col.name === 'custom_title');
+  if (!hasCustomTitle) {
+    console.log('Running migration: Adding custom_title column to feeds');
+    db.exec(`ALTER TABLE feeds ADD COLUMN custom_title TEXT`);
+    console.log('Migration completed: custom_title column added');
+  }
+
+  // Check if ai_tagging_enabled column exists in feeds (for per-feed smart tagging control)
+  const hasAiTaggingEnabled = feedsTableInfo.some((col) => col.name === 'ai_tagging_enabled');
+  if (!hasAiTaggingEnabled) {
+    console.log('Running migration: Adding ai_tagging_enabled column to feeds');
+    db.exec(`ALTER TABLE feeds ADD COLUMN ai_tagging_enabled INTEGER NOT NULL DEFAULT 1`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_feeds_ai_tagging_enabled ON feeds(ai_tagging_enabled)`);
+    console.log('Migration completed: ai_tagging_enabled column added');
+  }
+
+  // Check if tagging columns exist in user_settings (for smart tagging feature)
+  const hasTaggingApiKey = tableInfo.some((col) => col.name === 'tagging_api_key');
+  if (!hasTaggingApiKey) {
+    console.log('Running migration: Adding tagging columns to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tagging_api_key TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tagging_base_url TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tagging_model_name TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN ai_auto_tagging INTEGER DEFAULT 0`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN ai_auto_tagging_start_at TEXT`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tags_version INTEGER DEFAULT 1`);
+    console.log('Migration completed: tagging columns added');
+  }
+
+  // Refresh after possible ALTER TABLE changes above.
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+
+  // Add ai_auto_tagging_start_at for databases that already have tagging columns
+  const hasAutoTaggingStartAt = tableInfo.some((col) => col.name === 'ai_auto_tagging_start_at');
+  if (!hasAutoTaggingStartAt) {
+    console.log('Running migration: Adding ai_auto_tagging_start_at column to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN ai_auto_tagging_start_at TEXT`);
+    console.log('Migration completed: ai_auto_tagging_start_at column added');
+  }
+
+  // Check if ai_prompt_preference column exists in user_settings
+  const hasAiPromptPreference = tableInfo.some((col) => col.name === 'ai_prompt_preference');
+  if (!hasAiPromptPreference) {
+    console.log('Running migration: Adding ai_prompt_preference column to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN ai_prompt_preference TEXT DEFAULT ''`);
+    console.log('Migration completed: ai_prompt_preference column added');
+  }
+
+  // Check if match_mode / match_rules columns exist in user_tags (dual-mode tagging)
+  const userTagsInfo = db.pragma('table_info(user_tags)') as Array<{ name: string }>;
+  const hasMatchMode = userTagsInfo.some((col) => col.name === 'match_mode');
+  if (!hasMatchMode) {
+    console.log('Running migration: Adding match_mode and match_rules columns to user_tags');
+    db.exec(`ALTER TABLE user_tags ADD COLUMN match_mode TEXT DEFAULT 'ai'`);
+    db.exec(`ALTER TABLE user_tags ADD COLUMN match_rules TEXT`);
+    console.log('Migration completed: match_mode and match_rules columns added');
+  }
+
+  // Check if global AI config columns exist in user_settings
+  // Refresh table info after previous migrations
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasDefaultAiProvider = tableInfo.some((col) => col.name === 'default_ai_provider');
+  if (!hasDefaultAiProvider) {
+    console.log('Running migration: Adding global AI config columns to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN default_ai_provider TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN default_ai_api_key TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN default_ai_base_url TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN default_ai_model TEXT DEFAULT ''`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN summary_use_custom INTEGER DEFAULT 0`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN translation_use_custom INTEGER DEFAULT 0`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN tagging_use_custom INTEGER DEFAULT 0`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN embedding_use_custom INTEGER DEFAULT 0`);
+
+    // Auto-migrate: if summary config exists, promote it to global default
+    const existing = db.prepare('SELECT summary_api_key, summary_base_url, summary_model_name FROM user_settings WHERE id = 1').get() as {
+      summary_api_key: string;
+      summary_base_url: string;
+      summary_model_name: string;
+    } | undefined;
+
+    if (existing?.summary_api_key) {
+      db.prepare(`UPDATE user_settings SET
+        default_ai_api_key = ?,
+        default_ai_base_url = ?,
+        default_ai_model = ?
+        WHERE id = 1`
+      ).run(existing.summary_api_key, existing.summary_base_url, existing.summary_model_name);
+
+      // Check if translation/tagging have different configs — mark them as custom
+      const full = db.prepare('SELECT * FROM user_settings WHERE id = 1').get() as any;
+      if (full.translation_api_key && full.translation_api_key !== existing.summary_api_key) {
+        db.prepare('UPDATE user_settings SET translation_use_custom = 1 WHERE id = 1').run();
+      }
+      if (full.tagging_api_key && full.tagging_api_key !== existing.summary_api_key) {
+        db.prepare('UPDATE user_settings SET tagging_use_custom = 1 WHERE id = 1').run();
+      }
+      if (full.embedding_api_key) {
+        // Embedding almost always uses a different model, mark as custom
+        db.prepare('UPDATE user_settings SET embedding_use_custom = 1 WHERE id = 1').run();
+      }
+    }
+
+    console.log('Migration completed: global AI config columns added with auto-migration');
+  }
 }
+
 
 export function initDatabase(): void {
   const db = getDatabase();
@@ -90,11 +197,13 @@ export function initDatabase(): void {
       id TEXT PRIMARY KEY,
       url TEXT UNIQUE NOT NULL,
       title TEXT,
+      custom_title TEXT,
       site_url TEXT,
       description TEXT,
       favicon_url TEXT,
       group_name TEXT DEFAULT 'default',
       view_type TEXT DEFAULT 'articles',
+      ai_tagging_enabled INTEGER NOT NULL DEFAULT 1,
       last_checked_at TEXT,
       last_error TEXT,
       update_interval_minutes INTEGER DEFAULT 60,
@@ -203,12 +312,20 @@ export function initDatabase(): void {
       max_auto_title_translations INTEGER NOT NULL DEFAULT 10,
       mark_as_read_range TEXT NOT NULL DEFAULT 'current',
       details_panel_mode TEXT NOT NULL DEFAULT 'docked',
+      default_ai_provider TEXT NOT NULL DEFAULT '',
+      default_ai_api_key TEXT NOT NULL DEFAULT '',
+      default_ai_base_url TEXT NOT NULL DEFAULT '',
+      default_ai_model TEXT NOT NULL DEFAULT '',
+      summary_use_custom INTEGER NOT NULL DEFAULT 0,
+      translation_use_custom INTEGER NOT NULL DEFAULT 0,
+      tagging_use_custom INTEGER NOT NULL DEFAULT 0,
+      embedding_use_custom INTEGER NOT NULL DEFAULT 0,
       summary_api_key TEXT NOT NULL DEFAULT '',
-      summary_base_url TEXT NOT NULL DEFAULT 'https://open.bigmodel.cn/api/paas/v4/',
-      summary_model_name TEXT NOT NULL DEFAULT 'glm-4-flash',
+      summary_base_url TEXT NOT NULL DEFAULT '',
+      summary_model_name TEXT NOT NULL DEFAULT '',
       translation_api_key TEXT NOT NULL DEFAULT '',
-      translation_base_url TEXT NOT NULL DEFAULT 'https://open.bigmodel.cn/api/paas/v4/',
-      translation_model_name TEXT NOT NULL DEFAULT 'glm-4-flash',
+      translation_base_url TEXT NOT NULL DEFAULT '',
+      translation_model_name TEXT NOT NULL DEFAULT '',
       ai_auto_summary INTEGER NOT NULL DEFAULT 0,
       ai_auto_title_translation INTEGER NOT NULL DEFAULT 0,
       ai_title_display_mode TEXT NOT NULL DEFAULT 'original-first',
@@ -217,6 +334,13 @@ export function initDatabase(): void {
       embedding_model TEXT NOT NULL DEFAULT 'netease-youdao/bce-embedding-base_v1',
       embedding_api_key TEXT NOT NULL DEFAULT '',
       embedding_base_url TEXT NOT NULL DEFAULT 'https://api.siliconflow.cn/v1',
+      tagging_api_key TEXT NOT NULL DEFAULT '',
+      tagging_base_url TEXT NOT NULL DEFAULT '',
+      tagging_model_name TEXT NOT NULL DEFAULT '',
+      ai_auto_tagging INTEGER NOT NULL DEFAULT 0,
+      ai_auto_tagging_start_at TEXT,
+      tags_version INTEGER NOT NULL DEFAULT 1,
+      ai_prompt_preference TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       CHECK (id = 1)
@@ -254,8 +378,78 @@ export function initDatabase(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_collection_entries_collection ON collection_entries(collection_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_collection_entries_entry ON collection_entries(entry_id)`);
 
+  // Create user_tags table (user-defined tags for smart tagging)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_tags (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      color TEXT DEFAULT '#3b82f6',
+      sort_order INTEGER DEFAULT 0,
+      enabled INTEGER DEFAULT 1,
+      match_mode TEXT DEFAULT 'ai',
+      match_rules TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_user_tags_name ON user_tags(name)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_user_tags_enabled ON user_tags(enabled)`);
+
+  // Create entry_tags table (entry-tag relationship)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS entry_tags (
+      entry_id TEXT NOT NULL,
+      tag_id TEXT NOT NULL,
+      is_manual INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (entry_id, tag_id),
+      FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE,
+      FOREIGN KEY (tag_id) REFERENCES user_tags(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entry_tags_entry_id ON entry_tags(entry_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entry_tags_tag_id ON entry_tags(tag_id)`);
+
+  // Create entry_analysis_status table (tracking AI analysis status)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS entry_analysis_status (
+      entry_id TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'pending',
+      analyzed_at TEXT,
+      tags_version INTEGER DEFAULT 0,
+      FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entry_analysis_status_status ON entry_analysis_status(status)`);
+
+  // Create digest summary history table (LLM-generated summaries per tag/period snapshot)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS digest_tag_summaries (
+      id TEXT PRIMARY KEY,
+      tag_id TEXT NOT NULL,
+      period TEXT NOT NULL,
+      time_range_key TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'zh',
+      source_count INTEGER NOT NULL DEFAULT 0,
+      source_hash TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      keywords_json TEXT,
+      model_name TEXT NOT NULL,
+      trigger_type TEXT NOT NULL DEFAULT 'auto',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (tag_id) REFERENCES user_tags(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_digest_tag_summaries_tag_period_time ON digest_tag_summaries(tag_id, period, time_range_key, language)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_digest_tag_summaries_created_at ON digest_tag_summaries(created_at DESC)`);
+
   // Run migrations for existing databases
   runMigrations();
+
 
   // Load sqlite-vss extension and create vector tables
   loadVssExtension();

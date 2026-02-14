@@ -12,6 +12,7 @@ import { iconsRoutes } from './routes/icons.js';
 import { schedulerRoutes } from './routes/scheduler.js';
 import { zoteroRoutes } from './routes/zotero.js';
 import { collectionsRoutes } from './routes/collections.js';
+import tagsRoutes from './routes/tags.js';
 import { scheduler } from './services/scheduler.js';
 import { handleMcpRequest, handleMcpGetRequest, handleMcpDeleteRequest } from './mcp/server.js';
 
@@ -47,8 +48,7 @@ await app.register(multipart, {
   }
 });
 
-// Health check endpoint with database connectivity
-app.get('/health', async () => {
+async function healthCheck() {
   let dbStatus = 'ok';
   let dbError = null;
 
@@ -71,7 +71,11 @@ app.get('/health', async () => {
       error: dbError,
     },
   };
-});
+}
+
+// Health check endpoint with database connectivity
+app.get('/health', async () => healthCheck());
+app.get('/api/health', async () => healthCheck());
 
 // Initialize database on startup
 try {
@@ -96,6 +100,7 @@ await app.register(iconsRoutes, { prefix: '/api' });
 await app.register(schedulerRoutes, { prefix: '/api' });
 await app.register(zoteroRoutes, { prefix: '/api' });
 await app.register(collectionsRoutes, { prefix: '/api' });
+await app.register(tagsRoutes, { prefix: '/api' });
 
 // ============================================
 // MCP (Model Context Protocol) Endpoint

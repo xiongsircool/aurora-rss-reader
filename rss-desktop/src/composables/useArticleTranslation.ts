@@ -30,13 +30,6 @@ interface SSEProgressEvent {
   cached: number
 }
 
-interface SSEDoneEvent {
-  total: number
-  success: number
-  failed: number
-  cached: number
-}
-
 /**
  * 创建文章翻译 composable
  */
@@ -151,7 +144,7 @@ export function useArticleTranslation(
     abortController.value = new AbortController()
 
     try {
-      const baseUrl = api.defaults.baseURL || 'http://127.0.0.1:15432/api'
+      const baseUrl = api.defaults.baseURL || '/api'
       const response = await fetch(`${baseUrl}/ai/translate-blocks`, {
         method: 'POST',
         headers: {
@@ -262,9 +255,7 @@ export function useArticleTranslation(
       }
 
       case 'done': {
-        const doneData = data as SSEDoneEvent
         progress.value = 100
-        console.log('Translation done:', doneData)
         break
       }
     }

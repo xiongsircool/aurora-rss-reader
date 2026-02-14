@@ -5,6 +5,7 @@ import type { Entry } from '../../types'
 import type { ContentBlock } from '../../composables/useArticleParser'
 import DetailsHeader from './DetailsHeader.vue'
 import DetailsActions from './DetailsActions.vue'
+import EntryTagChips from './EntryTagChips.vue'
 import AISummaryCard from './AISummaryCard.vue'
 import ArticleContent from './ArticleContent.vue'
 import AudioPlayer from './AudioPlayer.vue'
@@ -86,6 +87,8 @@ const containerClasses = computed(() => [
         @update:translation-language="emit('update:translationLanguage', $event)"
         @toggle-full-text-translation="emit('toggle-full-text-translation')"
       />
+
+      <EntryTagChips :entry-id="entry.id" />
 
       <AISummaryCard
         :summary-text="summaryText"

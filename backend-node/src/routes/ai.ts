@@ -8,35 +8,67 @@ import { generateEmbedding } from '../services/vector.js';
 import { EntryRepository, TranslationRepository, SummaryRepository } from '../db/repositories/index.js';
 import { userSettingsService } from '../services/userSettings.js';
 import { getConfig } from '../config/index.js';
+import { initTaggingClient } from '../services/tagging.js';
 
 function resolveServiceConfig(service: ServiceKey) {
   const settings = userSettingsService.getSettings();
   const config = getConfig();
 
-  const fallbackApiKey = config.glmApiKey || '';
-  const fallbackBaseUrl = config.glmBaseUrl || '';
-  const fallbackModel = config.glmModel || '';
+  const envFallbackApiKey = config.glmApiKey || '';
+  const envFallbackBaseUrl = config.glmBaseUrl || '';
+  const envFallbackModel = config.glmModel || '';
 
-  if (service === 'summary') {
-    return {
-      apiKey: settings.summary_api_key || fallbackApiKey,
-      baseUrl: settings.summary_base_url || fallbackBaseUrl,
-      modelName: settings.summary_model_name || fallbackModel,
-    };
-  }
+  // Global default from user settings
+  const globalApiKey = settings.default_ai_api_key || envFallbackApiKey;
+  const globalBaseUrl = settings.default_ai_base_url || envFallbackBaseUrl;
+  const globalModel = settings.default_ai_model || envFallbackModel;
 
-  if (service === 'embedding') {
+  // Service-specific field mapping
+  const serviceFields: Record<ServiceKey, { useCustom: string; apiKey: string; baseUrl: string; model: string }> = {
+    summary: {
+      useCustom: 'summary_use_custom',
+      apiKey: 'summary_api_key',
+      baseUrl: 'summary_base_url',
+      model: 'summary_model_name',
+    },
+    translation: {
+      useCustom: 'translation_use_custom',
+      apiKey: 'translation_api_key',
+      baseUrl: 'translation_base_url',
+      model: 'translation_model_name',
+    },
+    tagging: {
+      useCustom: 'tagging_use_custom',
+      apiKey: 'tagging_api_key',
+      baseUrl: 'tagging_base_url',
+      model: 'tagging_model_name',
+    },
+    embedding: {
+      useCustom: 'embedding_use_custom',
+      apiKey: 'embedding_api_key',
+      baseUrl: 'embedding_base_url',
+      model: 'embedding_model',
+    },
+  };
+
+  const fields = serviceFields[service];
+
+  // Embedding always uses its own config (it's not a chat/LLM model)
+  const alwaysCustomServices: ServiceKey[] = ['embedding'];
+  const useCustom = alwaysCustomServices.includes(service) || (settings as any)[fields.useCustom] === 1;
+
+  if (useCustom) {
     return {
-      apiKey: settings.embedding_api_key || '',
-      baseUrl: settings.embedding_base_url || '',
-      modelName: settings.embedding_model || '',
+      apiKey: (settings as any)[fields.apiKey] || '',
+      baseUrl: (settings as any)[fields.baseUrl] || '',
+      modelName: (settings as any)[fields.model] || '',
     };
   }
 
   return {
-    apiKey: settings.translation_api_key || fallbackApiKey,
-    baseUrl: settings.translation_base_url || fallbackBaseUrl,
-    modelName: settings.translation_model_name || fallbackModel,
+    apiKey: globalApiKey,
+    baseUrl: globalBaseUrl,
+    modelName: globalModel,
   };
 }
 
@@ -105,7 +137,9 @@ export async function aiRoutes(app: FastifyInstance) {
 
     try {
       const client = createClient('summary');
-      const summary = await client.summarize(combinedContent, { language: targetLanguage });
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
+      const summary = await client.summarize(combinedContent, { language: targetLanguage, userPreference });
       summaryRepo.upsert({ entry_id, language: targetLanguage, summary });
       return { entry_id, language: targetLanguage, summary };
     } catch (error) {
@@ -139,7 +173,9 @@ export async function aiRoutes(app: FastifyInstance) {
 
     try {
       const client = createClient('translation');
-      const title = await client.translate(entry.title, { targetLanguage });
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
+      const title = await client.translate(entry.title, { targetLanguage, userPreference });
       translationRepo.upsert({ entry_id, language: targetLanguage, title });
       return { entry_id, title, language: targetLanguage, from_cache: false };
     } catch (error) {
@@ -222,6 +258,8 @@ export async function aiRoutes(app: FastifyInstance) {
 
     try {
       const client = createClient('translation');
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
 
       for (const block of misses) {
         if (request.raw.aborted) {
@@ -229,7 +267,7 @@ export async function aiRoutes(app: FastifyInstance) {
         }
 
         try {
-          const translated = await client.translate(block.text, { targetLanguage: targetLang });
+          const translated = await client.translate(block.text, { targetLanguage: targetLang, userPreference });
           cachedMap[block.id] = translated;
           sendEvent('translation', { id: block.id, text: translated });
           successCount += 1;
@@ -278,7 +316,9 @@ export async function aiRoutes(app: FastifyInstance) {
       }
 
       const client = createClient('translation');
-      const translation = await client.translate(text, { targetLanguage: target_language || 'zh' });
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
+      const translation = await client.translate(text, { targetLanguage: target_language || 'zh', userPreference });
 
       if (entry_id) {
         translationRepo.upsert({
@@ -312,7 +352,9 @@ export async function aiRoutes(app: FastifyInstance) {
       }
 
       const client = createClient('summary');
-      const summary = await client.summarize(content, { language: language || 'zh' });
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.ai_prompt_preference || '';
+      const summary = await client.summarize(content, { language: language || 'zh', userPreference });
 
       if (entry_id) {
         summaryRepo.upsert({
@@ -331,34 +373,44 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // GET /ai/config - Get AI configuration
   app.get('/ai/config', async () => {
-    const summaryConfig = resolveServiceConfig('summary');
-    const translationConfig = resolveServiceConfig('translation');
-    // @ts-ignore - 'embedding' is a new service key not yet in ServiceKey type maybe
-    const embeddingConfig = resolveServiceConfig('embedding' as any);
     const settings = userSettingsService.getSettings();
 
     return {
+      global: {
+        provider: settings.default_ai_provider || '',
+        api_key: settings.default_ai_api_key || '',
+        base_url: settings.default_ai_base_url || '',
+        model_name: settings.default_ai_model || '',
+        has_api_key: !!settings.default_ai_api_key,
+      },
       summary: {
-        api_key: summaryConfig.apiKey,
-        base_url: summaryConfig.baseUrl,
-        model_name: summaryConfig.modelName,
-        has_api_key: !!summaryConfig.apiKey,
+        use_custom: settings.summary_use_custom === 1,
+        api_key: settings.summary_api_key || '',
+        base_url: settings.summary_base_url || '',
+        model_name: settings.summary_model_name || '',
       },
       translation: {
-        api_key: translationConfig.apiKey,
-        base_url: translationConfig.baseUrl,
-        model_name: translationConfig.modelName,
-        has_api_key: !!translationConfig.apiKey,
+        use_custom: settings.translation_use_custom === 1,
+        api_key: settings.translation_api_key || '',
+        base_url: settings.translation_base_url || '',
+        model_name: settings.translation_model_name || '',
+      },
+      tagging: {
+        use_custom: settings.tagging_use_custom === 1,
+        api_key: settings.tagging_api_key || '',
+        base_url: settings.tagging_base_url || '',
+        model_name: settings.tagging_model_name || '',
       },
       embedding: {
-        api_key: embeddingConfig.apiKey,
-        base_url: embeddingConfig.baseUrl,
-        model_name: embeddingConfig.modelName,
-        has_api_key: !!embeddingConfig.apiKey,
+        use_custom: settings.embedding_use_custom === 1,
+        api_key: settings.embedding_api_key || '',
+        base_url: settings.embedding_base_url || '',
+        model_name: settings.embedding_model || '',
       },
       features: {
         auto_summary: !!settings.ai_auto_summary,
         auto_title_translation: !!settings.ai_auto_title_translation,
+        auto_tagging: !!settings.ai_auto_tagging,
         title_display_mode: settings.ai_title_display_mode || 'original-first',
         translation_language: settings.ai_translation_language || 'zh',
       },
@@ -368,13 +420,31 @@ export async function aiRoutes(app: FastifyInstance) {
   // PATCH /ai/config - Update AI configuration
   app.patch('/ai/config', async (request) => {
     const body = request.body as any;
+    const globalConfig = body.global || {};
     const summaryConfig = body.summary || {};
     const translationConfig = body.translation || {};
+    const taggingConfig = body.tagging || {};
     const embeddingConfig = body.embedding || {};
     const features = body.features || {};
 
     const updates: Record<string, any> = {};
+    const settings = userSettingsService.getSettings();
+    const wasAutoTaggingEnabled = settings.ai_auto_tagging === 1;
+    const now = new Date().toISOString();
 
+    // Global default config
+    if (globalConfig.provider !== undefined) updates.default_ai_provider = globalConfig.provider;
+    if (globalConfig.api_key !== undefined) updates.default_ai_api_key = globalConfig.api_key;
+    if (globalConfig.base_url !== undefined) updates.default_ai_base_url = globalConfig.base_url;
+    if (globalConfig.model_name !== undefined) updates.default_ai_model = globalConfig.model_name;
+
+    // Per-service custom override flags
+    if (summaryConfig.use_custom !== undefined) updates.summary_use_custom = summaryConfig.use_custom ? 1 : 0;
+    if (translationConfig.use_custom !== undefined) updates.translation_use_custom = translationConfig.use_custom ? 1 : 0;
+    if (taggingConfig.use_custom !== undefined) updates.tagging_use_custom = taggingConfig.use_custom ? 1 : 0;
+    if (embeddingConfig.use_custom !== undefined) updates.embedding_use_custom = embeddingConfig.use_custom ? 1 : 0;
+
+    // Per-service custom configurations
     if (summaryConfig.api_key !== undefined) updates.summary_api_key = summaryConfig.api_key;
     if (summaryConfig.base_url !== undefined) updates.summary_base_url = summaryConfig.base_url;
     if (summaryConfig.model_name !== undefined) updates.summary_model_name = summaryConfig.model_name;
@@ -383,16 +453,28 @@ export async function aiRoutes(app: FastifyInstance) {
     if (translationConfig.base_url !== undefined) updates.translation_base_url = translationConfig.base_url;
     if (translationConfig.model_name !== undefined) updates.translation_model_name = translationConfig.model_name;
 
+    if (taggingConfig.api_key !== undefined) updates.tagging_api_key = taggingConfig.api_key;
+    if (taggingConfig.base_url !== undefined) updates.tagging_base_url = taggingConfig.base_url;
+    if (taggingConfig.model_name !== undefined) updates.tagging_model_name = taggingConfig.model_name;
+
     if (embeddingConfig.api_key !== undefined) updates.embedding_api_key = embeddingConfig.api_key;
     if (embeddingConfig.base_url !== undefined) updates.embedding_base_url = embeddingConfig.base_url;
     if (embeddingConfig.model_name !== undefined) updates.embedding_model = embeddingConfig.model_name;
 
+    // Feature flags
     if (features.auto_summary !== undefined) updates.ai_auto_summary = features.auto_summary ? 1 : 0;
     if (features.auto_title_translation !== undefined) updates.ai_auto_title_translation = features.auto_title_translation ? 1 : 0;
+    if (features.auto_tagging !== undefined) {
+      updates.ai_auto_tagging = features.auto_tagging ? 1 : 0;
+      if (features.auto_tagging && !wasAutoTaggingEnabled) {
+        updates.ai_auto_tagging_start_at = now;
+      }
+    }
     if (features.title_display_mode !== undefined) updates.ai_title_display_mode = features.title_display_mode;
     if (features.translation_language !== undefined) updates.ai_translation_language = features.translation_language;
 
     userSettingsService.updateSettings(updates);
+    initTaggingClient();
 
     return { success: true, message: 'AI configuration updated' };
   });
@@ -414,7 +496,7 @@ export async function aiRoutes(app: FastifyInstance) {
     }
 
     // Special case for embedding testing
-    if (service === 'embedding' as any) {
+    if (service === 'embedding') {
       try {
         // We need to bypass the client creation and test embedding generation directly
         // or construct a temporary client configuration.
