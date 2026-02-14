@@ -50,6 +50,26 @@ type DigestSummaryRecord = {
     created_at: string;
 };
 
+const DIGEST_AUTO_REGEN_NEW_ENTRIES_THRESHOLD = 3;
+const DIGEST_AUTO_REGEN_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+function normalizeDigestLanguage(language?: string | null): 'zh' | 'en' | 'ja' | 'ko' {
+    const value = (language || '').toLowerCase();
+    if (value.startsWith('en')) return 'en';
+    if (value.startsWith('ja')) return 'ja';
+    if (value.startsWith('ko')) return 'ko';
+    return 'zh';
+}
+
+function getLanguageDisplayName(language: 'zh' | 'en' | 'ja' | 'ko') {
+    switch (language) {
+        case 'en': return 'English';
+        case 'ja': return '日本語';
+        case 'ko': return '한국어';
+        default: return '简体中文';
+    }
+}
+
 function resolveSummaryClient() {
     const settings = userSettingsService.getSettings();
     const config = getConfig();
@@ -67,13 +87,25 @@ function resolveSummaryClient() {
 function buildDigestTimeWindow(period?: string) {
     const now = new Date();
     if (period === 'week') {
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const weekKey = `${now.getUTCFullYear()}-W${String(Math.floor((now.getUTCDate() - 1) / 7) + 1).padStart(2, '0')}`;
-        return { startDate: weekAgo.toISOString(), periodKey: weekKey, normalizedPeriod: 'week' as const };
+        const weekStart = new Date(now);
+        const day = weekStart.getDay();
+        const diff = day === 0 ? -6 : 1 - day; // Monday as first day
+        weekStart.setDate(weekStart.getDate() + diff);
+        weekStart.setHours(0, 0, 0, 0);
+
+        // ISO week key
+        const isoDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+        const isoDay = isoDate.getUTCDay() || 7;
+        isoDate.setUTCDate(isoDate.getUTCDate() + 4 - isoDay);
+        const isoYear = isoDate.getUTCFullYear();
+        const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+        const weekNo = Math.ceil((((isoDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+        const weekKey = `${isoYear}-W${String(weekNo).padStart(2, '0')}`;
+
+        return { startDate: weekStart.toISOString(), periodKey: weekKey, normalizedPeriod: 'week' as const };
     }
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const dayKey = now.toISOString().slice(0, 10);
-    return { startDate: todayStart.toISOString(), periodKey: dayKey, normalizedPeriod: 'today' as const };
+    // latest mode: no hard time filter, always use newest entries for each tag
+    return { startDate: null, periodKey: 'latest', normalizedPeriod: 'latest' as const };
 }
 
 function buildSourceHash(entries: DigestEntryRow[]) {
@@ -91,46 +123,92 @@ function parseKeywordsJson(raw: string | null | undefined): string[] {
     }
 }
 
+function parseDigestSummaryPayload(raw: string): { summary?: string; keywords?: string[] } | null {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+
+    const tryParse = (candidate: string) => {
+        try {
+            return JSON.parse(candidate) as { summary?: string; keywords?: string[] };
+        } catch {
+            return null;
+        }
+    };
+
+    const direct = tryParse(trimmed);
+    if (direct) return direct;
+
+    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fencedMatch?.[1]) {
+        const fencedParsed = tryParse(fencedMatch[1].trim());
+        if (fencedParsed) return fencedParsed;
+    }
+
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+        const objectChunk = trimmed.slice(start, end + 1);
+        const chunkParsed = tryParse(objectChunk);
+        if (chunkParsed) return chunkParsed;
+    }
+
+    return null;
+}
+
 async function generateDigestSummary(input: {
     tagName: string;
-    period: 'today' | 'week';
+    period: 'latest' | 'week';
+    timeRangeKey: string;
     entries: DigestEntryRow[];
     language: string;
 }): Promise<{ summary: string; keywords: string[] }> {
     const { client } = resolveSummaryClient();
-    const titles = input.entries
-        .map((e, idx) => `${idx + 1}. ${e.title || 'Untitled'}`)
+    const titleLines = input.entries
+        .map((e, idx) => {
+            const feed = e.feed_title || 'Unknown Source';
+            const publishedAt = e.published_at || e.inserted_at || '';
+            const snippet = (e.summary || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+            return `${idx + 1}. 标题: ${e.title || 'Untitled'}\n来源: ${feed}\n时间: ${publishedAt}\n线索: ${snippet || '无'}\n`;
+        })
         .join('\n');
-    const periodText = input.period === 'week' ? '本周' : '今日';
-    const systemPrompt = `你是信息分析助手。基于给定标题生成“标签简报摘要”。只允许依据输入，不得编造。请输出 JSON：
-{"summary":"80-180字","keywords":["关键词1","关键词2"]}`;
+    const periodText = input.period === 'week' ? '本周' : '最新';
+    const languageDisplay = getLanguageDisplayName(normalizeDigestLanguage(input.language));
+    const systemPrompt = `你是信息分析助手。基于给定标题生成“标签简报摘要”，只能依据输入，不得编造。
+输出必须是 JSON 对象，格式：
+{"summary":"320-700字","keywords":["关键词1","关键词2"]}`;
     const userPrompt = `标签：${input.tagName}
 时间范围：${periodText}
-标题列表（最多20条）：
-${titles}
+时间标识：${input.timeRangeKey}
+信息源（最多20条）：
+${titleLines}
 
 要求：
-1) summary 使用${input.language}。
-2) keywords 3-8个，短词。
-3) 输出必须是严格 JSON，不要 Markdown。`;
+1) summary 必须使用 ${languageDisplay} 输出，不能混用其他语言。
+2) summary 只写“新知识/新结果/新结论”，优先保留可验证事实：研究对象、方法、数据范围、结果方向、边界条件。
+3) 表达必须去评价化，禁止使用以下低信息短语：具有重要意义、值得关注、进展活跃、有望、突破性、显著提升（若无量化证据）。
+4) summary 按单段组织：时间范围一句 + 3-6个高信息点 + 结论句；每个信息点尽量包含“谁/做了什么/得到什么”。
+5) 结论句为必填，必须使用“结论：...”开头，明确给出本时间窗内最可靠的新结果与限制条件。
+6) 若输入中没有明确结果或结论，不要补写推断，只说明“标题未提供明确结果”。
+7) keywords 4-8个，短词，尽量覆盖核心主题与方法名。
+8) 输出必须是严格 JSON，不要 Markdown，不要代码块。`;
 
     const raw = await client.chat(
         [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
         ],
-        { maxTokens: 500, temperature: 0.2 },
+        { maxTokens: 2000, temperature: 0.2 },
     );
 
-    try {
-        const parsed = JSON.parse(raw) as { summary?: string; keywords?: string[] };
+    const parsed = parseDigestSummaryPayload(raw);
+    if (parsed) {
         return {
             summary: (parsed.summary || '').trim(),
             keywords: Array.isArray(parsed.keywords) ? parsed.keywords.filter(Boolean).slice(0, 8) : [],
         };
-    } catch {
-        return { summary: raw.trim(), keywords: [] };
     }
+
+    return { summary: raw.trim(), keywords: [] };
 }
 
 const tagsRoutes: FastifyPluginAsync = async (app) => {
@@ -390,7 +468,8 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
     });
 
     /**
-     * POST /ai/tags/analyze - Analyze entries
+     * POST /ai/tags/analyze - Analyze entries (SSE streaming)
+     * Returns Server-Sent Events for real-time progress updates
      */
     app.post<{
         Body: { entryIds: string[] };
@@ -426,18 +505,39 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
 
         const tagsVersion = config.tagsVersion;
 
-        const results: Array<{
-            entryId: string;
-            success: boolean;
-            tagIds: string[];
-            tagNames: string[];
-            error?: string;
-        }> = [];
+        // Set up SSE response (take over raw response so Fastify does not send again)
+        reply.sent = true;
+        reply.raw.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+        });
 
-        for (const entryId of entryIds) {
+        const sendEvent = (event: string, data: unknown) => {
+            reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        };
+
+        // Send initial progress
+        sendEvent('start', { total: entryIds.length });
+
+        let successCount = 0;
+        let taggedCount = 0;
+
+        for (let i = 0; i < entryIds.length; i++) {
+            const entryId = entryIds[i];
             const entry = entryRepo.findById(entryId);
+
             if (!entry) {
-                results.push({ entryId, success: false, tagIds: [], tagNames: [], error: '文章不存在' });
+                sendEvent('progress', {
+                    current: i + 1,
+                    total: entryIds.length,
+                    entryId,
+                    success: false,
+                    tagIds: [],
+                    tagNames: [],
+                    error: '文章不存在',
+                });
                 continue;
             }
 
@@ -483,8 +583,15 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
                 .map((tagId) => allTags.find((t) => t.id === tagId)?.name)
                 .filter((name): name is string => !!name);
 
-            results.push({
+            successCount++;
+            if (allMatchedIds.length > 0) taggedCount++;
+
+            // Send progress event for each entry
+            sendEvent('progress', {
+                current: i + 1,
+                total: entryIds.length,
                 entryId,
+                entryTitle: entry.title,
                 success: true,
                 tagIds: allMatchedIds,
                 tagNames,
@@ -492,19 +599,17 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             });
         }
 
-        // Calculate summary
-        const successCount = results.filter((r) => r.success).length;
-        const taggedCount = results.filter((r) => r.success && r.tagIds.length > 0).length;
-
-        return {
-            results,
+        // Send completion event
+        sendEvent('complete', {
             summary: {
                 total: entryIds.length,
                 success: successCount,
                 tagged: taggedCount,
                 untagged: successCount - taggedCount,
             },
-        };
+        });
+
+        reply.raw.end();
     });
 
     /**
@@ -945,16 +1050,59 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
      * GET /digest - Daily/weekly digest grouped by tag, with latest LLM summary
      */
     app.get<{
-        Querystring: { period?: string; with_summary?: string | boolean };
+        Querystring: { period?: string; with_summary?: string | boolean; ui_language?: string };
     }>('/digest', async (request) => {
-        const { period, with_summary } = request.query;
+        const { period, with_summary, ui_language } = request.query;
         const db = getDatabase();
         const settings = userSettingsService.getSettings();
-        const language = settings.ai_translation_language || 'zh';
+        const language = normalizeDigestLanguage(ui_language || settings.language || settings.ai_translation_language || 'zh');
         const { startDate, normalizedPeriod, periodKey } = buildDigestTimeWindow(period);
         const shouldGenerateSummary = with_summary !== '0' && with_summary !== false;
 
         const allTags = tagRepo.getAllWithEntryCounts();
+        const generateAndStoreSummary = async (args: {
+            tagId: string;
+            tagName: string;
+            normalizedPeriod: 'latest' | 'week';
+            periodKey: string;
+            language: string;
+            sourceHash: string;
+            entries: DigestEntryRow[];
+            triggerType: 'auto' | 'manual';
+        }) => {
+            const generated = await generateDigestSummary({
+                tagName: args.tagName,
+                period: args.normalizedPeriod,
+                timeRangeKey: args.periodKey,
+                entries: args.entries,
+                language: args.language,
+            });
+            if (!generated.summary) return null;
+
+            const { modelName } = resolveSummaryClient();
+            const now = new Date().toISOString();
+            db.prepare(`
+                INSERT INTO digest_tag_summaries (
+                    id, tag_id, period, time_range_key, language, source_count, source_hash,
+                    summary, keywords_json, model_name, trigger_type, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+                `${args.tagId}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+                args.tagId,
+                args.normalizedPeriod,
+                args.periodKey,
+                args.language,
+                args.entries.length,
+                args.sourceHash,
+                generated.summary,
+                JSON.stringify(generated.keywords || []),
+                modelName || 'unknown',
+                args.triggerType,
+                now,
+            );
+            return { summary: generated.summary, keywords: generated.keywords || [], createdAt: now };
+        };
+
         const result: Array<{
             tag: typeof allTags[number];
             recentCount: number;
@@ -962,19 +1110,31 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             llm_summary: string | null;
             keywords: string[];
             summary_updated_at: string | null;
+            time_range_key: string;
+            unsummarized_count: number;
         }> = [];
 
         for (const tag of allTags) {
-            const entries = db.prepare(`
-                SELECT e.id, e.title, e.url, e.published_at, e.inserted_at, e.summary, f.title as feed_title
-                FROM entries e
-                INNER JOIN entry_tags et ON e.id = et.entry_id
-                LEFT JOIN feeds f ON e.feed_id = f.id
-                WHERE et.tag_id = ?
-                  AND e.inserted_at >= ?
-                ORDER BY e.inserted_at DESC
-                LIMIT 20
-            `).all(tag.id, startDate) as DigestEntryRow[];
+            const entries = startDate
+                ? db.prepare(`
+                    SELECT e.id, e.title, e.url, e.published_at, e.inserted_at, e.summary, f.title as feed_title
+                    FROM entries e
+                    INNER JOIN entry_tags et ON e.id = et.entry_id
+                    LEFT JOIN feeds f ON e.feed_id = f.id
+                    WHERE et.tag_id = ?
+                      AND e.inserted_at >= ?
+                    ORDER BY e.inserted_at DESC
+                    LIMIT 20
+                `).all(tag.id, startDate) as DigestEntryRow[]
+                : db.prepare(`
+                    SELECT e.id, e.title, e.url, e.published_at, e.inserted_at, e.summary, f.title as feed_title
+                    FROM entries e
+                    INNER JOIN entry_tags et ON e.id = et.entry_id
+                    LEFT JOIN feeds f ON e.feed_id = f.id
+                    WHERE et.tag_id = ?
+                    ORDER BY e.inserted_at DESC
+                    LIMIT 20
+                `).all(tag.id) as DigestEntryRow[];
 
             if (!entries.length) continue;
 
@@ -991,40 +1151,53 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             let keywords: string[] = parseKeywordsJson(latest?.keywords_json);
             let summaryUpdatedAt = latest?.created_at ?? null;
 
-            const needGenerate = shouldGenerateSummary && (!latest || latest.source_hash !== sourceHash);
+            const latestSummaryText = latest?.summary?.trim() || '';
+            const looksLikeRawJsonSummary =
+                latestSummaryText.startsWith('{') && latestSummaryText.includes('"summary"');
+            const summaryAgeMs = latest?.created_at
+                ? (Date.now() - new Date(latest.created_at).getTime())
+                : Number.POSITIVE_INFINITY;
+            const changedSinceLastSummary = !latest || latest.source_hash !== sourceHash;
+            const unsummarizedCount = latest
+                ? ((startDate
+                    ? db.prepare(`
+                        SELECT COUNT(*) as count
+                        FROM entries e
+                        INNER JOIN entry_tags et ON e.id = et.entry_id
+                        WHERE et.tag_id = ?
+                          AND e.inserted_at >= ?
+                          AND e.inserted_at > ?
+                    `).get(tag.id, startDate, latest.created_at)
+                    : db.prepare(`
+                        SELECT COUNT(*) as count
+                        FROM entries e
+                        INNER JOIN entry_tags et ON e.id = et.entry_id
+                        WHERE et.tag_id = ?
+                          AND e.inserted_at > ?
+                    `).get(tag.id, latest.created_at)
+                ) as { count: number }).count
+                : entries.length;
+            const passAutoRegenPolicy = !latest
+                || unsummarizedCount >= DIGEST_AUTO_REGEN_NEW_ENTRIES_THRESHOLD
+                || summaryAgeMs >= DIGEST_AUTO_REGEN_COOLDOWN_MS
+                || looksLikeRawJsonSummary;
+            const needGenerate = shouldGenerateSummary && changedSinceLastSummary && passAutoRegenPolicy;
             if (needGenerate) {
                 try {
-                    const generated = await generateDigestSummary({
+                    const generated = await generateAndStoreSummary({
+                        tagId: tag.id,
                         tagName: tag.name,
-                        period: normalizedPeriod,
-                        entries,
+                        normalizedPeriod,
+                        periodKey,
                         language,
+                        sourceHash,
+                        entries,
+                        triggerType: 'auto',
                     });
-                    if (generated.summary) {
-                        const { modelName } = resolveSummaryClient();
-                        const now = new Date().toISOString();
-                        db.prepare(`
-                            INSERT INTO digest_tag_summaries (
-                                id, tag_id, period, time_range_key, language, source_count, source_hash,
-                                summary, keywords_json, model_name, trigger_type, created_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        `).run(
-                            `${tag.id}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-                            tag.id,
-                            normalizedPeriod,
-                            periodKey,
-                            language,
-                            entries.length,
-                            sourceHash,
-                            generated.summary,
-                            JSON.stringify(generated.keywords || []),
-                            modelName || 'unknown',
-                            'auto',
-                            now,
-                        );
+                    if (generated) {
                         summary = generated.summary;
-                        keywords = generated.keywords || [];
-                        summaryUpdatedAt = now;
+                        keywords = generated.keywords;
+                        summaryUpdatedAt = generated.createdAt;
                     }
                 } catch (error) {
                     console.warn(`[Digest] Summary generation failed for tag ${tag.name}:`, error);
@@ -1038,6 +1211,8 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
                 llm_summary: summary,
                 keywords,
                 summary_updated_at: summaryUpdatedAt,
+                time_range_key: periodKey,
+                unsummarized_count: unsummarizedCount,
             });
         }
 
@@ -1050,26 +1225,118 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
     });
 
     /**
-     * GET /digest/:tagId/history - Summary history for a tag
+     * POST /digest/:tagId/regenerate - Force regenerate latest digest summary for a tag/period
      */
-    app.get<{
+    app.post<{
         Params: { tagId: string };
-        Querystring: { period?: string; limit?: string; cursor?: string };
-    }>('/digest/:tagId/history', async (request, reply) => {
+        Body: { period?: 'latest' | 'week'; ui_language?: string };
+    }>('/digest/:tagId/regenerate', async (request, reply) => {
         const { tagId } = request.params;
-        const { period, limit, cursor } = request.query;
+        const period = request.body?.period;
         const db = getDatabase();
-        const safeLimit = Math.max(1, Math.min(parseInt(limit || '10', 10) || 10, 50));
-        const normalizedPeriod = period === 'week' ? 'week' : 'today';
+        const settings = userSettingsService.getSettings();
+        const language = normalizeDigestLanguage(request.body?.ui_language || settings.language || settings.ai_translation_language || 'zh');
+        const { startDate, normalizedPeriod, periodKey } = buildDigestTimeWindow(period);
 
         const tag = tagRepo.findById(tagId);
         if (!tag) return reply.status(404).send({ error: '标签不存在' });
 
-        const params: Array<string | number> = [tagId, normalizedPeriod];
+        const entries = startDate
+            ? db.prepare(`
+                SELECT e.id, e.title, e.url, e.published_at, e.inserted_at, e.summary, f.title as feed_title
+                FROM entries e
+                INNER JOIN entry_tags et ON e.id = et.entry_id
+                LEFT JOIN feeds f ON e.feed_id = f.id
+                WHERE et.tag_id = ?
+                  AND e.inserted_at >= ?
+                ORDER BY e.inserted_at DESC
+                LIMIT 20
+            `).all(tagId, startDate) as DigestEntryRow[]
+            : db.prepare(`
+                SELECT e.id, e.title, e.url, e.published_at, e.inserted_at, e.summary, f.title as feed_title
+                FROM entries e
+                INNER JOIN entry_tags et ON e.id = et.entry_id
+                LEFT JOIN feeds f ON e.feed_id = f.id
+                WHERE et.tag_id = ?
+                ORDER BY e.inserted_at DESC
+                LIMIT 20
+            `).all(tagId) as DigestEntryRow[];
+
+        if (!entries.length) {
+            return reply.status(400).send({ error: '当前时间范围内暂无可用于生成摘要的文章' });
+        }
+
+        const sourceHash = buildSourceHash(entries);
+        try {
+            const generated = await generateDigestSummary({
+                tagName: tag.name,
+                period: normalizedPeriod,
+                timeRangeKey: periodKey,
+                entries,
+                language,
+            });
+            if (!generated.summary) {
+                return reply.status(500).send({ error: '摘要生成失败' });
+            }
+            const { modelName } = resolveSummaryClient();
+            const now = new Date().toISOString();
+            db.prepare(`
+                INSERT INTO digest_tag_summaries (
+                    id, tag_id, period, time_range_key, language, source_count, source_hash,
+                    summary, keywords_json, model_name, trigger_type, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+                `${tag.id}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+                tag.id,
+                normalizedPeriod,
+                periodKey,
+                language,
+                entries.length,
+                sourceHash,
+                generated.summary,
+                JSON.stringify(generated.keywords || []),
+                modelName || 'unknown',
+                'manual',
+                now,
+            );
+            return {
+                item: {
+                    summary: generated.summary,
+                    keywords: generated.keywords || [],
+                    summary_updated_at: now,
+                    time_range_key: periodKey,
+                    source_count: entries.length,
+                },
+            };
+        } catch (error) {
+            console.warn(`[Digest] Manual regenerate failed for tag ${tag.name}:`, error);
+            return reply.status(500).send({ error: '摘要生成失败' });
+        }
+    });
+
+    /**
+     * GET /digest/:tagId/history - Summary history for a tag
+     */
+    app.get<{
+        Params: { tagId: string };
+        Querystring: { period?: string; limit?: string; cursor?: string; ui_language?: string };
+    }>('/digest/:tagId/history', async (request, reply) => {
+        const { tagId } = request.params;
+        const { period, limit, cursor, ui_language } = request.query;
+        const db = getDatabase();
+        const settings = userSettingsService.getSettings();
+        const language = normalizeDigestLanguage(ui_language || settings.language || settings.ai_translation_language || 'zh');
+        const safeLimit = Math.max(1, Math.min(parseInt(limit || '10', 10) || 10, 50));
+        const normalizedPeriod = period === 'week' ? 'week' : 'latest';
+
+        const tag = tagRepo.findById(tagId);
+        if (!tag) return reply.status(404).send({ error: '标签不存在' });
+
+        const params: Array<string | number> = [tagId, normalizedPeriod, language];
         let sql = `
             SELECT id, tag_id, period, time_range_key, language, source_count, source_hash, summary, keywords_json, model_name, trigger_type, created_at
             FROM digest_tag_summaries
-            WHERE tag_id = ? AND period = ?
+            WHERE tag_id = ? AND period = ? AND language = ?
         `;
         if (cursor) {
             sql += ' AND created_at < ?';

@@ -75,6 +75,11 @@ export const useTagsStore = defineStore('tags', () => {
     const config = ref<TagConfig | null>(null)
     const loading = ref(false)
     const analyzing = ref(false)
+    const analyzeProgress = ref<{
+        current: number
+        total: number
+        currentTitle?: string
+    } | null>(null)
     const cursor = ref<string | null>(null)
     const hasMore = ref(false)
 
@@ -286,14 +291,135 @@ export const useTagsStore = defineStore('tags', () => {
 
     async function analyzeEntries(entryIds: string[]) {
         analyzing.value = true
+        analyzeProgress.value = { current: 0, total: entryIds.length }
+
         try {
             const res = await fetch(`${API_BASE}/ai/tags/analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ entryIds }),
             })
-            const data = await res.json()
-            // Refresh data after analysis
+
+            const contentType = (res.headers.get('content-type') || '').toLowerCase()
+            const isSSE = contentType.includes('text/event-stream')
+
+            // Prefer streaming parser when server responds with SSE
+            if (isSSE) {
+                const reader = res.body?.getReader()
+                if (!reader) throw new Error('No response body')
+
+                const decoder = new TextDecoder()
+                let buffer = ''
+                let summary = null as any
+                let currentEvent = ''
+
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+
+                    buffer += decoder.decode(value, { stream: true })
+                    const lines = buffer.split(/\r?\n/)
+                    buffer = lines.pop() || ''
+
+                    for (const line of lines) {
+                        if (line.startsWith('event: ')) {
+                            currentEvent = line.slice(7).trim()
+                            continue
+                        }
+                        if (!line.startsWith('data: ')) continue
+
+                        const payload = line.slice(6).trim()
+                        let data: any = null
+                        try {
+                            data = JSON.parse(payload)
+                        } catch {
+                            // Skip malformed SSE chunks to avoid crashing UI
+                            continue
+                        }
+
+                        if (currentEvent === 'progress') {
+                            analyzeProgress.value = {
+                                current: data.current,
+                                total: data.total,
+                                currentTitle: data.entryTitle,
+                            }
+                        } else if (currentEvent === 'complete') {
+                            summary = data.summary
+                        }
+                    }
+                }
+
+                // Process any remaining buffer (e.g. last event when stream ends)
+                if (buffer.trim()) {
+                    const lines = buffer.split(/\r?\n/)
+                    for (const line of lines) {
+                        if (line.startsWith('event: ')) {
+                            currentEvent = line.slice(7).trim()
+                            continue
+                        }
+                        if (!line.startsWith('data: ')) continue
+                        const payload = line.slice(6).trim()
+                        try {
+                            const data = JSON.parse(payload)
+                            if (currentEvent === 'progress') {
+                                analyzeProgress.value = {
+                                    current: data.current,
+                                    total: data.total,
+                                    currentTitle: data.entryTitle,
+                                }
+                            } else if (currentEvent === 'complete') {
+                                summary = data.summary
+                            }
+                        } catch {
+                            /* ignore malformed */
+                        }
+                    }
+                }
+
+                await fetchStats()
+                await fetchTags()
+                return { summary }
+            }
+
+            // Backward compatibility and proxy/header mismatch fallback:
+            // first read as text, then decide JSON or SSE-like payload.
+            const raw = await res.text()
+            const trimmed = raw.trim()
+
+            // Some environments may strip SSE content-type but still return SSE frames
+            if (trimmed.startsWith('event:') || trimmed.includes('\nevent:')) {
+                let summary = null as any
+                const chunks = trimmed.split(/\r?\n\r?\n/).filter(Boolean)
+                for (const chunk of chunks) {
+                    const lines = chunk.split(/\r?\n/)
+                    let eventType = ''
+                    let dataRaw = ''
+                    for (const line of lines) {
+                        if (line.startsWith('event: ')) eventType = line.slice(7).trim()
+                        if (line.startsWith('data: ')) dataRaw = line.slice(6).trim()
+                    }
+                    if (!dataRaw) continue
+                    try {
+                        const data = JSON.parse(dataRaw)
+                        if (eventType === 'progress') {
+                            analyzeProgress.value = {
+                                current: data.current,
+                                total: data.total,
+                                currentTitle: data.entryTitle,
+                            }
+                        } else if (eventType === 'complete') {
+                            summary = data.summary
+                        }
+                    } catch {
+                        // ignore malformed block
+                    }
+                }
+                await fetchStats()
+                await fetchTags()
+                return { summary }
+            }
+
+            const data = trimmed ? JSON.parse(trimmed) : {}
             await fetchStats()
             await fetchTags()
             return data
@@ -302,6 +428,7 @@ export const useTagsStore = defineStore('tags', () => {
             throw error
         } finally {
             analyzing.value = false
+            analyzeProgress.value = null
         }
     }
 
@@ -474,9 +601,10 @@ export const useTagsStore = defineStore('tags', () => {
         }
     }
 
-    async function fetchDigest(period: 'today' | 'week' = 'today'): Promise<any> {
+    async function fetchDigest(period: 'latest' | 'week' = 'latest', uiLanguage?: string): Promise<any> {
         try {
             const params = new URLSearchParams({ period, with_summary: '1' })
+            if (uiLanguage) params.set('ui_language', uiLanguage)
             const res = await fetch(`${API_BASE}/digest?${params}`)
             return await res.json()
         } catch (error) {
@@ -487,13 +615,15 @@ export const useTagsStore = defineStore('tags', () => {
 
     async function fetchDigestHistory(
         tagId: string,
-        period: 'today' | 'week' = 'today',
+        period: 'latest' | 'week' = 'latest',
         limit = 10,
-        cursor?: string
-    ): Promise<{ items: Array<{ id: string; summary: string; keywords: string[]; created_at: string; source_count: number; model_name: string }>; nextCursor: string | null; hasMore: boolean }> {
+        cursor?: string,
+        uiLanguage?: string
+    ): Promise<{ items: Array<{ id: string; period: 'latest' | 'week'; summary: string; keywords: string[]; created_at: string; source_count: number; model_name: string; time_range_key: string; trigger_type: string }>; nextCursor: string | null; hasMore: boolean }> {
         try {
             const params = new URLSearchParams({ period, limit: String(limit) })
             if (cursor) params.append('cursor', cursor)
+            if (uiLanguage) params.append('ui_language', uiLanguage)
             const res = await fetch(`${API_BASE}/digest/${tagId}/history?${params}`)
             const data = await res.json()
             return {
@@ -504,6 +634,26 @@ export const useTagsStore = defineStore('tags', () => {
         } catch (error) {
             console.error('Failed to fetch digest history:', error)
             return { items: [], nextCursor: null, hasMore: false }
+        }
+    }
+
+    async function regenerateDigestSummary(
+        tagId: string,
+        period: 'latest' | 'week' = 'latest',
+        uiLanguage?: string
+    ): Promise<{ summary: string; keywords: string[]; summary_updated_at: string; time_range_key: string } | null> {
+        try {
+            const res = await fetch(`${API_BASE}/digest/${tagId}/regenerate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ period, ui_language: uiLanguage }),
+            })
+            if (!res.ok) return null
+            const data = await res.json()
+            return data?.item || null
+        } catch (error) {
+            console.error('Failed to regenerate digest summary:', error)
+            return null
         }
     }
 
@@ -528,6 +678,7 @@ export const useTagsStore = defineStore('tags', () => {
         config,
         loading,
         analyzing,
+        analyzeProgress,
         hasMore,
         // Computed
         selectedTag,
@@ -557,6 +708,7 @@ export const useTagsStore = defineStore('tags', () => {
         fetchTimeline,
         fetchDigest,
         fetchDigestHistory,
+        regenerateDigestSummary,
         fetchRelatedTags,
     }
 })

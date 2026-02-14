@@ -635,9 +635,17 @@
     "articles": "articles",
     "digest": "Digest",
     "digestToday": "Today",
+    "digestLatest": "Latest",
     "digestWeek": "This Week",
     "digestEmpty": "No new articles",
     "digestNewArticles": "{count} new articles",
+    "digestExpand": "Expand",
+    "digestCollapse": "Collapse",
+    "digestRegenerate": "Regenerate",
+    "digestRegenerating": "Generating...",
+    "digestManual": "Manual",
+    "digestAuto": "Auto",
+    "digestUnsummarized": "{count} pending",
     "relatedTags": "Related Tags",
     "overlapCount": "{count} shared articles"
   }

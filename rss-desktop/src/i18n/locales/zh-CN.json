@@ -639,9 +639,17 @@
     "articles": "篇文章",
     "digest": "信息简报",
     "digestToday": "今日",
+    "digestLatest": "最新",
     "digestWeek": "本周",
     "digestEmpty": "暂无新文章",
     "digestNewArticles": "{count} 篇新文章",
+    "digestExpand": "展开详情",
+    "digestCollapse": "收起详情",
+    "digestRegenerate": "重新生成",
+    "digestRegenerating": "生成中...",
+    "digestManual": "手动生成",
+    "digestAuto": "自动生成",
+    "digestUnsummarized": "待纳入 {count} 条",
     "relatedTags": "相关标签",
     "overlapCount": "{count} 篇共同文章"
   }

@@ -7,6 +7,7 @@ import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import ConfirmModal from '../common/ConfirmModal.vue'
 import RuleBuilderModal from '../tags/RuleBuilderModal.vue'
 import RelatedTags from '../tags/RelatedTags.vue'
+import FeedScopeModal from '../tags/FeedScopeModal.vue'
 
 defineProps<{
   expanded: boolean
@@ -30,6 +31,8 @@ const {
   handleConfirm,
   handleCancel
 } = useConfirmDialog()
+
+const showFeedScope = ref(false)
 
 const showCreateInput = ref(false)
 const newTagName = ref('')
@@ -61,6 +64,12 @@ const matchModeOptions: Array<{ value: 'ai' | 'rule' | 'both'; labelKey: string 
 
 const tags = computed(() => tagsStore.tags)
 const pendingCount = computed(() => tagsStore.stats.pending)
+const analyzeProgress = computed(() => tagsStore.analyzeProgress)
+const analyzePercent = computed(() => {
+  const p = analyzeProgress.value
+  if (!p || p.total === 0) return 0
+  return Math.round((p.current / p.total) * 100)
+})
 
 function resetCreateForm() {
   newTagName.value = ''
@@ -139,7 +148,18 @@ async function handleDelete(id: string) {
 async function handleAnalyzeAll() {
   if (pendingCount.value === 0) return
   await tagsStore.fetchPendingEntries(true)
-  const ids = tagsStore.entries.map(e => e.id)
+  // Load all pending pages instead of only the first visible page.
+  // Guard against infinite retry loops when pagination request fails but hasMore stays true.
+  let safety = 0
+  let previousLength = tagsStore.entries.length
+  while (tagsStore.hasMore && !tagsStore.analyzing) {
+    if (safety++ > 200) break
+    await tagsStore.fetchPendingEntries(false)
+    const currentLength = tagsStore.entries.length
+    if (currentLength <= previousLength) break
+    previousLength = currentLength
+  }
+  const ids = Array.from(new Set(tagsStore.entries.map(e => e.id)))
   if (ids.length > 0) {
     await tagsStore.analyzeEntries(ids)
     await tagsStore.fetchStats()
@@ -216,8 +236,8 @@ async function handleAnalyzeAll() {
         </button>
       </div>
 
-      <!-- Analyze All Button -->
-      <div v-if="pendingCount > 0" class="mb-2 px-1">
+      <!-- Analyze All Button + Progress -->
+      <div v-if="pendingCount > 0 || tagsStore.analyzing" class="mb-2 px-1">
         <button
           @click="handleAnalyzeAll"
           :disabled="tagsStore.analyzing"
@@ -228,6 +248,32 @@ async function handleAnalyzeAll() {
           </svg>
           <div v-else class="animate-spin w-3.5 h-3.5 border-2 border-[#8b5cf6] border-t-transparent rounded-full"></div>
           {{ tagsStore.analyzing ? t('tags.analyzing') : t('tags.analyzeAll') }}
+        </button>
+        <!-- Progress Bar -->
+        <div v-if="tagsStore.analyzing && analyzeProgress" class="mt-1.5 space-y-1">
+          <div class="w-full h-1.5 rounded-full bg-[rgba(139,92,246,0.12)] overflow-hidden">
+            <div
+              class="h-full rounded-full bg-[#8b5cf6] transition-all duration-300 ease-out"
+              :style="{ width: analyzePercent + '%' }"
+            ></div>
+          </div>
+          <div class="flex items-center justify-between text-[10px] c-[var(--text-tertiary)]">
+            <span class="truncate max-w-[70%]">{{ analyzeProgress.currentTitle || '' }}</span>
+            <span class="shrink-0 tabular-nums">{{ analyzeProgress.current }}/{{ analyzeProgress.total }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed Scope Button -->
+      <div class="mb-2 px-1">
+        <button
+          @click.stop="showFeedScope = true"
+          class="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] c-[var(--text-secondary)] hover:c-[var(--text-primary)] bg-transparent border border-[var(--border-color)] rounded-lg cursor-pointer transition-all hover:bg-[rgba(139,92,246,0.06)] hover:border-[rgba(139,92,246,0.3)]"
+        >
+          <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4 1.65 1.65 0 0 0 13 21v.09a2 2 0 0 1-4 0V21a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15 1.65 1.65 0 0 0 3 13H2.91a2 2 0 0 1 0-4H3a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 11 3V2.91a2 2 0 0 1 4 0V3a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.37.23.82.36 1.3.36H21.09a2 2 0 0 1 0 4H21a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          {{ t('tags.configureFeedScope') }}
         </button>
       </div>
 
@@ -479,5 +525,11 @@ async function handleAnalyzeAll() {
     :rules="editFullMatchRules"
     @close="showEditRuleBuilder = false"
     @save="handleSaveEditRules"
+  />
+
+  <!-- Feed Scope Modal -->
+  <FeedScopeModal
+    :visible="showFeedScope"
+    @close="showFeedScope = false"
   />
 </template>

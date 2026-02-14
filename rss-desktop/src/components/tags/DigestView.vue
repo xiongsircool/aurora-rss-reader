@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTagsStore } from '../../stores/tagsStore'
 import { formatDate } from '../../utils/date'
@@ -9,29 +9,36 @@ const emit = defineEmits<{
   (e: 'select-tag', tagId: string): void
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const tagsStore = useTagsStore()
 
-const period = ref<'today' | 'week'>('today')
+const period = ref<'latest' | 'week'>('latest')
 const digestData = ref<Array<{
   tag: { id: string; name: string; color: string; entry_count: number }
   recentCount: number
   llm_summary: string | null
   keywords: string[]
   summary_updated_at: string | null
+  time_range_key: string
+  unsummarized_count?: number
   entries: Array<{ id: string; title: string; url: string; published_at: string; summary: string | null; feed_title: string }>
 }>>([])
 const loading = ref(false)
-const expandedHistory = ref<Set<string>>(new Set())
-const historyByTag = ref<Record<string, Array<{ id: string; summary: string; keywords: string[]; created_at: string; source_count: number; model_name: string }>>>({})
+const expandedSummary = ref<Set<string>>(new Set())
+const expandedHistorySummary = ref<Set<string>>(new Set())
+const historyByTag = ref<Record<string, Array<{ id: string; period: 'latest' | 'week'; summary: string; keywords: string[]; created_at: string; source_count: number; model_name: string; time_range_key: string; trigger_type: string }>>>({})
 const historyCursorByTag = ref<Record<string, string | null>>({})
 const historyHasMoreByTag = ref<Record<string, boolean>>({})
 const historyLoadingByTag = ref<Record<string, boolean>>({})
+const regeneratingByTag = ref<Record<string, boolean>>({})
+const historyModalTagId = ref<string | null>(null)
+const historyModalTagName = ref('')
+const historyModalTagColor = ref('#8b5cf6')
 
 async function loadDigest() {
   loading.value = true
   try {
-    const data = await tagsStore.fetchDigest(period.value)
+    const data = await tagsStore.fetchDigest(period.value, locale.value)
     digestData.value = data.items || []
   } finally {
     loading.value = false
@@ -39,10 +46,52 @@ async function loadDigest() {
 }
 
 onMounted(() => loadDigest())
+watch(() => locale.value, () => {
+  loadDigest()
+  if (historyModalTagId.value) {
+    loadHistory(historyModalTagId.value, true)
+  }
+})
 
-function switchPeriod(p: 'today' | 'week') {
+function isSummaryExpanded(tagId: string) {
+  return expandedSummary.value.has(tagId)
+}
+
+function toggleSummary(tagId: string) {
+  if (expandedSummary.value.has(tagId)) {
+    expandedSummary.value.delete(tagId)
+  } else {
+    expandedSummary.value.add(tagId)
+  }
+  expandedSummary.value = new Set(expandedSummary.value)
+}
+
+function shouldShowSummaryToggle(summary: string | null) {
+  return !!summary && summary.length > 120
+}
+
+function formatRange(periodValue: 'latest' | 'week', rangeKey?: string | null) {
+  if (!rangeKey) return periodValue === 'week' ? t('tags.digestWeek') : t('tags.digestLatest')
+  return periodValue === 'week'
+    ? `${t('tags.digestWeek')} (${rangeKey})`
+    : t('tags.digestLatest')
+}
+
+function isHistorySummaryExpanded(itemId: string) {
+  return expandedHistorySummary.value.has(itemId)
+}
+
+function toggleHistorySummary(itemId: string) {
+  if (expandedHistorySummary.value.has(itemId)) expandedHistorySummary.value.delete(itemId)
+  else expandedHistorySummary.value.add(itemId)
+  expandedHistorySummary.value = new Set(expandedHistorySummary.value)
+}
+
+function switchPeriod(p: 'latest' | 'week') {
   period.value = p
-  expandedHistory.value = new Set()
+  expandedSummary.value = new Set()
+  expandedHistorySummary.value = new Set()
+  historyModalTagId.value = null
   historyByTag.value = {}
   historyCursorByTag.value = {}
   historyHasMoreByTag.value = {}
@@ -50,17 +99,16 @@ function switchPeriod(p: 'today' | 'week') {
   loadDigest()
 }
 
-async function toggleHistory(tagId: string) {
-  if (expandedHistory.value.has(tagId)) {
-    expandedHistory.value.delete(tagId)
-    expandedHistory.value = new Set(expandedHistory.value)
-    return
-  }
-  expandedHistory.value.add(tagId)
-  expandedHistory.value = new Set(expandedHistory.value)
-  if (!historyByTag.value[tagId]) {
-    await loadHistory(tagId, true)
-  }
+async function openHistory(tagId: string) {
+  const tag = digestData.value.find((item) => item.tag.id === tagId)?.tag
+  historyModalTagId.value = tagId
+  historyModalTagName.value = tag?.name || ''
+  historyModalTagColor.value = tag?.color || '#8b5cf6'
+  await loadHistory(tagId, true)
+}
+
+function closeHistoryModal() {
+  historyModalTagId.value = null
 }
 
 async function loadHistory(tagId: string, reset = false) {
@@ -68,7 +116,7 @@ async function loadHistory(tagId: string, reset = false) {
   historyLoadingByTag.value[tagId] = true
   try {
     const cursor = reset ? undefined : (historyCursorByTag.value[tagId] || undefined)
-    const data = await tagsStore.fetchDigestHistory(tagId, period.value, 10, cursor)
+    const data = await tagsStore.fetchDigestHistory(tagId, period.value, 10, cursor, locale.value)
     historyByTag.value[tagId] = reset
       ? data.items
       : [...(historyByTag.value[tagId] || []), ...data.items]
@@ -76,6 +124,30 @@ async function loadHistory(tagId: string, reset = false) {
     historyHasMoreByTag.value[tagId] = data.hasMore
   } finally {
     historyLoadingByTag.value[tagId] = false
+  }
+}
+
+async function regenerateSummary(tagId: string) {
+  if (regeneratingByTag.value[tagId]) return
+  regeneratingByTag.value[tagId] = true
+  try {
+    const result = await tagsStore.regenerateDigestSummary(tagId, period.value, locale.value)
+    if (!result) return
+    const idx = digestData.value.findIndex((item) => item.tag.id === tagId)
+    if (idx >= 0) {
+      digestData.value[idx] = {
+        ...digestData.value[idx],
+        llm_summary: result.summary,
+        keywords: result.keywords || [],
+        summary_updated_at: result.summary_updated_at,
+        time_range_key: result.time_range_key || digestData.value[idx].time_range_key,
+      }
+    }
+    if (historyModalTagId.value === tagId) {
+      await loadHistory(tagId, true)
+    }
+  } finally {
+    regeneratingByTag.value[tagId] = false
   }
 }
 </script>
@@ -96,13 +168,13 @@ async function loadHistory(tagId: string, reset = false) {
       </div>
       <div class="flex items-center gap-1 bg-[var(--bg-base)] rounded-lg p-0.5 border border-[var(--border-color)]">
         <button
-          @click="switchPeriod('today')"
+          @click="switchPeriod('latest')"
           class="px-2.5 py-1 text-[11px] font-medium rounded-md transition-all"
-          :class="period === 'today'
+          :class="period === 'latest'
             ? 'bg-[var(--bg-surface)] c-[var(--text-primary)] shadow-sm'
             : 'c-[var(--text-tertiary)] hover:c-[var(--text-secondary)]'"
         >
-          {{ t('tags.digestToday') }}
+          {{ t('tags.digestLatest') }}
         </button>
         <button
           @click="switchPeriod('week')"
@@ -144,7 +216,41 @@ async function loadHistory(tagId: string, reset = false) {
         </button>
 
         <div v-if="item.llm_summary" class="px-4 pb-3">
-          <p class="text-[12px] leading-5 c-[var(--text-primary)] m-0">{{ item.llm_summary }}</p>
+          <div class="mb-1.5 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] c-[var(--text-tertiary)]">
+                {{ formatRange(period, item.time_range_key) }}
+              </span>
+              <span
+                v-if="(item.unsummarized_count || 0) > 0"
+                class="text-[10px] px-1.5 py-0.5 rounded-full border border-[rgba(245,158,11,0.35)] bg-[rgba(245,158,11,0.10)] c-[#b45309]"
+              >
+                {{ t('tags.digestUnsummarized', { count: item.unsummarized_count || 0 }) }}
+              </span>
+            </div>
+            <button
+              class="text-[11px] c-[#8b5cf6] hover:underline bg-transparent border-none cursor-pointer"
+              :disabled="!!regeneratingByTag[item.tag.id]"
+              @click.stop="regenerateSummary(item.tag.id)"
+            >
+              {{ regeneratingByTag[item.tag.id] ? t('tags.digestRegenerating') : t('tags.digestRegenerate') }}
+            </button>
+          </div>
+          <p
+            class="text-[12px] leading-5 c-[var(--text-primary)] m-0 whitespace-pre-line"
+            :style="isSummaryExpanded(item.tag.id)
+              ? {}
+              : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }"
+          >
+            {{ item.llm_summary }}
+          </p>
+          <button
+            v-if="shouldShowSummaryToggle(item.llm_summary)"
+            class="mt-1 text-[11px] c-[#8b5cf6] hover:underline bg-transparent border-none cursor-pointer px-0"
+            @click.stop="toggleSummary(item.tag.id)"
+          >
+            {{ isSummaryExpanded(item.tag.id) ? t('tags.digestCollapse') : t('tags.digestExpand') }}
+          </button>
           <div v-if="item.keywords?.length" class="mt-2 flex flex-wrap gap-1.5">
             <span
               v-for="kw in item.keywords"
@@ -160,9 +266,9 @@ async function loadHistory(tagId: string, reset = false) {
             </span>
             <button
               class="text-[11px] c-[#8b5cf6] hover:underline bg-transparent border-none cursor-pointer"
-              @click.stop="toggleHistory(item.tag.id)"
+              @click.stop="openHistory(item.tag.id)"
             >
-              {{ expandedHistory.has(item.tag.id) ? t('common.close') : t('common.viewHistory') }}
+              {{ t('common.viewHistory') }}
             </button>
           </div>
         </div>
@@ -193,36 +299,6 @@ async function loadHistory(tagId: string, reset = false) {
           </div>
         </div>
 
-        <div
-          v-if="expandedHistory.has(item.tag.id)"
-          class="border-t border-[var(--border-color)] px-4 py-3 bg-[rgba(139,92,246,0.04)]"
-        >
-          <div v-if="historyLoadingByTag[item.tag.id]" class="text-[11px] c-[var(--text-tertiary)]">
-            Loading...
-          </div>
-          <div v-else-if="(historyByTag[item.tag.id] || []).length === 0" class="text-[11px] c-[var(--text-tertiary)]">
-            {{ t('common.noData') }}
-          </div>
-          <div v-else class="space-y-2">
-            <div
-              v-for="h in historyByTag[item.tag.id]"
-              :key="h.id"
-              class="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-2"
-            >
-              <div class="text-[10px] c-[var(--text-tertiary)] mb-1">
-                {{ formatDate(h.created_at, null) }} · {{ h.source_count }}
-              </div>
-              <div class="text-[11px] c-[var(--text-primary)] leading-4">{{ h.summary }}</div>
-            </div>
-            <button
-              v-if="historyHasMoreByTag[item.tag.id]"
-              class="w-full py-1.5 rounded-md border border-[var(--border-color)] text-[11px] c-[var(--text-secondary)] bg-[var(--bg-surface)] hover:c-[var(--text-primary)]"
-              @click="loadHistory(item.tag.id)"
-            >
-              {{ t('common.loadMore') }}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -230,5 +306,83 @@ async function loadHistory(tagId: string, reset = false) {
     <div v-else class="py-8 text-center">
       <p class="text-[13px] c-[var(--text-tertiary)]">{{ t('tags.digestEmpty') }}</p>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="historyModalTagId"
+        class="fixed inset-0 z-[12000] flex items-center justify-center p-4"
+        @keydown.esc="closeHistoryModal"
+      >
+        <div class="absolute inset-0 bg-black/45" @click="closeHistoryModal"></div>
+        <div class="relative w-[min(920px,96vw)] max-h-[86vh] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: historyModalTagColor }"></span>
+              <span class="text-[13px] font-semibold c-[var(--text-primary)]">{{ historyModalTagName }} · {{ t('common.viewHistory') }}</span>
+            </div>
+            <button class="text-[11px] c-[var(--text-secondary)] hover:c-[var(--text-primary)] bg-transparent border-none cursor-pointer" @click="closeHistoryModal">
+              {{ t('common.close') }}
+            </button>
+          </div>
+          <div class="p-4 overflow-y-auto max-h-[calc(86vh-56px)] bg-[var(--bg-base)]">
+            <div v-if="historyLoadingByTag[historyModalTagId]" class="text-[12px] c-[var(--text-tertiary)]">
+              Loading...
+            </div>
+            <div v-else-if="(historyByTag[historyModalTagId] || []).length === 0" class="text-[12px] c-[var(--text-tertiary)]">
+              {{ t('common.noData') }}
+            </div>
+            <div v-else class="space-y-2">
+              <div
+                v-for="h in historyByTag[historyModalTagId]"
+                :key="h.id"
+                class="relative rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 pl-4"
+              >
+                <span class="absolute left-1.5 top-3 h-1.5 w-1.5 rounded-full bg-[#8b5cf6]"></span>
+                <div class="text-[10px] c-[var(--text-tertiary)] mb-1 flex flex-wrap items-center gap-1.5">
+                  <span>{{ formatDate(h.created_at, null) }}</span>
+                  <span>·</span>
+                  <span>{{ formatRange(h.period, h.time_range_key) }}</span>
+                  <span>·</span>
+                  <span>{{ h.source_count }}</span>
+                  <span>·</span>
+                  <span>{{ h.trigger_type === 'manual' ? t('tags.digestManual') : t('tags.digestAuto') }}</span>
+                </div>
+                <div
+                  class="text-[12px] c-[var(--text-primary)] leading-5 whitespace-pre-line"
+                  :style="isHistorySummaryExpanded(h.id)
+                    ? {}
+                    : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }"
+                >
+                  {{ h.summary }}
+                </div>
+                <button
+                  v-if="shouldShowSummaryToggle(h.summary)"
+                  class="mt-1 text-[10px] c-[#8b5cf6] hover:underline bg-transparent border-none cursor-pointer px-0"
+                  @click.stop="toggleHistorySummary(h.id)"
+                >
+                  {{ isHistorySummaryExpanded(h.id) ? t('tags.digestCollapse') : t('tags.digestExpand') }}
+                </button>
+                <div v-if="h.keywords?.length" class="mt-1.5 flex flex-wrap gap-1">
+                  <span
+                    v-for="kw in h.keywords"
+                    :key="`${h.id}-${kw}`"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] border border-[rgba(139,92,246,0.25)] bg-[rgba(139,92,246,0.08)] c-[#7c3aed]"
+                  >
+                    {{ kw }}
+                  </span>
+                </div>
+              </div>
+              <button
+                v-if="historyHasMoreByTag[historyModalTagId]"
+                class="w-full py-1.5 rounded-md border border-[var(--border-color)] text-[11px] c-[var(--text-secondary)] bg-[var(--bg-surface)] hover:c-[var(--text-primary)]"
+                @click="loadHistory(historyModalTagId)"
+              >
+                {{ t('common.loadMore') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
