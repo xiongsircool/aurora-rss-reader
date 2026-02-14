@@ -52,7 +52,8 @@
     "justNow": "刚刚",
     "hoursAgo": "{n}小时前",
     "daysAgo": "{n}天前",
-    "done": "完成"
+    "done": "完成",
+    "viewHistory": "查看历史"
   },
   "navigation": {
     "all": "全部",
@@ -265,7 +266,7 @@
     "taggingSubtitle": "用于自动文章标签分类",
     "useSummaryConfig": "沿用摘要配置",
     "knowledgeBase": "知识库 / 语义检索",
-    "embeddingSubtitle": "配置 Embedding 模型以启用 AI 搜索与知识库",
+    "embeddingSubtitle": "配置 Embedding 模型以启用语义搜索与知识库（非语言模型，需独立配置）",
     "mcpService": "MCP 服务",
     "mcpSubtitle": "Model Context Protocol - AI 工具访问接口",
     "mcpEndpoint": "服务端点",
@@ -300,7 +301,6 @@
     "usingGlobalConfig": "当前使用全局默认配置",
     "usingGlobalConfigHint": "此服务将使用上方的全局默认 API 配置",
     "embeddingService": "Embedding 检索",
-    "embeddingSubtitle": "配置 Embedding 模型以启用语义搜索与知识库（非语言模型，需独立配置）",
     "embeddingModelName": "Embedding 模型",
     "embeddingModelPlaceholder": "例如: text-embedding-3-small",
     "embeddingApiUrlPlaceholder": "例如: https://api.siliconflow.cn/v1",
@@ -365,7 +365,7 @@
     "markAsReadRange7d": "7天之前的文章",
     "markAsReadRange30d": "30天之前的文章",
     "markAsReadRangeAll": "所有未读文章",
-    "aboutDescription": "一个现代化的本地RSS阅读器，支持AI摘要、智能翻译和优雅的阅读体验。",
+    "aboutDescription": "一款注重效率与阅读体验的本地 RSS 阅读器，提供智能摘要、标题翻译、标签组织与收藏管理，帮助你更快捕捉关键信息。",
     "appNameDescription": "{name} 的名字灵感来自极光，希望为你的信息流带来灵感与光亮。",
     "features": {
       "rss": "RSS订阅",

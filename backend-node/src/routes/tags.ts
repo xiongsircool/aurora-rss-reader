@@ -4,6 +4,7 @@
  */
 
 import { FastifyPluginAsync } from 'fastify';
+import { createHash } from 'crypto';
 import {
     TagRepository,
     EntryTagRepository,
@@ -20,6 +21,117 @@ import {
 import { runRuleMatchingForEntry } from '../services/ruleMatching.js';
 import { TagMatchRule } from '../db/models.js';
 import { getDatabase } from '../db/session.js';
+import { AIClient } from '../services/ai.js';
+import { userSettingsService } from '../services/userSettings.js';
+import { getConfig } from '../config/index.js';
+
+type DigestEntryRow = {
+    id: string;
+    title: string | null;
+    url: string | null;
+    published_at: string | null;
+    inserted_at: string;
+    summary: string | null;
+    feed_title: string | null;
+};
+
+type DigestSummaryRecord = {
+    id: string;
+    tag_id: string;
+    period: string;
+    time_range_key: string;
+    language: string;
+    source_count: number;
+    source_hash: string;
+    summary: string;
+    keywords_json: string | null;
+    model_name: string;
+    trigger_type: string;
+    created_at: string;
+};
+
+function resolveSummaryClient() {
+    const settings = userSettingsService.getSettings();
+    const config = getConfig();
+
+    const useCustom = settings.summary_use_custom === 1;
+    const baseUrl = (useCustom ? settings.summary_base_url : settings.default_ai_base_url) || config.glmBaseUrl || '';
+    const apiKey = (useCustom ? settings.summary_api_key : settings.default_ai_api_key) || config.glmApiKey || '';
+    const modelName = (useCustom ? settings.summary_model_name : settings.default_ai_model) || config.glmModel || '';
+    return {
+        client: new AIClient({ baseUrl, apiKey, model: modelName }),
+        modelName,
+    };
+}
+
+function buildDigestTimeWindow(period?: string) {
+    const now = new Date();
+    if (period === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const weekKey = `${now.getUTCFullYear()}-W${String(Math.floor((now.getUTCDate() - 1) / 7) + 1).padStart(2, '0')}`;
+        return { startDate: weekAgo.toISOString(), periodKey: weekKey, normalizedPeriod: 'week' as const };
+    }
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayKey = now.toISOString().slice(0, 10);
+    return { startDate: todayStart.toISOString(), periodKey: dayKey, normalizedPeriod: 'today' as const };
+}
+
+function buildSourceHash(entries: DigestEntryRow[]) {
+    const titlePayload = entries.map((e) => (e.title || '').trim()).join('\n');
+    return createHash('sha256').update(titlePayload).digest('hex');
+}
+
+function parseKeywordsJson(raw: string | null | undefined): string[] {
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter(Boolean).slice(0, 8) : [];
+    } catch {
+        return [];
+    }
+}
+
+async function generateDigestSummary(input: {
+    tagName: string;
+    period: 'today' | 'week';
+    entries: DigestEntryRow[];
+    language: string;
+}): Promise<{ summary: string; keywords: string[] }> {
+    const { client } = resolveSummaryClient();
+    const titles = input.entries
+        .map((e, idx) => `${idx + 1}. ${e.title || 'Untitled'}`)
+        .join('\n');
+    const periodText = input.period === 'week' ? '本周' : '今日';
+    const systemPrompt = `你是信息分析助手。基于给定标题生成“标签简报摘要”。只允许依据输入，不得编造。请输出 JSON：
+{"summary":"80-180字","keywords":["关键词1","关键词2"]}`;
+    const userPrompt = `标签：${input.tagName}
+时间范围：${periodText}
+标题列表（最多20条）：
+${titles}
+
+要求：
+1) summary 使用${input.language}。
+2) keywords 3-8个，短词。
+3) 输出必须是严格 JSON，不要 Markdown。`;
+
+    const raw = await client.chat(
+        [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+        ],
+        { maxTokens: 500, temperature: 0.2 },
+    );
+
+    try {
+        const parsed = JSON.parse(raw) as { summary?: string; keywords?: string[] };
+        return {
+            summary: (parsed.summary || '').trim(),
+            keywords: Array.isArray(parsed.keywords) ? parsed.keywords.filter(Boolean).slice(0, 8) : [],
+        };
+    } catch {
+        return { summary: raw.trim(), keywords: [] };
+    }
+}
 
 const tagsRoutes: FastifyPluginAsync = async (app) => {
     const tagRepo = new TagRepository();
@@ -830,71 +942,161 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
     });
 
     /**
-     * GET /digest - Daily/weekly digest grouped by tag
+     * GET /digest - Daily/weekly digest grouped by tag, with latest LLM summary
      */
     app.get<{
-        Querystring: { period?: string };
+        Querystring: { period?: string; with_summary?: string | boolean };
     }>('/digest', async (request) => {
-        const { period } = request.query;
+        const { period, with_summary } = request.query;
         const db = getDatabase();
+        const settings = userSettingsService.getSettings();
+        const language = settings.ai_translation_language || 'zh';
+        const { startDate, normalizedPeriod, periodKey } = buildDigestTimeWindow(period);
+        const shouldGenerateSummary = with_summary !== '0' && with_summary !== false;
 
-        // Calculate the start date based on period
-        const now = new Date();
-        let startDate: string;
-        if (period === 'week') {
-            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            startDate = weekAgo.toISOString();
-        } else {
-            // Default: today
-            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            startDate = todayStart.toISOString();
-        }
-
-        // Get all tags with recent entries
         const allTags = tagRepo.getAllWithEntryCounts();
         const result: Array<{
             tag: typeof allTags[number];
             recentCount: number;
-            entries: any[];
+            entries: DigestEntryRow[];
+            llm_summary: string | null;
+            keywords: string[];
+            summary_updated_at: string | null;
         }> = [];
 
         for (const tag of allTags) {
-            const sql = `
-                SELECT e.id, e.title, e.url, e.published_at, e.summary, f.title as feed_title
+            const entries = db.prepare(`
+                SELECT e.id, e.title, e.url, e.published_at, e.inserted_at, e.summary, f.title as feed_title
                 FROM entries e
                 INNER JOIN entry_tags et ON e.id = et.entry_id
                 LEFT JOIN feeds f ON e.feed_id = f.id
                 WHERE et.tag_id = ?
-                    AND e.inserted_at >= ?
+                  AND e.inserted_at >= ?
                 ORDER BY e.inserted_at DESC
-                LIMIT 5
-            `;
-            const entries = db.prepare(sql).all(tag.id, startDate) as any[];
+                LIMIT 20
+            `).all(tag.id, startDate) as DigestEntryRow[];
 
-            const countSql = `
-                SELECT COUNT(*) as count
-                FROM entry_tags et
-                INNER JOIN entries e ON et.entry_id = e.id
-                WHERE et.tag_id = ? AND e.inserted_at >= ?
-            `;
-            const countResult = db.prepare(countSql).get(tag.id, startDate) as { count: number };
+            if (!entries.length) continue;
 
-            if (countResult.count > 0) {
-                result.push({
-                    tag,
-                    recentCount: countResult.count,
-                    entries,
-                });
+            const sourceHash = buildSourceHash(entries);
+            const latest = db.prepare(`
+                SELECT *
+                FROM digest_tag_summaries
+                WHERE tag_id = ? AND period = ? AND time_range_key = ? AND language = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+            `).get(tag.id, normalizedPeriod, periodKey, language) as DigestSummaryRecord | undefined;
+
+            let summary = latest?.summary ?? null;
+            let keywords: string[] = parseKeywordsJson(latest?.keywords_json);
+            let summaryUpdatedAt = latest?.created_at ?? null;
+
+            const needGenerate = shouldGenerateSummary && (!latest || latest.source_hash !== sourceHash);
+            if (needGenerate) {
+                try {
+                    const generated = await generateDigestSummary({
+                        tagName: tag.name,
+                        period: normalizedPeriod,
+                        entries,
+                        language,
+                    });
+                    if (generated.summary) {
+                        const { modelName } = resolveSummaryClient();
+                        const now = new Date().toISOString();
+                        db.prepare(`
+                            INSERT INTO digest_tag_summaries (
+                                id, tag_id, period, time_range_key, language, source_count, source_hash,
+                                summary, keywords_json, model_name, trigger_type, created_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `).run(
+                            `${tag.id}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+                            tag.id,
+                            normalizedPeriod,
+                            periodKey,
+                            language,
+                            entries.length,
+                            sourceHash,
+                            generated.summary,
+                            JSON.stringify(generated.keywords || []),
+                            modelName || 'unknown',
+                            'auto',
+                            now,
+                        );
+                        summary = generated.summary;
+                        keywords = generated.keywords || [];
+                        summaryUpdatedAt = now;
+                    }
+                } catch (error) {
+                    console.warn(`[Digest] Summary generation failed for tag ${tag.name}:`, error);
+                }
             }
+
+            result.push({
+                tag,
+                recentCount: entries.length,
+                entries: entries.slice(0, 5),
+                llm_summary: summary,
+                keywords,
+                summary_updated_at: summaryUpdatedAt,
+            });
         }
 
-        // Sort by recent count descending
         result.sort((a, b) => b.recentCount - a.recentCount);
-
         return {
-            period: period || 'today',
+            period: normalizedPeriod,
             startDate,
             items: result,
+        };
+    });
+
+    /**
+     * GET /digest/:tagId/history - Summary history for a tag
+     */
+    app.get<{
+        Params: { tagId: string };
+        Querystring: { period?: string; limit?: string; cursor?: string };
+    }>('/digest/:tagId/history', async (request, reply) => {
+        const { tagId } = request.params;
+        const { period, limit, cursor } = request.query;
+        const db = getDatabase();
+        const safeLimit = Math.max(1, Math.min(parseInt(limit || '10', 10) || 10, 50));
+        const normalizedPeriod = period === 'week' ? 'week' : 'today';
+
+        const tag = tagRepo.findById(tagId);
+        if (!tag) return reply.status(404).send({ error: '标签不存在' });
+
+        const params: Array<string | number> = [tagId, normalizedPeriod];
+        let sql = `
+            SELECT id, tag_id, period, time_range_key, language, source_count, source_hash, summary, keywords_json, model_name, trigger_type, created_at
+            FROM digest_tag_summaries
+            WHERE tag_id = ? AND period = ?
+        `;
+        if (cursor) {
+            sql += ' AND created_at < ?';
+            params.push(cursor);
+        }
+        sql += ' ORDER BY created_at DESC LIMIT ?';
+        params.push(safeLimit + 1);
+
+        const rows = db.prepare(sql).all(...params) as DigestSummaryRecord[];
+        const hasMore = rows.length > safeLimit;
+        const items = hasMore ? rows.slice(0, safeLimit) : rows;
+        const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].created_at : null;
+
+        return {
+            items: items.map((row) => ({
+                id: row.id,
+                period: row.period,
+                time_range_key: row.time_range_key,
+                source_count: row.source_count,
+                summary: row.summary,
+                keywords: parseKeywordsJson(row.keywords_json),
+                model_name: row.model_name,
+                trigger_type: row.trigger_type,
+                created_at: row.created_at,
+            })),
+            nextCursor,
+            hasMore,
         };
     });
 

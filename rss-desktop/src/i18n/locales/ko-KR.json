@@ -47,7 +47,8 @@
     "reading": "읽기",
     "platform": "플랫폼",
     "private": "비공개",
-    "appName": "Aurora Feeds"
+    "appName": "Aurora Feeds",
+    "viewHistory": "기록 보기"
   },
   "opml": {
     "export": "OPML 내보내기",
@@ -248,7 +249,7 @@
     "taggingSubtitle": "새 글 자동 태그 분류에 사용",
     "useSummaryConfig": "요약 설정 사용",
     "knowledgeBase": "지식 베이스 / 시맨틱 검색",
-    "embeddingSubtitle": "Embedding 모델을 설정하여 AI 검색 및 지식 베이스 활성화",
+    "embeddingSubtitle": "시맨틱 검색 및 지식 베이스를 위한 Embedding 모델 설정 (언어 모델이 아니며, 별도 설정 필요)",
     "mcpService": "MCP 서비스",
     "mcpSubtitle": "Model Context Protocol - AI 도구 액세스 인터페이스",
     "mcpEndpoint": "서비스 엔드포인트",
@@ -283,7 +284,6 @@
     "usingGlobalConfig": "글로벌 기본 설정 사용 중",
     "usingGlobalConfigHint": "이 서비스는 위의 글로벌 기본 API 설정을 사용합니다",
     "embeddingService": "Embedding 검색",
-    "embeddingSubtitle": "시맨틱 검색 및 지식 베이스를 위한 Embedding 모델 설정 (언어 모델이 아니며, 별도 설정 필요)",
     "embeddingModelName": "Embedding 모델",
     "embeddingModelPlaceholder": "예: text-embedding-3-small",
     "embeddingApiUrlPlaceholder": "예: https://api.siliconflow.cn/v1",
@@ -330,7 +330,7 @@
     "entryTime": "입력 시간(권장)",
     "publishTime": "기사 게시 시간",
     "timeBaseDescription": "입력 시간이 더 신뢰성이 높으며, 기사 게시 시간은 비어있을 수 있습니다",
-    "aboutDescription": "AI 요약, 스마트 번역, 우아한 읽기 경험을 지원하는 현대적인 로컬 RSS 리더입니다.",
+    "aboutDescription": "속도와 가독성에 집중한 로컬 우선 RSS 리더입니다. AI 요약, 제목 번역, 태그 정리, 즐겨찾기 관리로 중요한 업데이트를 더 빠르게 파악할 수 있습니다.",
     "appNameDescription": "{name}라는 이름은 오로라에서 영감을 받아 당신의 정보 피드에 영감과 빛을 가져다주기를 바랍니다.",
     "features": {
       "rss": "RSS 구독",

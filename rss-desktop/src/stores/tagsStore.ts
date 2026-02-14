@@ -476,12 +476,34 @@ export const useTagsStore = defineStore('tags', () => {
 
     async function fetchDigest(period: 'today' | 'week' = 'today'): Promise<any> {
         try {
-            const params = new URLSearchParams({ period })
+            const params = new URLSearchParams({ period, with_summary: '1' })
             const res = await fetch(`${API_BASE}/digest?${params}`)
             return await res.json()
         } catch (error) {
             console.error('Failed to fetch digest:', error)
             return { items: [] }
+        }
+    }
+
+    async function fetchDigestHistory(
+        tagId: string,
+        period: 'today' | 'week' = 'today',
+        limit = 10,
+        cursor?: string
+    ): Promise<{ items: Array<{ id: string; summary: string; keywords: string[]; created_at: string; source_count: number; model_name: string }>; nextCursor: string | null; hasMore: boolean }> {
+        try {
+            const params = new URLSearchParams({ period, limit: String(limit) })
+            if (cursor) params.append('cursor', cursor)
+            const res = await fetch(`${API_BASE}/digest/${tagId}/history?${params}`)
+            const data = await res.json()
+            return {
+                items: data.items || [],
+                nextCursor: data.nextCursor ?? null,
+                hasMore: data.hasMore ?? false,
+            }
+        } catch (error) {
+            console.error('Failed to fetch digest history:', error)
+            return { items: [], nextCursor: null, hasMore: false }
         }
     }
 
@@ -534,6 +556,7 @@ export const useTagsStore = defineStore('tags', () => {
         fetchFilteredEntries,
         fetchTimeline,
         fetchDigest,
+        fetchDigestHistory,
         fetchRelatedTags,
     }
 })

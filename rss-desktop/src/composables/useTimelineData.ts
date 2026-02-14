@@ -26,6 +26,9 @@ export function useTimelineData(options: {
   filteredEntries: Ref<Entry[]>
   dateRangeFilter: Ref<string>
   isDateFilterActive: Ref<boolean>
+  comboFilterActive: Ref<boolean>
+  comboFilterTagIds: Ref<string[]>
+  comboFilterMode: Ref<'and' | 'or'>
 }) {
   const {
     viewMode,
@@ -37,6 +40,9 @@ export function useTimelineData(options: {
     filteredEntries,
     dateRangeFilter,
     isDateFilterActive,
+    comboFilterActive,
+    comboFilterTagIds,
+    comboFilterMode,
   } = options
 
   const store = useFeedStore()
@@ -108,6 +114,7 @@ export function useTimelineData(options: {
       if (activeTagView.value === 'digest') return t('tags.digest')
       if (activeTagView.value === 'pending') return t('tags.pending')
       if (activeTagView.value === 'untagged') return t('tags.untagged')
+      if (comboFilterActive.value) return t('tags.comboFilter')
       const tag = tagsStore.selectedTag
       return tag ? tag.name : t('tags.title')
     }
@@ -162,6 +169,10 @@ export function useTimelineData(options: {
   // === Load more ===
   async function handleLoadMoreEntries() {
     if (viewMode.value === 'tag' && tagsStore.hasMore) {
+      if (comboFilterActive.value && comboFilterTagIds.value.length > 0) {
+        await tagsStore.fetchFilteredEntries(comboFilterTagIds.value, comboFilterMode.value)
+        return
+      }
       const tagFilterOptions = {
         dateRange: isDateFilterActive.value ? dateRangeFilter.value : undefined,
         timeField: settingsStore.settings.time_field,

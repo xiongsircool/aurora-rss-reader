@@ -52,7 +52,8 @@
     "justNow": "Just now",
     "hoursAgo": "{n} hours ago",
     "daysAgo": "{n} days ago",
-    "done": "Done"
+    "done": "Done",
+    "viewHistory": "View History"
   },
   "navigation": {
     "all": "All",
@@ -264,7 +265,7 @@
     "taggingSubtitle": "For automatic article tagging",
     "useSummaryConfig": "Use summary configuration",
     "knowledgeBase": "Knowledge Base / Semantic Search",
-    "embeddingSubtitle": "Configure Embedding model to enable AI search and knowledge base",
+    "embeddingSubtitle": "Configure Embedding model for semantic search & knowledge base (not a language model, requires separate config)",
     "mcpService": "MCP Service",
     "mcpSubtitle": "Model Context Protocol - AI Tool Access Interface",
     "mcpEndpoint": "Service Endpoint",
@@ -299,7 +300,6 @@
     "usingGlobalConfig": "Using global default config",
     "usingGlobalConfigHint": "This service will use the global default API config above",
     "embeddingService": "Embedding Search",
-    "embeddingSubtitle": "Configure Embedding model for semantic search & knowledge base (not a language model, requires separate config)",
     "embeddingModelName": "Embedding Model",
     "embeddingModelPlaceholder": "e.g.: text-embedding-3-small",
     "embeddingApiUrlPlaceholder": "e.g.: https://api.siliconflow.cn/v1",
@@ -361,7 +361,7 @@
     "markAsReadRange7d": "Articles Older than 7 Days",
     "markAsReadRange30d": "Articles Older than 30 Days",
     "markAsReadRangeAll": "All Unread Articles",
-    "aboutDescription": "A modern local RSS reader with AI summarization, smart translation, and elegant reading experience.",
+    "aboutDescription": "A local-first RSS reader focused on speed and clarity, with AI summaries, title translation, tag organization, and favorites management to help you capture key updates faster.",
     "appNameDescription": "{name} takes its name from the aurora, aiming to bring a calm, luminous reading experience to your feeds.",
     "features": {
       "rss": "RSS Subscriptions",

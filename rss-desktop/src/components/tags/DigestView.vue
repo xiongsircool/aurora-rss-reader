@@ -16,9 +16,17 @@ const period = ref<'today' | 'week'>('today')
 const digestData = ref<Array<{
   tag: { id: string; name: string; color: string; entry_count: number }
   recentCount: number
+  llm_summary: string | null
+  keywords: string[]
+  summary_updated_at: string | null
   entries: Array<{ id: string; title: string; url: string; published_at: string; summary: string | null; feed_title: string }>
 }>>([])
 const loading = ref(false)
+const expandedHistory = ref<Set<string>>(new Set())
+const historyByTag = ref<Record<string, Array<{ id: string; summary: string; keywords: string[]; created_at: string; source_count: number; model_name: string }>>>({})
+const historyCursorByTag = ref<Record<string, string | null>>({})
+const historyHasMoreByTag = ref<Record<string, boolean>>({})
+const historyLoadingByTag = ref<Record<string, boolean>>({})
 
 async function loadDigest() {
   loading.value = true
@@ -34,7 +42,41 @@ onMounted(() => loadDigest())
 
 function switchPeriod(p: 'today' | 'week') {
   period.value = p
+  expandedHistory.value = new Set()
+  historyByTag.value = {}
+  historyCursorByTag.value = {}
+  historyHasMoreByTag.value = {}
+  historyLoadingByTag.value = {}
   loadDigest()
+}
+
+async function toggleHistory(tagId: string) {
+  if (expandedHistory.value.has(tagId)) {
+    expandedHistory.value.delete(tagId)
+    expandedHistory.value = new Set(expandedHistory.value)
+    return
+  }
+  expandedHistory.value.add(tagId)
+  expandedHistory.value = new Set(expandedHistory.value)
+  if (!historyByTag.value[tagId]) {
+    await loadHistory(tagId, true)
+  }
+}
+
+async function loadHistory(tagId: string, reset = false) {
+  if (historyLoadingByTag.value[tagId]) return
+  historyLoadingByTag.value[tagId] = true
+  try {
+    const cursor = reset ? undefined : (historyCursorByTag.value[tagId] || undefined)
+    const data = await tagsStore.fetchDigestHistory(tagId, period.value, 10, cursor)
+    historyByTag.value[tagId] = reset
+      ? data.items
+      : [...(historyByTag.value[tagId] || []), ...data.items]
+    historyCursorByTag.value[tagId] = data.nextCursor
+    historyHasMoreByTag.value[tagId] = data.hasMore
+  } finally {
+    historyLoadingByTag.value[tagId] = false
+  }
 }
 </script>
 
@@ -101,6 +143,30 @@ function switchPeriod(p: 'today' | 'week') {
           </span>
         </button>
 
+        <div v-if="item.llm_summary" class="px-4 pb-3">
+          <p class="text-[12px] leading-5 c-[var(--text-primary)] m-0">{{ item.llm_summary }}</p>
+          <div v-if="item.keywords?.length" class="mt-2 flex flex-wrap gap-1.5">
+            <span
+              v-for="kw in item.keywords"
+              :key="kw"
+              class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.12)] c-[#7c3aed]"
+            >
+              {{ kw }}
+            </span>
+          </div>
+          <div class="mt-2 flex items-center justify-between">
+            <span class="text-[10px] c-[var(--text-tertiary)]">
+              {{ item.summary_updated_at ? formatDate(item.summary_updated_at, null) : '' }}
+            </span>
+            <button
+              class="text-[11px] c-[#8b5cf6] hover:underline bg-transparent border-none cursor-pointer"
+              @click.stop="toggleHistory(item.tag.id)"
+            >
+              {{ expandedHistory.has(item.tag.id) ? t('common.close') : t('common.viewHistory') }}
+            </button>
+          </div>
+        </div>
+
         <!-- Entry list -->
         <div class="border-t border-[var(--border-color)]">
           <button
@@ -124,6 +190,37 @@ function switchPeriod(p: 'today' | 'week') {
             class="px-4 py-1.5 text-[10px] c-[var(--text-tertiary)] border-t border-[var(--border-color)]"
           >
             +{{ item.recentCount - item.entries.length }} more...
+          </div>
+        </div>
+
+        <div
+          v-if="expandedHistory.has(item.tag.id)"
+          class="border-t border-[var(--border-color)] px-4 py-3 bg-[rgba(139,92,246,0.04)]"
+        >
+          <div v-if="historyLoadingByTag[item.tag.id]" class="text-[11px] c-[var(--text-tertiary)]">
+            Loading...
+          </div>
+          <div v-else-if="(historyByTag[item.tag.id] || []).length === 0" class="text-[11px] c-[var(--text-tertiary)]">
+            {{ t('common.noData') }}
+          </div>
+          <div v-else class="space-y-2">
+            <div
+              v-for="h in historyByTag[item.tag.id]"
+              :key="h.id"
+              class="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-2"
+            >
+              <div class="text-[10px] c-[var(--text-tertiary)] mb-1">
+                {{ formatDate(h.created_at, null) }} · {{ h.source_count }}
+              </div>
+              <div class="text-[11px] c-[var(--text-primary)] leading-4">{{ h.summary }}</div>
+            </div>
+            <button
+              v-if="historyHasMoreByTag[item.tag.id]"
+              class="w-full py-1.5 rounded-md border border-[var(--border-color)] text-[11px] c-[var(--text-secondary)] bg-[var(--bg-surface)] hover:c-[var(--text-primary)]"
+              @click="loadHistory(item.tag.id)"
+            >
+              {{ t('common.loadMore') }}
+            </button>
           </div>
         </div>
       </div>

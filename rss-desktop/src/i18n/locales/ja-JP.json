@@ -47,7 +47,8 @@
     "reading": "読書",
     "platform": "プラットフォーム",
     "private": "プライベート",
-    "appName": "Aurora Feeds"
+    "appName": "Aurora Feeds",
+    "viewHistory": "履歴を見る"
   },
   "navigation": {
     "all": "すべて",
@@ -244,7 +245,7 @@
     "taggingSubtitle": "記事を自動でタグ分類",
     "useSummaryConfig": "要約設定を引き継ぐ",
     "knowledgeBase": "ナレッジベース / セマンティック検索",
-    "embeddingSubtitle": "Embeddingモデルを設定してAI検索とナレッジベースを有効化",
+    "embeddingSubtitle": "セマンティック検索とナレッジベースのためのEmbeddingモデルを設定（言語モデルではなく、個別設定が必要）",
     "mcpService": "MCPサービス",
     "mcpSubtitle": "Model Context Protocol - AIツールアクセスインターフェース",
     "mcpEndpoint": "サービスエンドポイント",
@@ -279,7 +280,6 @@
     "usingGlobalConfig": "グローバルデフォルト設定を使用中",
     "usingGlobalConfigHint": "このサービスは上のグローバルデフォルトAPI設定を使用します",
     "embeddingService": "Embedding 検索",
-    "embeddingSubtitle": "セマンティック検索とナレッジベースのためのEmbeddingモデルを設定（言語モデルではなく、個別設定が必要）",
     "embeddingModelName": "Embedding モデル",
     "embeddingModelPlaceholder": "例: text-embedding-3-small",
     "embeddingApiUrlPlaceholder": "例: https://api.siliconflow.cn/v1",
@@ -326,7 +326,7 @@
     "entryTime": "登録時間（推奨）",
     "publishTime": "記事公開時間",
     "timeBaseDescription": "登録時間の方が信頼性が高く、記事公開時間は空の場合があります",
-    "aboutDescription": "AI要約、スマート翻訳、エレガントな閲覧体験をサポートするモダンなローカルRSSリーダー。",
+    "aboutDescription": "速度と可読性を重視したローカルファーストのRSSリーダー。AI要約、タイトル翻訳、タグ整理、お気に入り管理で重要な更新を素早く把握できます。",
     "appNameDescription": "{name} の名前はオーロラから着想を得ており、あなたの情報フィードにインスピレーションと光をもたらすことを願っています。",
     "features": {
       "rss": "RSS購読",

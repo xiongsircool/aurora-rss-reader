@@ -46,6 +46,17 @@ const tagsStore = useTagsStore()
 const searchStore = useSearchStore()
 const { t } = useI18n()
 const { loadLanguage } = useLanguage()
+const SUBSCRIPTION_DATE_RANGE_KEY = 'date-range:feeds'
+const FAVORITES_DATE_RANGE_KEY = 'date-range:favorites'
+const TAGS_DATE_RANGE_KEY = 'date-range:tags'
+
+function readSavedDateRange(key: string): string | null {
+  try { return localStorage.getItem(key) } catch { return null }
+}
+
+function writeSavedDateRange(key: string, value: string) {
+  try { localStorage.setItem(key, value) } catch { /* ignore */ }
+}
 
 // === Title Translation ===
 const {
@@ -81,6 +92,10 @@ const {
 const { handleToggleStar } = useFeedActions()
 setupFilterWatchers()
 
+const subscriptionDateRange = ref('30d')
+const favoritesDateRange = ref('30d')
+const tagsDateRange = ref('30d')
+
 // === View Mode ===
 const selectedFavoriteEntryId = ref<string | null>(null)
 const {
@@ -94,15 +109,99 @@ const {
   ensureFeedsMode,
   handleSelectCollection,
   handleToggleCollections,
-  handleSelectTag,
-  handleSelectTagView,
-  handleToggleTags,
+  handleSelectTag: handleSelectTagRaw,
+  handleSelectTagView: handleSelectTagViewRaw,
+  handleToggleTags: handleToggleTagsRaw,
   handleToggleAISearch,
   handleAISearch,
 } = useViewMode(showFavoritesOnly, selectedFavoriteEntryId, {
   dateRangeFilter,
   isDateFilterActive,
 })
+
+const comboFilterTagIds = ref<string[]>([])
+const comboFilterMode = ref<'and' | 'or'>('or')
+const comboFilterActive = computed(() => comboFilterTagIds.value.length > 0)
+const comboFilterPrevContext = ref<{ activeTagId: string | null; activeTagView: 'tag' | 'pending' | 'untagged' | 'digest' | null } | null>(null)
+
+function clearComboFilterState() {
+  comboFilterTagIds.value = []
+  comboFilterMode.value = 'or'
+  comboFilterPrevContext.value = null
+}
+
+async function handleSelectTag(tagId: string) {
+  clearComboFilterState()
+  await handleSelectTagRaw(tagId)
+}
+
+async function handleSelectTagView(view: 'pending' | 'untagged' | 'digest') {
+  clearComboFilterState()
+  await handleSelectTagViewRaw(view)
+}
+
+function handleToggleTags() {
+  clearComboFilterState()
+  handleToggleTagsRaw()
+}
+
+async function handleApplyTagCombo(tagIds: string[], mode: 'and' | 'or') {
+  if (!tagIds.length) return
+  if (!comboFilterActive.value) {
+    comboFilterPrevContext.value = {
+      activeTagId: activeTagId.value,
+      activeTagView: activeTagView.value,
+    }
+  }
+  comboFilterTagIds.value = tagIds
+  comboFilterMode.value = mode
+  viewMode.value = 'tag'
+  activeCollectionId.value = null
+  activeTagId.value = null
+  activeTagView.value = 'tag'
+  tagsStore.selectTag(null)
+  await tagsStore.fetchFilteredEntries(tagIds, mode, true)
+}
+
+async function handleClearTagCombo() {
+  if (!comboFilterActive.value) return
+  const prev = comboFilterPrevContext.value
+  clearComboFilterState()
+
+  const tagOptions = {
+    dateRange: isDateFilterActive.value ? dateRangeFilter.value : undefined,
+    timeField: settingsStore.settings.time_field,
+  }
+
+  if (prev?.activeTagView === 'pending') {
+    activeTagId.value = null
+    activeTagView.value = 'pending'
+    tagsStore.setView('pending')
+    await tagsStore.fetchPendingEntries(true, tagOptions)
+    return
+  }
+
+  if (prev?.activeTagView === 'untagged') {
+    activeTagId.value = null
+    activeTagView.value = 'untagged'
+    tagsStore.setView('untagged')
+    await tagsStore.fetchUntaggedEntries(true, tagOptions)
+    return
+  }
+
+  if (prev?.activeTagId) {
+    activeTagId.value = prev.activeTagId
+    activeTagView.value = 'tag'
+    tagsStore.selectTag(prev.activeTagId)
+    await tagsStore.fetchEntriesByTag(prev.activeTagId, true, tagOptions)
+    return
+  }
+
+  activeTagId.value = null
+  activeTagView.value = 'pending'
+  tagsStore.setView('pending')
+  await tagsStore.fetchPendingEntries(true, tagOptions)
+}
 
 // === Entry Selection ===
 const currentSelectedEntry = computed<Entry | null>(() => {
@@ -175,6 +274,9 @@ const {
   filteredEntries,
   dateRangeFilter,
   isDateFilterActive,
+  comboFilterActive,
+  comboFilterTagIds,
+  comboFilterMode,
 })
 
 // === Feed Management ===
@@ -371,6 +473,10 @@ watch(showFavoritesOnly, async (val) => {
 
 watch(dateRangeFilter, () => {
   if (showFavoritesOnly.value) loadFavoritesData({ includeEntries: true })
+  if (comboFilterActive.value) {
+    tagsStore.fetchFilteredEntries(comboFilterTagIds.value, comboFilterMode.value, true)
+    return
+  }
   if (viewMode.value === 'tag') {
     const tagOptions = {
       dateRange: isDateFilterActive.value ? dateRangeFilter.value : undefined,
@@ -381,8 +487,39 @@ watch(dateRangeFilter, () => {
     else if (activeTagId.value) tagsStore.fetchEntriesByTag(activeTagId.value, true, tagOptions)
   }
 })
+
+watch(dateRangeFilter, (val) => {
+  if (viewMode.value === 'tag') {
+    tagsDateRange.value = val
+    writeSavedDateRange(TAGS_DATE_RANGE_KEY, val)
+    return
+  }
+  if (viewMode.value === 'favorites') {
+    favoritesDateRange.value = val
+    writeSavedDateRange(FAVORITES_DATE_RANGE_KEY, val)
+    return
+  }
+  subscriptionDateRange.value = val
+  writeSavedDateRange(SUBSCRIPTION_DATE_RANGE_KEY, val)
+})
+
+watch(viewMode, (mode) => {
+  if (mode === 'tag') {
+    dateRangeFilter.value = tagsDateRange.value
+    return
+  }
+  if (mode === 'favorites') {
+    dateRangeFilter.value = favoritesDateRange.value
+    return
+  }
+  dateRangeFilter.value = subscriptionDateRange.value
+})
 watch(() => settingsStore.settings.time_field, () => {
   if (showFavoritesOnly.value) loadFavoritesData({ includeEntries: true })
+  if (comboFilterActive.value) {
+    tagsStore.fetchFilteredEntries(comboFilterTagIds.value, comboFilterMode.value, true)
+    return
+  }
   if (viewMode.value === 'tag') {
     const tagOptions = {
       dateRange: isDateFilterActive.value ? dateRangeFilter.value : undefined,
@@ -574,7 +711,11 @@ onMounted(async () => {
   await loadLanguage()
   await aiStore.fetchConfig()
 
-  dateRangeFilter.value = settingsStore.settings.default_date_range
+  const defaultRange = settingsStore.settings.default_date_range
+  subscriptionDateRange.value = readSavedDateRange(SUBSCRIPTION_DATE_RANGE_KEY) || defaultRange
+  favoritesDateRange.value = readSavedDateRange(FAVORITES_DATE_RANGE_KEY) || defaultRange
+  tagsDateRange.value = readSavedDateRange(TAGS_DATE_RANGE_KEY) || defaultRange
+  dateRangeFilter.value = subscriptionDateRange.value
   loadFavoritesData()
 
   const initialDateRange = settingsStore.settings.enable_date_filter ? dateRangeFilter.value : undefined
@@ -698,6 +839,7 @@ onUnmounted(() => {
           :title="timelineTitle"
           :subtitle="timelineSubtitle"
           :show-favorites-only="false"
+          :can-mark-all-read="false"
           @refresh="reloadFeeds"
           @back-to-feeds="backToAllFeeds"
         />
@@ -715,6 +857,19 @@ onUnmounted(() => {
       :title="timelineTitle"
       :subtitle="timelineSubtitle"
       :show-favorites-only="showFavoritesOnly"
+      :view-mode="viewMode"
+      :active-tag-id="activeTagId"
+      :active-tag-name="tagsStore.selectedTag?.name || undefined"
+      :active-tag-view="activeTagView"
+      :tag-stats="{
+        pending: tagsStore.stats.pending,
+        analyzed: tagsStore.stats.analyzed,
+        withoutTags: tagsStore.stats.withoutTags
+      }"
+      :combo-filter-active="comboFilterActive"
+      :combo-filter-tag-ids="comboFilterTagIds"
+      :combo-filter-mode="comboFilterMode"
+      :available-tags="tagsStore.tags"
       :view-type="timelineViewType"
       :search-query="searchQuery"
       :filter-mode="filterMode"
@@ -752,6 +907,8 @@ onUnmounted(() => {
       @mark-all-read="handleMarkAllAsRead"
       @toggle-ai-search="handleToggleAISearch"
       @ai-search="handleAISearch"
+      @apply-tag-combo="handleApplyTagCombo"
+      @clear-tag-combo="handleClearTagCombo"
     />
 
     <div

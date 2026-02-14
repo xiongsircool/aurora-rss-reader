@@ -426,6 +426,27 @@ export function initDatabase(): void {
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_entry_analysis_status_status ON entry_analysis_status(status)`);
 
+  // Create digest summary history table (LLM-generated summaries per tag/period snapshot)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS digest_tag_summaries (
+      id TEXT PRIMARY KEY,
+      tag_id TEXT NOT NULL,
+      period TEXT NOT NULL,
+      time_range_key TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'zh',
+      source_count INTEGER NOT NULL DEFAULT 0,
+      source_hash TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      keywords_json TEXT,
+      model_name TEXT NOT NULL,
+      trigger_type TEXT NOT NULL DEFAULT 'auto',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (tag_id) REFERENCES user_tags(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_digest_tag_summaries_tag_period_time ON digest_tag_summaries(tag_id, period, time_range_key, language)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_digest_tag_summaries_created_at ON digest_tag_summaries(created_at DESC)`);
+
   // Run migrations for existing databases
   runMigrations();
 

@@ -21,6 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const quickDateRanges = ['7d', '30d', 'all'] as const
 
 function handleSearchKeydown(event: KeyboardEvent) {
   if (event.key === 'Enter' && props.aiSearchActive && props.searchQuery.trim()) {
@@ -99,6 +100,25 @@ function handleSearchKeydown(event: KeyboardEvent) {
           <option value="365d">{{ t('time.last1Year') }}</option>
           <option value="all">{{ t('time.allTime') }}</option>
         </select>
+      </div>
+      <div v-if="enableDateFilter" class="flex items-center gap-1.5">
+        <button
+          v-for="range in quickDateRanges"
+          :key="range"
+          class="px-2 py-1 rounded-md text-[11px] border transition-all"
+          :class="dateRangeFilter === range
+            ? 'bg-[rgba(255,122,24,0.16)] border-[rgba(255,122,24,0.35)] c-[var(--accent)]'
+            : 'bg-[var(--bg-surface)] border-[var(--border-color)] c-[var(--text-secondary)] hover:c-[var(--text-primary)] hover:border-[var(--accent)]'"
+          @click="emit('update:dateRangeFilter', range)"
+        >
+          {{
+            range === '7d'
+              ? t('time.last1Week')
+              : range === '30d'
+                ? t('time.last1Month')
+                : t('time.allTime')
+          }}
+        </button>
       </div>
     </div>
   </div>
