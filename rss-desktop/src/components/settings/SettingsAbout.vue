@@ -1,7 +1,33 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
+const checkingUpdate = ref(false)
+const updateResultType = ref<'success' | 'error' | ''>('')
+const updateResultText = ref('')
+
+async function handleCheckUpdate() {
+  if (!window.electron || checkingUpdate.value) return
+  checkingUpdate.value = true
+  updateResultType.value = ''
+  updateResultText.value = ''
+  try {
+    const result = await window.electron.checkForUpdates()
+    if (result?.success) {
+      updateResultType.value = 'success'
+      updateResultText.value = t('settings.updateCheckStarted')
+    } else {
+      updateResultType.value = 'error'
+      updateResultText.value = result?.error || t('settings.updateCheckFailed')
+    }
+  } catch {
+    updateResultType.value = 'error'
+    updateResultText.value = t('settings.updateCheckFailed')
+  } finally {
+    checkingUpdate.value = false
+  }
+}
 </script>
 
 <template>
@@ -19,6 +45,26 @@ const { t } = useI18n()
 
       <!-- Description -->
       <p class="text-3.5 text-[var(--text-primary)] leading-relaxed m-0 mb-4">{{ t('settings.aboutDescription') }}</p>
+
+      <!-- Update check -->
+      <div class="mb-4">
+        <button
+          :disabled="checkingUpdate"
+          class="inline-flex items-center gap-2 py-2 px-3 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2 text-[var(--text-primary)] text-3.25 font-600 cursor-pointer transition-all duration-200 hover:border-orange-500 hover:bg-orange-500/10 disabled:opacity-60 disabled:cursor-not-allowed"
+          @click="handleCheckUpdate"
+        >
+          <span v-if="checkingUpdate" class="inline-block animate-spin w-3.5 h-3.5 border-2 border-[var(--text-secondary)] border-t-transparent rounded-full"></span>
+          <span v-else class="i-carbon-renew text-4"></span>
+          {{ checkingUpdate ? t('settings.checkingUpdate') : t('settings.checkUpdate') }}
+        </button>
+        <p
+          v-if="updateResultText"
+          class="mt-2 mb-0 text-3"
+          :class="updateResultType === 'success' ? 'text-[#16a34a]' : 'text-[#dc2626]'"
+        >
+          {{ updateResultText }}
+        </p>
+      </div>
 
       <!-- Features -->
       <div class="flex flex-wrap gap-2 mb-4">
