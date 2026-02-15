@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAIStore, type AIServiceKey } from '../stores/aiStore'
+import { getApiBaseUrl } from '../api/base'
 import type { LocalConfig } from './useSettingsModal'
 import type { ConfirmOptions } from './useConfirmDialog'
 
@@ -173,7 +174,7 @@ export function useAIConfigSettings(
         mcpTestResult.value = null
 
         try {
-            const apiBase = import.meta.env.VITE_API_BASE_URL ?? '/api'
+            const apiBase = getApiBaseUrl()
             const response = await fetch(`${apiBase}/health`)
             const data = await response.json()
             if (data?.status === 'ok' || data?.status === 'degraded') {

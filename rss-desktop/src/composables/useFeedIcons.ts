@@ -1,7 +1,8 @@
 import { ref } from 'vue'
 import type { Feed } from '../types'
+import { getApiBaseUrl } from '../api/base'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
+const API_BASE = getApiBaseUrl()
 
 const FEED_ICON_COLORS = [
     '#FF8A3D',

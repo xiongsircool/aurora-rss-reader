@@ -5,6 +5,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { getApiBaseUrl } from '../api/base'
 
 export interface TagMatchRule {
     keywords: string[]
@@ -93,7 +94,7 @@ export const useTagsStore = defineStore('tags', () => {
     )
 
     // API Base URL
-    const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
+    const API_BASE = getApiBaseUrl()
 
     // Actions
     async function fetchTags() {

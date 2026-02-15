@@ -107,12 +107,23 @@ function logToFile(message: string) {
 /**
  * 健康检查：等待后端服务就绪
  */
-async function waitForBackendReady(): Promise<boolean> {
+type BackendWaitOptions = {
+  expectedInstanceId?: string
+  shouldAbort?: () => boolean
+}
+
+async function waitForBackendReady(options: BackendWaitOptions = {}): Promise<boolean> {
   const startTime = Date.now()
+  const { expectedInstanceId, shouldAbort } = options
 
   logToFile(`⏳ 等待后端服务就绪... (${HEALTH_CHECK_URL})`)
 
   while (Date.now() - startTime < HEALTH_CHECK_TIMEOUT) {
+    if (shouldAbort?.()) {
+      logToFile('❌ 后端进程在就绪前退出')
+      return false
+    }
+
     try {
       const response = await fetch(HEALTH_CHECK_URL, {
         method: 'GET',
@@ -121,9 +132,15 @@ async function waitForBackendReady(): Promise<boolean> {
 
       if (response.ok) {
         const data = await response.json()
-        logToFile(`✅ 后端服务已就绪: ${JSON.stringify(data)}`)
-        backendReady = true
-        return true
+        const instanceId = typeof data?.instanceId === 'string' ? data.instanceId : undefined
+
+        if (expectedInstanceId && instanceId !== expectedInstanceId) {
+          logToFile(`⚠️ 命中其他后端实例，期望=${expectedInstanceId}，实际=${instanceId || 'unknown'}，继续等待`)
+        } else {
+          logToFile(`✅ 后端服务已就绪: ${JSON.stringify(data)}`)
+          backendReady = true
+          return true
+        }
       }
     } catch (error) {
       // 忽略连接错误，继续重试
@@ -209,6 +226,9 @@ async function startBackend(): Promise<{ success: boolean; error?: string; path?
     logToFile('Finding backend entry...')
     try {
       const { exec, args, cwd, env: backendEnv } = getBackendExecutable()
+      const backendInstanceId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      let backendExited = false
+      let backendExitCode: number | null = null
       execPath = exec
 
       logToFile('🚀 启动后端服务...')
@@ -224,7 +244,8 @@ async function startBackend(): Promise<{ success: boolean; error?: string; path?
           NODE_ENV: isDev ? 'development' : 'production',
           APP_ENV: isDev ? 'development' : 'production',
           API_PORT: String(BACKEND_PORT),
-          API_HOST: BACKEND_HOST
+          API_HOST: BACKEND_HOST,
+          AURORA_BACKEND_INSTANCE_ID: backendInstanceId
         },
         stdio: isDev ? 'inherit' : ['pipe', 'pipe', 'pipe'] as const
       }
@@ -253,17 +274,29 @@ async function startBackend(): Promise<{ success: boolean; error?: string; path?
 
       spawnedProcess.on('exit', (code, signal) => {
         logToFile(`[Backend] 进程退出 - 代码: ${code}, 信号: ${signal}`)
+        backendExited = true
+        backendExitCode = code
         backendProcess = null
         backendReady = false
       })
 
       logToFile('✅ 后端进程已启动，等待服务就绪...')
 
-      const ready = await waitForBackendReady()
+      const ready = await waitForBackendReady({
+        expectedInstanceId: backendInstanceId,
+        shouldAbort: () => backendExited
+      })
 
       if (!ready) {
         logToFile('❌ 后端服务未能在规定时间内就绪')
         stopBackend()
+        if (backendExited && backendExitCode !== 0) {
+          return {
+            success: false,
+            error: '后端启动失败：端口 15432 可能被占用，请关闭旧的 Aurora 后端进程后重试',
+            path: execPath
+          }
+        }
         return { success: false, error: `后端服务启动超时（${Math.round(HEALTH_CHECK_TIMEOUT / 1000)}s）`, path: execPath }
       }
 

@@ -66,6 +66,8 @@ async function healthCheck() {
     version: '0.1.0',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
+    instanceId: process.env.AURORA_BACKEND_INSTANCE_ID || null,
+    pid: process.pid,
     database: {
       status: dbStatus,
       error: dbError,
