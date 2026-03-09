@@ -63,7 +63,7 @@ export function useFeedManagement(options: {
       await store.addFeed(url, { groupName: targetGroupName })
       showNotification(t('feeds.addSuccess'), 'success')
     } catch {
-      showNotification(t('feeds.addFailed'), 'error')
+      showNotification(store.errorMessage || t('feeds.addFailed'), 'error')
     }
   }
 

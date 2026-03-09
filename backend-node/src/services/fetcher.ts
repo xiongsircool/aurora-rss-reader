@@ -4,7 +4,7 @@
  */
 
 import Parser from 'rss-parser';
-import { request as undiciRequest } from 'undici';
+import { request as undiciRequest, ProxyAgent } from 'undici';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { FeedRepository, EntryRepository, FetchLogRepository } from '../db/repositories/index.js';
@@ -22,6 +22,17 @@ import { cleanHtmlText } from '../utils/text.js';
 const parser = new Parser();
 
 const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; RSS Reader/1.0; +https://github.com/rss-reader)';
+
+function getProxyAgent() {
+  const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy;
+  if (!proxy) return undefined;
+  try {
+    return new ProxyAgent(proxy);
+  } catch (error) {
+    console.warn('Failed to create proxy agent:', error);
+    return undefined;
+  }
+}
 
 function buildHeaders(userAgent: string): Record<string, string> {
   return {
@@ -98,11 +109,13 @@ async function delay(ms: number): Promise<void> {
 }
 
 async function fetchFeedXml(url: string, headers: Record<string, string>): Promise<string> {
+  const proxyAgent = getProxyAgent();
   const response = await undiciRequest(url, {
     headers,
     maxRedirections: 3,
     headersTimeout: TIMEOUT_CONFIG.read,
     bodyTimeout: TIMEOUT_CONFIG.read,
+    dispatcher: proxyAgent,
   });
 
   if (response.statusCode < 200 || response.statusCode >= 300) {

@@ -143,9 +143,11 @@ export const useFeedStore = defineStore('feed', () => {
         dateRange: lastEntryFilters.value?.dateRange,
         timeField: lastEntryFilters.value?.timeField,
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      errorMessage.value = '添加订阅失败，请检查链接'
+      const message = error.response?.data?.error || error.message || '添加订阅失败，请检查链接'
+      errorMessage.value = message
+      throw error
     } finally {
       addingFeed.value = false
     }
