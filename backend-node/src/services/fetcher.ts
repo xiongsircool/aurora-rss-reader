@@ -23,8 +23,37 @@ const parser = new Parser();
 
 const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; RSS Reader/1.0; +https://github.com/rss-reader)';
 
+function getSystemProxy(): string | null {
+  if (process.platform !== 'darwin') return null;
+  try {
+    const { execSync } = require('child_process');
+    const output = execSync('scutil --proxy', { encoding: 'utf-8' });
+    const httpEnabled = /HTTPEnable\s*:\s*1/.test(output);
+    const httpsEnabled = /HTTPSEnable\s*:\s*1/.test(output);
+
+    if (httpsEnabled) {
+      const proxyMatch = output.match(/HTTPSProxy\s*:\s*(\S+)/);
+      const portMatch = output.match(/HTTPSPort\s*:\s*(\d+)/);
+      if (proxyMatch && portMatch) {
+        return `http://${proxyMatch[1]}:${portMatch[1]}`;
+      }
+    }
+
+    if (httpEnabled) {
+      const proxyMatch = output.match(/HTTPProxy\s*:\s*(\S+)/);
+      const portMatch = output.match(/HTTPPort\s*:\s*(\d+)/);
+      if (proxyMatch && portMatch) {
+        return `http://${proxyMatch[1]}:${portMatch[1]}`;
+      }
+    }
+  } catch (error) {
+    // Ignore errors
+  }
+  return null;
+}
+
 function getProxyAgent() {
-  const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy;
+  const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy || getSystemProxy();
   if (!proxy) return undefined;
   try {
     return new ProxyAgent(proxy);
