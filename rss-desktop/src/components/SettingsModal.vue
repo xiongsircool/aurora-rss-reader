@@ -101,6 +101,11 @@ const detailsPanelMode = computed({
   set: (value) => settingsStore.updateSettings({ details_panel_mode: value })
 })
 
+const timelineFilterDensity = computed({
+  get: () => settingsStore.settings.timeline_filter_density,
+  set: (value) => settingsStore.updateSettings({ timeline_filter_density: value })
+})
+
 // Watch modal visibility
 watch(() => props.show, async (show) => {
   if (show) {
@@ -324,6 +329,7 @@ async function saveSettings() {
                       v-model:openOriginalMode="openOriginalMode"
                       v-model:markAsReadRange="markAsReadRange"
                       v-model:detailsPanelMode="detailsPanelMode"
+                      v-model:timelineFilterDensity="timelineFilterDensity"
                     />
                   </div>
                 </div>

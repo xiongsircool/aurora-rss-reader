@@ -18,6 +18,8 @@ export interface AppSettings {
   mark_as_read_range: string // 'current' | '3d' | '7d' | '30d' | 'all'
   // 详情栏显示模式
   details_panel_mode: 'docked' | 'click'
+  // 时间线筛选区密度
+  timeline_filter_density: 'compact' | 'standard'
   // 语言设置
   language: string // 'zh' | 'en' | 'ja' | 'ko'
   summary_prompt_preference: string
@@ -39,6 +41,7 @@ export const useSettingsStore = defineStore('settings', () => {
     max_auto_title_translations: getDefaultAutoTitleTranslationLimit(),
     mark_as_read_range: 'current',
     details_panel_mode: 'docked',
+    timeline_filter_density: 'compact',
     language: 'zh',
     summary_prompt_preference: '',
     translation_prompt_preference: '',

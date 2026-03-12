@@ -50,9 +50,15 @@ export async function userSettingsRoutes(app: FastifyInstance) {
 
       const proxyMode = typeof payload.outbound_proxy_mode === 'string' ? payload.outbound_proxy_mode : undefined;
       const proxyUrl = typeof payload.outbound_proxy_url === 'string' ? payload.outbound_proxy_url.trim() : undefined;
+      const filterDensity =
+        typeof payload.timeline_filter_density === 'string' ? payload.timeline_filter_density : undefined;
 
       if (proxyMode && !['system', 'custom', 'off'].includes(proxyMode)) {
         return reply.code(400).send({ error: 'Invalid outbound_proxy_mode' });
+      }
+
+      if (filterDensity && !['compact', 'standard'].includes(filterDensity)) {
+        return reply.code(400).send({ error: 'Invalid timeline_filter_density' });
       }
 
       if (proxyMode === 'custom' && (!proxyUrl || !isValidProxyUrl(proxyUrl))) {

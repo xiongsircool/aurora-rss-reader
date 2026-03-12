@@ -95,6 +95,9 @@ setupFilterWatchers()
 const subscriptionDateRange = ref('30d')
 const favoritesDateRange = ref('30d')
 const tagsDateRange = ref('30d')
+const compactTimelineFilterDensity = computed(
+  () => settingsStore.settings.timeline_filter_density === 'compact'
+)
 
 // === View Mode ===
 const selectedFavoriteEntryId = ref<string | null>(null)
@@ -862,6 +865,7 @@ onUnmounted(() => {
     <template v-if="viewMode === 'tag' && activeTagView === 'digest'">
       <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden">
         <TimelineHeader
+          v-if="!compactTimelineFilterDensity"
           :title="timelineTitle"
           :subtitle="timelineSubtitle"
           :show-favorites-only="false"
@@ -869,7 +873,7 @@ onUnmounted(() => {
           @refresh="reloadFeeds"
           @back-to-feeds="backToAllFeeds"
         />
-        <div class="flex-1 overflow-y-auto p-4">
+        <div class="flex-1 overflow-y-auto" :class="compactTimelineFilterDensity ? 'p-3 pt-2' : 'p-4'">
           <DigestView
             @select-entry="handleEntrySelect"
             @select-tag="handleSelectTag"
@@ -902,6 +906,7 @@ onUnmounted(() => {
       :date-range-filter="dateRangeFilter"
       :filter-loading="filterLoading"
       :enable-date-filter="settingsStore.settings.enable_date_filter"
+      :filter-density="settingsStore.settings.timeline_filter_density"
       :entries="unifiedEntries"
       :loading="unifiedLoading"
       :has-more="timelineHasMore"

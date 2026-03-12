@@ -124,6 +124,7 @@ export interface UserSettings {
   max_auto_title_translations: number;
   mark_as_read_range: string;
   details_panel_mode: string; // 'docked' | 'click'
+  timeline_filter_density: 'compact' | 'standard';
   // Global default AI configuration
   default_ai_provider: string; // Provider preset ID (e.g. 'openai', 'deepseek', 'gemini')
   default_ai_api_key: string;

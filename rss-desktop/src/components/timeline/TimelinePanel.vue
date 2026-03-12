@@ -41,6 +41,7 @@ const props = defineProps<{
   dateRangeFilter: string
   filterLoading: boolean
   enableDateFilter: boolean
+  filterDensity?: 'compact' | 'standard'
   
   // List props
   entries: Entry[]
@@ -124,6 +125,7 @@ const hasDateFilter = computed(() => props.enableDateFilter && props.dateRangeFi
 const hasAnyFilters = computed(() =>
   hasSearchFilter.value || hasStateFilter.value || hasDateFilter.value || !!props.comboFilterActive
 )
+const showTopHeader = computed(() => props.filterDensity !== 'compact')
 const filterModeLabel = computed(() => {
   if (props.filterMode === 'unread') return t('navigation.unread')
   if (props.filterMode === 'starred') return t('navigation.favorites')
@@ -252,6 +254,7 @@ function handleVisibleUpdate(
 <template>
   <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden lt-md:w-full! lt-md:border-r-0 lt-md:border-b lt-md:min-w-auto lt-md:h-auto lt-md:max-h-none lt-md:overflow-visible">
     <TimelineHeader
+      v-if="showTopHeader"
       :title="title"
       :subtitle="subtitle"
       :show-favorites-only="showFavoritesOnly"
@@ -261,7 +264,10 @@ function handleVisibleUpdate(
       @mark-all-read="emit('mark-all-read')"
     />
 
-    <div class="mx-4 mt-3 mb-2 px-3 py-2 rounded-xl border flex items-center justify-between gap-3" :class="modeAccentClass">
+    <div
+      class="mx-4 mb-2 px-3 py-2 rounded-xl border flex items-center justify-between gap-3"
+      :class="[modeAccentClass, showTopHeader ? 'mt-3' : 'mt-2']"
+    >
       <div class="flex items-center gap-2 min-w-0">
         <span class="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0"></span>
         <span class="text-[12px] font-semibold c-[var(--text-primary)] truncate">{{ modeLabel }}</span>
@@ -338,6 +344,7 @@ function handleVisibleUpdate(
       :date-range-filter="dateRangeFilter"
       :filter-loading="filterLoading"
       :enable-date-filter="enableDateFilter"
+      :filter-density="filterDensity"
       :ai-search-enabled="aiSearchEnabled"
       :ai-search-active="aiSearchActive"
       :ai-search-loading="aiSearchLoading"

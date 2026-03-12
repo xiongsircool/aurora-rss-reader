@@ -143,6 +143,14 @@ function runMigrations(): void {
     console.log('Migration completed: ai_auto_tagging_start_at column added');
   }
 
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasTimelineFilterDensity = tableInfo.some((col) => col.name === 'timeline_filter_density');
+  if (!hasTimelineFilterDensity) {
+    console.log('Running migration: Adding timeline_filter_density column to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN timeline_filter_density TEXT NOT NULL DEFAULT 'compact'`);
+    console.log('Migration completed: timeline_filter_density column added');
+  }
+
   // Check if legacy ai_prompt_preference column exists in user_settings
   const hasAiPromptPreference = tableInfo.some((col) => col.name === 'ai_prompt_preference');
   if (!hasAiPromptPreference) {
@@ -416,6 +424,7 @@ export function initDatabase(): void {
       max_auto_title_translations INTEGER NOT NULL DEFAULT 10,
       mark_as_read_range TEXT NOT NULL DEFAULT 'current',
       details_panel_mode TEXT NOT NULL DEFAULT 'docked',
+      timeline_filter_density TEXT NOT NULL DEFAULT 'compact',
       default_ai_provider TEXT NOT NULL DEFAULT '',
       default_ai_api_key TEXT NOT NULL DEFAULT '',
       default_ai_base_url TEXT NOT NULL DEFAULT '',
