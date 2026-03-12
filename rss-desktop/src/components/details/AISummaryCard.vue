@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import MarkdownContent from '../common/MarkdownContent.vue'
 
 defineProps<{
   summaryText: string
@@ -20,7 +21,7 @@ const { t } = useI18n()
   >
     <div class="flex-1">
       <p class="summary-card__label text-xs tracking-wide uppercase c-[var(--text-secondary)] mb-0.5 font-semibold">{{ t('ai.summaryLabel') }}</p>
-      <p v-if="summaryText" class="summary-card__text text-sm leading-relaxed c-[var(--text-primary)]">{{ summaryText }}</p>
+      <MarkdownContent v-if="summaryText" :content="summaryText" class="summary-card__text" />
       <p v-else class="summary-card__placeholder c-[var(--text-secondary)] text-xs leading-relaxed">
         {{ t('ai.summaryDescription') }}
       </p>
@@ -59,6 +60,10 @@ const { t } = useI18n()
 .summary-card--loading .summary-card__text,
 .summary-card--loading .summary-card__placeholder {
   position: relative;
+}
+
+.summary-card__text {
+  margin-top: 0.35rem;
 }
 
 .summary-card--loading .summary-card__text::after,

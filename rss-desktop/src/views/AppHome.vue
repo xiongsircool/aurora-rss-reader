@@ -357,6 +357,7 @@ const summaryText = ref('')
 const summaryLoading = ref(false)
 const translationLanguage = ref('zh')
 const lastVisibleEntries = ref<Entry[]>([])
+let summaryRequestVersion = 0
 
 const cleanupTitleTranslationAutoRetry = registerAutoRetryHandler((entryId, language) => {
   if (!aiFeatures.value?.auto_title_translation) return
@@ -431,15 +432,29 @@ async function handleFullTextTranslation() {
 
 async function handleSummary() {
   if (!currentSelectedEntry.value) return
+  const requestVersion = ++summaryRequestVersion
+  const entryId = currentSelectedEntry.value.id
+  const hadSummary = !!summaryText.value.trim()
+  const previousSummary = summaryText.value
   summaryLoading.value = true
+  if (hadSummary) {
+    summaryText.value = ''
+  }
   try {
-    const summary = await store.requestSummary(currentSelectedEntry.value.id)
-    summaryText.value = summary.summary
-    showNotification(t('toast.summarySuccess'), 'success')
+    const summary = await store.requestSummary(entryId, 'zh', { force: hadSummary })
+    if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entryId) {
+      summaryText.value = summary.summary
+      showNotification(t('toast.summarySuccess'), 'success')
+    }
   } catch {
-    showNotification(t('toast.summaryFailed'), 'error')
+    if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entryId) {
+      summaryText.value = previousSummary
+      showNotification(t('toast.summaryFailed'), 'error')
+    }
   } finally {
-    summaryLoading.value = false
+    if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entryId) {
+      summaryLoading.value = false
+    }
   }
 }
 
@@ -662,18 +677,29 @@ watch(
 watch(
   () => currentSelectedEntry.value,
   async (entry) => {
-    if (!entry) { summaryText.value = ''; return }
-    const cached = store.summaryCache[entry.id]
+    const requestVersion = ++summaryRequestVersion
+    if (!entry) {
+      summaryText.value = ''
+      summaryLoading.value = false
+      return
+    }
+    const cached = store.getCachedSummary(entry.id)
     summaryText.value = cached?.summary ?? ''
     if (aiFeatures.value?.auto_summary && !cached?.summary) {
       try {
         summaryLoading.value = true
         const summary = await store.requestSummary(entry.id)
-        summaryText.value = summary.summary
+        if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entry.id) {
+          summaryText.value = summary.summary
+        }
       } catch (error) {
-        console.error('Auto summary failed:', error)
+        if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entry.id) {
+          console.error('Auto summary failed:', error)
+        }
       } finally {
-        summaryLoading.value = false
+        if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entry.id) {
+          summaryLoading.value = false
+        }
       }
     }
     if (!entry.read) await store.toggleEntryState(entry, { read: true })

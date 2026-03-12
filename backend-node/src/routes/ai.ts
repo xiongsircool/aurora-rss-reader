@@ -121,6 +121,7 @@ export async function aiRoutes(app: FastifyInstance) {
 
     const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
     const language = typeof body.language === 'string' ? body.language : undefined;
+    const force = typeof body.force === 'boolean' ? body.force : false;
     const targetLanguage = language || 'zh';
 
     if (!entry_id) {
@@ -133,7 +134,7 @@ export async function aiRoutes(app: FastifyInstance) {
     }
 
     const existing = summaryRepo.findByEntryIdAndLanguage(entry_id, targetLanguage);
-    if (existing?.summary) {
+    if (!force && existing?.summary) {
       return { entry_id, language: targetLanguage, summary: existing.summary };
     }
 
