@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { getConfig } from './config/index.js';
 import { initDatabase } from './db/init.js';
+import { closeDatabase } from './db/session.js';
 import { userSettingsRoutes } from './routes/userSettings.js';
 import { feedsRoutes } from './routes/feeds.js';
 import { entriesRoutes } from './routes/entries.js';
@@ -19,6 +20,7 @@ import { handleMcpRequest, handleMcpGetRequest, handleMcpDeleteRequest } from '.
 const app = Fastify({
   logger: true
 });
+let isShuttingDown = false;
 
 // CORS configuration
 await app.register(cors, {
@@ -83,7 +85,7 @@ app.get('/api/health', async () => healthCheck());
 try {
   initDatabase();
   console.log('✅ Database initialized');
-  console.log('✅ Vector DB initialized (sqlite-vss)');
+  console.log('ℹ️  Vector DB initialization completed; check startup logs for sqlite-vss availability');
 } catch (error) {
   console.error('❌ Database initialization failed:', error);
   process.exit(1);
@@ -146,15 +148,34 @@ app.listen({ port: config.apiPort, host: config.apiHost }, (err, address) => {
   console.log(`🚀 Server listening at ${address}`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
+async function shutdown(signal: 'SIGTERM' | 'SIGINT') {
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
+  console.log(`${signal} received, shutting down gracefully`);
   scheduler.stop();
+
+  try {
+    await app.close();
+  } catch (error) {
+    console.error('Error while closing Fastify:', error);
+  }
+
+  try {
+    closeDatabase();
+  } catch (error) {
+    console.error('Error while closing database:', error);
+  }
+
   process.exit(0);
+}
+
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  scheduler.stop();
-  process.exit(0);
+  void shutdown('SIGINT');
 });

@@ -24,6 +24,7 @@ import { getDatabase } from '../db/session.js';
 import { AIClient } from '../services/ai.js';
 import { userSettingsService } from '../services/userSettings.js';
 import { getConfig } from '../config/index.js';
+import { getObjectBody } from '../utils/http.js';
 
 type DigestEntryRow = {
     id: string;
@@ -240,7 +241,18 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             match_rules?: TagMatchRule[];
         };
     }>('/tags', async (request, reply) => {
-        const { name, description, color, match_mode, match_rules } = request.body;
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const name = typeof body.name === 'string' ? body.name : '';
+        const description = typeof body.description === 'string' ? body.description : undefined;
+        const color = typeof body.color === 'string' ? body.color : undefined;
+        const match_mode = body.match_mode === 'ai' || body.match_mode === 'rule' || body.match_mode === 'both'
+            ? body.match_mode
+            : undefined;
+        const match_rules = Array.isArray(body.match_rules) ? body.match_rules as TagMatchRule[] : undefined;
 
         if (!name || !name.trim()) {
             return reply.status(400).send({ error: '标签名称不能为空' });
@@ -281,7 +293,19 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
         };
     }>('/tags/:id', async (request, reply) => {
         const { id } = request.params;
-        const { name, description, color, enabled, match_mode, match_rules } = request.body;
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const name = typeof body.name === 'string' ? body.name : undefined;
+        const description = typeof body.description === 'string' ? body.description : undefined;
+        const color = typeof body.color === 'string' ? body.color : undefined;
+        const enabled = typeof body.enabled === 'boolean' ? body.enabled : undefined;
+        const match_mode = body.match_mode === 'ai' || body.match_mode === 'rule' || body.match_mode === 'both'
+            ? body.match_mode
+            : undefined;
+        const match_rules = Array.isArray(body.match_rules) ? body.match_rules as TagMatchRule[] : undefined;
 
         const existing = tagRepo.findById(id);
         if (!existing) {
@@ -474,7 +498,14 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
     app.post<{
         Body: { entryIds: string[] };
     }>('/ai/tags/analyze', async (request, reply) => {
-        const { entryIds } = request.body;
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const entryIds = Array.isArray(body.entryIds)
+            ? body.entryIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+            : [];
 
         if (!entryIds || entryIds.length === 0) {
             return reply.status(400).send({ error: '请提供要分析的文章ID' });
@@ -626,7 +657,17 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             mode?: 'missing' | 'all';
         };
     }>('/ai/tags/rerun-range', async (request, reply) => {
-        const { from, to, cursor, limit, feedIds, mode } = request.body;
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const from = typeof body.from === 'string' ? body.from : '';
+        const to = typeof body.to === 'string' ? body.to : '';
+        const cursor = typeof body.cursor === 'string' ? body.cursor : undefined;
+        const limit = typeof body.limit === 'number' ? body.limit : body.limit;
+        const feedIds = Array.isArray(body.feedIds) ? body.feedIds : undefined;
+        const mode = body.mode === 'all' ? 'all' : 'missing';
 
         if (!from || !to) {
             return reply.status(400).send({ error: '请提供 from/to (ISO 时间字符串)' });
@@ -644,7 +685,7 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
         const parsedLimit =
             typeof limit === 'number' ? limit : Number.parseInt(String(limit ?? ''), 10);
         const safeLimit = Math.max(1, Math.min(Number.isFinite(parsedLimit) ? parsedLimit : 50, 200));
-        const nextMode: 'missing' | 'all' = mode === 'all' ? 'all' : 'missing';
+        const nextMode: 'missing' | 'all' = mode;
 
         // Get enabled tags
         const tags = tagRepo.findAllEnabled();
@@ -857,8 +898,16 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             modelName?: string;
             autoTagging?: boolean;
         };
-    }>('/ai/tags/config', async (request) => {
-        const { apiKey, baseUrl, modelName, autoTagging } = request.body;
+    }>('/ai/tags/config', async (request, reply) => {
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const apiKey = typeof body.apiKey === 'string' ? body.apiKey : undefined;
+        const baseUrl = typeof body.baseUrl === 'string' ? body.baseUrl : undefined;
+        const modelName = typeof body.modelName === 'string' ? body.modelName : undefined;
+        const autoTagging = typeof body.autoTagging === 'boolean' ? body.autoTagging : undefined;
 
         updateTaggingConfig({
             apiKey,

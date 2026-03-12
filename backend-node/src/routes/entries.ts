@@ -8,6 +8,7 @@ import { getDatabase } from '../db/session.js';
 import { cleanHtmlText } from '../utils/text.js';
 import { normalizeTimeField, parseRelativeTime } from '../utils/dateRange.js';
 import { userSettingsService } from '../services/userSettings.js';
+import { getObjectBody, getStringArrayBody } from '../utils/http.js';
 
 type CursorPayload = { t: string; id: string };
 
@@ -236,11 +237,14 @@ export async function entriesRoutes(app: FastifyInstance) {
   // PATCH /entries/:id - Update entry state
   app.patch('/entries/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const updates = request.body as { read?: boolean; starred?: boolean };
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
 
     const entry = entryRepo.update(id, {
-      read: updates.read,
-      starred: updates.starred,
+      read: typeof body.read === 'boolean' ? body.read : undefined,
+      starred: typeof body.starred === 'boolean' ? body.starred : undefined,
     });
 
     if (!entry) {
@@ -410,8 +414,8 @@ export async function entriesRoutes(app: FastifyInstance) {
 
   // POST /entries/bulk-star - Bulk star entries
   app.post('/entries/bulk-star', async (request, reply) => {
-    const entryIds = request.body as string[] | undefined;
-    const ids = Array.isArray(entryIds) ? entryIds.filter(Boolean) : [];
+    const entryIds = getStringArrayBody(request.body);
+    const ids = entryIds ? entryIds.filter(Boolean) : [];
 
     if (ids.length === 0) {
       return reply.code(400).send({ error: 'Entry IDs are required' });
@@ -432,8 +436,8 @@ export async function entriesRoutes(app: FastifyInstance) {
 
   // POST /entries/bulk-unstar - Bulk unstar entries
   app.post('/entries/bulk-unstar', async (request, reply) => {
-    const entryIds = request.body as string[] | undefined;
-    const ids = Array.isArray(entryIds) ? entryIds.filter(Boolean) : [];
+    const entryIds = getStringArrayBody(request.body);
+    const ids = entryIds ? entryIds.filter(Boolean) : [];
 
     if (ids.length === 0) {
       return reply.code(400).send({ error: 'Entry IDs are required' });

@@ -9,6 +9,7 @@ import { EntryRepository, TranslationRepository, SummaryRepository } from '../db
 import { userSettingsService } from '../services/userSettings.js';
 import { getConfig } from '../config/index.js';
 import { initTaggingClient } from '../services/tagging.js';
+import { getObjectBody } from '../utils/http.js';
 
 function resolveServiceConfig(service: ServiceKey) {
   const settings = userSettingsService.getSettings();
@@ -113,7 +114,13 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // POST /ai/summary - Generate summary (frontend expects entry_id)
   app.post('/ai/summary', async (request, reply) => {
-    const { entry_id, language } = request.body as { entry_id?: string; language?: string };
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
+    const language = typeof body.language === 'string' ? body.language : undefined;
     const targetLanguage = language || 'zh';
 
     if (!entry_id) {
@@ -150,7 +157,13 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // POST /ai/translate-title - Translate entry title
   app.post('/ai/translate-title', async (request, reply) => {
-    const { entry_id, language } = request.body as { entry_id?: string; language?: string };
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
+    const language = typeof body.language === 'string' ? body.language : undefined;
     const targetLanguage = language || 'zh';
 
     if (!entry_id) {
@@ -186,17 +199,23 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // POST /ai/translate-blocks - SSE translation
   app.post('/ai/translate-blocks', async (request, reply) => {
-    const body = request.body as {
-      entry_id?: string;
-      source_lang?: string;
-      target_lang?: string;
-      blocks?: Array<{ id: string; text: string }>;
-    };
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
 
-    const entryId = body.entry_id;
-    const sourceLang = body.source_lang || 'en';
-    const targetLang = body.target_lang || 'zh';
-    const blocks = Array.isArray(body.blocks) ? body.blocks : [];
+    const entryId = typeof body.entry_id === 'string' ? body.entry_id : undefined;
+    const sourceLang = typeof body.source_lang === 'string' ? body.source_lang : 'en';
+    const targetLang = typeof body.target_lang === 'string' ? body.target_lang : 'zh';
+    const blocks = Array.isArray(body.blocks)
+      ? body.blocks.filter(
+          (block): block is { id: string; text: string } =>
+            typeof block === 'object' &&
+            block !== null &&
+            typeof (block as { id?: unknown }).id === 'string' &&
+            typeof (block as { text?: unknown }).text === 'string'
+        )
+      : [];
 
     if (!entryId || blocks.length === 0) {
       return reply.code(400).send({ error: 'entry_id and blocks are required' });
@@ -301,7 +320,14 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // POST /ai/translate - Translate text
   app.post('/ai/translate', async (request, reply) => {
-    const { text, target_language, entry_id } = request.body as any;
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const text = typeof body.text === 'string' ? body.text : '';
+    const target_language = typeof body.target_language === 'string' ? body.target_language : undefined;
+    const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
 
     if (!text) {
       return reply.code(400).send({ error: 'Text is required' });
@@ -337,7 +363,14 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // POST /ai/summarize - Generate summary
   app.post('/ai/summarize', async (request, reply) => {
-    const { content, language, entry_id } = request.body as any;
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const content = typeof body.content === 'string' ? body.content : '';
+    const language = typeof body.language === 'string' ? body.language : undefined;
+    const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
 
     if (!content) {
       return reply.code(400).send({ error: 'Content is required' });
@@ -418,14 +451,18 @@ export async function aiRoutes(app: FastifyInstance) {
   });
 
   // PATCH /ai/config - Update AI configuration
-  app.patch('/ai/config', async (request) => {
-    const body = request.body as any;
-    const globalConfig = body.global || {};
-    const summaryConfig = body.summary || {};
-    const translationConfig = body.translation || {};
-    const taggingConfig = body.tagging || {};
-    const embeddingConfig = body.embedding || {};
-    const features = body.features || {};
+  app.patch('/ai/config', async (request, reply) => {
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const globalConfig = getObjectBody(body.global) || {};
+    const summaryConfig = getObjectBody(body.summary) || {};
+    const translationConfig = getObjectBody(body.translation) || {};
+    const taggingConfig = getObjectBody(body.tagging) || {};
+    const embeddingConfig = getObjectBody(body.embedding) || {};
+    const features = getObjectBody(body.features) || {};
 
     const updates: Record<string, any> = {};
     const settings = userSettingsService.getSettings();
@@ -480,13 +517,16 @@ export async function aiRoutes(app: FastifyInstance) {
   });
 
   // POST /ai/test - Test AI connection
-  app.post('/ai/test', async (request) => {
-    const body = request.body as any;
+  app.post('/ai/test', async (request, reply) => {
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ success: false, message: 'Invalid request body: expected an object' });
+    }
 
-    const service = (body.service || 'summary') as ServiceKey;
-    const apiKey = body.api_key;
-    const baseUrl = body.base_url;
-    const modelName = body.model_name;
+    const service = (typeof body.service === 'string' ? body.service : 'summary') as ServiceKey;
+    const apiKey = typeof body.api_key === 'string' ? body.api_key : undefined;
+    const baseUrl = typeof body.base_url === 'string' ? body.base_url : undefined;
+    const modelName = typeof body.model_name === 'string' ? body.model_name : undefined;
 
     if (!apiKey || !baseUrl || !modelName) {
       return {
@@ -581,7 +621,16 @@ export async function aiRoutes(app: FastifyInstance) {
   app.post<{
     Body: { query: string; limit?: number; type?: 'semantic' | 'keyword' | 'hybrid' }
   }>('/ai/search', async (request, reply) => {
-    const { query, limit = 20, type = 'hybrid' } = request.body;
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.status(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const query = typeof body.query === 'string' ? body.query : '';
+    const limit = typeof body.limit === 'number' ? body.limit : 20;
+    const type = body.type === 'semantic' || body.type === 'keyword' || body.type === 'hybrid'
+      ? body.type
+      : 'hybrid';
 
     if (!query || query.trim().length === 0) {
       return reply.status(400).send({ error: 'Query is required' });

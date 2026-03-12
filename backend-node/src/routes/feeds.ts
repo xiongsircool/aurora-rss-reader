@@ -7,6 +7,7 @@ import { FeedRepository, EntryRepository } from '../db/repositories/index.js';
 import { getDatabase } from '../db/session.js';
 import { refreshFeed } from '../services/fetcher.js';
 import { normalizeTimeField, parseRelativeTime } from '../utils/dateRange.js';
+import { getObjectBody } from '../utils/http.js';
 
 // Leave headroom under SQLite's default 999-parameter limit.
 const SQLITE_IN_CLAUSE_CHUNK_SIZE = 900;
@@ -88,8 +89,16 @@ export async function feedsRoutes(app: FastifyInstance) {
 
   // POST /feeds - Create a new feed
   app.post('/feeds', async (request, reply) => {
-    const { url, title, group_name, view_type } = request.body as any;
-    const trimmedUrl = typeof url === 'string' ? url.trim() : '';
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const url = typeof body.url === 'string' ? body.url : '';
+    const title = typeof body.title === 'string' ? body.title : null;
+    const groupName = typeof body.group_name === 'string' ? body.group_name : 'default';
+    const viewType = typeof body.view_type === 'string' ? body.view_type : 'articles';
+    const trimmedUrl = url.trim();
 
     if (!trimmedUrl) {
       return reply.code(400).send({ error: 'Feed URL is required' });
@@ -102,9 +111,9 @@ export async function feedsRoutes(app: FastifyInstance) {
 
     const feed = feedRepo.create({
       url: trimmedUrl,
-      title: title || null,
-      group_name: group_name || 'default',
-      view_type: view_type || 'articles',
+      title,
+      group_name: groupName || 'default',
+      view_type: viewType as any,
     });
 
     refreshFeed(feed.id).catch((error) => {
@@ -141,7 +150,10 @@ export async function feedsRoutes(app: FastifyInstance) {
   // PUT /feeds/:id - Update a feed
   app.put('/feeds/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const updates = request.body as any;
+    const updates = getObjectBody(request.body);
+    if (!updates) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
 
     const feed = feedRepo.update(id, updates);
 
@@ -247,7 +259,10 @@ export async function feedsRoutes(app: FastifyInstance) {
   // PATCH /feeds/:id - Update a feed (frontend uses PATCH)
   app.patch('/feeds/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const updates = request.body as any;
+    const updates = getObjectBody(request.body);
+    if (!updates) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
 
     const feed = feedRepo.update(id, updates);
 
