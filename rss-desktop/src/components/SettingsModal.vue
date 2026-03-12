@@ -6,6 +6,7 @@ import { useSettingsModal } from '../composables/useSettingsModal'
 import { useRSSHubSettings } from '../composables/useRSSHubSettings'
 import { useAIConfigSettings } from '../composables/useAIConfigSettings'
 import { useRefreshSettings } from '../composables/useRefreshSettings'
+import { useProxySettings } from '../composables/useProxySettings'
 import { clampAutoTitleTranslationLimit } from '../constants/translation'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmModal from './common/ConfirmModal.vue'
@@ -13,6 +14,7 @@ import ConfirmModal from './common/ConfirmModal.vue'
 // Section Components
 import {
   SettingsLanguage,
+  SettingsProxy,
   SettingsRSSHub,
   SettingsAIConfig,
   SettingsAIFeatures,
@@ -44,6 +46,7 @@ const {
 } = useConfirmDialog()
 const aiConfig = useAIConfigSettings(localConfig, requestConfirm)
 const refresh = useRefreshSettings()
+const proxy = useProxySettings()
 
 // Navigation
 type Category = 'general' | 'display' | 'sync' | 'intelligence'
@@ -109,6 +112,8 @@ watch(() => props.show, async (show) => {
       }
     )
     refresh.syncFromStore()
+    proxy.syncFromStore()
+    await proxy.fetchProxyStatus()
     // Sync the local autoTitleTranslationLimit with store value
     autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
     // Sync the local aiPromptPreference with store value
@@ -172,6 +177,9 @@ async function saveSettings() {
     if (rsshub.rsshubUrl.value) {
       await rsshub.saveRSSHubUrl()
     }
+
+    const proxyValid = await proxy.commitProxySettings()
+    if (!proxyValid) return
 
     await saveAIConfig()
     
@@ -286,6 +294,15 @@ async function saveSettings() {
                    <div class="setting-group">
                       <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.general') }}</h3>
                       <SettingsLanguage />
+                      <div class="h-6"></div>
+                      <SettingsProxy
+                        v-model:proxyMode="proxy.proxyMode.value"
+                        v-model:proxyUrl="proxy.proxyUrl.value"
+                        :proxyStatus="proxy.proxyStatus.value"
+                        :proxyStatusLoading="proxy.proxyStatusLoading.value"
+                        :proxyError="proxy.proxyError.value"
+                        @refreshStatus="proxy.fetchProxyStatus"
+                      />
                    </div>
                    <div class="setting-group">
                       <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.about') }}</h3>

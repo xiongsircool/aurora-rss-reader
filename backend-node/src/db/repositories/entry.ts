@@ -1,5 +1,5 @@
 import { getDatabase } from '../session.js';
-import { Entry, generateId } from '../models.js';
+import { ContentExtractionStatus, Entry, generateId } from '../models.js';
 
 export interface EntryCreateInput {
   feed_id: string;
@@ -22,6 +22,10 @@ export interface EntryCreateInput {
   // Academic article identifiers
   doi?: string | null;
   pmid?: string | null;
+  content_extraction_status?: ContentExtractionStatus;
+  content_extraction_error?: string | null;
+  content_extracted_at?: string | null;
+  content_source_url?: string | null;
 }
 
 export interface EntryUpdateInput {
@@ -36,6 +40,17 @@ export interface EntryUpdateInput {
   published_at?: string | null;
   read?: boolean;
   starred?: boolean;
+  enclosure_url?: string | null;
+  enclosure_type?: string | null;
+  enclosure_length?: number | null;
+  duration?: string | null;
+  image_url?: string | null;
+  doi?: string | null;
+  pmid?: string | null;
+  content_extraction_status?: ContentExtractionStatus;
+  content_extraction_error?: string | null;
+  content_extracted_at?: string | null;
+  content_source_url?: string | null;
 }
 
 export class EntryRepository {
@@ -66,6 +81,10 @@ export class EntryRepository {
       image_url: input.image_url ?? null,
       doi: input.doi ?? null,
       pmid: input.pmid ?? null,
+      content_extraction_status: input.content_extraction_status ?? 'skipped',
+      content_extraction_error: input.content_extraction_error ?? null,
+      content_extracted_at: input.content_extracted_at ?? null,
+      content_source_url: input.content_source_url ?? input.url ?? null,
     };
 
     const stmt = this.db.prepare(`
@@ -74,8 +93,9 @@ export class EntryRepository {
         summary, content, readability_content, categories_json,
         published_at, inserted_at, read, starred,
         enclosure_url, enclosure_type, enclosure_length, duration, image_url,
-        doi, pmid
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        doi, pmid, content_extraction_status, content_extraction_error,
+        content_extracted_at, content_source_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -100,7 +120,11 @@ export class EntryRepository {
       entry.duration,
       entry.image_url,
       entry.doi,
-      entry.pmid
+      entry.pmid,
+      entry.content_extraction_status,
+      entry.content_extraction_error,
+      entry.content_extracted_at,
+      entry.content_source_url
     );
 
     return entry;
@@ -187,13 +211,27 @@ export class EntryRepository {
       published_at: input.published_at !== undefined ? input.published_at : existing.published_at,
       read: input.read !== undefined ? (input.read ? 1 : 0) : existing.read,
       starred: input.starred !== undefined ? (input.starred ? 1 : 0) : existing.starred,
+      enclosure_url: input.enclosure_url !== undefined ? input.enclosure_url : existing.enclosure_url,
+      enclosure_type: input.enclosure_type !== undefined ? input.enclosure_type : existing.enclosure_type,
+      enclosure_length: input.enclosure_length !== undefined ? input.enclosure_length : existing.enclosure_length,
+      duration: input.duration !== undefined ? input.duration : existing.duration,
+      image_url: input.image_url !== undefined ? input.image_url : existing.image_url,
+      doi: input.doi !== undefined ? input.doi : existing.doi,
+      pmid: input.pmid !== undefined ? input.pmid : existing.pmid,
+      content_extraction_status: input.content_extraction_status !== undefined ? input.content_extraction_status : existing.content_extraction_status,
+      content_extraction_error: input.content_extraction_error !== undefined ? input.content_extraction_error : existing.content_extraction_error,
+      content_extracted_at: input.content_extracted_at !== undefined ? input.content_extracted_at : existing.content_extracted_at,
+      content_source_url: input.content_source_url !== undefined ? input.content_source_url : existing.content_source_url,
     };
 
     const stmt = this.db.prepare(`
       UPDATE entries SET
         title = ?, url = ?, title_translations = ?, author = ?,
         summary = ?, content = ?, readability_content = ?,
-        categories_json = ?, published_at = ?, read = ?, starred = ?
+        categories_json = ?, published_at = ?, read = ?, starred = ?,
+        enclosure_url = ?, enclosure_type = ?, enclosure_length = ?, duration = ?,
+        image_url = ?, doi = ?, pmid = ?, content_extraction_status = ?,
+        content_extraction_error = ?, content_extracted_at = ?, content_source_url = ?
       WHERE id = ?
     `);
 
@@ -209,6 +247,17 @@ export class EntryRepository {
       updated.published_at,
       updated.read,
       updated.starred,
+      updated.enclosure_url,
+      updated.enclosure_type,
+      updated.enclosure_length,
+      updated.duration,
+      updated.image_url,
+      updated.doi,
+      updated.pmid,
+      updated.content_extraction_status,
+      updated.content_extraction_error,
+      updated.content_extracted_at,
+      updated.content_source_url,
       id
     );
 

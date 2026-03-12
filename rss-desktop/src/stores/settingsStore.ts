@@ -22,6 +22,8 @@ export interface AppSettings {
   language: string // 'zh' | 'en' | 'ja' | 'ko'
   // AI 提示词偏好
   ai_prompt_preference: string
+  outbound_proxy_mode: 'system' | 'custom' | 'off'
+  outbound_proxy_url: string
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -38,7 +40,9 @@ export const useSettingsStore = defineStore('settings', () => {
     mark_as_read_range: 'current',
     details_panel_mode: 'docked',
     language: 'zh',
-    ai_prompt_preference: ''
+    ai_prompt_preference: '',
+    outbound_proxy_mode: 'system',
+    outbound_proxy_url: ''
   })
 
   const loading = ref(false)

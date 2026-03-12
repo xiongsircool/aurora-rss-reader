@@ -97,6 +97,28 @@ function runMigrations(): void {
     console.log('Migration completed: ai_tagging_enabled column added');
   }
 
+  const hasFetchEtag = feedsTableInfo.some((col) => col.name === 'fetch_etag');
+  if (!hasFetchEtag) {
+    console.log('Running migration: Adding fetch metadata columns to feeds');
+    db.exec(`ALTER TABLE feeds ADD COLUMN fetch_etag TEXT`);
+    db.exec(`ALTER TABLE feeds ADD COLUMN fetch_last_modified TEXT`);
+    db.exec(`ALTER TABLE feeds ADD COLUMN last_fetch_url TEXT`);
+    console.log('Migration completed: fetch metadata columns added');
+  }
+
+  const hasExtractionStatus = entriesTableInfo.some((col) => col.name === 'content_extraction_status');
+  if (!hasExtractionStatus) {
+    console.log('Running migration: Adding content extraction columns to entries');
+    db.exec(`ALTER TABLE entries ADD COLUMN content_extraction_status TEXT NOT NULL DEFAULT 'skipped'`);
+    db.exec(`ALTER TABLE entries ADD COLUMN content_extraction_error TEXT`);
+    db.exec(`ALTER TABLE entries ADD COLUMN content_extracted_at TEXT`);
+    db.exec(`ALTER TABLE entries ADD COLUMN content_source_url TEXT`);
+    db.exec(`UPDATE entries SET content_extraction_status = 'succeeded', content_extracted_at = inserted_at WHERE readability_content IS NOT NULL`);
+    db.exec(`UPDATE entries SET content_source_url = url WHERE content_source_url IS NULL`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_content_extraction_status ON entries(content_extraction_status)`);
+    console.log('Migration completed: content extraction columns added');
+  }
+
   // Check if tagging columns exist in user_settings (for smart tagging feature)
   const hasTaggingApiKey = tableInfo.some((col) => col.name === 'tagging_api_key');
   if (!hasTaggingApiKey) {
@@ -127,6 +149,15 @@ function runMigrations(): void {
     console.log('Running migration: Adding ai_prompt_preference column to user_settings');
     db.exec(`ALTER TABLE user_settings ADD COLUMN ai_prompt_preference TEXT DEFAULT ''`);
     console.log('Migration completed: ai_prompt_preference column added');
+  }
+
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasOutboundProxyMode = tableInfo.some((col) => col.name === 'outbound_proxy_mode');
+  if (!hasOutboundProxyMode) {
+    console.log('Running migration: Adding outbound proxy columns to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN outbound_proxy_mode TEXT NOT NULL DEFAULT 'system'`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN outbound_proxy_url TEXT NOT NULL DEFAULT ''`);
+    console.log('Migration completed: outbound proxy columns added');
   }
 
   // Check if match_mode / match_rules columns exist in user_tags (dual-mode tagging)
@@ -206,6 +237,9 @@ export function initDatabase(): void {
       ai_tagging_enabled INTEGER NOT NULL DEFAULT 1,
       last_checked_at TEXT,
       last_error TEXT,
+      fetch_etag TEXT,
+      fetch_last_modified TEXT,
+      last_fetch_url TEXT,
       update_interval_minutes INTEGER DEFAULT 60,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -233,6 +267,17 @@ export function initDatabase(): void {
       inserted_at TEXT NOT NULL,
       read INTEGER DEFAULT 0,
       starred INTEGER DEFAULT 0,
+      enclosure_url TEXT,
+      enclosure_type TEXT,
+      enclosure_length INTEGER,
+      duration TEXT,
+      image_url TEXT,
+      doi TEXT,
+      pmid TEXT,
+      content_extraction_status TEXT NOT NULL DEFAULT 'skipped',
+      content_extraction_error TEXT,
+      content_extracted_at TEXT,
+      content_source_url TEXT,
       FOREIGN KEY (feed_id) REFERENCES feeds(id),
       UNIQUE(feed_id, guid)
     )
@@ -295,6 +340,26 @@ export function initDatabase(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_fetch_logs_feed_id ON fetch_logs(feed_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_fetch_logs_status ON fetch_logs(status)`);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS article_extraction_jobs (
+      id TEXT PRIMARY KEY,
+      entry_id TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'queued',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 3,
+      next_run_at TEXT,
+      leased_at TEXT,
+      lease_owner TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_article_extraction_jobs_status_next_run_at ON article_extraction_jobs(status, next_run_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_article_extraction_jobs_lease ON article_extraction_jobs(status, leased_at)`);
+
   // Create user_settings table (singleton with id=1)
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_settings (
@@ -331,6 +396,8 @@ export function initDatabase(): void {
       ai_title_display_mode TEXT NOT NULL DEFAULT 'original-first',
       ai_translation_language TEXT NOT NULL DEFAULT 'zh',
       language TEXT NOT NULL DEFAULT 'zh',
+      outbound_proxy_mode TEXT NOT NULL DEFAULT 'system',
+      outbound_proxy_url TEXT NOT NULL DEFAULT '',
       embedding_model TEXT NOT NULL DEFAULT 'netease-youdao/bce-embedding-base_v1',
       embedding_api_key TEXT NOT NULL DEFAULT '',
       embedding_base_url TEXT NOT NULL DEFAULT 'https://api.siliconflow.cn/v1',
@@ -449,6 +516,9 @@ export function initDatabase(): void {
 
   // Run migrations for existing databases
   runMigrations();
+
+  // Create indexes that depend on migrated columns after schema upgrades finish.
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_content_extraction_status ON entries(content_extraction_status)`);
 
 
   // Load sqlite-vss extension and create vector tables

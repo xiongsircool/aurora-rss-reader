@@ -1,4 +1,5 @@
 export { default as SettingsLanguage } from './SettingsLanguage.vue'
+export { default as SettingsProxy } from './SettingsProxy.vue'
 export { default as SettingsRSSHub } from './SettingsRSSHub.vue'
 export { default as SettingsAIConfig } from './SettingsAIConfig.vue'
 export { default as SettingsAIFeatures } from './SettingsAIFeatures.vue'

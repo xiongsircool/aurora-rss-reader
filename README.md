@@ -142,7 +142,7 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 ## Quick Start
 
 ### System Requirements
-- Node.js 18+
+- Node.js 22
 - pnpm 8+
 
 ### Installation and Running

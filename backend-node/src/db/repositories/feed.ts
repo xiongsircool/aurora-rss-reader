@@ -12,6 +12,9 @@ export interface FeedCreateInput {
   view_type?: ViewType;
   ai_tagging_enabled?: boolean;
   update_interval_minutes?: number;
+  fetch_etag?: string | null;
+  fetch_last_modified?: string | null;
+  last_fetch_url?: string | null;
 }
 
 export interface FeedUpdateInput {
@@ -26,6 +29,9 @@ export interface FeedUpdateInput {
   ai_tagging_enabled?: boolean;
   last_checked_at?: string | null;
   last_error?: string | null;
+  fetch_etag?: string | null;
+  fetch_last_modified?: string | null;
+  last_fetch_url?: string | null;
   update_interval_minutes?: number;
 }
 
@@ -47,6 +53,9 @@ export class FeedRepository {
       ai_tagging_enabled: input.ai_tagging_enabled === false ? 0 : 1,
       last_checked_at: null,
       last_error: null,
+      fetch_etag: input.fetch_etag ?? null,
+      fetch_last_modified: input.fetch_last_modified ?? null,
+      last_fetch_url: input.last_fetch_url ?? null,
       update_interval_minutes: input.update_interval_minutes ?? 60,
       created_at: now,
       updated_at: now,
@@ -55,9 +64,10 @@ export class FeedRepository {
     const stmt = this.db.prepare(`
       INSERT INTO feeds (
         id, url, title, custom_title, site_url, description, favicon_url,
-        group_name, view_type, ai_tagging_enabled, last_checked_at, last_error, update_interval_minutes,
+        group_name, view_type, ai_tagging_enabled, last_checked_at, last_error,
+        fetch_etag, fetch_last_modified, last_fetch_url, update_interval_minutes,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -73,6 +83,9 @@ export class FeedRepository {
       feed.ai_tagging_enabled,
       feed.last_checked_at,
       feed.last_error,
+      feed.fetch_etag,
+      feed.fetch_last_modified,
+      feed.last_fetch_url,
       feed.update_interval_minutes,
       feed.created_at,
       feed.updated_at
@@ -129,6 +142,9 @@ export class FeedRepository {
         ai_tagging_enabled = ?,
         last_checked_at = ?,
         last_error = ?,
+        fetch_etag = ?,
+        fetch_last_modified = ?,
+        last_fetch_url = ?,
         update_interval_minutes = ?,
         updated_at = ?
       WHERE id = ?
@@ -146,6 +162,9 @@ export class FeedRepository {
       updated.ai_tagging_enabled,
       updated.last_checked_at,
       updated.last_error,
+      updated.fetch_etag,
+      updated.fetch_last_modified,
+      updated.last_fetch_url,
       updated.update_interval_minutes,
       updated.updated_at,
       id

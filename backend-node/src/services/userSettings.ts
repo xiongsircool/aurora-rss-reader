@@ -9,6 +9,27 @@ const FETCH_INTERVAL_MIN = 5;
 const FETCH_INTERVAL_MAX = 1440;
 const DEFAULT_FETCH_INTERVAL_MINUTES = 720;
 
+export class InvalidUserSettingsUpdateError extends Error {
+  invalidKeys: string[];
+
+  constructor(invalidKeys: string[]) {
+    super(`Invalid user settings fields: ${invalidKeys.join(', ')}`);
+    this.name = 'InvalidUserSettingsUpdateError';
+    this.invalidKeys = invalidKeys;
+  }
+}
+
+type TableInfoRow = { name: string };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSafeSqlIdentifier(value: string): boolean {
+  // Conservative: SQLite identifiers for columns in this project are snake_case.
+  return /^[a-z_][a-z0-9_]*$/.test(value);
+}
+
 /**
  * Normalize fetch interval to valid range
  */
@@ -27,6 +48,20 @@ export function normalizeFetchInterval(value: number | null | undefined): number
 
 export class UserSettingsService {
   private db = getDatabase();
+  private updatableColumns: Set<string> | null = null;
+
+  private getUpdatableColumns(): Set<string> {
+    if (this.updatableColumns) {
+      return this.updatableColumns;
+    }
+    const tableInfo = this.db.pragma('table_info(user_settings)') as TableInfoRow[];
+    const columns = new Set(tableInfo.map((row) => row.name));
+    columns.delete('id');
+    columns.delete('created_at');
+    columns.delete('updated_at');
+    this.updatableColumns = columns;
+    return columns;
+  }
 
   /**
    * Get user settings, create default if not exists
@@ -45,12 +80,12 @@ export class UserSettingsService {
           details_panel_mode, summary_api_key, summary_base_url, summary_model_name,
           translation_api_key, translation_base_url, translation_model_name,
           ai_auto_summary, ai_auto_title_translation, ai_title_display_mode,
-          ai_translation_language, created_at, updated_at
+          ai_translation_language, outbound_proxy_mode, outbound_proxy_url, created_at, updated_at
         ) VALUES (
           1, 'https://rsshub.app', 720, 1, 1, 50, 1, 'system', 1, '30d', 'inserted_at',
           10, 'current', 'docked', '', 'https://open.bigmodel.cn/api/paas/v4/', 'glm-4-flash',
           '', 'https://open.bigmodel.cn/api/paas/v4/', 'glm-4-flash', 0, 0, 'original-first',
-          'zh', ?, ?
+          'zh', 'system', '', ?, ?
         )
       `).run(now, now);
 
@@ -71,19 +106,46 @@ export class UserSettingsService {
   /**
    * Update user settings
    */
-  updateSettings(updates: Partial<Omit<UserSettings, 'id' | 'created_at'>>): UserSettings {
+  updateSettings(updates: unknown): UserSettings {
     const settings = this.getSettings();
     const now = new Date().toISOString();
 
+    if (!isPlainObject(updates)) {
+      throw new Error('Invalid settings payload: expected an object');
+    }
+
     // Build update query dynamically
+    const allowedColumns = this.getUpdatableColumns();
     const updateFields: string[] = [];
-    const values: any[] = [];
+    const values: Array<string | number | boolean | null> = [];
+    const invalidKeys: string[] = [];
 
     for (const [key, value] of Object.entries(updates)) {
-      if (value !== undefined && key !== 'id' && key !== 'created_at') {
-        updateFields.push(`${key} = ?`);
-        values.push(value);
+      if (value === undefined) continue;
+      if (key === 'id' || key === 'created_at' || key === 'updated_at') {
+        invalidKeys.push(key);
+        continue;
       }
+      if (!isSafeSqlIdentifier(key) || !allowedColumns.has(key)) {
+        invalidKeys.push(key);
+        continue;
+      }
+      if (
+        value !== null &&
+        typeof value !== 'string' &&
+        typeof value !== 'number' &&
+        typeof value !== 'boolean'
+      ) {
+        invalidKeys.push(key);
+        continue;
+      }
+
+      updateFields.push(`${key} = ?`);
+      values.push(value);
+    }
+
+    if (invalidKeys.length > 0) {
+      throw new InvalidUserSettingsUpdateError(invalidKeys);
     }
 
     if (updateFields.length > 0) {

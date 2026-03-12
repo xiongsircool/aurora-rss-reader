@@ -3,6 +3,7 @@ export { EntryRepository } from './entry.js';
 export { TranslationRepository } from './translation.js';
 export { SummaryRepository } from './summary.js';
 export { FetchLogRepository } from './fetchLog.js';
+export { ArticleExtractionJobRepository } from './articleExtractionJob.js';
 export { CollectionRepository } from './collections.js';
 export { TagRepository } from './tag.js';
 export { EntryTagRepository } from './entryTag.js';
@@ -32,6 +33,10 @@ export type {
   FetchLogCreateInput,
   FetchLogUpdateInput,
 } from './fetchLog.js';
+
+export type {
+  ArticleExtractionJobCreateInput,
+} from './articleExtractionJob.js';
 
 export type {
   CollectionCreateInput,

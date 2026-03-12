@@ -195,7 +195,7 @@ chmod +x start.sh
 ## 快速开始
 
 ### 系统要求
-- Node.js 18+
+- Node.js 22
 - pnpm 8+
 
 ### 安装运行

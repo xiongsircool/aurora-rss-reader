@@ -22,10 +22,15 @@ export interface Feed {
   ai_tagging_enabled: number; // SQLite boolean (0/1)
   last_checked_at: string | null;
   last_error: string | null;
+  fetch_etag: string | null;
+  fetch_last_modified: string | null;
+  last_fetch_url: string | null;
   update_interval_minutes: number;
   created_at: string;
   updated_at: string;
 }
+
+export type ContentExtractionStatus = 'pending' | 'queued' | 'running' | 'succeeded' | 'failed' | 'skipped';
 
 export interface Entry {
   id: string;
@@ -52,6 +57,10 @@ export interface Entry {
   // Academic article identifiers
   doi: string | null;
   pmid: string | null;
+  content_extraction_status: ContentExtractionStatus;
+  content_extraction_error: string | null;
+  content_extracted_at: string | null;
+  content_source_url: string | null;
 }
 
 export interface Translation {
@@ -82,6 +91,22 @@ export interface FetchLog {
   finished_at: string | null;
   duration_ms: number | null;
   item_count: number;
+}
+
+export type ArticleExtractionJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface ArticleExtractionJob {
+  id: string;
+  entry_id: string;
+  status: ArticleExtractionJobStatus;
+  attempts: number;
+  max_attempts: number;
+  next_run_at: string | null;
+  leased_at: string | null;
+  lease_owner: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserSettings {
@@ -122,6 +147,8 @@ export interface UserSettings {
   ai_translation_language: string;
   ai_prompt_preference: string; // User custom preference for AI prompts
   language: string; // 'zh' | 'en' | 'ja' | 'ko'
+  outbound_proxy_mode: 'system' | 'custom' | 'off';
+  outbound_proxy_url: string;
   embedding_model: string;
   embedding_api_key: string;
   embedding_base_url: string;
