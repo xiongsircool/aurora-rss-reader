@@ -143,12 +143,51 @@ function runMigrations(): void {
     console.log('Migration completed: ai_auto_tagging_start_at column added');
   }
 
-  // Check if ai_prompt_preference column exists in user_settings
+  // Check if legacy ai_prompt_preference column exists in user_settings
   const hasAiPromptPreference = tableInfo.some((col) => col.name === 'ai_prompt_preference');
   if (!hasAiPromptPreference) {
     console.log('Running migration: Adding ai_prompt_preference column to user_settings');
     db.exec(`ALTER TABLE user_settings ADD COLUMN ai_prompt_preference TEXT DEFAULT ''`);
     console.log('Migration completed: ai_prompt_preference column added');
+  }
+
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasSummaryPromptPreference = tableInfo.some((col) => col.name === 'summary_prompt_preference');
+  const hasTranslationPromptPreference = tableInfo.some((col) => col.name === 'translation_prompt_preference');
+  if (!hasSummaryPromptPreference || !hasTranslationPromptPreference) {
+    console.log('Running migration: Adding split AI prompt preference columns to user_settings');
+    if (!hasSummaryPromptPreference) {
+      db.exec(`ALTER TABLE user_settings ADD COLUMN summary_prompt_preference TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!hasTranslationPromptPreference) {
+      db.exec(`ALTER TABLE user_settings ADD COLUMN translation_prompt_preference TEXT NOT NULL DEFAULT ''`);
+    }
+
+    const legacyPromptPreference = db
+      .prepare('SELECT ai_prompt_preference, summary_prompt_preference, translation_prompt_preference FROM user_settings WHERE id = 1')
+      .get() as {
+        ai_prompt_preference?: string;
+        summary_prompt_preference?: string;
+        translation_prompt_preference?: string;
+      } | undefined;
+
+    const legacyPrompt = legacyPromptPreference?.ai_prompt_preference?.trim() || '';
+    if (legacyPrompt) {
+      db.prepare(`
+        UPDATE user_settings
+        SET summary_prompt_preference = CASE
+              WHEN COALESCE(summary_prompt_preference, '') = '' THEN ?
+              ELSE summary_prompt_preference
+            END,
+            translation_prompt_preference = CASE
+              WHEN COALESCE(translation_prompt_preference, '') = '' THEN ?
+              ELSE translation_prompt_preference
+            END
+        WHERE id = 1
+      `).run(legacyPrompt, legacyPrompt);
+    }
+
+    console.log('Migration completed: split AI prompt preference columns added');
   }
 
   tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
@@ -407,7 +446,8 @@ export function initDatabase(): void {
       ai_auto_tagging INTEGER NOT NULL DEFAULT 0,
       ai_auto_tagging_start_at TEXT,
       tags_version INTEGER NOT NULL DEFAULT 1,
-      ai_prompt_preference TEXT NOT NULL DEFAULT '',
+      summary_prompt_preference TEXT NOT NULL DEFAULT '',
+      translation_prompt_preference TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       CHECK (id = 1)

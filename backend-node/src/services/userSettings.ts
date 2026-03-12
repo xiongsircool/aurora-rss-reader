@@ -80,12 +80,13 @@ export class UserSettingsService {
           details_panel_mode, summary_api_key, summary_base_url, summary_model_name,
           translation_api_key, translation_base_url, translation_model_name,
           ai_auto_summary, ai_auto_title_translation, ai_title_display_mode,
-          ai_translation_language, outbound_proxy_mode, outbound_proxy_url, created_at, updated_at
+          ai_translation_language, summary_prompt_preference, translation_prompt_preference,
+          outbound_proxy_mode, outbound_proxy_url, created_at, updated_at
         ) VALUES (
           1, 'https://rsshub.app', 720, 1, 1, 50, 1, 'system', 1, '30d', 'inserted_at',
           10, 'current', 'docked', '', 'https://open.bigmodel.cn/api/paas/v4/', 'glm-4-flash',
           '', 'https://open.bigmodel.cn/api/paas/v4/', 'glm-4-flash', 0, 0, 'original-first',
-          'zh', 'system', '', ?, ?
+          'zh', '', '', 'system', '', ?, ?
         )
       `).run(now, now);
 

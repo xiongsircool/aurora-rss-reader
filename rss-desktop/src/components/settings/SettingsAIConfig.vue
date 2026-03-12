@@ -118,7 +118,7 @@ function isServiceConfigured(tab: ServiceTab): boolean {
         <p class="m-0 mt-1 text-xs text-[var(--text-tertiary)]">{{ t('settings.globalDefaultConfigHint') }}</p>
       </div>
 
-      <div class="p-5">
+      <div class="p-5 min-w-0">
         <!-- Provider Presets -->
         <div class="mb-5">
           <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.providerPreset') }}</label>
@@ -126,14 +126,14 @@ function isServiceConfigured(tab: ServiceTab): boolean {
             <button
               type="button"
               @click="showProviderDropdown = !showProviderDropdown"
-              class="w-full flex items-center justify-between px-3.5 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] cursor-pointer hover:border-orange-500/50 transition-colors"
+              class="w-full min-w-0 flex items-center justify-between gap-3 px-3.5 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] cursor-pointer hover:border-orange-500/50 transition-colors"
             >
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 min-w-0">
                 <span v-if="selectedPreset" :class="selectedPreset.icon" class="text-base text-orange-500"></span>
-                <span v-if="selectedPreset">{{ selectedPreset.name }}</span>
-                <span v-else class="text-[var(--text-tertiary)]">{{ t('settings.selectProvider') }}</span>
+                <span v-if="selectedPreset" class="truncate">{{ selectedPreset.name }}</span>
+                <span v-else class="text-[var(--text-tertiary)] truncate">{{ t('settings.selectProvider') }}</span>
               </div>
-              <span class="i-carbon-chevron-down text-[var(--text-tertiary)] transition-transform" :class="{ 'rotate-180': showProviderDropdown }"></span>
+              <span class="i-carbon-chevron-down shrink-0 text-[var(--text-tertiary)] transition-transform" :class="{ 'rotate-180': showProviderDropdown }"></span>
             </button>
 
             <!-- Dropdown -->
@@ -230,12 +230,12 @@ function isServiceConfigured(tab: ServiceTab): boolean {
         </div>
 
         <!-- Footer -->
-        <div class="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p class="m-0 text-xs text-[var(--text-tertiary)]">{{ t('settings.allProvidersOpenAICompat') }}</p>
+        <div class="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 min-w-0">
+          <p class="m-0 text-xs text-[var(--text-tertiary)] min-w-0 break-words">{{ t('settings.allProvidersOpenAICompat') }}</p>
           <button
             @click="emit('testGlobalConnection')"
             :disabled="globalTesting || !globalConfig.api_key || !globalConfig.base_url || !globalConfig.model_name"
-            class="shrink-0 px-5 py-2 rounded-lg text-sm font-medium transition-all border-none cursor-pointer bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:not-disabled:shadow-lg hover:not-disabled:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+            class="w-full sm:w-auto sm:max-w-full px-5 py-2 rounded-lg text-sm font-medium transition-all border-none cursor-pointer bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:not-disabled:shadow-lg hover:not-disabled:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none whitespace-normal break-words text-center"
             :class="{
               'from-green-500! to-green-600!': globalTestResult?.success,
               'from-red-500! to-red-600!': globalTestResult?.success === false
@@ -256,7 +256,7 @@ function isServiceConfigured(tab: ServiceTab): boolean {
             v-for="tab in serviceTabs"
             :key="tab.id"
             @click="activeTab = tab.id"
-            class="flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap transition-all relative border-none bg-transparent cursor-pointer shrink-0"
+            class="flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap transition-all relative border-none bg-transparent cursor-pointer shrink-0 min-w-fit"
             :class="[
               activeTab === tab.id
                 ? 'text-orange-600 dark:text-orange-400'
@@ -312,11 +312,11 @@ function isServiceConfigured(tab: ServiceTab): boolean {
               {{ mcpTestResult.message }}
             </div>
 
-            <div class="mt-6 pt-4 border-t border-[var(--border-color)] flex items-center justify-end">
+            <div class="mt-6 pt-4 border-t border-[var(--border-color)] flex flex-wrap items-center justify-end gap-3">
               <button
                 @click="emit('testMcp')"
                 :disabled="mcpTesting"
-                class="shrink-0 px-5 py-2 rounded-lg text-sm font-medium transition-all border-none cursor-pointer bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:not-disabled:shadow-lg hover:not-disabled:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                class="w-full sm:w-auto px-5 py-2 rounded-lg text-sm font-medium transition-all border-none cursor-pointer bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:not-disabled:shadow-lg hover:not-disabled:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none whitespace-normal break-words text-center"
                 :class="{
                   'from-green-500! to-green-600!': mcpTestResult?.success,
                   'from-red-500! to-red-600!': mcpTestResult?.success === false
@@ -391,20 +391,20 @@ function isServiceConfigured(tab: ServiceTab): boolean {
             </div>
 
             <!-- Footer actions -->
-            <div class="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <p class="m-0 text-xs text-[var(--text-tertiary)]">{{ t('settings.embeddingNote') }}</p>
-              <div class="flex flex-wrap gap-2">
+            <div class="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 min-w-0">
+              <p class="m-0 text-xs text-[var(--text-tertiary)] min-w-0 break-words">{{ t('settings.embeddingNote') }}</p>
+              <div class="flex flex-wrap gap-2 sm:justify-end">
                 <button
                   @click="emit('rebuildVectors')"
                   :disabled="rebuildingVectors || !embeddingConfig.api_key"
-                  class="px-3 py-2 rounded-lg text-sm font-medium transition-all border border-dashed border-blue-400/50 bg-blue-500/5 text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-500/10 hover:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="w-full sm:w-auto px-3 py-2 rounded-lg text-sm font-medium transition-all border border-dashed border-blue-400/50 bg-blue-500/5 text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-500/10 hover:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed whitespace-normal break-words text-center"
                 >
                   {{ rebuildingVectors ? t('settings.rebuildingVectors') : t('settings.rebuildVectors') }}
                 </button>
                 <button
                   @click="emit('testConnection', 'embedding')"
                   :disabled="serviceTesting.embedding || !embeddingConfig.api_key || !embeddingConfig.base_url || !embeddingConfig.model_name"
-                  class="px-5 py-2 rounded-lg text-sm font-medium transition-all border-none cursor-pointer bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:not-disabled:shadow-lg hover:not-disabled:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                  class="w-full sm:w-auto px-5 py-2 rounded-lg text-sm font-medium transition-all border-none cursor-pointer bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:not-disabled:shadow-lg hover:not-disabled:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none whitespace-normal break-words text-center"
                   :class="{
                     'from-green-500! to-green-600!': serviceTestResult.embedding?.success,
                     'from-red-500! to-red-600!': serviceTestResult.embedding?.success === false
@@ -420,11 +420,11 @@ function isServiceConfigured(tab: ServiceTab): boolean {
           <div v-else :key="activeTab">
             <!-- Config source toggle -->
             <div class="mb-5">
-              <div class="flex items-center gap-3 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
                 <button
                   type="button"
                   @click="currentServiceConfig && (currentServiceConfig.use_custom = false)"
-                  class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all border-none cursor-pointer"
+                  class="flex-1 min-w-0 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all border-none cursor-pointer whitespace-normal break-words text-center"
                   :class="currentServiceConfig && !currentServiceConfig.use_custom
                     ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm'
                     : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'"
@@ -435,7 +435,7 @@ function isServiceConfigured(tab: ServiceTab): boolean {
                 <button
                   type="button"
                   @click="currentServiceConfig && (currentServiceConfig.use_custom = true)"
-                  class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all border-none cursor-pointer"
+                  class="flex-1 min-w-0 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all border-none cursor-pointer whitespace-normal break-words text-center"
                   :class="currentServiceConfig && currentServiceConfig.use_custom
                     ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm'
                     : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'"
@@ -514,13 +514,13 @@ function isServiceConfigured(tab: ServiceTab): boolean {
             </div>
 
             <!-- Footer actions -->
-            <div class="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <p class="m-0 text-xs text-[var(--text-tertiary)]">{{ t('settings.openaiCompatible') }}</p>
-              <div class="flex flex-wrap gap-2">
+            <div class="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 min-w-0">
+              <p class="m-0 text-xs text-[var(--text-tertiary)] min-w-0 break-words">{{ t('settings.openaiCompatible') }}</p>
+              <div class="flex flex-wrap gap-2 sm:justify-end">
                 <button
                   @click="emit('testConnection', activeTab as AIServiceKey)"
                   :disabled="serviceTesting[activeTab as AIServiceKey]"
-                  class="px-5 py-2 rounded-lg text-sm font-medium transition-all border-none cursor-pointer bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:not-disabled:shadow-lg hover:not-disabled:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                  class="w-full sm:w-auto px-5 py-2 rounded-lg text-sm font-medium transition-all border-none cursor-pointer bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:not-disabled:shadow-lg hover:not-disabled:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none whitespace-normal break-words text-center"
                   :class="{
                     'from-green-500! to-green-600!': serviceTestResult[activeTab as AIServiceKey]?.success,
                     'from-red-500! to-red-600!': serviceTestResult[activeTab as AIServiceKey]?.success === false

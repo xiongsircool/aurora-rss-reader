@@ -146,7 +146,7 @@ export async function aiRoutes(app: FastifyInstance) {
     try {
       const client = createClient('summary');
       const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
+      const userPreference = settings.summary_prompt_preference || settings.ai_prompt_preference || '';
       const summary = await client.summarize(combinedContent, { language: targetLanguage, userPreference });
       summaryRepo.upsert({ entry_id, language: targetLanguage, summary });
       return { entry_id, language: targetLanguage, summary };
@@ -188,7 +188,7 @@ export async function aiRoutes(app: FastifyInstance) {
     try {
       const client = createClient('translation');
       const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
+      const userPreference = settings.translation_prompt_preference || settings.ai_prompt_preference || '';
       const title = await client.translate(entry.title, { targetLanguage, userPreference });
       translationRepo.upsert({ entry_id, language: targetLanguage, title });
       return { entry_id, title, language: targetLanguage, from_cache: false };
@@ -279,7 +279,7 @@ export async function aiRoutes(app: FastifyInstance) {
     try {
       const client = createClient('translation');
       const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
+      const userPreference = settings.translation_prompt_preference || settings.ai_prompt_preference || '';
 
       for (const block of misses) {
         if (request.raw.aborted) {
@@ -344,7 +344,7 @@ export async function aiRoutes(app: FastifyInstance) {
 
       const client = createClient('translation');
       const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
+      const userPreference = settings.translation_prompt_preference || settings.ai_prompt_preference || '';
       const translation = await client.translate(text, { targetLanguage: target_language || 'zh', userPreference });
 
       if (entry_id) {
@@ -387,7 +387,7 @@ export async function aiRoutes(app: FastifyInstance) {
 
       const client = createClient('summary');
       const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
+      const userPreference = settings.summary_prompt_preference || settings.ai_prompt_preference || '';
       const summary = await client.summarize(content, { language: language || 'zh', userPreference });
 
       if (entry_id) {

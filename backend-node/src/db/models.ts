@@ -145,7 +145,9 @@ export interface UserSettings {
   ai_auto_title_translation: number; // SQLite boolean (0/1)
   ai_title_display_mode: string;
   ai_translation_language: string;
-  ai_prompt_preference: string; // User custom preference for AI prompts
+  summary_prompt_preference: string; // User custom preference for summary prompts
+  translation_prompt_preference: string; // User custom preference for translation prompts
+  ai_prompt_preference?: string; // Legacy prompt preference kept for migration compatibility
   language: string; // 'zh' | 'en' | 'ja' | 'ko'
   outbound_proxy_mode: 'system' | 'custom' | 'off';
   outbound_proxy_url: string;

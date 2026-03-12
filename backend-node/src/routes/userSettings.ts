@@ -36,7 +36,18 @@ export async function userSettingsRoutes(app: FastifyInstance) {
     }
 
     try {
-      const payload = updates as Record<string, unknown>;
+      const payload = { ...(updates as Record<string, unknown>) };
+      const legacyPromptPreference =
+        typeof payload.ai_prompt_preference === 'string' ? payload.ai_prompt_preference : undefined;
+      if (legacyPromptPreference !== undefined) {
+        if (payload.summary_prompt_preference === undefined) {
+          payload.summary_prompt_preference = legacyPromptPreference;
+        }
+        if (payload.translation_prompt_preference === undefined) {
+          payload.translation_prompt_preference = legacyPromptPreference;
+        }
+      }
+
       const proxyMode = typeof payload.outbound_proxy_mode === 'string' ? payload.outbound_proxy_mode : undefined;
       const proxyUrl = typeof payload.outbound_proxy_url === 'string' ? payload.outbound_proxy_url.trim() : undefined;
 
@@ -48,7 +59,7 @@ export async function userSettingsRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: 'Custom proxy URL must be a valid http:// or https:// URL' });
       }
 
-      const settings = userSettingsService.updateSettings(updates);
+      const settings = userSettingsService.updateSettings(payload);
       return normalizeSettings(settings);
     } catch (error) {
       if (error instanceof InvalidUserSettingsUpdateError) {

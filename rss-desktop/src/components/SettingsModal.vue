@@ -88,7 +88,8 @@ const openOriginalMode = computed({
 
 const autoTitleTranslationLimit = ref(settingsStore.settings.max_auto_title_translations)
 
-const aiPromptPreference = ref(settingsStore.settings.ai_prompt_preference)
+const summaryPromptPreference = ref(settingsStore.settings.summary_prompt_preference)
+const translationPromptPreference = ref(settingsStore.settings.translation_prompt_preference)
 
 const markAsReadRange = computed({
   get: () => settingsStore.settings.mark_as_read_range,
@@ -116,8 +117,8 @@ watch(() => props.show, async (show) => {
     await proxy.fetchProxyStatus()
     // Sync the local autoTitleTranslationLimit with store value
     autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
-    // Sync the local aiPromptPreference with store value
-    aiPromptPreference.value = settingsStore.settings.ai_prompt_preference
+    summaryPromptPreference.value = settingsStore.settings.summary_prompt_preference
+    translationPromptPreference.value = settingsStore.settings.translation_prompt_preference
 
     // Reset view state
     activeCategory.value = 'general'
@@ -187,7 +188,8 @@ async function saveSettings() {
     const clampedLimit = clampAutoTitleTranslationLimit(autoTitleTranslationLimit.value)
     await settingsStore.updateSettings({
       max_auto_title_translations: clampedLimit,
-      ai_prompt_preference: aiPromptPreference.value
+      summary_prompt_preference: summaryPromptPreference.value,
+      translation_prompt_preference: translationPromptPreference.value
     })
     
     emit('close')
@@ -204,7 +206,7 @@ async function saveSettings() {
       <!-- Main Modal Container -->
       <div
         class="
-          w-full max-w-4xl h-[85vh] md:h-[85vh] h-full
+          w-full max-w-full md:max-w-[min(96vw,1360px)] h-[85vh] md:h-[85vh] h-full
           flex flex-col md:flex-row
           rounded-none md:rounded-2xl overflow-hidden
           bg-[var(--bg-base)] md:bg-white/80 md:dark:bg-[#0f1115]/75
@@ -248,9 +250,9 @@ async function saveSettings() {
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] border-l-3 border-transparent'
               "
             >
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-3 min-w-0">
                 <span :class="[cat.icon, 'text-lg transition-colors', activeCategory === cat.id ? 'text-orange-500 dark:text-white' : 'text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]']"></span>
-                <span>{{ t(cat.label) }}</span>
+                <span class="min-w-0 break-words text-left leading-snug">{{ t(cat.label) }}</span>
               </div>
               <span class="i-carbon-chevron-right text-[var(--text-tertiary)] md:hidden"></span>
             </button>
@@ -287,7 +289,7 @@ async function saveSettings() {
           <!-- Scrollable Content -->
           <div class="flex-1 overflow-y-auto p-6 md:p-8 scroll-smooth">
             <Transition name="fade" mode="out-in">
-              <div :key="activeCategory" class="max-w-2xl mx-auto space-y-6">
+              <div :key="activeCategory" class="w-full max-w-[min(100%,1120px)] mx-auto space-y-6 min-w-0">
                 
                 <!-- General Section -->
                 <div v-if="activeCategory === 'general'" class="space-y-6">
@@ -374,7 +376,8 @@ async function saveSettings() {
                     <SettingsAIFeatures
                       v-model:features="localConfig.features"
                       v-model:autoTitleTranslationLimit="autoTitleTranslationLimit"
-                      v-model:aiPromptPreference="aiPromptPreference"
+                      v-model:summaryPromptPreference="summaryPromptPreference"
+                      v-model:translationPromptPreference="translationPromptPreference"
                     />
                   </div>
                 </div>
@@ -384,11 +387,11 @@ async function saveSettings() {
           </div>
 
           <!-- Desktop Actions Footer -->
-          <div class="hidden md:flex items-center justify-end gap-3 p-6 border-t border-[var(--border-color)] bg-white/50 dark:bg-[var(--bg-surface)]/50 backdrop-blur-sm">
+          <div class="hidden md:flex flex-wrap items-center justify-end gap-3 p-6 border-t border-[var(--border-color)] bg-white/50 dark:bg-[var(--bg-surface)]/50 backdrop-blur-sm">
             <button
               @click="handleClose"
               class="
-                px-5 py-2.5 rounded-xl font-medium text-sm transition-all
+                px-5 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-normal text-center
                 text-[var(--text-primary)] hover:bg-[var(--bg-hover)]
               "
             >
@@ -397,7 +400,7 @@ async function saveSettings() {
             <button
               @click="saveSettings"
               class="
-                px-6 py-2.5 rounded-xl font-medium text-sm text-white transition-all
+                px-6 py-2.5 rounded-xl font-medium text-sm text-white transition-all whitespace-normal text-center
                 bg-gradient-to-r from-orange-500 to-orange-600
                 hover:shadow-lg hover:shadow-orange-500/25 hover:-translate-y-0.5
                 active:translate-y-0

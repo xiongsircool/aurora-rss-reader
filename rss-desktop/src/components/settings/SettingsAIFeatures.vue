@@ -8,7 +8,8 @@ import {
 
 const features = defineModel<LocalFeatureConfig>('features', { required: true })
 const autoTitleTranslationLimit = defineModel<number>('autoTitleTranslationLimit', { required: true })
-const aiPromptPreference = defineModel<string>('aiPromptPreference', { required: true })
+const summaryPromptPreference = defineModel<string>('summaryPromptPreference', { required: true })
+const translationPromptPreference = defineModel<string>('translationPromptPreference', { required: true })
 
 const { t } = useI18n()
 
@@ -126,16 +127,28 @@ const limitBounds = {
       <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.autoTitleTranslationLimitHint', { count: autoTitleTranslationLimit }) }}</p>
     </div>
 
-    <!-- AI Prompt Preference -->
+    <!-- Summary Prompt Preference -->
     <div class="mb-4">
-      <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.aiPromptPreference') }}</label>
+      <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.summaryPromptPreference') }}</label>
       <textarea
-        v-model="aiPromptPreference"
+        v-model="summaryPromptPreference"
         class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all shadow-none focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)] resize-none"
         rows="3"
-        :placeholder="t('settings.aiPromptPreferencePlaceholder')"
+        :placeholder="t('settings.summaryPromptPreferencePlaceholder')"
       ></textarea>
-      <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.aiPromptPreferenceHint') }}</p>
+      <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.summaryPromptPreferenceHint') }}</p>
+    </div>
+
+    <!-- Translation Prompt Preference -->
+    <div class="mb-4">
+      <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.translationPromptPreference') }}</label>
+      <textarea
+        v-model="translationPromptPreference"
+        class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all shadow-none focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)] resize-none"
+        rows="3"
+        :placeholder="t('settings.translationPromptPreferencePlaceholder')"
+      ></textarea>
+      <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.translationPromptPreferenceHint') }}</p>
     </div>
   </section>
 </template>
