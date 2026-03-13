@@ -319,8 +319,88 @@ const {
 const { showToast, toastMessage, toastType, showNotification } = useNotification()
 const { darkMode, toggleTheme, loadTheme } = useTheme()
 const showSettings = ref(false)
+const settingsInitialCategory = ref<'general' | 'display' | 'sync' | 'intelligence'>('general')
 const showBookmarkGroupModal = ref(false)
 const bookmarkGroupEntryId = ref<string | null>(null)
+
+function openGeneralSettings() {
+  settingsInitialCategory.value = 'general'
+  showSettings.value = true
+}
+
+function openTagSettings() {
+  settingsInitialCategory.value = 'intelligence'
+  showSettings.value = true
+}
+
+function resolveQuickRerunWindow() {
+  const now = Date.now()
+  let range = isDateFilterActive.value ? dateRangeFilter.value : settingsStore.settings.default_date_range
+  if (!range || range === 'all') {
+    range = settingsStore.settings.default_date_range || '30d'
+  }
+
+  const day = 24 * 60 * 60 * 1000
+  const dayMap: Record<string, number> = {
+    '1d': 1,
+    '3d': 3,
+    '7d': 7,
+    '30d': 30,
+    '90d': 90,
+  }
+  const fallbackDays = 30
+  const days = dayMap[range] || fallbackDays
+  const from = new Date(now - days * day).toISOString()
+  const to = new Date(now).toISOString()
+  return { from, to, effectiveRange: range }
+}
+
+async function handleQuickRerunTagging(payload: { scope: 'feed' | 'tag' | 'group'; feedId?: string; tagId?: string; groupName?: string; label: string }) {
+  if (tagsStore.rerunTask.running) {
+    showNotification(t('tags.quickRerunRunning'), 'info')
+    return
+  }
+
+  const { from, to, effectiveRange } = resolveQuickRerunWindow()
+  let feedIds: string[] | undefined
+  if (payload.scope === 'feed' && payload.feedId) {
+    feedIds = [payload.feedId]
+  } else if (payload.scope === 'group' && payload.groupName !== undefined) {
+    feedIds = store.feeds
+      .filter((feed) => (feed.group_name || '') === payload.groupName && feed.ai_tagging_enabled !== 0)
+      .map((feed) => feed.id)
+  }
+
+  if (payload.scope === 'group' && (!feedIds || feedIds.length === 0)) {
+    showNotification(t('tags.quickRerunEmptyScope'), 'info')
+    return
+  }
+
+  showNotification(
+    t('tags.quickRerunStarted', { label: payload.label, range: effectiveRange }),
+    'info',
+  )
+
+  try {
+    const result = await tagsStore.runRangeRerunTask({
+      from,
+      to,
+      mode: 'missing',
+      limit: 100,
+      feedIds,
+    })
+    showNotification(
+      t('tags.quickRerunFinished', {
+        total: result.summary.total,
+        tagged: result.summary.tagged,
+      }),
+      'success',
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    showNotification(t('tags.quickRerunFailed', { error: message }), 'error')
+  }
+}
 
 // === Group collapse ===
 const collapsedGroups = computed<Record<string, boolean>>(() => {
@@ -791,7 +871,8 @@ onUnmounted(() => {
   />
   <SettingsModal
     :show="showSettings"
-    @close="showSettings = false"
+    :initial-category="settingsInitialCategory"
+    @close="showSettings = false; settingsInitialCategory = 'general'"
   />
   <AddToBookmarkGroupModal
     v-if="bookmarkGroupEntryId"
@@ -822,7 +903,7 @@ onUnmounted(() => {
       :is-date-filter-active="isDateFilterActive"
       :time-filter-label="timeFilterLabel"
       @toggle-theme="toggleTheme"
-      @open-settings="showSettings = true"
+      @open-settings="openGeneralSettings"
       @reset-layout="resetLayout"
       @add-feed="handleAddFeed"
       @export-opml="handleExportOpml"
@@ -834,7 +915,7 @@ onUnmounted(() => {
       @toggle-tags="handleToggleTags"
       @select-tag="handleSelectTag"
       @select-tag-view="handleSelectTagView"
-      @open-tag-settings="showSettings = true"
+      @open-tag-settings="openTagSettings"
       @group-click="handleGroupClick"
       @toggle-collapse="toggleGroupCollapse"
       @group-row-click="handleGroupRowClick"
@@ -852,6 +933,7 @@ onUnmounted(() => {
       @change-view-type="handleChangeViewType"
       @move-to-group="handleMoveToGroup"
       @set-custom-title="handleSetCustomTitle"
+      @quick-rerun-tagging="handleQuickRerunTagging"
     />
 
     <div

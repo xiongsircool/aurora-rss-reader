@@ -26,6 +26,7 @@ const emit = defineEmits<{
   (e: 'change-view-type', feedId: string, viewType: ViewType): void
   (e: 'move-to-group', feedId: string, groupName: string): void
   (e: 'set-custom-title', feedId: string, customTitle: string | null): void
+  (e: 'quick-rerun-tagging', payload: { scope: 'feed' | 'group'; feedId?: string; groupName?: string; label: string }): void
 }>()
 
 const { t } = useI18n()
@@ -34,6 +35,7 @@ const { t } = useI18n()
 const displayName = computed(() => {
   return props.feed.custom_title || props.feed.title || props.feed.url
 })
+const groupLabel = computed(() => props.feed.group_name || t('tags.ungrouped'))
 
 // 右键菜单状态
 const showContextMenu = ref(false)
@@ -330,7 +332,7 @@ onUnmounted(() => {
     <div
       v-if="showContextMenu"
       ref="contextMenuRef"
-      class="feed-context-menu fixed z-[9999] bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.2)] py-1.5 min-w-[200px]"
+      class="feed-context-menu fixed z-[9999] bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.2)] py-1.5 min-w-[240px]"
       :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }"
     >
       <!-- 标记已读 -->
@@ -343,6 +345,35 @@ onUnmounted(() => {
         </svg>
         <span>{{ t('articles.markAsRead') }}</span>
       </button>
+
+      <div class="h-px bg-[var(--border-color)] my-1.5"></div>
+
+      <!-- 快速补打智能标签（当前订阅源） -->
+      <button
+        @click="emit('quick-rerun-tagging', { scope: 'feed', feedId: feed.id, label: displayName }); closeContextMenu()"
+        class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
+      >
+        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/>
+          <path d="M19 3v4"/>
+          <path d="M17 5h4"/>
+        </svg>
+        <span>{{ t('tags.quickRerunMenuFeed') }}</span>
+      </button>
+
+      <!-- 快速补打智能标签（该订阅所在分组） -->
+      <button
+        @click="emit('quick-rerun-tagging', { scope: 'group', groupName: feed.group_name || '', label: groupLabel }); closeContextMenu()"
+        class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
+      >
+        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7"/>
+          <path d="M11 14l-3 4h3l-1 4 5-6h-3l1-4z"/>
+        </svg>
+        <span>{{ t('tags.quickRerunMenuGroup') }}</span>
+      </button>
+
+      <div class="h-px bg-[var(--border-color)] my-1.5"></div>
 
       <!-- 编辑分组 -->
       <button

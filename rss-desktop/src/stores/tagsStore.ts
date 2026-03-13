@@ -57,6 +57,24 @@ export interface RerunSummary {
     untagged: number
 }
 
+export interface RerunTaskState {
+    running: boolean
+    input: {
+        from: string
+        to: string
+        feedIds?: string[]
+        mode: 'missing' | 'all'
+        limit: number
+    } | null
+    currentSummary: RerunSummary | null
+    totalSummary: RerunSummary | null
+    batches: number
+    stoppedReason: string | null
+    error: string | null
+    startedAt: string | null
+    finishedAt: string | null
+}
+
 export interface TagConfig {
     apiKey: string
     baseUrl: string
@@ -83,6 +101,17 @@ export const useTagsStore = defineStore('tags', () => {
     } | null>(null)
     const cursor = ref<string | null>(null)
     const hasMore = ref(false)
+    const rerunTask = ref<RerunTaskState>({
+        running: false,
+        input: null,
+        currentSummary: null,
+        totalSummary: null,
+        batches: 0,
+        stoppedReason: null,
+        error: null,
+        startedAt: null,
+        finishedAt: null,
+    })
 
     // Computed
     const selectedTag = computed(() =>
@@ -440,7 +469,7 @@ export const useTagsStore = defineStore('tags', () => {
         mode?: 'missing' | 'all'
         cursor?: string | null
         limit?: number
-    }): Promise<{ summary: RerunSummary; nextCursor: string | null; hasMore: boolean }> {
+    }, options: { refreshMeta?: boolean } = {}): Promise<{ summary: RerunSummary; nextCursor: string | null; hasMore: boolean }> {
         const res = await fetch(`${API_BASE}/ai/tags/rerun-range`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -451,12 +480,110 @@ export const useTagsStore = defineStore('tags', () => {
             throw new Error(data.error || '范围重跑失败')
         }
         const data = await res.json()
-        await fetchStats()
-        await fetchTags()
+        if (options.refreshMeta !== false) {
+            await fetchStats()
+            await fetchTags()
+        }
         return {
             summary: data.summary,
             nextCursor: data.nextCursor ?? null,
             hasMore: data.hasMore ?? false,
+        }
+    }
+
+    async function runRangeRerunTask(input: {
+        from: string
+        to: string
+        feedIds?: string[]
+        mode?: 'missing' | 'all'
+        limit?: number
+    }): Promise<{ summary: RerunSummary; batches: number; stoppedReason: string | null }> {
+        if (rerunTask.value.running) {
+            throw new Error('范围重跑任务正在执行中')
+        }
+
+        const mode = input.mode === 'all' ? 'all' : 'missing'
+        const safeLimit = Math.max(1, Math.min(input.limit ?? 50, 200))
+        const normalizedFeedIds = Array.isArray(input.feedIds) && input.feedIds.length > 0
+            ? Array.from(new Set(input.feedIds.filter((id) => typeof id === 'string' && id.trim())))
+            : undefined
+
+        rerunTask.value = {
+            running: true,
+            input: {
+                from: input.from,
+                to: input.to,
+                feedIds: normalizedFeedIds,
+                mode,
+                limit: safeLimit,
+            },
+            currentSummary: null,
+            totalSummary: { total: 0, success: 0, tagged: 0, untagged: 0 },
+            batches: 0,
+            stoppedReason: null,
+            error: null,
+            startedAt: new Date().toISOString(),
+            finishedAt: null,
+        }
+
+        let cursor: string | null = null
+        let hasMorePages = true
+        let guard = 0
+
+        try {
+            while (hasMorePages) {
+                const batch = await rerunRange(
+                    {
+                        from: input.from,
+                        to: input.to,
+                        mode,
+                        feedIds: normalizedFeedIds,
+                        cursor,
+                        limit: safeLimit,
+                    },
+                    { refreshMeta: false },
+                )
+
+                rerunTask.value.currentSummary = batch.summary
+                rerunTask.value.totalSummary = {
+                    total: (rerunTask.value.totalSummary?.total || 0) + batch.summary.total,
+                    success: (rerunTask.value.totalSummary?.success || 0) + batch.summary.success,
+                    tagged: (rerunTask.value.totalSummary?.tagged || 0) + batch.summary.tagged,
+                    untagged: (rerunTask.value.totalSummary?.untagged || 0) + batch.summary.untagged,
+                }
+                rerunTask.value.batches += 1
+
+                hasMorePages = batch.hasMore
+                const nextCursor = batch.nextCursor
+                if (hasMorePages && nextCursor === cursor) {
+                    rerunTask.value.stoppedReason = 'cursor_not_advanced'
+                    break
+                }
+                cursor = nextCursor
+
+                guard += 1
+                if (guard > 2000) {
+                    rerunTask.value.stoppedReason = 'too_many_batches'
+                    break
+                }
+            }
+
+            await fetchStats()
+            await fetchTags()
+
+            rerunTask.value.finishedAt = new Date().toISOString()
+            rerunTask.value.running = false
+            return {
+                summary: rerunTask.value.totalSummary || { total: 0, success: 0, tagged: 0, untagged: 0 },
+                batches: rerunTask.value.batches,
+                stoppedReason: rerunTask.value.stoppedReason,
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            rerunTask.value.error = errorMessage
+            rerunTask.value.finishedAt = new Date().toISOString()
+            rerunTask.value.running = false
+            throw error
         }
     }
 
@@ -681,6 +808,7 @@ export const useTagsStore = defineStore('tags', () => {
         analyzing,
         analyzeProgress,
         hasMore,
+        rerunTask,
         // Computed
         selectedTag,
         enabledTags,
@@ -695,6 +823,7 @@ export const useTagsStore = defineStore('tags', () => {
         fetchEntriesByTag,
         analyzeEntries,
         rerunRange,
+        runRangeRerunTask,
         reanalyzeEntry,
         addTagToEntry,
         removeTagFromEntry,

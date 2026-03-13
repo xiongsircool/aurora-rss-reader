@@ -4,7 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useTagsStore } from '../../stores/tagsStore'
 import type { TagMatchRule } from '../../stores/tagsStore'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import { useContextMenu } from '../../composables/useContextMenu'
 import ConfirmModal from '../common/ConfirmModal.vue'
+import ContextMenu from '../common/ContextMenu.vue'
 import RuleBuilderModal from '../tags/RuleBuilderModal.vue'
 import RelatedTags from '../tags/RelatedTags.vue'
 import FeedScopeModal from '../tags/FeedScopeModal.vue'
@@ -20,6 +22,7 @@ const emit = defineEmits<{
   (e: 'select-tag', id: string): void
   (e: 'select-tag-view', view: 'pending' | 'untagged' | 'digest'): void
   (e: 'open-tag-settings'): void
+  (e: 'quick-rerun-tagging', payload: { scope: 'tag'; tagId: string; label: string }): void
 }>()
 
 const { t } = useI18n()
@@ -70,6 +73,7 @@ const analyzePercent = computed(() => {
   if (!p || p.total === 0) return 0
   return Math.round((p.current / p.total) * 100)
 })
+const tagContextMenu = useContextMenu<{ tagId: string; label: string }>()
 
 function resetCreateForm() {
   newTagName.value = ''
@@ -165,6 +169,17 @@ async function handleAnalyzeAll() {
     await tagsStore.fetchStats()
     await tagsStore.fetchTags()
   }
+}
+
+function openTagContextMenu(event: MouseEvent, payload: { tagId: string; label: string }) {
+  tagContextMenu.open(event, payload)
+}
+
+function handleQuickRerunByTag() {
+  const data = tagContextMenu.targetData.value
+  if (!data) return
+  emit('quick-rerun-tagging', { scope: 'tag', tagId: data.tagId, label: data.label })
+  tagContextMenu.close()
 }
 
 </script>
@@ -375,6 +390,7 @@ async function handleAnalyzeAll() {
           v-for="tag in tags"
           :key="tag.id"
           @click="emit('select-tag', tag.id)"
+          @contextmenu="openTagContextMenu($event, { tagId: tag.id, label: tag.name })"
           class="w-full flex items-center gap-2 px-2.5 py-1.5 bg-transparent border border-transparent rounded-md text-left cursor-pointer transition-all duration-200 text-[13px] c-inherit dark:c-[var(--text-primary)] hover:bg-[rgba(139,92,246,0.08)] hover:border-[rgba(139,92,246,0.15)] dark:hover:bg-[rgba(139,92,246,0.15)] dark:hover:border-[rgba(139,92,246,0.3)] group relative"
           :class="{ 'bg-[rgba(139,92,246,0.15)] border-[rgba(139,92,246,0.3)] c-[#8b5cf6]! dark:bg-[rgba(139,92,246,0.25)] dark:border-[rgba(139,92,246,0.5)]': activeTagId === tag.id }"
         >
@@ -532,4 +548,21 @@ async function handleAnalyzeAll() {
     :visible="showFeedScope"
     @close="showFeedScope = false"
   />
+
+  <ContextMenu
+    :show="tagContextMenu.isOpen.value"
+    :position="tagContextMenu.position.value"
+    @close="tagContextMenu.close()"
+  >
+    <button
+      type="button"
+      class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(139,92,246,0.1)] transition-colors c-[var(--text-primary)]"
+      @click="handleQuickRerunByTag"
+    >
+      <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      <span>{{ t('tags.quickRerunMenuTag') }}</span>
+    </button>
+  </ContextMenu>
 </template>

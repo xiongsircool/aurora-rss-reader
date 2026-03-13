@@ -18,14 +18,20 @@ import {
   SettingsRSSHub,
   SettingsAIConfig,
   SettingsAIFeatures,
+  SettingsTagRerun,
   SettingsRefresh,
   SettingsDisplay,
   SettingsAbout
 } from './settings'
 
-const props = defineProps<{
+type Category = 'general' | 'display' | 'sync' | 'intelligence'
+
+const props = withDefaults(defineProps<{
   show: boolean
-}>()
+  initialCategory?: Category
+}>(), {
+  initialCategory: 'general'
+})
 
 const emit = defineEmits<{
   close: []
@@ -49,8 +55,7 @@ const refresh = useRefreshSettings()
 const proxy = useProxySettings()
 
 // Navigation
-type Category = 'general' | 'display' | 'sync' | 'intelligence'
-const activeCategory = ref<Category>('general')
+const activeCategory = ref<Category>(props.initialCategory)
 const isMobileDetailOpen = ref(false)
 
 const categories = [
@@ -126,7 +131,7 @@ watch(() => props.show, async (show) => {
     translationPromptPreference.value = settingsStore.settings.translation_prompt_preference
 
     // Reset view state
-    activeCategory.value = 'general'
+    activeCategory.value = props.initialCategory
     isMobileDetailOpen.value = false
 
     // Auto-test MCP connection on modal open
@@ -385,6 +390,8 @@ async function saveSettings() {
                       v-model:summaryPromptPreference="summaryPromptPreference"
                       v-model:translationPromptPreference="translationPromptPreference"
                     />
+                    <div class="h-6"></div>
+                    <SettingsTagRerun />
                   </div>
                 </div>
 

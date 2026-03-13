@@ -100,6 +100,7 @@ const emit = defineEmits<{
   (e: 'select-tag', id: string): void
   (e: 'select-tag-view', view: 'pending' | 'untagged' | 'digest'): void
   (e: 'open-tag-settings'): void
+  (e: 'quick-rerun-tagging', payload: { scope: 'feed' | 'tag' | 'group'; feedId?: string; tagId?: string; groupName?: string; label: string }): void
 }>()
 
 const { t } = useI18n()
@@ -238,6 +239,18 @@ function isGroupCollapsed(groupName: string): boolean {
   return !!props.collapsedGroups[groupName]
 }
 
+function handleGroupFeedViewType(feedId: string, viewType: ViewType) {
+  emit('change-view-type', feedId, viewType)
+}
+
+function handleGroupMoveTo(feedId: string, groupName: string) {
+  emit('move-to-group', feedId, groupName)
+}
+
+function handleGroupSetCustomTitle(feedId: string, customTitle: string | null) {
+  emit('set-custom-title', feedId, customTitle)
+}
+
 watch(showCreateGroupModal, (visible) => {
   if (!visible) return
   nextTick(() => groupNameInput.value?.focus())
@@ -343,6 +356,7 @@ watch(showCreateGroupModal, (visible) => {
         @select-tag="emit('select-tag', $event)"
         @select-tag-view="emit('select-tag-view', $event)"
         @open-tag-settings="emit('open-tag-settings')"
+        @quick-rerun-tagging="emit('quick-rerun-tagging', $event)"
       />
     </template>
 
@@ -397,6 +411,7 @@ watch(showCreateGroupModal, (visible) => {
         @select-tag="emit('select-tag', $event)"
         @select-tag-view="emit('select-tag-view', $event)"
         @open-tag-settings="emit('open-tag-settings')"
+        @quick-rerun-tagging="emit('quick-rerun-tagging', $event)"
       />
     </template>
 
@@ -453,9 +468,10 @@ watch(showCreateGroupModal, (visible) => {
         @update:editing-group-name="emit('update:editingGroupName', $event)"
         @mark-group-read="emit('mark-group-read', $event)"
         @mark-feed-read="emit('mark-feed-read', $event)"
-        @change-view-type="(feedId, viewType) => emit('change-view-type', feedId, viewType)"
-        @move-to-group="(feedId, groupName) => emit('move-to-group', feedId, groupName)"
-        @set-custom-title="(feedId, customTitle) => emit('set-custom-title', feedId, customTitle)"
+        @change-view-type="handleGroupFeedViewType"
+        @move-to-group="handleGroupMoveTo"
+        @set-custom-title="handleGroupSetCustomTitle"
+        @quick-rerun-tagging="emit('quick-rerun-tagging', $event)"
         @delete-group="handleDeleteGroup"
       />
     </div>
