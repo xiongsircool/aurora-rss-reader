@@ -82,6 +82,45 @@ export interface Summary {
   created_at: string;
 }
 
+export type AITaskKey =
+  | 'entry_summary'
+  | 'title_translation'
+  | 'fulltext_translation'
+  | 'aggregate_digest'
+  | 'smart_tagging';
+
+export type AIScopeType = 'global' | 'feed' | 'group' | 'tag';
+
+export type AIAutomationMode = 'inherit' | 'enabled' | 'disabled';
+
+export interface AIAutomationRule {
+  id: string;
+  task_key: AITaskKey;
+  scope_type: AIScopeType;
+  scope_id: string | null;
+  mode: AIAutomationMode;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AggregateDigest {
+  id: string;
+  task_key: 'aggregate_digest';
+  scope_type: Exclude<AIScopeType, 'global'>;
+  scope_id: string;
+  period: string;
+  time_range_key: string;
+  language: string;
+  source_count: number;
+  source_hash: string;
+  summary_md: string;
+  citations_json: string;
+  keywords_json: string | null;
+  model_name: string;
+  trigger_type: string;
+  created_at: string;
+}
+
 export interface FetchLog {
   id: string;
   feed_id: string | null;

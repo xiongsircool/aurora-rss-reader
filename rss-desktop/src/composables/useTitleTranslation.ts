@@ -3,6 +3,7 @@ import { useFeedStore } from '../stores/feedStore'
 import { useAIStore } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { clampAutoTitleTranslationLimit } from '../constants/translation'
+import { useAIAutomation } from './useAIAutomation'
 import type { Entry } from '../types'
 
 type TitleTranslationResult = { title: string; language: string }
@@ -16,6 +17,7 @@ export function useTitleTranslation() {
   const store = useFeedStore()
   const aiStore = useAIStore()
   const settingsStore = useSettingsStore()
+  const { automationRevision, isEntryTaskEnabled } = useAIAutomation()
 
   const TITLE_TRANSLATION_FAILURE_COOLDOWN_MS = 30_000
 
@@ -261,8 +263,7 @@ export function useTitleTranslation() {
   }
 
   function queueAutoTitleTranslation(entry: Entry, languageOverride?: string) {
-    const autoEnabled = !!aiFeatures.value?.auto_title_translation
-    if (!autoEnabled) {
+    if (!isEntryTaskEnabled('title_translation', entry)) {
       return
     }
     const language = languageOverride || aiFeatures.value?.translation_language || 'zh'
@@ -277,16 +278,12 @@ export function useTitleTranslation() {
     const stopSettingsWatch = watch(
       () => [
         aiFeatures.value?.translation_language || 'zh',
-        aiFeatures.value?.auto_title_translation,
+        automationRevision.value,
       ],
-      ([, auto]) => {
+      () => {
         clearQueuedLoading()
         autoTranslationQueue.length = 0
         queuedKeys.clear()
-
-        if (!auto) {
-          return
-        }
       },
       { immediate: true }
     )

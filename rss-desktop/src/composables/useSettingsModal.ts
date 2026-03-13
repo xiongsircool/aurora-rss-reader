@@ -1,6 +1,7 @@
 import { ref, watch } from 'vue'
 import { useAIStore } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import type { AIAutomationRule, AITaskKey } from '../stores/aiStore'
 
 export interface LocalGlobalConfig {
     provider: string
@@ -31,6 +32,19 @@ export interface LocalConfig {
     tagging: LocalServiceConfig
     embedding: LocalServiceConfig
     features: LocalFeatureConfig
+}
+
+export interface LocalAutomationRule {
+    task_key: AITaskKey
+    scope_type: 'global' | 'feed' | 'group' | 'tag'
+    scope_id: string | null
+    mode: 'inherit' | 'enabled' | 'disabled'
+}
+
+export interface AutomationTarget {
+    scope_type: 'feed' | 'group' | 'tag'
+    scope_id: string
+    label: string
 }
 
 const createLocalGlobalConfig = (): LocalGlobalConfig => ({
@@ -67,8 +81,58 @@ export function useSettingsModal() {
         embedding: createLocalServiceConfig(),
         features: createLocalFeatureConfig()
     })
+    const localAutomationRules = ref<LocalAutomationRule[]>([])
+    const localScopedAutomationRules = ref<LocalAutomationRule[]>([])
+    const currentAutomationTarget = ref<AutomationTarget | null>(null)
 
-    function syncFromStore() {
+    function buildAutomationRulesForScope(target?: AutomationTarget | null): LocalAutomationRule[] {
+        const defaults = aiStore.automationDefaults || []
+        const explicitRules = aiStore.automationRules || []
+        const taskKeys: AITaskKey[] = ['entry_summary', 'title_translation', 'aggregate_digest', 'smart_tagging']
+
+        return taskKeys.map((taskKey) => {
+            if (target) {
+                const explicit = explicitRules.find((item) =>
+                    item.task_key === taskKey &&
+                    item.scope_type === target.scope_type &&
+                    item.scope_id === target.scope_id
+                )
+                return {
+                    task_key: taskKey,
+                    scope_type: target.scope_type,
+                    scope_id: target.scope_id,
+                    mode: explicit?.mode || 'inherit',
+                }
+            }
+
+            const explicit = explicitRules.find((item) => item.task_key === taskKey && item.scope_type === 'global' && item.scope_id === null)
+            if (explicit && explicit.mode !== 'inherit') {
+                return {
+                    task_key: taskKey,
+                    scope_type: 'global',
+                    scope_id: null,
+                    mode: explicit.mode === 'enabled' ? 'enabled' : 'disabled',
+                }
+            }
+            const fallback = defaults.find((item) => item.task_key === taskKey)
+            return {
+                task_key: taskKey,
+                scope_type: 'global',
+                scope_id: null,
+                mode: fallback?.enabled ? 'enabled' : 'disabled',
+            }
+        })
+    }
+
+    function getGlobalAutomationEnabled(taskKey: AITaskKey, fallback: boolean): boolean {
+        const rule = localAutomationRules.value.find((item) => item.task_key === taskKey)
+        if (!rule) return fallback
+        if (rule.mode === 'enabled') return true
+        if (rule.mode === 'disabled') return false
+        return fallback
+    }
+
+    function syncFromStore(target?: AutomationTarget | null) {
         const global = aiStore.config.global || {}
         const summary = aiStore.config.summary || {}
         const translation = aiStore.config.translation || {}
@@ -114,11 +178,14 @@ export function useSettingsModal() {
             title_display_mode: features.title_display_mode ?? localConfig.value.features.title_display_mode,
             translation_language: features.translation_language ?? localConfig.value.features.translation_language
         }
+        localAutomationRules.value = buildAutomationRulesForScope(null)
+        currentAutomationTarget.value = target || null
+        localScopedAutomationRules.value = target ? buildAutomationRulesForScope(target) : []
     }
 
     // Watch store config changes
     watch(() => aiStore.config, () => {
-        syncFromStore()
+        syncFromStore(currentAutomationTarget.value)
     }, { deep: true })
 
     async function initializeSettings(
@@ -127,6 +194,7 @@ export function useSettingsModal() {
     ) {
         await Promise.all([
             aiStore.fetchConfig(),
+            aiStore.fetchAutomationRules(),
             settingsStore.fetchSettings(),
             onRSSHubFetch()
         ])
@@ -141,16 +209,45 @@ export function useSettingsModal() {
             translation: { ...localConfig.value.translation },
             tagging: { ...localConfig.value.tagging },
             embedding: { ...localConfig.value.embedding },
-            features: { ...localConfig.value.features }
+            features: {
+                ...localConfig.value.features,
+                auto_summary: getGlobalAutomationEnabled('entry_summary', localConfig.value.features.auto_summary),
+                auto_title_translation: getGlobalAutomationEnabled('title_translation', localConfig.value.features.auto_title_translation),
+                auto_tagging: getGlobalAutomationEnabled('smart_tagging', localConfig.value.features.auto_tagging),
+            }
         })
         if (!success) {
             console.error('AI配置保存失败')
         }
-        return success
+        if (!success) return false
+
+        const automationRulesToSave = [
+            ...localAutomationRules.value,
+            ...localScopedAutomationRules.value,
+        ]
+
+        const automationSuccess = await aiStore.updateAutomationRules({
+            upserts: automationRulesToSave.map((item): AIAutomationRule => ({
+                task_key: item.task_key,
+                scope_type: item.scope_type,
+                scope_id: item.scope_id,
+                mode: item.mode,
+            })),
+        })
+        if (!automationSuccess) {
+            console.error('AI自动化规则保存失败')
+            return false
+        }
+
+        return true
     }
 
     return {
         localConfig,
+        localAutomationRules,
+        localScopedAutomationRules,
+        currentAutomationTarget,
+        buildAutomationRulesForScope,
         syncFromStore,
         initializeSettings,
         saveAIConfig,

@@ -747,7 +747,7 @@ export const useTagsStore = defineStore('tags', () => {
         limit = 10,
         cursor?: string,
         uiLanguage?: string
-    ): Promise<{ items: Array<{ id: string; period: 'latest' | 'week'; summary: string; keywords: string[]; created_at: string; source_count: number; model_name: string; time_range_key: string; trigger_type: string }>; nextCursor: string | null; hasMore: boolean }> {
+    ): Promise<{ items: Array<{ id: string; period: 'latest' | 'week'; summary: string; citations: Array<{ ref: number; entry_id: string }>; keywords: string[]; created_at: string; source_count: number; model_name: string; time_range_key: string; trigger_type: string }>; nextCursor: string | null; hasMore: boolean }> {
         try {
             const params = new URLSearchParams({ period, limit: String(limit) })
             if (cursor) params.append('cursor', cursor)
@@ -769,7 +769,7 @@ export const useTagsStore = defineStore('tags', () => {
         tagId: string,
         period: 'latest' | 'week' = 'latest',
         uiLanguage?: string
-    ): Promise<{ summary: string; keywords: string[]; summary_updated_at: string; time_range_key: string } | null> {
+    ): Promise<{ summary: string; citations: Array<{ ref: number; entry_id: string }>; keywords: string[]; summary_updated_at: string; time_range_key: string } | null> {
         try {
             const res = await fetch(`${API_BASE}/digest/${tagId}/regenerate`, {
                 method: 'POST',

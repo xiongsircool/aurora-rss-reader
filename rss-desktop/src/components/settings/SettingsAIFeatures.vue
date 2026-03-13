@@ -23,42 +23,12 @@ const limitBounds = {
 <template>
   <section class="mb-6 p-5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] last:mb-0">
     <h3 class="m-[0_0_16px_0] text-base font-semibold text-[var(--text-primary)] hidden md:block">{{ t('settings.aiFeatures') }}</h3>
-
-    <!-- Auto Summary -->
-    <div class="mb-4">
-      <label class="flex items-start gap-2 cursor-pointer py-1 text-[var(--text-primary)]">
-        <input v-model="features.auto_summary" type="checkbox" class="mr-2 accent-orange-500" />
-        <div>
-          {{ t('settings.autoSummary') }}
-          <span class="text-xs text-[var(--text-secondary)] block mt-0.5 leading-snug">{{ t('settings.autoSummaryHint') }}</span>
-        </div>
-      </label>
-    </div>
-
-    <!-- Auto Title Translation -->
-    <div class="mb-4">
-      <label class="flex items-start gap-2 cursor-pointer py-1 text-[var(--text-primary)]">
-        <input v-model="features.auto_title_translation" type="checkbox" class="mr-2 accent-orange-500" />
-        <div>
-          {{ t('settings.autoTitleTranslation') }}
-          <span class="text-xs text-[var(--text-secondary)] block mt-0.5 leading-snug">{{ t('settings.autoTitleTranslationHint') }}</span>
-        </div>
-      </label>
-    </div>
-
-    <!-- Auto Tagging -->
-    <div class="mb-4">
-      <label class="flex items-start gap-2 cursor-pointer py-1 text-[var(--text-primary)]">
-        <input v-model="features.auto_tagging" type="checkbox" class="mr-2 accent-orange-500" />
-        <div>
-          {{ t('settings.autoTagging') }}
-          <span class="text-xs text-[var(--text-secondary)] block mt-0.5 leading-snug">{{ t('settings.autoTaggingHint') }}</span>
-        </div>
-      </label>
-    </div>
+    <p class="m-[0_0_16px_0] text-xs leading-5 text-[var(--text-secondary)]">
+      {{ t('settings.aiFeaturesHint') }}
+    </p>
 
     <!-- Title Display Mode -->
-    <div class="mb-4" v-if="features.auto_title_translation">
+    <div class="mb-4">
       <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.titleDisplayMode') }}</label>
       <div class="flex gap-2 mt-2">
         <button
@@ -92,7 +62,7 @@ const limitBounds = {
     </div>
 
     <!-- Translation Target Language -->
-    <div class="mb-4" v-if="features.auto_title_translation">
+    <div class="mb-4">
       <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.translationTargetLanguage') }}</label>
       <select v-model="features.translation_language" class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all shadow-none focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]">
         <option value="zh">{{ t('languages.zh') }}</option>
@@ -118,7 +88,6 @@ const limitBounds = {
         @input="autoTitleTranslationLimit = Number(($event.target as HTMLInputElement).value)"
         :min="limitBounds.min"
         :max="limitBounds.max"
-        :disabled="!features.auto_title_translation"
       />
       <div class="flex justify-between text-[11px] text-[var(--text-secondary)] mt-1">
         <span>{{ limitBounds.min }}</span>

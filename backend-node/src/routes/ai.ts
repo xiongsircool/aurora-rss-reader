@@ -6,10 +6,26 @@ import { FastifyInstance } from 'fastify';
 import { AIClient, type ServiceKey } from '../services/ai.js';
 import { generateEmbedding } from '../services/vector.js';
 import { EntryRepository, TranslationRepository, SummaryRepository } from '../db/repositories/index.js';
+import { AIAutomationRuleRepository } from '../db/repositories/aiAutomationRule.js';
+import { FeedRepository } from '../db/repositories/feed.js';
+import { TagRepository } from '../db/repositories/tag.js';
+import { getDatabase } from '../db/session.js';
 import { userSettingsService } from '../services/userSettings.js';
 import { getConfig } from '../config/index.js';
 import { initTaggingClient } from '../services/tagging.js';
 import { getObjectBody } from '../utils/http.js';
+import { AIAutomationMode, AIScopeType, AITaskKey } from '../db/models.js';
+import {
+  AUTOMATION_SCOPE_TYPES,
+  AUTOMATION_TASK_KEYS,
+  aiAutomationResolver,
+} from '../services/aiAutomationResolver.js';
+import {
+  aggregateDigestService,
+  buildDigestTimeWindow,
+  parseAggregateDigestRecord,
+  type DigestSourceItem,
+} from '../services/aggregateDigest.js';
 
 function resolveServiceConfig(service: ServiceKey) {
   const settings = userSettingsService.getSettings();
@@ -73,6 +89,130 @@ function resolveServiceConfig(service: ServiceKey) {
   };
 }
 
+type ScopeDigestEntryRow = {
+  id: string;
+  feed_id: string;
+  title: string | null;
+  url: string | null;
+  published_at: string | null;
+  inserted_at: string;
+  summary: string | null;
+  content?: string | null;
+  feed_title: string | null;
+  group_name: string | null;
+};
+
+function queryScopeDigestEntries(input: {
+  scope_type: Exclude<AIScopeType, 'global'>;
+  scope_id: string;
+  startDate: string | null;
+  limit?: number;
+}) {
+  const db = getDatabase();
+  const limit = Math.max(1, Math.min(input.limit || 20, 50));
+
+  if (input.scope_type === 'feed') {
+    if (input.startDate) {
+      return db.prepare(`
+        SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
+               f.title as feed_title, f.group_name as group_name
+        FROM entries e
+        LEFT JOIN feeds f ON e.feed_id = f.id
+        WHERE e.feed_id = ?
+          AND e.inserted_at >= ?
+        ORDER BY e.inserted_at DESC
+        LIMIT ?
+      `).all(input.scope_id, input.startDate, limit) as ScopeDigestEntryRow[];
+    }
+    return db.prepare(`
+      SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
+             f.title as feed_title, f.group_name as group_name
+      FROM entries e
+      LEFT JOIN feeds f ON e.feed_id = f.id
+      WHERE e.feed_id = ?
+      ORDER BY e.inserted_at DESC
+      LIMIT ?
+    `).all(input.scope_id, limit) as ScopeDigestEntryRow[];
+  }
+
+  if (input.scope_type === 'group') {
+    if (input.startDate) {
+      return db.prepare(`
+        SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
+               f.title as feed_title, f.group_name as group_name
+        FROM entries e
+        INNER JOIN feeds f ON e.feed_id = f.id
+        WHERE COALESCE(f.group_name, '') = ?
+          AND e.inserted_at >= ?
+        ORDER BY e.inserted_at DESC
+        LIMIT ?
+      `).all(input.scope_id, input.startDate, limit) as ScopeDigestEntryRow[];
+    }
+    return db.prepare(`
+      SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
+             f.title as feed_title, f.group_name as group_name
+      FROM entries e
+      INNER JOIN feeds f ON e.feed_id = f.id
+      WHERE COALESCE(f.group_name, '') = ?
+      ORDER BY e.inserted_at DESC
+      LIMIT ?
+    `).all(input.scope_id, limit) as ScopeDigestEntryRow[];
+  }
+
+  if (input.startDate) {
+    return db.prepare(`
+      SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
+             f.title as feed_title, f.group_name as group_name
+      FROM entries e
+      INNER JOIN entry_tags et ON e.id = et.entry_id
+      LEFT JOIN feeds f ON e.feed_id = f.id
+      WHERE et.tag_id = ?
+        AND e.inserted_at >= ?
+      ORDER BY e.inserted_at DESC
+      LIMIT ?
+    `).all(input.scope_id, input.startDate, limit) as ScopeDigestEntryRow[];
+  }
+
+  return db.prepare(`
+    SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
+           f.title as feed_title, f.group_name as group_name
+    FROM entries e
+    INNER JOIN entry_tags et ON e.id = et.entry_id
+    LEFT JOIN feeds f ON e.feed_id = f.id
+    WHERE et.tag_id = ?
+    ORDER BY e.inserted_at DESC
+    LIMIT ?
+  `).all(input.scope_id, limit) as ScopeDigestEntryRow[];
+}
+
+function toDigestSourceItems(rows: ScopeDigestEntryRow[]): DigestSourceItem[] {
+  return rows.map((entry, index) => ({
+    ref: index + 1,
+    entry_id: entry.id,
+    title: entry.title || 'Untitled',
+    summary: entry.summary,
+    content_snippet: entry.content,
+    feed_title: entry.feed_title,
+    group_name: entry.group_name,
+    published_at: entry.published_at,
+  }));
+}
+
+function resolveDigestScopeLabel(scope_type: Exclude<AIScopeType, 'global'>, scope_id: string) {
+  if (scope_type === 'feed') {
+    const feedRepo = new FeedRepository();
+    const feed = feedRepo.findById(scope_id);
+    if (!feed) return null;
+    return feed.custom_title || feed.title || feed.url || scope_id;
+  }
+  if (scope_type === 'tag') {
+    const tagRepo = new TagRepository();
+    const tag = tagRepo.findById(scope_id);
+    return tag?.name || null;
+  }
+  return scope_id;
+}
+
 function createClient(service: ServiceKey, overrides?: { apiKey?: string; baseUrl?: string; modelName?: string }) {
   const resolved = resolveServiceConfig(service);
   return new AIClient({
@@ -111,6 +251,237 @@ export async function aiRoutes(app: FastifyInstance) {
   const entryRepo = new EntryRepository();
   const translationRepo = new TranslationRepository();
   const summaryRepo = new SummaryRepository();
+  const automationRuleRepo = new AIAutomationRuleRepository();
+
+  const isTaskKey = (value: unknown): value is AITaskKey =>
+    typeof value === 'string' && AUTOMATION_TASK_KEYS.includes(value as AITaskKey);
+  const isScopeType = (value: unknown): value is AIScopeType =>
+    typeof value === 'string' && AUTOMATION_SCOPE_TYPES.includes(value as AIScopeType);
+  const isAutomationMode = (value: unknown): value is AIAutomationMode =>
+    value === 'inherit' || value === 'enabled' || value === 'disabled';
+
+  function getLegacyDefaults() {
+    return AUTOMATION_TASK_KEYS.map((taskKey) => ({
+      task_key: taskKey,
+      scope_type: 'global' as const,
+      scope_id: null,
+      enabled: aiAutomationResolver.resolve({ taskKey, scopeType: 'global' }),
+      source: 'legacy_fallback' as const,
+    }));
+  }
+
+  app.get('/ai/automation-rules', async () => {
+    return {
+      items: automationRuleRepo.findAll(),
+      defaults: getLegacyDefaults(),
+    };
+  });
+
+  app.patch('/ai/automation-rules', async (request, reply) => {
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const upserts = Array.isArray(body.upserts) ? body.upserts : [];
+    const removals = Array.isArray(body.removals) ? body.removals : [];
+
+    for (const item of upserts) {
+      const payload = getObjectBody(item);
+      if (!payload || !isTaskKey(payload.task_key) || !isScopeType(payload.scope_type) || !isAutomationMode(payload.mode)) {
+        return reply.code(400).send({ error: 'Invalid automation rule in upserts' });
+      }
+      const scopeId = typeof payload.scope_id === 'string' && payload.scope_id.trim()
+        ? payload.scope_id.trim()
+        : null;
+      if (payload.scope_type !== 'global' && !scopeId) {
+        return reply.code(400).send({ error: 'scope_id is required for non-global automation rules' });
+      }
+      automationRuleRepo.upsert({
+        task_key: payload.task_key,
+        scope_type: payload.scope_type,
+        scope_id: scopeId,
+        mode: payload.mode,
+      });
+    }
+
+    for (const item of removals) {
+      const payload = getObjectBody(item);
+      if (!payload || !isTaskKey(payload.task_key) || !isScopeType(payload.scope_type)) {
+        return reply.code(400).send({ error: 'Invalid automation rule in removals' });
+      }
+      const scopeId = typeof payload.scope_id === 'string' && payload.scope_id.trim()
+        ? payload.scope_id.trim()
+        : null;
+      if (payload.scope_type !== 'global' && !scopeId) {
+        return reply.code(400).send({ error: 'scope_id is required for non-global automation removals' });
+      }
+      automationRuleRepo.deleteByTaskAndScope(payload.task_key, payload.scope_type, scopeId);
+    }
+
+    return {
+      success: true,
+      items: automationRuleRepo.findAll(),
+      defaults: getLegacyDefaults(),
+    };
+  });
+
+  app.get('/ai/digests', async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    const scope_type = query.scope_type;
+    const scope_id = query.scope_id;
+    const period = typeof query.period === 'string' && query.period.trim() ? query.period.trim() : 'latest';
+    const { startDate, periodKey, normalizedPeriod } = buildDigestTimeWindow(period);
+    const time_range_key = typeof query.time_range_key === 'string' && query.time_range_key.trim() ? query.time_range_key.trim() : periodKey;
+    const language = typeof query.language === 'string' && query.language.trim() ? query.language.trim() : 'zh';
+
+    if (scope_type !== 'feed' && scope_type !== 'group' && scope_type !== 'tag') {
+      return reply.code(400).send({ error: 'scope_type must be feed, group, or tag' });
+    }
+    if (typeof scope_id !== 'string' || !scope_id.trim()) {
+      return reply.code(400).send({ error: 'scope_id is required' });
+    }
+    const scopeId = scope_id.trim();
+    const scopeLabel = resolveDigestScopeLabel(scope_type, scopeId);
+    if (!scopeLabel) {
+      return reply.code(404).send({ error: 'digest scope not found' });
+    }
+
+    const entries = queryScopeDigestEntries({
+      scope_type,
+      scope_id: scopeId,
+      startDate,
+      limit: 20,
+    });
+
+    const record = aggregateDigestService.getLatest({
+      scope_type,
+      scope_id: scopeId,
+      period: normalizedPeriod,
+      time_range_key,
+      language,
+    });
+
+    return {
+      scope_label: scopeLabel,
+      period: normalizedPeriod,
+      time_range_key,
+      recentCount: entries.length,
+      entries: entries.slice(0, 5),
+      item: record ? {
+        ...record,
+        citations: parseAggregateDigestRecord(record.citations_json, []),
+        keywords: parseAggregateDigestRecord(record.keywords_json, []),
+      } : null,
+    };
+  });
+
+  app.get('/ai/digests/history', async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    const scope_type = query.scope_type;
+    const scope_id = query.scope_id;
+    const period = typeof query.period === 'string' && query.period.trim() ? query.period.trim() : 'latest';
+    const language = typeof query.language === 'string' && query.language.trim() ? query.language.trim() : 'zh';
+    const cursor = typeof query.cursor === 'string' && query.cursor.trim() ? query.cursor.trim() : null;
+    const limit = Math.max(1, Math.min(Number(query.limit) || 10, 50));
+
+    if (scope_type !== 'feed' && scope_type !== 'group' && scope_type !== 'tag') {
+      return reply.code(400).send({ error: 'scope_type must be feed, group, or tag' });
+    }
+    if (typeof scope_id !== 'string' || !scope_id.trim()) {
+      return reply.code(400).send({ error: 'scope_id is required' });
+    }
+
+    const result = aggregateDigestService.getHistory({
+      scope_type,
+      scope_id: scope_id.trim(),
+      period,
+      language,
+      limit,
+      cursor,
+    });
+
+    return {
+      items: result.items.map((item) => ({
+        ...item,
+        citations: parseAggregateDigestRecord(item.citations_json, []),
+        keywords: parseAggregateDigestRecord(item.keywords_json, []),
+      })),
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
+    };
+  });
+
+  app.post('/ai/digests/regenerate', async (request, reply) => {
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const scope_type = body.scope_type;
+    const scope_id = typeof body.scope_id === 'string' ? body.scope_id.trim() : '';
+    const period = typeof body.period === 'string' && body.period.trim() ? body.period.trim() : 'latest';
+    const uiLanguage = typeof body.ui_language === 'string' && body.ui_language.trim() ? body.ui_language.trim() : 'zh';
+    const triggerType = body.trigger_type === 'auto' ? 'auto' : 'manual';
+
+    if (scope_type !== 'feed' && scope_type !== 'group' && scope_type !== 'tag') {
+      return reply.code(400).send({ error: 'scope_type must be feed, group, or tag' });
+    }
+    if (!scope_id) {
+      return reply.code(400).send({ error: 'scope_id is required' });
+    }
+
+    const scopeLabel = resolveDigestScopeLabel(scope_type, scope_id);
+    if (!scopeLabel) {
+      return reply.code(404).send({ error: 'digest scope not found' });
+    }
+
+    const { startDate, normalizedPeriod, periodKey } = buildDigestTimeWindow(period);
+    const entries = queryScopeDigestEntries({
+      scope_type,
+      scope_id,
+      startDate,
+      limit: 20,
+    });
+
+    if (!entries.length) {
+      return reply.code(400).send({ error: '当前时间范围内暂无可用于生成摘要的文章' });
+    }
+
+    try {
+      const generated = await aggregateDigestService.generate({
+        scope_type,
+        scope_id,
+        scope_label: scopeLabel,
+        period: normalizedPeriod,
+        time_range_key: periodKey,
+        language: uiLanguage,
+        items: toDigestSourceItems(entries),
+        trigger_type: triggerType,
+      });
+
+      return {
+        scope_label: scopeLabel,
+        period: normalizedPeriod,
+        time_range_key: periodKey,
+        recentCount: entries.length,
+        entries: entries.slice(0, 5),
+        item: {
+          summary: generated.payload.summary_md,
+          citations: generated.payload.citations,
+          keywords: generated.payload.keywords || [],
+          summary_updated_at: generated.record.created_at,
+          time_range_key: periodKey,
+          source_count: entries.length,
+          model_name: generated.modelName,
+          trigger_type: triggerType,
+        },
+      };
+    } catch (error) {
+      console.error('Failed to regenerate aggregate digest:', error);
+      return reply.code(500).send({ error: '生成聚合摘要失败' });
+    }
+  });
 
   // POST /ai/summary - Generate summary (frontend expects entry_id)
   app.post('/ai/summary', async (request, reply) => {

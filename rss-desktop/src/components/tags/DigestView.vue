@@ -3,6 +3,10 @@ import { ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTagsStore } from '../../stores/tagsStore'
 import { formatDate } from '../../utils/date'
+import MarkdownContent from '../common/MarkdownContent.vue'
+
+type DigestCitation = { ref: number; entry_id: string }
+type DigestEntryPreview = { id: string; title: string; url: string; published_at: string; summary: string | null; feed_title: string }
 
 const emit = defineEmits<{
   (e: 'select-entry', entryId: string): void
@@ -17,16 +21,17 @@ const digestData = ref<Array<{
   tag: { id: string; name: string; color: string; entry_count: number }
   recentCount: number
   llm_summary: string | null
+  citations: DigestCitation[]
   keywords: string[]
   summary_updated_at: string | null
   time_range_key: string
   unsummarized_count?: number
-  entries: Array<{ id: string; title: string; url: string; published_at: string; summary: string | null; feed_title: string }>
+  entries: DigestEntryPreview[]
 }>>([])
 const loading = ref(false)
 const expandedSummary = ref<Set<string>>(new Set())
 const expandedHistorySummary = ref<Set<string>>(new Set())
-const historyByTag = ref<Record<string, Array<{ id: string; period: 'latest' | 'week'; summary: string; keywords: string[]; created_at: string; source_count: number; model_name: string; time_range_key: string; trigger_type: string }>>>({})
+const historyByTag = ref<Record<string, Array<{ id: string; period: 'latest' | 'week'; summary: string; citations: DigestCitation[]; keywords: string[]; created_at: string; source_count: number; model_name: string; time_range_key: string; trigger_type: string }>>>({})
 const historyCursorByTag = ref<Record<string, string | null>>({})
 const historyHasMoreByTag = ref<Record<string, boolean>>({})
 const historyLoadingByTag = ref<Record<string, boolean>>({})
@@ -68,6 +73,21 @@ function toggleSummary(tagId: string) {
 
 function shouldShowSummaryToggle(summary: string | null) {
   return !!summary && summary.length > 120
+}
+
+function resolveCitationEntries(citations: DigestCitation[], entries: DigestEntryPreview[]) {
+  return citations
+    .map((citation) => {
+      const entry = entries.find((item) => item.id === citation.entry_id)
+      return {
+        ref: citation.ref,
+        entry,
+      }
+    })
+    .filter((item, index, list) => {
+      if (!item.entry) return true
+      return list.findIndex((candidate) => candidate.entry?.id === item.entry?.id) === index
+    })
 }
 
 function formatRange(periodValue: 'latest' | 'week', rangeKey?: string | null) {
@@ -138,6 +158,7 @@ async function regenerateSummary(tagId: string) {
       digestData.value[idx] = {
         ...digestData.value[idx],
         llm_summary: result.summary,
+        citations: result.citations || [],
         keywords: result.keywords || [],
         summary_updated_at: result.summary_updated_at,
         time_range_key: result.time_range_key || digestData.value[idx].time_range_key,
@@ -236,14 +257,13 @@ async function regenerateSummary(tagId: string) {
               {{ regeneratingByTag[item.tag.id] ? t('tags.digestRegenerating') : t('tags.digestRegenerate') }}
             </button>
           </div>
-          <p
-            class="text-[12px] leading-5 c-[var(--text-primary)] m-0 whitespace-pre-line"
+          <MarkdownContent
+            :content="item.llm_summary"
+            class="text-[12px] leading-5 c-[var(--text-primary)]"
             :style="isSummaryExpanded(item.tag.id)
               ? {}
               : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }"
-          >
-            {{ item.llm_summary }}
-          </p>
+          />
           <button
             v-if="shouldShowSummaryToggle(item.llm_summary)"
             class="mt-1 text-[11px] c-[#8b5cf6] hover:underline bg-transparent border-none cursor-pointer px-0"
@@ -251,6 +271,19 @@ async function regenerateSummary(tagId: string) {
           >
             {{ isSummaryExpanded(item.tag.id) ? t('tags.digestCollapse') : t('tags.digestExpand') }}
           </button>
+          <div v-if="item.citations?.length" class="mt-2 flex flex-wrap gap-1.5">
+            <button
+              v-for="citation in resolveCitationEntries(item.citations, item.entries)"
+              :key="`${item.tag.id}-${citation.ref}-${citation.entry?.id || 'missing'}`"
+              type="button"
+              class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full text-[10px] border border-[rgba(15,17,21,0.12)] bg-[rgba(15,17,21,0.04)] dark:border-[rgba(255,255,255,0.14)] dark:bg-[rgba(255,255,255,0.06)] c-[var(--text-secondary)] hover:c-[var(--text-primary)]"
+              :disabled="!citation.entry"
+              @click.stop="citation.entry && emit('select-entry', citation.entry.id)"
+            >
+              <span class="font-semibold">[{{ citation.ref }}]</span>
+              <span class="truncate">{{ citation.entry?.title || t('common.unknown') }}</span>
+            </button>
+          </div>
           <div v-if="item.keywords?.length" class="mt-2 flex flex-wrap gap-1.5">
             <span
               v-for="kw in item.keywords"
@@ -346,15 +379,16 @@ async function regenerateSummary(tagId: string) {
                   <span>{{ h.source_count }}</span>
                   <span>·</span>
                   <span>{{ h.trigger_type === 'manual' ? t('tags.digestManual') : t('tags.digestAuto') }}</span>
+                  <span v-if="h.model_name">·</span>
+                  <span v-if="h.model_name">{{ h.model_name }}</span>
                 </div>
-                <div
-                  class="text-[12px] c-[var(--text-primary)] leading-5 whitespace-pre-line"
+                <MarkdownContent
+                  :content="h.summary"
+                  class="text-[12px] c-[var(--text-primary)] leading-5"
                   :style="isHistorySummaryExpanded(h.id)
                     ? {}
-                    : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }"
-                >
-                  {{ h.summary }}
-                </div>
+                    : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }"
+                />
                 <button
                   v-if="shouldShowSummaryToggle(h.summary)"
                   class="mt-1 text-[10px] c-[#8b5cf6] hover:underline bg-transparent border-none cursor-pointer px-0"

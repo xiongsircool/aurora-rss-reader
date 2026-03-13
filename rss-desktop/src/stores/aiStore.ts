@@ -132,6 +132,33 @@ export interface AIFeatureConfig {
   translation_language: string
 }
 
+export type AITaskKey =
+  | 'entry_summary'
+  | 'title_translation'
+  | 'fulltext_translation'
+  | 'aggregate_digest'
+  | 'smart_tagging'
+
+export type AIScopeType = 'global' | 'feed' | 'group' | 'tag'
+
+export type AIAutomationMode = 'inherit' | 'enabled' | 'disabled'
+
+export interface AIAutomationRule {
+  id?: string
+  task_key: AITaskKey
+  scope_type: AIScopeType
+  scope_id: string | null
+  mode: AIAutomationMode
+}
+
+export interface AIAutomationDefault {
+  task_key: AITaskKey
+  scope_type: 'global'
+  scope_id: null
+  enabled: boolean
+  source: 'legacy_fallback'
+}
+
 export interface AIConfig {
   global: AIGlobalConfig
   summary: AIServiceConfig
@@ -139,6 +166,49 @@ export interface AIConfig {
   tagging: AIServiceConfig
   embedding: AIServiceConfig
   features: AIFeatureConfig
+}
+
+export interface AggregateDigestCitation {
+  ref: number
+  entry_id: string
+}
+
+export interface AggregateDigestEntryPreview {
+  id: string
+  feed_id: string
+  title: string | null
+  url: string | null
+  published_at: string | null
+  inserted_at: string
+  summary: string | null
+  feed_title: string | null
+  group_name: string | null
+}
+
+export interface AggregateDigestRecord {
+  id?: string
+  scope_type?: Exclude<AIScopeType, 'global'>
+  scope_id?: string
+  period?: 'latest' | 'week'
+  time_range_key: string
+  summary_md?: string
+  summary?: string
+  citations: AggregateDigestCitation[]
+  keywords: string[]
+  created_at?: string
+  summary_updated_at?: string
+  source_count?: number
+  model_name?: string
+  trigger_type?: 'auto' | 'manual'
+}
+
+export interface AggregateDigestResponse {
+  scope_label: string
+  period: 'latest' | 'week'
+  time_range_key: string
+  recentCount: number
+  entries: AggregateDigestEntryPreview[]
+  item: AggregateDigestRecord | null
 }
 
 export type PartialAIConfig = {
@@ -191,6 +261,8 @@ function mergeConfig(target: AIConfig, updates: PartialAIConfig): AIConfig {
 
 export const useAIStore = defineStore('ai', () => {
   const config = ref<AIConfig>(createDefaultConfig())
+  const automationRules = ref<AIAutomationRule[]>([])
+  const automationDefaults = ref<AIAutomationDefault[]>([])
 
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -224,6 +296,54 @@ export const useAIStore = defineStore('ai', () => {
     } catch (err) {
       console.error('Failed to update AI config:', err)
       error.value = '更新AI配置失败'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchAutomationRules() {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.get<{ items: AIAutomationRule[]; defaults: AIAutomationDefault[] }>('/ai/automation-rules')
+      automationRules.value = data.items || []
+      automationDefaults.value = data.defaults || []
+      return true
+    } catch (err) {
+      console.error('Failed to fetch automation rules:', err)
+      error.value = '获取AI自动化规则失败'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateAutomationRules(input: {
+    upserts?: AIAutomationRule[]
+    removals?: Array<Pick<AIAutomationRule, 'task_key' | 'scope_type' | 'scope_id'>>
+  }) {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.patch<{
+        success: boolean
+        items: AIAutomationRule[]
+        defaults: AIAutomationDefault[]
+      }>('/ai/automation-rules', {
+        upserts: input.upserts || [],
+        removals: input.removals || [],
+      })
+      if (!data.success) {
+        error.value = '更新AI自动化规则失败'
+        return false
+      }
+      automationRules.value = data.items || []
+      automationDefaults.value = data.defaults || []
+      return true
+    } catch (err) {
+      console.error('Failed to update automation rules:', err)
+      error.value = '更新AI自动化规则失败'
       return false
     } finally {
       loading.value = false
@@ -377,17 +497,92 @@ export const useAIStore = defineStore('ai', () => {
     }
   }
 
+  async function fetchAggregateDigest(input: {
+    scope_type: Exclude<AIScopeType, 'global'>
+    scope_id: string
+    period?: 'latest' | 'week'
+    time_range_key?: string
+    language?: string
+  }) {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.get<AggregateDigestResponse>('/ai/digests', { params: input })
+      return data
+    } catch (err) {
+      console.error('Failed to fetch aggregate digest:', err)
+      error.value = '获取聚合 Digest 失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchAggregateDigestHistory(input: {
+    scope_type: Exclude<AIScopeType, 'global'>
+    scope_id: string
+    period?: 'latest' | 'week'
+    language?: string
+    limit?: number
+    cursor?: string | null
+  }) {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.get<{
+        items: AggregateDigestRecord[]
+        nextCursor: string | null
+        hasMore: boolean
+      }>('/ai/digests/history', { params: input })
+      return data
+    } catch (err) {
+      console.error('Failed to fetch aggregate digest history:', err)
+      error.value = '获取聚合 Digest 历史失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function regenerateAggregateDigest(input: {
+    scope_type: Exclude<AIScopeType, 'global'>
+    scope_id: string
+    period?: 'latest' | 'week'
+    ui_language?: string
+    trigger_type?: 'auto' | 'manual'
+  }) {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.post<AggregateDigestResponse>('/ai/digests/regenerate', input)
+      return data
+    } catch (err) {
+      console.error('Failed to regenerate aggregate digest:', err)
+      error.value = '生成聚合 Digest 失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     config,
+    automationRules,
+    automationDefaults,
     loading,
     error,
     fetchConfig,
     updateConfig,
+    fetchAutomationRules,
+    updateAutomationRules,
     testConnection,
     testGlobalConnection,
     clearError,
     resetConfig,
     rebuildVectors,
-    getVectorStats
+    getVectorStats,
+    fetchAggregateDigest,
+    fetchAggregateDigestHistory,
+    regenerateAggregateDigest,
   }
 })

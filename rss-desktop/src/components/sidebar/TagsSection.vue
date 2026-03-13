@@ -23,6 +23,7 @@ const emit = defineEmits<{
   (e: 'select-tag-view', view: 'pending' | 'untagged' | 'digest'): void
   (e: 'open-tag-settings'): void
   (e: 'quick-rerun-tagging', payload: { scope: 'tag'; tagId: string; label: string }): void
+  (e: 'open-automation-settings', payload: { scope_type: 'tag'; scope_id: string; label: string }): void
 }>()
 
 const { t } = useI18n()
@@ -179,6 +180,13 @@ function handleQuickRerunByTag() {
   const data = tagContextMenu.targetData.value
   if (!data) return
   emit('quick-rerun-tagging', { scope: 'tag', tagId: data.tagId, label: data.label })
+  tagContextMenu.close()
+}
+
+function handleOpenAutomationByTag() {
+  const data = tagContextMenu.targetData.value
+  if (!data) return
+  emit('open-automation-settings', { scope_type: 'tag', scope_id: data.tagId, label: data.label })
   tagContextMenu.close()
 }
 
@@ -563,6 +571,21 @@ function handleQuickRerunByTag() {
         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
       </svg>
       <span>{{ t('tags.quickRerunMenuTag') }}</span>
+    </button>
+    <div class="h-px bg-[var(--border-color)] my-1.5"></div>
+    <button
+      type="button"
+      class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(139,92,246,0.1)] transition-colors c-[var(--text-primary)]"
+      @click="handleOpenAutomationByTag"
+    >
+      <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 3v4"/>
+        <path d="M12 17v4"/>
+        <path d="M3 12h4"/>
+        <path d="M17 12h4"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      <span>{{ t('settings.aiAutomationTagMenu') }}</span>
     </button>
   </ContextMenu>
 </template>

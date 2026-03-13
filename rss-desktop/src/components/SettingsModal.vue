@@ -10,6 +10,7 @@ import { useProxySettings } from '../composables/useProxySettings'
 import { clampAutoTitleTranslationLimit } from '../constants/translation'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmModal from './common/ConfirmModal.vue'
+import type { AutomationTarget } from '../composables/useSettingsModal'
 
 // Section Components
 import {
@@ -18,6 +19,7 @@ import {
   SettingsRSSHub,
   SettingsAIConfig,
   SettingsAIFeatures,
+  SettingsAIAutomation,
   SettingsTagRerun,
   SettingsRefresh,
   SettingsDisplay,
@@ -29,8 +31,10 @@ type Category = 'general' | 'display' | 'sync' | 'intelligence'
 const props = withDefaults(defineProps<{
   show: boolean
   initialCategory?: Category
+  initialAutomationTarget?: AutomationTarget | null
 }>(), {
-  initialCategory: 'general'
+  initialCategory: 'general',
+  initialAutomationTarget: null,
 })
 
 const emit = defineEmits<{
@@ -41,7 +45,15 @@ const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
 // Initialize composables
-const { localConfig, initializeSettings, saveAIConfig } = useSettingsModal()
+const {
+  localConfig,
+  localAutomationRules,
+  localScopedAutomationRules,
+  currentAutomationTarget,
+  initializeSettings,
+  saveAIConfig,
+  syncFromStore,
+} = useSettingsModal()
 const rsshub = useRSSHubSettings()
 const {
   show: confirmShow,
@@ -111,6 +123,37 @@ const timelineFilterDensity = computed({
   set: (value) => settingsStore.updateSettings({ timeline_filter_density: value })
 })
 
+const automationScopeTitle = computed(() => {
+  const target = currentAutomationTarget.value
+  if (!target) return ''
+  const label = target.scope_type === 'feed'
+    ? t('settings.aiAutomationFeedTitle')
+    : target.scope_type === 'group'
+      ? t('settings.aiAutomationGroupTitle')
+      : t('settings.aiAutomationTagTitle')
+  return `${label} · ${target.label}`
+})
+
+const automationScopeHint = computed(() => {
+  const target = currentAutomationTarget.value
+  if (!target) return ''
+  return target.scope_type === 'feed'
+    ? t('settings.aiAutomationFeedHint')
+    : target.scope_type === 'group'
+      ? t('settings.aiAutomationGroupHint')
+      : t('settings.aiAutomationTagHint')
+})
+
+const automationScopeBadge = computed(() => {
+  const target = currentAutomationTarget.value
+  if (!target) return ''
+  return target.scope_type === 'feed'
+    ? t('settings.aiAutomationFeedBadge')
+    : target.scope_type === 'group'
+      ? t('settings.aiAutomationGroupBadge')
+      : t('settings.aiAutomationTagBadge')
+})
+
 // Watch modal visibility
 watch(() => props.show, async (show) => {
   if (show) {
@@ -129,6 +172,7 @@ watch(() => props.show, async (show) => {
     autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
     summaryPromptPreference.value = settingsStore.settings.summary_prompt_preference
     translationPromptPreference.value = settingsStore.settings.translation_prompt_preference
+    syncFromStore(props.initialAutomationTarget ?? null)
 
     // Reset view state
     activeCategory.value = props.initialCategory
@@ -144,6 +188,11 @@ watch(() => props.show, async (show) => {
     document.body.style.overflow = ''
   }
 })
+
+watch(() => props.initialAutomationTarget, (target) => {
+  if (!props.show) return
+  syncFromStore(target ?? null)
+}, { deep: true })
 
 // Ensure scroll is unlocked when component is unmounted
 onMounted(() => {
@@ -192,7 +241,8 @@ async function saveSettings() {
     const proxyValid = await proxy.commitProxySettings()
     if (!proxyValid) return
 
-    await saveAIConfig()
+    const aiSaved = await saveAIConfig()
+    if (!aiSaved) return
     
     // Save autoTitleTranslationLimit to store
     const clampedLimit = clampAutoTitleTranslationLimit(autoTitleTranslationLimit.value)
@@ -389,6 +439,22 @@ async function saveSettings() {
                       v-model:autoTitleTranslationLimit="autoTitleTranslationLimit"
                       v-model:summaryPromptPreference="summaryPromptPreference"
                       v-model:translationPromptPreference="translationPromptPreference"
+                    />
+                    <div class="h-6"></div>
+                    <SettingsAIAutomation
+                      v-model:rules="localAutomationRules"
+                      :title="t('settings.aiAutomation')"
+                      :hint="t('settings.aiAutomationHint')"
+                      :badge="t('settings.aiAutomationGlobalOnly')"
+                    />
+                    <div v-if="currentAutomationTarget" class="h-6"></div>
+                    <SettingsAIAutomation
+                      v-if="currentAutomationTarget"
+                      v-model:rules="localScopedAutomationRules"
+                      :title="automationScopeTitle"
+                      :hint="automationScopeHint"
+                      :badge="automationScopeBadge"
+                      :allow-inherit="true"
                     />
                     <div class="h-6"></div>
                     <SettingsTagRerun />

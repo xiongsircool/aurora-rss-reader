@@ -563,6 +563,40 @@ export function initDatabase(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_digest_tag_summaries_tag_period_time ON digest_tag_summaries(tag_id, period, time_range_key, language)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_digest_tag_summaries_created_at ON digest_tag_summaries(created_at DESC)`);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_automation_rules (
+      id TEXT PRIMARY KEY,
+      task_key TEXT NOT NULL,
+      scope_type TEXT NOT NULL,
+      scope_id TEXT,
+      mode TEXT NOT NULL DEFAULT 'inherit',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_automation_rules_task_scope ON ai_automation_rules(task_key, scope_type, scope_id)`);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS aggregate_digests (
+      id TEXT PRIMARY KEY,
+      task_key TEXT NOT NULL DEFAULT 'aggregate_digest',
+      scope_type TEXT NOT NULL,
+      scope_id TEXT NOT NULL,
+      period TEXT NOT NULL,
+      time_range_key TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'zh',
+      source_count INTEGER NOT NULL DEFAULT 0,
+      source_hash TEXT NOT NULL,
+      summary_md TEXT NOT NULL,
+      citations_json TEXT NOT NULL,
+      keywords_json TEXT,
+      model_name TEXT NOT NULL,
+      trigger_type TEXT NOT NULL DEFAULT 'auto',
+      created_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_aggregate_digests_scope_period ON aggregate_digests(scope_type, scope_id, period, time_range_key, language)`);
+
   // Run migrations for existing databases
   runMigrations();
 

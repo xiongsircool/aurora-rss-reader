@@ -13,15 +13,15 @@ import { useLanguage } from '../composables/useLanguage'
 import { useLayoutManager } from '../composables/useLayoutManager'
 import { useNotification } from '../composables/useNotification'
 import { useTheme } from '../composables/useTheme'
-import { useTitleTranslation } from '../composables/useTitleTranslation'
 import { useFeedFilter } from '../composables/useFeedFilter'
 import { useAppSync } from '../composables/useAppSync'
 import { useFeedActions } from '../composables/useFeedActions'
-import { useArticleTranslation } from '../composables/useArticleTranslation'
 import { useViewMode } from '../composables/useViewMode'
 import { useDetailsPanel } from '../composables/useDetailsPanel'
 import { useTimelineData } from '../composables/useTimelineData'
 import { useFeedManagement } from '../composables/useFeedManagement'
+import { useEntryAI } from '../composables/useEntryAI'
+import type { AutomationTarget } from '../composables/useSettingsModal'
 
 import Toast from '../components/Toast.vue'
 import ConfirmModal from '../components/common/ConfirmModal.vue'
@@ -29,6 +29,7 @@ import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
 import TimelineHeader from '../components/timeline/TimelineHeader.vue'
 import DigestView from '../components/tags/DigestView.vue'
+import AggregateDigestView from '../components/digests/AggregateDigestView.vue'
 import DetailsPanel from '../components/details/DetailsPanel.vue'
 import type { Entry } from '../types'
 
@@ -57,19 +58,6 @@ function readSavedDateRange(key: string): string | null {
 function writeSavedDateRange(key: string, value: string) {
   try { localStorage.setItem(key, value) } catch { /* ignore */ }
 }
-
-// === Title Translation ===
-const {
-  aiFeatures,
-  titleTranslationLanguageLabel,
-  getTranslatedTitle,
-  isTitleTranslationLoading,
-  isTitleTranslationFailed,
-  registerAutoRetryHandler,
-  queueAutoTitleTranslation,
-  requestTitleTranslation,
-  setupAutoTranslationWatcher,
-} = useTitleTranslation()
 
 // === Feed Filter ===
 const {
@@ -254,6 +242,11 @@ const {
 
 // Close details when switching view modes
 watch(viewMode, () => { isDetailsOpen.value = false })
+watch([viewMode, showFavoritesOnly], ([mode, favoritesOnly]) => {
+  if (mode !== 'feeds' || favoritesOnly) {
+    closeAggregateDigest()
+  }
+})
 
 // === Timeline Data ===
 const {
@@ -320,17 +313,43 @@ const { showToast, toastMessage, toastType, showNotification } = useNotification
 const { darkMode, toggleTheme, loadTheme } = useTheme()
 const showSettings = ref(false)
 const settingsInitialCategory = ref<'general' | 'display' | 'sync' | 'intelligence'>('general')
+const settingsAutomationTarget = ref<AutomationTarget | null>(null)
+const activeAggregateDigest = ref<{ scope_type: 'feed' | 'group'; scope_id: string; label: string } | null>(null)
 const showBookmarkGroupModal = ref(false)
 const bookmarkGroupEntryId = ref<string | null>(null)
 
 function openGeneralSettings() {
   settingsInitialCategory.value = 'general'
+  settingsAutomationTarget.value = null
   showSettings.value = true
 }
 
 function openTagSettings() {
   settingsInitialCategory.value = 'intelligence'
+  settingsAutomationTarget.value = null
   showSettings.value = true
+}
+
+function openScopedAutomationSettings(target: AutomationTarget) {
+  settingsInitialCategory.value = 'intelligence'
+  settingsAutomationTarget.value = target
+  showSettings.value = true
+}
+
+function closeSettingsModal() {
+  showSettings.value = false
+  settingsInitialCategory.value = 'general'
+  settingsAutomationTarget.value = null
+}
+
+function openAggregateDigest(target: { scope_type: 'feed' | 'group'; scope_id: string; label: string }) {
+  ensureFeedsMode()
+  activeAggregateDigest.value = target
+  selectedUnifiedEntryId.value = null
+}
+
+function closeAggregateDigest() {
+  activeAggregateDigest.value = null
 }
 
 function resolveQuickRerunWindow() {
@@ -435,111 +454,31 @@ watch(() => favoritesStore.error, (error) => {
   }
 })
 
-// === Summary & Full-text Translation ===
-const summaryText = ref('')
-const summaryLoading = ref(false)
-const translationLanguage = ref('zh')
-const lastVisibleEntries = ref<Entry[]>([])
-let summaryRequestVersion = 0
-
-const cleanupTitleTranslationAutoRetry = registerAutoRetryHandler((entryId, language) => {
-  if (!aiFeatures.value?.auto_title_translation) return
-  const entry = lastVisibleEntries.value.find((item) => item.id === entryId)
-  if (!entry) return
-  queueAutoTitleTranslation(entry, language)
-})
-
-const currentEntryId = computed(() => currentSelectedEntry.value?.id ?? null)
-const currentEntryContent = computed(() => selectTranslationContent(currentSelectedEntry.value ?? null))
-
 const {
-  progress: fullTextTranslationProgress,
-  blocks: fullTextTranslationBlocks,
-  isTranslating: isFullTextTranslating,
-  showTranslation: showFullTextTranslation,
-  translatableBlocks: fullTextTranslatableBlocks,
-  getTranslation: getFullTextTranslation,
-  isBlockLoading: isFullTextBlockLoading,
-  isBlockFailed: isFullTextBlockFailed,
-  toggleTranslation: toggleFullTextTranslationRaw,
-} = useArticleTranslation(currentEntryId, currentEntryContent, translationLanguage)
-
-const translatedTitle = computed(() => {
-  if (!currentSelectedEntry.value) return null
-  return getTranslatedTitle(currentSelectedEntry.value.id, translationLanguage.value)
+  aiFeatures,
+  titleTranslationLanguageLabel,
+  translatedTitle,
+  translationLanguage,
+  summaryText,
+  summaryLoading,
+  fullTextTranslationProgress,
+  fullTextTranslationBlocks,
+  isFullTextTranslating,
+  showFullTextTranslation,
+  getFullTextTranslation,
+  isFullTextBlockLoading,
+  isFullTextBlockFailed,
+  getTranslatedTitle,
+  isTitleTranslationLoading,
+  isTitleTranslationFailed,
+  handleEntriesVisible,
+  handleFullTextTranslation,
+  handleSummary,
+  cleanup: cleanupEntryAI,
+} = useEntryAI(currentSelectedEntry, {
+  notify: showNotification,
+  t,
 })
-
-function getContentTextLength(html?: string | null): number {
-  if (!html) return 0
-  if (typeof DOMParser === 'undefined') {
-    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().length
-  }
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  return (doc.body?.textContent ?? '').replace(/\s+/g, ' ').trim().length
-}
-
-function selectTranslationContent(entry: Entry | null): string | null {
-  if (!entry) return null
-  const candidates = [
-    { value: entry.readability_content, priority: 3 },
-    { value: entry.content, priority: 2 },
-    { value: entry.summary, priority: 1 },
-  ]
-  let best: { value: string; length: number; priority: number } | null = null
-  for (const candidate of candidates) {
-    if (!candidate.value) continue
-    const length = getContentTextLength(candidate.value)
-    if (!best || length > best.length || (length === best.length && candidate.priority > best.priority)) {
-      best = { value: candidate.value, length, priority: candidate.priority }
-    }
-  }
-  if (best && best.length > 0) return best.value
-  return entry.readability_content ?? entry.content ?? entry.summary ?? null
-}
-
-async function handleFullTextTranslation() {
-  const wasShowing = showFullTextTranslation.value
-  toggleFullTextTranslationRaw()
-  if (!wasShowing && currentSelectedEntry.value) {
-    await nextTick()
-    if (fullTextTranslatableBlocks.value.length === 0) {
-      showNotification(t('toast.translationNoText'), 'info')
-    }
-    try {
-      await requestTitleTranslation(currentSelectedEntry.value.id, translationLanguage.value)
-    } catch (error) {
-      console.warn('Title translation failed:', error)
-    }
-  }
-}
-
-async function handleSummary() {
-  if (!currentSelectedEntry.value) return
-  const requestVersion = ++summaryRequestVersion
-  const entryId = currentSelectedEntry.value.id
-  const hadSummary = !!summaryText.value.trim()
-  const previousSummary = summaryText.value
-  summaryLoading.value = true
-  if (hadSummary) {
-    summaryText.value = ''
-  }
-  try {
-    const summary = await store.requestSummary(entryId, 'zh', { force: hadSummary })
-    if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entryId) {
-      summaryText.value = summary.summary
-      showNotification(t('toast.summarySuccess'), 'success')
-    }
-  } catch {
-    if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entryId) {
-      summaryText.value = previousSummary
-      showNotification(t('toast.summaryFailed'), 'error')
-    }
-  } finally {
-    if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entryId) {
-      summaryLoading.value = false
-    }
-  }
-}
 
 // === Favorites ===
 async function loadFavoritesData(options: { includeEntries?: boolean; feedId?: string | null } = {}) {
@@ -634,6 +573,7 @@ async function selectFavoriteFeed(feedId: string | null) {
 }
 
 function backToAllFeeds() {
+  closeAggregateDigest()
   if (viewMode.value === 'collection' || viewMode.value === 'tag') {
     viewMode.value = 'feeds'
     activeCollectionId.value = null
@@ -712,22 +652,37 @@ async function openExternal(url?: string | null) {
 
 // === Feed / Group clicks ===
 async function handleFeedClick(feedId: string) {
+  closeAggregateDigest()
   ensureFeedsMode()
   store.selectFeed(feedId)
   await store.fetchEntries({ feedId })
 }
 
 async function handleGroupClick(groupName: string) {
+  closeAggregateDigest()
   ensureFeedsMode()
   store.selectGroup(groupName)
   await store.fetchEntries({ groupName })
 }
 
 async function handleGroupRowClick(groupName: string) {
+  closeAggregateDigest()
   ensureFeedsMode()
   store.toggleGroupCollapse(groupName)
   store.selectGroup(groupName)
   await store.fetchEntries({ groupName })
+}
+
+async function handleAggregateDigestEntrySelect(entryId: string) {
+  const target = activeAggregateDigest.value
+  if (!target) return
+  if (target.scope_type === 'feed') {
+    await handleFeedClick(target.scope_id)
+  } else {
+    await handleGroupClick(target.scope_id)
+  }
+  await nextTick()
+  handleEntrySelect(entryId)
 }
 
 // === Entry selection & visible entries ===
@@ -742,73 +697,12 @@ function handleEntrySelect(entryId: string) {
   openDetails()
 }
 
-function handleEntriesVisible(entries: Entry[]) {
-  lastVisibleEntries.value = entries
-  entries.forEach((entry) => queueAutoTitleTranslation(entry))
-}
-
-// === Auto-translation watchers ===
-watch(
-  () => [aiFeatures.value?.auto_title_translation, aiFeatures.value?.translation_language],
-  ([autoEnabled]) => {
-    if (!autoEnabled || !lastVisibleEntries.value.length) return
-    lastVisibleEntries.value.forEach((entry) => queueAutoTitleTranslation(entry))
-  },
-)
-
-// === Entry change watchers ===
-watch(
-  () => currentSelectedEntry.value,
-  async (entry) => {
-    const requestVersion = ++summaryRequestVersion
-    if (!entry) {
-      summaryText.value = ''
-      summaryLoading.value = false
-      return
-    }
-    const cached = store.getCachedSummary(entry.id)
-    summaryText.value = cached?.summary ?? ''
-    if (aiFeatures.value?.auto_summary && !cached?.summary) {
-      try {
-        summaryLoading.value = true
-        const summary = await store.requestSummary(entry.id)
-        if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entry.id) {
-          summaryText.value = summary.summary
-        }
-      } catch (error) {
-        if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entry.id) {
-          console.error('Auto summary failed:', error)
-        }
-      } finally {
-        if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entry.id) {
-          summaryLoading.value = false
-        }
-      }
-    }
-    if (!entry.read) await store.toggleEntryState(entry, { read: true })
-  },
-  { immediate: true },
-)
-
-watch(
-  () => translationLanguage.value,
-  async (newLang, oldLang) => {
-    if (newLang === oldLang || !currentSelectedEntry.value || !showFullTextTranslation.value) return
-    try {
-      await requestTitleTranslation(currentSelectedEntry.value.id, newLang)
-    } catch (error) {
-      console.warn('Title translation failed:', error)
-    }
-  },
-)
-
 // === App Sync ===
 const { initSync, cleanupSync } = useAppSync(
   showFavoritesOnly,
   async () => { await loadFavoritesData() },
   dateRangeFilter,
 )
-setupAutoTranslationWatcher()
 
 // === Lifecycle ===
 onMounted(async () => {
@@ -818,7 +712,10 @@ onMounted(async () => {
   store.loadCustomGroups()
   try { await settingsStore.fetchSettings() } catch { /* continue with defaults */ }
   await loadLanguage()
-  await aiStore.fetchConfig()
+  await Promise.all([
+    aiStore.fetchConfig(),
+    aiStore.fetchAutomationRules(),
+  ])
 
   const defaultRange = settingsStore.settings.default_date_range
   subscriptionDateRange.value = readSavedDateRange(SUBSCRIPTION_DATE_RANGE_KEY) || defaultRange
@@ -844,7 +741,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  cleanupTitleTranslationAutoRetry()
+  cleanupEntryAI()
   cleanupLayout()
   cleanupSync()
   unlockBodyScroll()
@@ -872,7 +769,8 @@ onUnmounted(() => {
   <SettingsModal
     :show="showSettings"
     :initial-category="settingsInitialCategory"
-    @close="showSettings = false; settingsInitialCategory = 'general'"
+    :initial-automation-target="settingsAutomationTarget"
+    @close="closeSettingsModal"
   />
   <AddToBookmarkGroupModal
     v-if="bookmarkGroupEntryId"
@@ -934,6 +832,8 @@ onUnmounted(() => {
       @move-to-group="handleMoveToGroup"
       @set-custom-title="handleSetCustomTitle"
       @quick-rerun-tagging="handleQuickRerunTagging"
+      @open-automation-settings="openScopedAutomationSettings"
+      @open-digest="openAggregateDigest"
     />
 
     <div
@@ -943,8 +843,22 @@ onUnmounted(() => {
       :title="t('layout.leftResizeTitle')"
     ></div>
 
+    <template v-if="activeAggregateDigest">
+      <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden">
+        <div class="flex-1 overflow-y-auto" :class="compactTimelineFilterDensity ? 'p-3 pt-2' : 'p-4'">
+          <AggregateDigestView
+            :scope-type="activeAggregateDigest.scope_type"
+            :scope-id="activeAggregateDigest.scope_id"
+            :scope-label="activeAggregateDigest.label"
+            @back="closeAggregateDigest"
+            @select-entry="handleAggregateDigestEntrySelect"
+          />
+        </div>
+      </main>
+    </template>
+
     <!-- Digest view (tag mode: 今日/本周 简报) -->
-    <template v-if="viewMode === 'tag' && activeTagView === 'digest'">
+    <template v-else-if="viewMode === 'tag' && activeTagView === 'digest'">
       <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden">
         <TimelineHeader
           v-if="!compactTimelineFilterDensity"

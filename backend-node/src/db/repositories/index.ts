@@ -8,6 +8,8 @@ export { CollectionRepository } from './collections.js';
 export { TagRepository } from './tag.js';
 export { EntryTagRepository } from './entryTag.js';
 export { AnalysisStatusRepository } from './analysisStatus.js';
+export { AIAutomationRuleRepository } from './aiAutomationRule.js';
+export { AggregateDigestRepository } from './aggregateDigest.js';
 
 export type {
   FeedCreateInput,
@@ -52,3 +54,12 @@ export type {
 export type {
   AnalysisStats,
 } from './analysisStatus.js';
+
+export type {
+  AIAutomationRuleCreateInput,
+  AIAutomationRuleUpdateInput,
+} from './aiAutomationRule.js';
+
+export type {
+  AggregateDigestCreateInput,
+} from './aggregateDigest.js';
