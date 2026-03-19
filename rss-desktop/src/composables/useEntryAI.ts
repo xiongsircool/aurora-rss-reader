@@ -48,7 +48,8 @@ export function useEntryAI(
   const { automationRevision, isEntryTaskEnabled } = useAIAutomation()
   const summaryText = ref('')
   const summaryLoading = ref(false)
-  const translationLanguage = ref('zh')
+  const translationLanguage = ref('')
+
   const lastVisibleEntries = ref<Entry[]>([])
   let summaryRequestVersion = 0
 
@@ -63,6 +64,17 @@ export function useEntryAI(
     requestTitleTranslation,
     setupAutoTranslationWatcher,
   } = useTitleTranslation()
+
+  // Initialize from settings, but allow manual override
+  watch(
+    () => aiFeatures.value?.translation_language,
+    (newLang) => {
+      if (newLang && !translationLanguage.value) {
+        translationLanguage.value = newLang
+      }
+    },
+    { immediate: true },
+  )
 
   const currentEntryId = computed(() => currentSelectedEntry.value?.id ?? null)
   const currentEntryContent = computed(() => selectTranslationContent(currentSelectedEntry.value))
@@ -120,7 +132,8 @@ export function useEntryAI(
       summaryText.value = ''
     }
     try {
-      const summary = await store.requestSummary(entryId, 'zh', { force: hadSummary })
+      const summaryLanguage = aiFeatures.value?.translation_language || 'zh'
+      const summary = await store.requestSummary(entryId, summaryLanguage, { force: hadSummary })
       if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === entryId) {
         summaryText.value = summary.summary
         notify(t('toast.summarySuccess'), 'success')
@@ -165,7 +178,8 @@ export function useEntryAI(
       if (isEntryTaskEnabled('entry_summary', selectedEntry) && !cached?.summary) {
         try {
           summaryLoading.value = true
-          const summary = await store.requestSummary(selectedEntry.id)
+          const summaryLanguage = aiFeatures.value?.translation_language || 'zh'
+          const summary = await store.requestSummary(selectedEntry.id, summaryLanguage)
           if (requestVersion === summaryRequestVersion && currentSelectedEntry.value?.id === selectedEntry.id) {
             summaryText.value = summary.summary
           }

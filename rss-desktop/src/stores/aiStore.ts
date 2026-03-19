@@ -168,12 +168,15 @@ export interface AIConfig {
   features: AIFeatureConfig
 }
 
-export interface AggregateDigestCitation {
+export type ScopeSummaryWindowType = '24h' | '3d' | '7d' | '30d'
+export type ScopeSummaryStatus = 'empty' | 'idle' | 'stale' | 'generating' | 'ready' | 'failed'
+
+export interface ScopeSummaryCitation {
   ref: number
   entry_id: string
 }
 
-export interface AggregateDigestEntryPreview {
+export interface ScopeSummaryEntryPreview {
   id: string
   feed_id: string
   title: string | null
@@ -181,34 +184,57 @@ export interface AggregateDigestEntryPreview {
   published_at: string | null
   inserted_at: string
   summary: string | null
+  content?: string | null
+  readability_content?: string | null
   feed_title: string | null
-  group_name: string | null
 }
 
-export interface AggregateDigestRecord {
+export interface ScopeSummarySettingsSnapshot {
+  enabled: boolean
+  auto_generate: boolean
+  auto_generate_interval_minutes: number
+  default_window: ScopeSummaryWindowType
+  max_entries: number
+  chunk_size: number
+}
+
+export interface ScopeSummaryRecord {
   id?: string
-  scope_type?: Exclude<AIScopeType, 'global'>
+  scope_type?: 'feed' | 'group'
   scope_id?: string
-  period?: 'latest' | 'week'
-  time_range_key: string
+  window_type: ScopeSummaryWindowType
+  window_start_at: string
+  window_end_at: string
+  status?: 'generating' | 'ready' | 'failed'
   summary_md?: string
   summary?: string
-  citations: AggregateDigestCitation[]
+  citations: ScopeSummaryCitation[]
   keywords: string[]
   created_at?: string
+  updated_at?: string
   summary_updated_at?: string
   source_count?: number
-  model_name?: string
+  model_name?: string | null
   trigger_type?: 'auto' | 'manual'
+  error_message?: string | null
 }
 
-export interface AggregateDigestResponse {
+export interface ScopeSummaryResponse {
   scope_label: string
-  period: 'latest' | 'week'
-  time_range_key: string
+  scope_type: 'feed' | 'group'
+  scope_id: string
+  window_type: ScopeSummaryWindowType
+  window_start_at: string
+  window_end_at: string
+  status: ScopeSummaryStatus
   recentCount: number
-  entries: AggregateDigestEntryPreview[]
-  item: AggregateDigestRecord | null
+  entries: ScopeSummaryEntryPreview[]
+  entry_index_map: Record<number, string>
+  item: ScopeSummaryRecord | null
+  settings: ScopeSummarySettingsSnapshot
+  can_auto_generate: boolean
+  suggested_windows: ScopeSummaryWindowType[]
+  queue_state?: 'queued' | 'already_running' | 'completed'
 }
 
 export type PartialAIConfig = {
@@ -497,31 +523,30 @@ export const useAIStore = defineStore('ai', () => {
     }
   }
 
-  async function fetchAggregateDigest(input: {
-    scope_type: Exclude<AIScopeType, 'global'>
+  async function fetchScopeSummary(input: {
+    scope_type: 'feed' | 'group'
     scope_id: string
-    period?: 'latest' | 'week'
-    time_range_key?: string
+    window_type?: ScopeSummaryWindowType
     language?: string
   }) {
     loading.value = true
     error.value = null
     try {
-      const { data } = await api.get<AggregateDigestResponse>('/ai/digests', { params: input })
+      const { data } = await api.get<ScopeSummaryResponse>('/ai/scope-summary', { params: input })
       return data
     } catch (err) {
-      console.error('Failed to fetch aggregate digest:', err)
-      error.value = '获取聚合 Digest 失败'
+      console.error('Failed to fetch scope summary:', err)
+      error.value = '获取范围摘要失败'
       throw err
     } finally {
       loading.value = false
     }
   }
 
-  async function fetchAggregateDigestHistory(input: {
-    scope_type: Exclude<AIScopeType, 'global'>
+  async function fetchScopeSummaryHistory(input: {
+    scope_type: 'feed' | 'group'
     scope_id: string
-    period?: 'latest' | 'week'
+    window_type?: ScopeSummaryWindowType
     language?: string
     limit?: number
     cursor?: string | null
@@ -530,35 +555,61 @@ export const useAIStore = defineStore('ai', () => {
     error.value = null
     try {
       const { data } = await api.get<{
-        items: AggregateDigestRecord[]
+        items: ScopeSummaryRecord[]
         nextCursor: string | null
         hasMore: boolean
-      }>('/ai/digests/history', { params: input })
+      }>('/ai/scope-summary/history', { params: input })
       return data
     } catch (err) {
-      console.error('Failed to fetch aggregate digest history:', err)
-      error.value = '获取聚合 Digest 历史失败'
+      console.error('Failed to fetch scope summary history:', err)
+      error.value = '获取范围摘要历史失败'
       throw err
     } finally {
       loading.value = false
     }
   }
 
-  async function regenerateAggregateDigest(input: {
-    scope_type: Exclude<AIScopeType, 'global'>
+  async function generateScopeSummary(input: {
+    scope_type: 'feed' | 'group'
     scope_id: string
-    period?: 'latest' | 'week'
+    window_type?: ScopeSummaryWindowType
     ui_language?: string
     trigger_type?: 'auto' | 'manual'
+    background?: boolean
   }) {
     loading.value = true
     error.value = null
+    const background = input.background ?? true
     try {
-      const { data } = await api.post<AggregateDigestResponse>('/ai/digests/regenerate', input)
+      const { data } = await api.post<ScopeSummaryResponse>(
+        '/ai/scope-summary/generate',
+        {
+          ...input,
+          background,
+        },
+        { timeout: 30000 },
+      )
       return data
     } catch (err) {
-      console.error('Failed to regenerate aggregate digest:', err)
-      error.value = '生成聚合 Digest 失败'
+      const timeoutCode = (err as { code?: string } | null)?.code
+      if (background && timeoutCode === 'ECONNABORTED') {
+        try {
+          const fallback = await fetchScopeSummary({
+            scope_type: input.scope_type,
+            scope_id: input.scope_id,
+            window_type: input.window_type,
+            language: input.ui_language,
+          })
+          return {
+            ...fallback,
+            status: 'generating' as ScopeSummaryStatus,
+          }
+        } catch (fallbackErr) {
+          console.error('Failed to fallback after scope summary timeout:', fallbackErr)
+        }
+      }
+      console.error('Failed to generate scope summary:', err)
+      error.value = '生成范围摘要失败'
       throw err
     } finally {
       loading.value = false
@@ -581,8 +632,8 @@ export const useAIStore = defineStore('ai', () => {
     resetConfig,
     rebuildVectors,
     getVectorStats,
-    fetchAggregateDigest,
-    fetchAggregateDigestHistory,
-    regenerateAggregateDigest,
+    fetchScopeSummary,
+    fetchScopeSummaryHistory,
+    generateScopeSummary,
   }
 })

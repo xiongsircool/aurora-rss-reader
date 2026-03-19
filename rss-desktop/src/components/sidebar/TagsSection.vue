@@ -565,17 +565,6 @@ function handleOpenAutomationByTag() {
     <button
       type="button"
       class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(139,92,246,0.1)] transition-colors c-[var(--text-primary)]"
-      @click="handleQuickRerunByTag"
-    >
-      <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-      </svg>
-      <span>{{ t('tags.quickRerunMenuTag') }}</span>
-    </button>
-    <div class="h-px bg-[var(--border-color)] my-1.5"></div>
-    <button
-      type="button"
-      class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(139,92,246,0.1)] transition-colors c-[var(--text-primary)]"
       @click="handleOpenAutomationByTag"
     >
       <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -586,6 +575,17 @@ function handleOpenAutomationByTag() {
         <circle cx="12" cy="12" r="3"/>
       </svg>
       <span>{{ t('settings.aiAutomationTagMenu') }}</span>
+    </button>
+    <div class="h-px bg-[var(--border-color)] my-1.5"></div>
+    <button
+      type="button"
+      class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(139,92,246,0.1)] transition-colors c-[var(--text-primary)]"
+      @click="handleQuickRerunByTag"
+    >
+      <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      <span>{{ t('tags.quickRerunMenuTag') }}</span>
     </button>
   </ContextMenu>
 </template>

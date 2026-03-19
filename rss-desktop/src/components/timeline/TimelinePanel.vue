@@ -19,6 +19,8 @@ const props = defineProps<{
   subtitle: string
   showFavoritesOnly: boolean
   viewMode: ViewMode
+  scopeSummaryTarget?: { scope_type: 'feed' | 'group'; scope_id: string; label: string } | null
+  scopeSummaryActive?: boolean
   activeTagId: string | null
   activeTagName?: string
   activeTagView: 'tag' | 'pending' | 'untagged' | 'digest' | null
@@ -88,6 +90,7 @@ const emit = defineEmits<{
   (e: 'ai-search', query: string): void
   (e: 'apply-tag-combo', tagIds: string[], mode: 'and' | 'or'): void
   (e: 'clear-tag-combo'): void
+  (e: 'toggle-scope-summary', mode: 'articles' | 'summary'): void
 }>()
 
 const { t } = useI18n()
@@ -164,6 +167,9 @@ const emptyMessage = computed(() => {
   if (props.viewMode === 'tag' && props.activeTagView === 'digest') return t('tags.digestEmpty')
   return t('feeds.noArticlesAdd')
 })
+const showScopeSummaryToggle = computed(() =>
+  props.viewMode === 'feeds' && !props.showFavoritesOnly && !!props.scopeSummaryTarget
+)
 
 // Responsive grid columns
 const containerRef = ref<HTMLElement | null>(null)
@@ -274,6 +280,32 @@ function handleVisibleUpdate(
       </div>
       <div class="text-[11px] c-[var(--text-secondary)] whitespace-nowrap">
         {{ entries.length }} {{ t('articles.title') }}
+      </div>
+    </div>
+
+    <div
+      v-if="showScopeSummaryToggle"
+      class="mx-4 mb-2 px-3 py-2 rounded-xl border border-[rgba(255,122,24,0.22)] bg-[linear-gradient(135deg,rgba(255,122,24,0.08),rgba(255,190,48,0.06))] flex items-center justify-between gap-3"
+    >
+      <div class="min-w-0">
+        <div class="text-[12px] font-semibold c-[var(--text-primary)]">{{ t('scopeSummary.panelTitle') }}</div>
+        <div class="mt-0.5 text-[11px] c-[var(--text-secondary)] truncate">{{ scopeSummaryTarget?.label }}</div>
+      </div>
+      <div class="flex items-center gap-1 bg-[var(--bg-base)] rounded-lg p-0.5 border border-[var(--border-color)]">
+        <button
+          class="px-2.5 py-1 text-[11px] font-medium rounded-md transition-all"
+          :class="!scopeSummaryActive ? 'bg-[var(--bg-surface)] c-[var(--text-primary)] shadow-sm' : 'c-[var(--text-tertiary)] hover:c-[var(--text-secondary)]'"
+          @click="emit('toggle-scope-summary', 'articles')"
+        >
+          {{ t('scopeSummary.articlesTab') }}
+        </button>
+        <button
+          class="px-2.5 py-1 text-[11px] font-medium rounded-md transition-all"
+          :class="scopeSummaryActive ? 'bg-[var(--bg-surface)] c-[var(--text-primary)] shadow-sm' : 'c-[var(--text-tertiary)] hover:c-[var(--text-secondary)]'"
+          @click="emit('toggle-scope-summary', 'summary')"
+        >
+          {{ t('scopeSummary.summaryTab') }}
+        </button>
       </div>
     </div>
 

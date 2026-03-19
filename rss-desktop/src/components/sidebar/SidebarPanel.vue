@@ -102,7 +102,6 @@ const emit = defineEmits<{
   (e: 'open-tag-settings'): void
   (e: 'quick-rerun-tagging', payload: { scope: 'feed' | 'tag' | 'group'; feedId?: string; tagId?: string; groupName?: string; label: string }): void
   (e: 'open-automation-settings', payload: { scope_type: 'feed' | 'group' | 'tag'; scope_id: string; label: string }): void
-  (e: 'open-digest', payload: { scope_type: 'feed' | 'group'; scope_id: string; label: string }): void
 }>()
 
 const { t } = useI18n()
@@ -477,7 +476,6 @@ watch(showCreateGroupModal, (visible) => {
         @set-custom-title="handleGroupSetCustomTitle"
         @quick-rerun-tagging="emit('quick-rerun-tagging', $event)"
         @open-automation-settings="emit('open-automation-settings', $event)"
-        @open-digest="emit('open-digest', $event)"
         @delete-group="handleDeleteGroup"
       />
     </div>

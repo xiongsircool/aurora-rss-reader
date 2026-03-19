@@ -29,7 +29,7 @@ import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
 import TimelineHeader from '../components/timeline/TimelineHeader.vue'
 import DigestView from '../components/tags/DigestView.vue'
-import AggregateDigestView from '../components/digests/AggregateDigestView.vue'
+import ScopeSummaryView from '../components/summaries/ScopeSummaryView.vue'
 import DetailsPanel from '../components/details/DetailsPanel.vue'
 import type { Entry } from '../types'
 
@@ -195,14 +195,24 @@ async function handleClearTagCombo() {
 }
 
 // === Entry Selection ===
+// Store for digest/summary entry selection (entries from digest view that may not be in tagEntriesAsEntry)
+const selectedDigestEntry = ref<Entry | null>(null)
+
 const currentSelectedEntry = computed<Entry | null>(() => {
+  // Check digest entry first (e.g., when clicking citations in DigestView or ScopeSummaryView)
+  if (selectedDigestEntry.value) return selectedDigestEntry.value
+
   if (viewMode.value === 'collection') {
     if (!selectedUnifiedEntryId.value) return null
     return collectionEntriesAsEntry.value.find(e => e.id === selectedUnifiedEntryId.value) ?? null
   }
   if (viewMode.value === 'tag') {
     if (!selectedUnifiedEntryId.value) return null
-    return tagEntriesAsEntry.value.find(e => e.id === selectedUnifiedEntryId.value) ?? null
+    // First check tag timeline entries
+    const entry = tagEntriesAsEntry.value.find(e => e.id === selectedUnifiedEntryId.value) ?? null
+    if (entry) return entry
+    // Fallback: check feed store entries (e.g., entries from DigestView citations)
+    return store.selectedEntry?.id === selectedUnifiedEntryId.value ? store.selectedEntry : null
   }
   if (showFavoritesOnly.value) {
     return favoritesStore.starredEntries.find((entry) => entry.id === selectedFavoriteEntryId.value) ?? null
@@ -244,7 +254,7 @@ const {
 watch(viewMode, () => { isDetailsOpen.value = false })
 watch([viewMode, showFavoritesOnly], ([mode, favoritesOnly]) => {
   if (mode !== 'feeds' || favoritesOnly) {
-    closeAggregateDigest()
+    feedDetailMode.value = 'articles'
   }
 })
 
@@ -314,7 +324,7 @@ const { darkMode, toggleTheme, loadTheme } = useTheme()
 const showSettings = ref(false)
 const settingsInitialCategory = ref<'general' | 'display' | 'sync' | 'intelligence'>('general')
 const settingsAutomationTarget = ref<AutomationTarget | null>(null)
-const activeAggregateDigest = ref<{ scope_type: 'feed' | 'group'; scope_id: string; label: string } | null>(null)
+const feedDetailMode = ref<'articles' | 'summary'>('articles')
 const showBookmarkGroupModal = ref(false)
 const bookmarkGroupEntryId = ref<string | null>(null)
 
@@ -340,16 +350,6 @@ function closeSettingsModal() {
   showSettings.value = false
   settingsInitialCategory.value = 'general'
   settingsAutomationTarget.value = null
-}
-
-function openAggregateDigest(target: { scope_type: 'feed' | 'group'; scope_id: string; label: string }) {
-  ensureFeedsMode()
-  activeAggregateDigest.value = target
-  selectedUnifiedEntryId.value = null
-}
-
-function closeAggregateDigest() {
-  activeAggregateDigest.value = null
 }
 
 function resolveQuickRerunWindow() {
@@ -573,7 +573,7 @@ async function selectFavoriteFeed(feedId: string | null) {
 }
 
 function backToAllFeeds() {
-  closeAggregateDigest()
+  feedDetailMode.value = 'articles'
   if (viewMode.value === 'collection' || viewMode.value === 'tag') {
     viewMode.value = 'feeds'
     activeCollectionId.value = null
@@ -652,43 +652,67 @@ async function openExternal(url?: string | null) {
 
 // === Feed / Group clicks ===
 async function handleFeedClick(feedId: string) {
-  closeAggregateDigest()
   ensureFeedsMode()
   store.selectFeed(feedId)
   await store.fetchEntries({ feedId })
 }
 
 async function handleGroupClick(groupName: string) {
-  closeAggregateDigest()
   ensureFeedsMode()
   store.selectGroup(groupName)
   await store.fetchEntries({ groupName })
 }
 
 async function handleGroupRowClick(groupName: string) {
-  closeAggregateDigest()
   ensureFeedsMode()
   store.toggleGroupCollapse(groupName)
   store.selectGroup(groupName)
   await store.fetchEntries({ groupName })
 }
 
-async function handleAggregateDigestEntrySelect(entryId: string) {
-  const target = activeAggregateDigest.value
-  if (!target) return
-  if (target.scope_type === 'feed') {
-    await handleFeedClick(target.scope_id)
-  } else {
-    await handleGroupClick(target.scope_id)
+const currentScopeSummaryTarget = computed<{ scope_type: 'feed' | 'group'; scope_id: string; label: string } | null>(() => {
+  if (viewMode.value !== 'feeds' || showFavoritesOnly.value) return null
+  if (store.activeFeedId) {
+    const feed = store.feeds.find((item) => item.id === store.activeFeedId)
+    if (!feed) return null
+    return {
+      scope_type: 'feed',
+      scope_id: feed.id,
+      label: feed.custom_title || feed.title || feed.url,
+    }
   }
-  await nextTick()
-  handleEntrySelect(entryId)
+  if (store.activeGroupName) {
+    return {
+      scope_type: 'group',
+      scope_id: store.activeGroupName,
+      label: store.activeGroupName,
+    }
+  }
+  return null
+})
+
+watch(currentScopeSummaryTarget, (target) => {
+  if (!target) {
+    feedDetailMode.value = 'articles'
+  }
+})
+
+function handleToggleFeedDetailMode(mode: 'articles' | 'summary') {
+  feedDetailMode.value = mode
+}
+
+async function handleScopeSummaryEntrySelect(entryId: string) {
+  // 直接选择文章并在右侧显示详情，不切换视图模式
+  store.selectEntry(entryId)
+  openDetails()
 }
 
 // === Entry selection & visible entries ===
 function handleEntrySelect(entryId: string) {
   if (viewMode.value === 'collection' || viewMode.value === 'tag') {
     selectedUnifiedEntryId.value = entryId
+    // Also select in feedStore so currentSelectedEntry can find it as fallback
+    store.selectEntry(entryId)
   } else if (showFavoritesOnly.value) {
     selectedFavoriteEntryId.value = entryId
   } else {
@@ -770,6 +794,7 @@ onUnmounted(() => {
     :show="showSettings"
     :initial-category="settingsInitialCategory"
     :initial-automation-target="settingsAutomationTarget"
+    @notify="showNotification"
     @close="closeSettingsModal"
   />
   <AddToBookmarkGroupModal
@@ -833,7 +858,6 @@ onUnmounted(() => {
       @set-custom-title="handleSetCustomTitle"
       @quick-rerun-tagging="handleQuickRerunTagging"
       @open-automation-settings="openScopedAutomationSettings"
-      @open-digest="openAggregateDigest"
     />
 
     <div
@@ -843,15 +867,16 @@ onUnmounted(() => {
       :title="t('layout.leftResizeTitle')"
     ></div>
 
-    <template v-if="activeAggregateDigest">
+    <template v-if="currentScopeSummaryTarget && feedDetailMode === 'summary'">
       <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden">
         <div class="flex-1 overflow-y-auto" :class="compactTimelineFilterDensity ? 'p-3 pt-2' : 'p-4'">
-          <AggregateDigestView
-            :scope-type="activeAggregateDigest.scope_type"
-            :scope-id="activeAggregateDigest.scope_id"
-            :scope-label="activeAggregateDigest.label"
-            @back="closeAggregateDigest"
-            @select-entry="handleAggregateDigestEntrySelect"
+          <ScopeSummaryView
+            :scope-type="currentScopeSummaryTarget.scope_type"
+            :scope-id="currentScopeSummaryTarget.scope_id"
+            :scope-label="currentScopeSummaryTarget.label"
+            @back="handleToggleFeedDetailMode('articles')"
+            @select-entry="handleScopeSummaryEntrySelect"
+            @notify="showNotification"
           />
         </div>
       </main>
@@ -884,6 +909,8 @@ onUnmounted(() => {
       :subtitle="timelineSubtitle"
       :show-favorites-only="showFavoritesOnly"
       :view-mode="viewMode"
+      :scope-summary-target="currentScopeSummaryTarget"
+      :scope-summary-active="feedDetailMode === 'summary'"
       :active-tag-id="activeTagId"
       :active-tag-name="tagsStore.selectedTag?.name || undefined"
       :active-tag-view="activeTagView"
@@ -936,6 +963,7 @@ onUnmounted(() => {
       @ai-search="handleAISearch"
       @apply-tag-combo="handleApplyTagCombo"
       @clear-tag-combo="handleClearTagCombo"
+      @toggle-scope-summary="handleToggleFeedDetailMode"
     />
 
     <div

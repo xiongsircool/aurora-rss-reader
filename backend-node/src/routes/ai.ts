@@ -7,9 +7,6 @@ import { AIClient, type ServiceKey } from '../services/ai.js';
 import { generateEmbedding } from '../services/vector.js';
 import { EntryRepository, TranslationRepository, SummaryRepository } from '../db/repositories/index.js';
 import { AIAutomationRuleRepository } from '../db/repositories/aiAutomationRule.js';
-import { FeedRepository } from '../db/repositories/feed.js';
-import { TagRepository } from '../db/repositories/tag.js';
-import { getDatabase } from '../db/session.js';
 import { userSettingsService } from '../services/userSettings.js';
 import { getConfig } from '../config/index.js';
 import { initTaggingClient } from '../services/tagging.js';
@@ -21,11 +18,9 @@ import {
   aiAutomationResolver,
 } from '../services/aiAutomationResolver.js';
 import {
-  aggregateDigestService,
-  buildDigestTimeWindow,
-  parseAggregateDigestRecord,
-  type DigestSourceItem,
-} from '../services/aggregateDigest.js';
+  scopeSummaryService,
+  normalizeScopeSummaryWindowType,
+} from '../services/scopeSummary.js';
 
 function resolveServiceConfig(service: ServiceKey) {
   const settings = userSettingsService.getSettings();
@@ -89,130 +84,6 @@ function resolveServiceConfig(service: ServiceKey) {
   };
 }
 
-type ScopeDigestEntryRow = {
-  id: string;
-  feed_id: string;
-  title: string | null;
-  url: string | null;
-  published_at: string | null;
-  inserted_at: string;
-  summary: string | null;
-  content?: string | null;
-  feed_title: string | null;
-  group_name: string | null;
-};
-
-function queryScopeDigestEntries(input: {
-  scope_type: Exclude<AIScopeType, 'global'>;
-  scope_id: string;
-  startDate: string | null;
-  limit?: number;
-}) {
-  const db = getDatabase();
-  const limit = Math.max(1, Math.min(input.limit || 20, 50));
-
-  if (input.scope_type === 'feed') {
-    if (input.startDate) {
-      return db.prepare(`
-        SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
-               f.title as feed_title, f.group_name as group_name
-        FROM entries e
-        LEFT JOIN feeds f ON e.feed_id = f.id
-        WHERE e.feed_id = ?
-          AND e.inserted_at >= ?
-        ORDER BY e.inserted_at DESC
-        LIMIT ?
-      `).all(input.scope_id, input.startDate, limit) as ScopeDigestEntryRow[];
-    }
-    return db.prepare(`
-      SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
-             f.title as feed_title, f.group_name as group_name
-      FROM entries e
-      LEFT JOIN feeds f ON e.feed_id = f.id
-      WHERE e.feed_id = ?
-      ORDER BY e.inserted_at DESC
-      LIMIT ?
-    `).all(input.scope_id, limit) as ScopeDigestEntryRow[];
-  }
-
-  if (input.scope_type === 'group') {
-    if (input.startDate) {
-      return db.prepare(`
-        SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
-               f.title as feed_title, f.group_name as group_name
-        FROM entries e
-        INNER JOIN feeds f ON e.feed_id = f.id
-        WHERE COALESCE(f.group_name, '') = ?
-          AND e.inserted_at >= ?
-        ORDER BY e.inserted_at DESC
-        LIMIT ?
-      `).all(input.scope_id, input.startDate, limit) as ScopeDigestEntryRow[];
-    }
-    return db.prepare(`
-      SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
-             f.title as feed_title, f.group_name as group_name
-      FROM entries e
-      INNER JOIN feeds f ON e.feed_id = f.id
-      WHERE COALESCE(f.group_name, '') = ?
-      ORDER BY e.inserted_at DESC
-      LIMIT ?
-    `).all(input.scope_id, limit) as ScopeDigestEntryRow[];
-  }
-
-  if (input.startDate) {
-    return db.prepare(`
-      SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
-             f.title as feed_title, f.group_name as group_name
-      FROM entries e
-      INNER JOIN entry_tags et ON e.id = et.entry_id
-      LEFT JOIN feeds f ON e.feed_id = f.id
-      WHERE et.tag_id = ?
-        AND e.inserted_at >= ?
-      ORDER BY e.inserted_at DESC
-      LIMIT ?
-    `).all(input.scope_id, input.startDate, limit) as ScopeDigestEntryRow[];
-  }
-
-  return db.prepare(`
-    SELECT e.id, e.feed_id, e.title, e.url, e.published_at, e.inserted_at, e.summary, e.content,
-           f.title as feed_title, f.group_name as group_name
-    FROM entries e
-    INNER JOIN entry_tags et ON e.id = et.entry_id
-    LEFT JOIN feeds f ON e.feed_id = f.id
-    WHERE et.tag_id = ?
-    ORDER BY e.inserted_at DESC
-    LIMIT ?
-  `).all(input.scope_id, limit) as ScopeDigestEntryRow[];
-}
-
-function toDigestSourceItems(rows: ScopeDigestEntryRow[]): DigestSourceItem[] {
-  return rows.map((entry, index) => ({
-    ref: index + 1,
-    entry_id: entry.id,
-    title: entry.title || 'Untitled',
-    summary: entry.summary,
-    content_snippet: entry.content,
-    feed_title: entry.feed_title,
-    group_name: entry.group_name,
-    published_at: entry.published_at,
-  }));
-}
-
-function resolveDigestScopeLabel(scope_type: Exclude<AIScopeType, 'global'>, scope_id: string) {
-  if (scope_type === 'feed') {
-    const feedRepo = new FeedRepository();
-    const feed = feedRepo.findById(scope_id);
-    if (!feed) return null;
-    return feed.custom_title || feed.title || feed.url || scope_id;
-  }
-  if (scope_type === 'tag') {
-    const tagRepo = new TagRepository();
-    const tag = tagRepo.findById(scope_id);
-    return tag?.name || null;
-  }
-  return scope_id;
-}
-
 function createClient(service: ServiceKey, overrides?: { apiKey?: string; baseUrl?: string; modelName?: string }) {
   const resolved = resolveServiceConfig(service);
   return new AIClient({
@@ -247,6 +118,36 @@ function buildSummaryContent(entry: {
   return `Metadata:\n${metaLines.join('\n')}\n\nContent:\n${content}`;
 }
 
+function buildSafeFtsQuery(rawQuery: string): string | null {
+  const tokens = rawQuery
+    .trim()
+    .split(/\s+/)
+    .map((token) => token.replaceAll('"', '').trim())
+    .filter(Boolean);
+
+  if (!tokens.length) {
+    return null;
+  }
+
+  // Quote every token so user input can't break MATCH grammar.
+  return tokens.map((token) => `"${token}"`).join(' ');
+}
+
+function normalizeKeywordScore(rank: number, minRank: number, maxRank: number): number {
+  if (!Number.isFinite(rank) || !Number.isFinite(minRank) || !Number.isFinite(maxRank)) {
+    return 0.8;
+  }
+
+  const range = maxRank - minRank;
+  if (Math.abs(range) < 1e-9) {
+    return 0.8;
+  }
+
+  // Lower bm25 rank is better; map to a stable score band.
+  const normalized = (maxRank - rank) / range;
+  return 0.65 + Math.max(0, Math.min(1, normalized)) * 0.25;
+}
+
 export async function aiRoutes(app: FastifyInstance) {
   const entryRepo = new EntryRepository();
   const translationRepo = new TranslationRepository();
@@ -259,6 +160,7 @@ export async function aiRoutes(app: FastifyInstance) {
     typeof value === 'string' && AUTOMATION_SCOPE_TYPES.includes(value as AIScopeType);
   const isAutomationMode = (value: unknown): value is AIAutomationMode =>
     value === 'inherit' || value === 'enabled' || value === 'disabled';
+  const scopeSummaryJobs = new Set<string>();
 
   function getLegacyDefaults() {
     return AUTOMATION_TASK_KEYS.map((taskKey) => ({
@@ -326,93 +228,103 @@ export async function aiRoutes(app: FastifyInstance) {
     };
   });
 
-  app.get('/ai/digests', async (request, reply) => {
+
+  app.get('/ai/scope-summary', async (request, reply) => {
     const query = request.query as Record<string, unknown>;
     const scope_type = query.scope_type;
-    const scope_id = query.scope_id;
-    const period = typeof query.period === 'string' && query.period.trim() ? query.period.trim() : 'latest';
-    const { startDate, periodKey, normalizedPeriod } = buildDigestTimeWindow(period);
-    const time_range_key = typeof query.time_range_key === 'string' && query.time_range_key.trim() ? query.time_range_key.trim() : periodKey;
-    const language = typeof query.language === 'string' && query.language.trim() ? query.language.trim() : 'zh';
+    const scope_id = typeof query.scope_id === 'string' ? query.scope_id.trim() : '';
+    const window_type = typeof query.window_type === 'string' ? query.window_type.trim() : undefined;
+    const language = typeof query.language === 'string' ? query.language.trim() : 'zh';
 
-    if (scope_type !== 'feed' && scope_type !== 'group' && scope_type !== 'tag') {
-      return reply.code(400).send({ error: 'scope_type must be feed, group, or tag' });
+    if (scope_type !== 'feed' && scope_type !== 'group') {
+      return reply.code(400).send({ error: 'scope_type must be feed or group' });
     }
-    if (typeof scope_id !== 'string' || !scope_id.trim()) {
+    if (!scope_id) {
       return reply.code(400).send({ error: 'scope_id is required' });
     }
-    const scopeId = scope_id.trim();
-    const scopeLabel = resolveDigestScopeLabel(scope_type, scopeId);
-    if (!scopeLabel) {
-      return reply.code(404).send({ error: 'digest scope not found' });
+
+    const state = scopeSummaryService.buildScopeState({
+      scope_type,
+      scope_id,
+      window_type,
+      language,
+    });
+    if (!state) {
+      return reply.code(404).send({ error: 'scope summary scope not found' });
     }
 
-    const entries = queryScopeDigestEntries({
-      scope_type,
-      scope_id: scopeId,
-      startDate,
-      limit: 20,
-    });
+    const latest = scopeSummaryService.parseRun(state.latestRun);
+    const canAutoGenerate = state.settings.enabled
+      && state.settings.auto_generate
+      && (state.status === 'idle' || state.status === 'stale');
 
-    const record = aggregateDigestService.getLatest({
-      scope_type,
-      scope_id: scopeId,
-      period: normalizedPeriod,
-      time_range_key,
-      language,
+    const entryIndexMap: Record<number, string> = {};
+    state.items.forEach((item) => {
+      entryIndexMap[item.ref - 1] = item.entry_id;
     });
 
     return {
-      scope_label: scopeLabel,
-      period: normalizedPeriod,
-      time_range_key,
-      recentCount: entries.length,
-      entries: entries.slice(0, 5),
-      item: record ? {
-        ...record,
-        citations: parseAggregateDigestRecord(record.citations_json, []),
-        keywords: parseAggregateDigestRecord(record.keywords_json, []),
+      scope_label: state.scopeLabel,
+      scope_type,
+      scope_id,
+      window_type: state.windowType,
+      window_start_at: state.windowStartAt,
+      window_end_at: state.windowEndAt,
+      status: state.status,
+      recentCount: state.items.length,
+      entries: state.rows,
+      entry_index_map: entryIndexMap,
+      item: latest ? {
+        ...latest,
+        summary: latest.summary_md,
+        summary_updated_at: latest.updated_at,
       } : null,
+      settings: state.settings,
+      can_auto_generate: canAutoGenerate,
+      suggested_windows: state.items.length === 0 && state.windowType === '24h'
+        ? ['3d', '7d']
+        : [],
     };
   });
 
-  app.get('/ai/digests/history', async (request, reply) => {
+  app.get('/ai/scope-summary/history', async (request, reply) => {
     const query = request.query as Record<string, unknown>;
     const scope_type = query.scope_type;
-    const scope_id = query.scope_id;
-    const period = typeof query.period === 'string' && query.period.trim() ? query.period.trim() : 'latest';
-    const language = typeof query.language === 'string' && query.language.trim() ? query.language.trim() : 'zh';
+    const scope_id = typeof query.scope_id === 'string' ? query.scope_id.trim() : '';
+    const window_type = normalizeScopeSummaryWindowType(
+      typeof query.window_type === 'string' ? query.window_type.trim() : undefined,
+    );
+    const language = typeof query.language === 'string' ? query.language.trim() : 'zh';
     const cursor = typeof query.cursor === 'string' && query.cursor.trim() ? query.cursor.trim() : null;
     const limit = Math.max(1, Math.min(Number(query.limit) || 10, 50));
 
-    if (scope_type !== 'feed' && scope_type !== 'group' && scope_type !== 'tag') {
-      return reply.code(400).send({ error: 'scope_type must be feed, group, or tag' });
+    if (scope_type !== 'feed' && scope_type !== 'group') {
+      return reply.code(400).send({ error: 'scope_type must be feed or group' });
     }
-    if (typeof scope_id !== 'string' || !scope_id.trim()) {
+    if (!scope_id) {
       return reply.code(400).send({ error: 'scope_id is required' });
     }
 
-    const result = aggregateDigestService.getHistory({
+    const result = scopeSummaryService.getHistory({
       scope_type,
-      scope_id: scope_id.trim(),
-      period,
+      scope_id,
+      window_type,
       language,
       limit,
       cursor,
     });
 
     return {
-      items: result.items.map((item) => ({
-        ...item,
-        citations: parseAggregateDigestRecord(item.citations_json, []),
-        keywords: parseAggregateDigestRecord(item.keywords_json, []),
-      })),
+      items: result.items.map((item) => {
+        const parsed = scopeSummaryService.parseRun(item);
+        return parsed ? { ...parsed, summary: parsed.summary_md, summary_updated_at: parsed.updated_at } : item;
+      }),
       nextCursor: result.nextCursor,
       hasMore: result.hasMore,
     };
   });
 
-  app.post('/ai/digests/regenerate', async (request, reply) => {
+  app.post('/ai/scope-summary/generate', async (request, reply) => {
     const body = getObjectBody(request.body);
     if (!body) {
       return reply.code(400).send({ error: 'Invalid request body: expected an object' });
@@ -420,66 +332,130 @@ export async function aiRoutes(app: FastifyInstance) {
 
     const scope_type = body.scope_type;
     const scope_id = typeof body.scope_id === 'string' ? body.scope_id.trim() : '';
-    const period = typeof body.period === 'string' && body.period.trim() ? body.period.trim() : 'latest';
+    const window_type = typeof body.window_type === 'string' ? body.window_type.trim() : undefined;
     const uiLanguage = typeof body.ui_language === 'string' && body.ui_language.trim() ? body.ui_language.trim() : 'zh';
     const triggerType = body.trigger_type === 'auto' ? 'auto' : 'manual';
+    const background = body.background !== false;
 
-    if (scope_type !== 'feed' && scope_type !== 'group' && scope_type !== 'tag') {
-      return reply.code(400).send({ error: 'scope_type must be feed, group, or tag' });
+    if (scope_type !== 'feed' && scope_type !== 'group') {
+      return reply.code(400).send({ error: 'scope_type must be feed or group' });
     }
     if (!scope_id) {
       return reply.code(400).send({ error: 'scope_id is required' });
     }
 
-    const scopeLabel = resolveDigestScopeLabel(scope_type, scope_id);
-    if (!scopeLabel) {
-      return reply.code(404).send({ error: 'digest scope not found' });
-    }
-
-    const { startDate, normalizedPeriod, periodKey } = buildDigestTimeWindow(period);
-    const entries = queryScopeDigestEntries({
+    const state = scopeSummaryService.buildScopeState({
       scope_type,
       scope_id,
-      startDate,
-      limit: 20,
+      window_type,
+      language: uiLanguage,
     });
-
-    if (!entries.length) {
+    if (!state) {
+      return reply.code(404).send({ error: 'scope summary scope not found' });
+    }
+    if (!state.items.length) {
       return reply.code(400).send({ error: '当前时间范围内暂无可用于生成摘要的文章' });
     }
 
-    try {
-      const generated = await aggregateDigestService.generate({
+    const jobKey = `${scope_type}:${scope_id}:${state.windowType}:${state.language}`;
+    const toGeneratingResponse = () => {
+      const latest = scopeSummaryService.parseRun(state.latestRun);
+      const entryIndexMap: Record<number, string> = {};
+      state.items.forEach((item) => {
+        entryIndexMap[item.ref - 1] = item.entry_id;
+      });
+      return {
+        scope_label: state.scopeLabel,
         scope_type,
         scope_id,
-        scope_label: scopeLabel,
-        period: normalizedPeriod,
-        time_range_key: periodKey,
-        language: uiLanguage,
-        items: toDigestSourceItems(entries),
+        window_type: state.windowType,
+        window_start_at: state.windowStartAt,
+        window_end_at: state.windowEndAt,
+        status: 'generating',
+        recentCount: state.items.length,
+        entries: state.rows,
+        entry_index_map: entryIndexMap,
+        item: latest ? {
+          ...latest,
+          summary: latest.summary_md,
+          summary_updated_at: latest.updated_at,
+        } : null,
+        settings: state.settings,
+        can_auto_generate: false,
+      };
+    };
+
+    if (background) {
+      if (state.latestRun?.status === 'generating' || scopeSummaryJobs.has(jobKey)) {
+        return {
+          ...toGeneratingResponse(),
+          queue_state: 'already_running' as const,
+        };
+      }
+
+      scopeSummaryJobs.add(jobKey);
+      void scopeSummaryService.generate({
+        scope_type,
+        scope_id,
+        window_type: state.windowType,
+        language: state.language,
         trigger_type: triggerType,
+      }).catch((error) => {
+        console.error('Background scope summary generation failed:', error);
+      }).finally(() => {
+        scopeSummaryJobs.delete(jobKey);
       });
 
       return {
-        scope_label: scopeLabel,
-        period: normalizedPeriod,
-        time_range_key: periodKey,
-        recentCount: entries.length,
-        entries: entries.slice(0, 5),
+        ...toGeneratingResponse(),
+        queue_state: 'queued' as const,
+      };
+    }
+
+    try {
+      const generated = await scopeSummaryService.generate({
+        scope_type,
+        scope_id,
+        window_type: state.windowType,
+        language: state.language,
+        trigger_type: triggerType,
+      });
+
+      const entryIndexMap: Record<number, string> = {};
+      generated.state.items.forEach((item) => {
+        entryIndexMap[item.ref - 1] = item.entry_id;
+      });
+
+      return {
+        scope_label: generated.state.scopeLabel,
+        scope_type,
+        scope_id,
+        window_type: generated.state.windowType,
+        window_start_at: generated.state.windowStartAt,
+        window_end_at: generated.state.windowEndAt,
+        status: 'ready',
+        recentCount: generated.state.items.length,
+        entries: generated.entries,
+        entry_index_map: entryIndexMap,
         item: {
+          ...scopeSummaryService.parseRun(generated.run),
           summary: generated.payload.summary_md,
-          citations: generated.payload.citations,
-          keywords: generated.payload.keywords || [],
-          summary_updated_at: generated.record.created_at,
-          time_range_key: periodKey,
-          source_count: entries.length,
-          model_name: generated.modelName,
-          trigger_type: triggerType,
+          summary_updated_at: generated.run.updated_at,
         },
+        settings: generated.state.settings,
+        can_auto_generate: false,
+        queue_state: 'completed' as const,
       };
     } catch (error) {
-      console.error('Failed to regenerate aggregate digest:', error);
-      return reply.code(500).send({ error: '生成聚合摘要失败' });
+      const message = error instanceof Error ? error.message : '生成范围摘要失败';
+      if (message === 'scope not found') {
+        return reply.code(404).send({ error: 'scope summary scope not found' });
+      }
+      if (message === 'empty scope window') {
+        return reply.code(400).send({ error: '当前时间范围内暂无可用于生成摘要的文章' });
+      }
+      console.error('Failed to generate scope summary:', error);
+      return reply.code(500).send({ error: '生成范围摘要失败' });
     }
   });
 
@@ -493,7 +469,8 @@ export async function aiRoutes(app: FastifyInstance) {
     const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
     const language = typeof body.language === 'string' ? body.language : undefined;
     const force = typeof body.force === 'boolean' ? body.force : false;
-    const targetLanguage = language || 'zh';
+    const settings = userSettingsService.getSettings();
+    const targetLanguage = language || settings.ai_translation_language || 'zh';
 
     if (!entry_id) {
       return reply.code(400).send({ error: 'entry_id is required' });
@@ -536,7 +513,8 @@ export async function aiRoutes(app: FastifyInstance) {
 
     const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
     const language = typeof body.language === 'string' ? body.language : undefined;
-    const targetLanguage = language || 'zh';
+    const settings = userSettingsService.getSettings();
+    const targetLanguage = language || settings.ai_translation_language || 'zh';
 
     if (!entry_id) {
       return reply.code(400).send({ error: 'entry_id is required' });
@@ -748,23 +726,25 @@ export async function aiRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Content is required' });
     }
 
+    const settings = userSettingsService.getSettings();
+    const targetLanguage = language || settings.ai_translation_language || 'zh';
+
     try {
       if (entry_id) {
-        const existing = summaryRepo.findByEntryIdAndLanguage(entry_id, language || 'zh');
+        const existing = summaryRepo.findByEntryIdAndLanguage(entry_id, targetLanguage);
         if (existing?.summary) {
           return { summary: existing.summary, cached: true };
         }
       }
 
       const client = createClient('summary');
-      const settings = userSettingsService.getSettings();
       const userPreference = settings.summary_prompt_preference || settings.ai_prompt_preference || '';
-      const summary = await client.summarize(content, { language: language || 'zh', userPreference });
+      const summary = await client.summarize(content, { language: targetLanguage, userPreference });
 
       if (entry_id) {
         summaryRepo.upsert({
           entry_id,
-          language: language || 'zh',
+          language: targetLanguage,
           summary,
         });
       }
@@ -1021,33 +1001,88 @@ export async function aiRoutes(app: FastifyInstance) {
         match_type: 'semantic' | 'keyword';
       }> = [];
 
-      // Keyword search using SQL LIKE
+      // Keyword search using FTS5 (fallback to LIKE if unavailable)
       if (type === 'keyword' || type === 'hybrid') {
         const db = (await import('../db/session.js')).getDatabase();
-        const keywordResults = db.prepare(`
-          SELECT e.id, e.title, e.content, e.feed_id, f.title as feed_title,
-                 e.published_at, e.url
-          FROM entries e
-          LEFT JOIN feeds f ON e.feed_id = f.id
-          WHERE e.title LIKE ? OR e.content LIKE ?
-          ORDER BY e.published_at DESC
-          LIMIT ?
-        `).all(`%${query}%`, `%${query}%`, limit) as Array<{
-          id: string;
-          title: string;
-          content: string;
-          feed_id: string;
-          feed_title: string;
-          published_at: string | null;
-          url: string | null;
-        }>;
+        const ftsQuery = buildSafeFtsQuery(query);
 
-        for (const r of keywordResults) {
-          results.push({
-            ...r,
-            score: 0.8,
-            match_type: 'keyword'
-          });
+        try {
+          if (!ftsQuery) {
+            throw new Error('Invalid FTS query');
+          }
+
+          const keywordResults = db.prepare(`
+            SELECT
+              e.id,
+              e.title,
+              COALESCE(e.readability_content, e.content, e.summary) AS content,
+              e.feed_id,
+              f.title as feed_title,
+              e.published_at,
+              e.url,
+              bm25(entries_fts, 12.0, 4.0, 1.0, 2.0) AS rank
+            FROM entries_fts
+            JOIN entries e ON e.rowid = entries_fts.rowid
+            LEFT JOIN feeds f ON e.feed_id = f.id
+            WHERE entries_fts MATCH ?
+            ORDER BY rank ASC, e.published_at DESC
+            LIMIT ?
+          `).all(ftsQuery, limit) as Array<{
+            id: string;
+            title: string;
+            content: string | null;
+            feed_id: string;
+            feed_title: string;
+            published_at: string | null;
+            url: string | null;
+            rank: number;
+          }>;
+
+          const rankValues = keywordResults.map((item) => item.rank).filter((item) => Number.isFinite(item));
+          const minRank = rankValues.length ? Math.min(...rankValues) : 0;
+          const maxRank = rankValues.length ? Math.max(...rankValues) : 0;
+
+          for (const r of keywordResults) {
+            results.push({
+              id: r.id,
+              title: r.title,
+              content: r.content ?? '',
+              feed_id: r.feed_id,
+              feed_title: r.feed_title,
+              published_at: r.published_at,
+              url: r.url,
+              score: normalizeKeywordScore(r.rank, minRank, maxRank),
+              match_type: 'keyword'
+            });
+          }
+        } catch (ftsError) {
+          console.warn('[Search] FTS search failed, fallback to LIKE:', ftsError);
+
+          const keywordResults = db.prepare(`
+            SELECT e.id, e.title, e.content, e.feed_id, f.title as feed_title,
+                   e.published_at, e.url
+            FROM entries e
+            LEFT JOIN feeds f ON e.feed_id = f.id
+            WHERE e.title LIKE ? OR e.content LIKE ?
+            ORDER BY e.published_at DESC
+            LIMIT ?
+          `).all(`%${query}%`, `%${query}%`, limit) as Array<{
+            id: string;
+            title: string;
+            content: string;
+            feed_id: string;
+            feed_title: string;
+            published_at: string | null;
+            url: string | null;
+          }>;
+
+          for (const r of keywordResults) {
+            results.push({
+              ...r,
+              score: 0.8,
+              match_type: 'keyword'
+            });
+          }
         }
       }
 

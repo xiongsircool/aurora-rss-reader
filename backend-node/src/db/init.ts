@@ -207,6 +207,28 @@ function runMigrations(): void {
     console.log('Migration completed: outbound proxy columns added');
   }
 
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const scopeSummaryColumns: Array<{ name: string; sql: string }> = [
+    { name: 'scope_summary_enabled', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_enabled INTEGER NOT NULL DEFAULT 1` },
+    { name: 'scope_summary_auto_generate', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_auto_generate INTEGER NOT NULL DEFAULT 1` },
+    { name: 'scope_summary_auto_interval_minutes', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_auto_interval_minutes INTEGER NOT NULL DEFAULT 60` },
+    { name: 'scope_summary_default_window', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_default_window TEXT NOT NULL DEFAULT '24h'` },
+    { name: 'scope_summary_max_entries', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_max_entries INTEGER NOT NULL DEFAULT 100` },
+    { name: 'scope_summary_chunk_size', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_chunk_size INTEGER NOT NULL DEFAULT 10` },
+    { name: 'scope_summary_model_name', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_model_name TEXT NOT NULL DEFAULT ''` },
+    { name: 'scope_summary_use_custom', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_use_custom INTEGER NOT NULL DEFAULT 0` },
+    { name: 'scope_summary_base_url', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_base_url TEXT NOT NULL DEFAULT ''` },
+    { name: 'scope_summary_api_key', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_api_key TEXT NOT NULL DEFAULT ''` },
+  ];
+  const missingScopeSummaryColumns = scopeSummaryColumns.filter(({ name }) => !tableInfo.some((col) => col.name === name));
+  if (missingScopeSummaryColumns.length > 0) {
+    console.log(`Running migration: Adding missing scope summary settings to user_settings (${missingScopeSummaryColumns.map((col) => col.name).join(', ')})`);
+    for (const column of missingScopeSummaryColumns) {
+      db.exec(column.sql);
+    }
+    console.log('Migration completed: scope summary settings added');
+  }
+
   // Check if match_mode / match_rules columns exist in user_tags (dual-mode tagging)
   const userTagsInfo = db.pragma('table_info(user_tags)') as Array<{ name: string }>;
   const hasMatchMode = userTagsInfo.some((col) => col.name === 'match_mode');
@@ -455,6 +477,16 @@ export function initDatabase(): void {
       ai_auto_tagging INTEGER NOT NULL DEFAULT 0,
       ai_auto_tagging_start_at TEXT,
       tags_version INTEGER NOT NULL DEFAULT 1,
+      scope_summary_enabled INTEGER NOT NULL DEFAULT 1,
+      scope_summary_auto_generate INTEGER NOT NULL DEFAULT 1,
+      scope_summary_auto_interval_minutes INTEGER NOT NULL DEFAULT 60,
+      scope_summary_default_window TEXT NOT NULL DEFAULT '24h',
+      scope_summary_max_entries INTEGER NOT NULL DEFAULT 100,
+      scope_summary_chunk_size INTEGER NOT NULL DEFAULT 10,
+      scope_summary_model_name TEXT NOT NULL DEFAULT '',
+      scope_summary_use_custom INTEGER NOT NULL DEFAULT 0,
+      scope_summary_base_url TEXT NOT NULL DEFAULT '',
+      scope_summary_api_key TEXT NOT NULL DEFAULT '',
       summary_prompt_preference TEXT NOT NULL DEFAULT '',
       translation_prompt_preference TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
@@ -597,16 +629,146 @@ export function initDatabase(): void {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_aggregate_digests_scope_period ON aggregate_digests(scope_type, scope_id, period, time_range_key, language)`);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scope_summary_runs (
+      id TEXT PRIMARY KEY,
+      scope_type TEXT NOT NULL,
+      scope_id TEXT NOT NULL,
+      window_type TEXT NOT NULL,
+      window_start_at TEXT NOT NULL,
+      window_end_at TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'zh',
+      source_count INTEGER NOT NULL DEFAULT 0,
+      source_hash TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'generating',
+      summary_md TEXT NOT NULL DEFAULT '',
+      citations_json TEXT NOT NULL DEFAULT '[]',
+      keywords_json TEXT,
+      model_name TEXT,
+      trigger_type TEXT NOT NULL DEFAULT 'manual',
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_scope_summary_runs_scope_window ON scope_summary_runs(scope_type, scope_id, window_type, window_start_at, window_end_at, language)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_scope_summary_runs_status ON scope_summary_runs(status, updated_at DESC)`);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scope_summary_chunks (
+      id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      source_count INTEGER NOT NULL DEFAULT 0,
+      source_refs_json TEXT NOT NULL,
+      chunk_summary_md TEXT NOT NULL,
+      keywords_json TEXT,
+      model_name TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (run_id) REFERENCES scope_summary_runs(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_scope_summary_chunks_run_id ON scope_summary_chunks(run_id, chunk_index)`);
+
   // Run migrations for existing databases
   runMigrations();
 
   // Create indexes that depend on migrated columns after schema upgrades finish.
   db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_content_extraction_status ON entries(content_extraction_status)`);
 
+  // Create local full-text search index and sync triggers.
+  createFtsTables();
 
   // Load sqlite-vss extension and create vector tables
   loadVssExtension();
   createVectorTables();
+}
+
+/**
+ * Create local full-text search tables (FTS5)
+ */
+function createFtsTables(): void {
+  const db = getDatabase();
+
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS search_index_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
+    db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
+        title,
+        summary,
+        content,
+        readability_content,
+        content='entries',
+        content_rowid='rowid'
+      )
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS entries_fts_ai
+      AFTER INSERT ON entries
+      BEGIN
+        INSERT INTO entries_fts(rowid, title, summary, content, readability_content)
+        VALUES (new.rowid, new.title, new.summary, new.content, new.readability_content);
+      END
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS entries_fts_ad
+      AFTER DELETE ON entries
+      BEGIN
+        INSERT INTO entries_fts(entries_fts, rowid, title, summary, content, readability_content)
+        VALUES ('delete', old.rowid, old.title, old.summary, old.content, old.readability_content);
+      END
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS entries_fts_au
+      AFTER UPDATE ON entries
+      BEGIN
+        INSERT INTO entries_fts(entries_fts, rowid, title, summary, content, readability_content)
+        VALUES ('delete', old.rowid, old.title, old.summary, old.content, old.readability_content);
+        INSERT INTO entries_fts(rowid, title, summary, content, readability_content)
+        VALUES (new.rowid, new.title, new.summary, new.content, new.readability_content);
+      END
+    `);
+
+    const entriesCount = db.prepare('SELECT COUNT(*) as count FROM entries').get() as { count: number };
+    const ftsVersionRow = db.prepare(`
+      SELECT value
+      FROM search_index_meta
+      WHERE key = 'entries_fts_version'
+    `).get() as { value: string } | undefined;
+
+    // For external-content FTS, COUNT(*) mirrors the content table even when the
+    // index is empty, so use an explicit version marker instead of row counts.
+    if (ftsVersionRow?.value !== '1') {
+      db.exec(`INSERT INTO entries_fts(entries_fts) VALUES ('rebuild')`);
+      db.prepare(`
+        INSERT INTO search_index_meta(key, value, updated_at)
+        VALUES ('entries_fts_version', '1', datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET
+          value = excluded.value,
+          updated_at = excluded.updated_at
+      `).run();
+
+      if (entriesCount.count > 0) {
+        console.log(`✅ FTS backfill completed (${entriesCount.count} entries indexed)`);
+      } else {
+        console.log('✅ FTS tables ready');
+      }
+    } else {
+      console.log('✅ FTS tables ready');
+    }
+  } catch (error) {
+    console.warn('⚠️  Could not create FTS tables:', error);
+  }
 }
 
 /**

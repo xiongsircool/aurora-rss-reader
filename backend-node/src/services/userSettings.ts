@@ -81,12 +81,15 @@ export class UserSettingsService {
           translation_api_key, translation_base_url, translation_model_name,
           ai_auto_summary, ai_auto_title_translation, ai_title_display_mode,
           ai_translation_language, summary_prompt_preference, translation_prompt_preference,
-          outbound_proxy_mode, outbound_proxy_url, created_at, updated_at
+          outbound_proxy_mode, outbound_proxy_url, scope_summary_enabled,
+          scope_summary_auto_generate, scope_summary_auto_interval_minutes,
+          scope_summary_default_window, scope_summary_max_entries, scope_summary_chunk_size,
+          created_at, updated_at
         ) VALUES (
           1, 'https://rsshub.app', 720, 1, 1, 50, 1, 'system', 1, '30d', 'inserted_at',
           10, 'current', 'docked', 'compact', '', 'https://open.bigmodel.cn/api/paas/v4/', 'glm-4-flash',
           '', 'https://open.bigmodel.cn/api/paas/v4/', 'glm-4-flash', 0, 0, 'original-first',
-          'zh', '', '', 'system', '', ?, ?
+          'zh', '', '', 'system', '', 1, 1, 60, '24h', 100, 10, ?, ?
         )
       `).run(now, now);
 
@@ -118,7 +121,7 @@ export class UserSettingsService {
     // Build update query dynamically
     const allowedColumns = this.getUpdatableColumns();
     const updateFields: string[] = [];
-    const values: Array<string | number | boolean | null> = [];
+    const values: Array<string | number | null> = [];
     const invalidKeys: string[] = [];
 
     for (const [key, value] of Object.entries(updates)) {
@@ -142,7 +145,7 @@ export class UserSettingsService {
       }
 
       updateFields.push(`${key} = ?`);
-      values.push(value);
+      values.push(typeof value === 'boolean' ? (value ? 1 : 0) : value);
     }
 
     if (invalidKeys.length > 0) {

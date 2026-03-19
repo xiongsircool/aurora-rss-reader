@@ -39,6 +39,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   close: []
+  notify: [message: string, type: 'success' | 'error' | 'info']
 }>()
 
 const { t } = useI18n()
@@ -107,6 +108,16 @@ const autoTitleTranslationLimit = ref(settingsStore.settings.max_auto_title_tran
 
 const summaryPromptPreference = ref(settingsStore.settings.summary_prompt_preference)
 const translationPromptPreference = ref(settingsStore.settings.translation_prompt_preference)
+const scopeSummaryEnabled = ref(settingsStore.settings.scope_summary_enabled)
+const scopeSummaryAutoGenerate = ref(settingsStore.settings.scope_summary_auto_generate)
+const scopeSummaryAutoIntervalMinutes = ref(settingsStore.settings.scope_summary_auto_interval_minutes)
+const scopeSummaryDefaultWindow = ref<'24h' | '3d' | '7d' | '30d'>(settingsStore.settings.scope_summary_default_window)
+const scopeSummaryMaxEntries = ref(settingsStore.settings.scope_summary_max_entries)
+const scopeSummaryChunkSize = ref(settingsStore.settings.scope_summary_chunk_size)
+const scopeSummaryModelName = ref(settingsStore.settings.scope_summary_model_name)
+const scopeSummaryUseCustom = ref(settingsStore.settings.scope_summary_use_custom)
+const scopeSummaryBaseUrl = ref(settingsStore.settings.scope_summary_base_url)
+const scopeSummaryApiKey = ref(settingsStore.settings.scope_summary_api_key)
 
 const markAsReadRange = computed({
   get: () => settingsStore.settings.mark_as_read_range,
@@ -172,6 +183,16 @@ watch(() => props.show, async (show) => {
     autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
     summaryPromptPreference.value = settingsStore.settings.summary_prompt_preference
     translationPromptPreference.value = settingsStore.settings.translation_prompt_preference
+    scopeSummaryEnabled.value = settingsStore.settings.scope_summary_enabled
+    scopeSummaryAutoGenerate.value = settingsStore.settings.scope_summary_auto_generate
+    scopeSummaryAutoIntervalMinutes.value = settingsStore.settings.scope_summary_auto_interval_minutes
+    scopeSummaryDefaultWindow.value = settingsStore.settings.scope_summary_default_window
+    scopeSummaryMaxEntries.value = settingsStore.settings.scope_summary_max_entries
+    scopeSummaryChunkSize.value = settingsStore.settings.scope_summary_chunk_size
+    scopeSummaryModelName.value = settingsStore.settings.scope_summary_model_name
+    scopeSummaryUseCustom.value = settingsStore.settings.scope_summary_use_custom
+    scopeSummaryBaseUrl.value = settingsStore.settings.scope_summary_base_url
+    scopeSummaryApiKey.value = settingsStore.settings.scope_summary_api_key
     syncFromStore(props.initialAutomationTarget ?? null)
 
     // Reset view state
@@ -242,19 +263,36 @@ async function saveSettings() {
     if (!proxyValid) return
 
     const aiSaved = await saveAIConfig()
-    if (!aiSaved) return
+    if (!aiSaved) {
+      emit('notify', t('toast.settingsSaveFailed'), 'error')
+      return
+    }
     
     // Save autoTitleTranslationLimit to store
     const clampedLimit = clampAutoTitleTranslationLimit(autoTitleTranslationLimit.value)
+    const normalizedAutoInterval = Math.max(5, Math.min(240, Number(scopeSummaryAutoIntervalMinutes.value) || 60))
+    const normalizedMaxEntries = Math.max(20, Math.min(200, Number(scopeSummaryMaxEntries.value) || 100))
+    const normalizedChunkSize = Math.max(5, Math.min(25, Number(scopeSummaryChunkSize.value) || 10))
     await settingsStore.updateSettings({
       max_auto_title_translations: clampedLimit,
       summary_prompt_preference: summaryPromptPreference.value,
-      translation_prompt_preference: translationPromptPreference.value
+      translation_prompt_preference: translationPromptPreference.value,
+      scope_summary_enabled: scopeSummaryEnabled.value,
+      scope_summary_auto_generate: scopeSummaryAutoGenerate.value,
+      scope_summary_auto_interval_minutes: normalizedAutoInterval,
+      scope_summary_default_window: scopeSummaryDefaultWindow.value,
+      scope_summary_max_entries: normalizedMaxEntries,
+      scope_summary_chunk_size: normalizedChunkSize,
+      scope_summary_model_name: scopeSummaryModelName.value,
+      scope_summary_use_custom: scopeSummaryUseCustom.value,
+      scope_summary_base_url: scopeSummaryBaseUrl.value,
+      scope_summary_api_key: scopeSummaryApiKey.value
     })
-    
+    emit('notify', t('toast.settingsSaved'), 'success')
     emit('close')
   } catch (error) {
     console.error('保存设置失败:', error)
+    emit('notify', t('toast.settingsSaveFailed'), 'error')
   }
 }
 </script>
@@ -439,6 +477,16 @@ async function saveSettings() {
                       v-model:autoTitleTranslationLimit="autoTitleTranslationLimit"
                       v-model:summaryPromptPreference="summaryPromptPreference"
                       v-model:translationPromptPreference="translationPromptPreference"
+                      v-model:scopeSummaryEnabled="scopeSummaryEnabled"
+                      v-model:scopeSummaryAutoGenerate="scopeSummaryAutoGenerate"
+                      v-model:scopeSummaryAutoIntervalMinutes="scopeSummaryAutoIntervalMinutes"
+                      v-model:scopeSummaryDefaultWindow="scopeSummaryDefaultWindow"
+                      v-model:scopeSummaryMaxEntries="scopeSummaryMaxEntries"
+                      v-model:scopeSummaryChunkSize="scopeSummaryChunkSize"
+                      v-model:scopeSummaryModelName="scopeSummaryModelName"
+                      v-model:scopeSummaryUseCustom="scopeSummaryUseCustom"
+                      v-model:scopeSummaryBaseUrl="scopeSummaryBaseUrl"
+                      v-model:scopeSummaryApiKey="scopeSummaryApiKey"
                     />
                     <div class="h-6"></div>
                     <SettingsAIAutomation

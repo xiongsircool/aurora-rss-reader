@@ -121,6 +121,43 @@ export interface AggregateDigest {
   created_at: string;
 }
 
+export type ScopeSummaryScopeType = 'feed' | 'group';
+export type ScopeSummaryWindowType = '24h' | '3d' | '7d' | '30d';
+export type ScopeSummaryStatus = 'generating' | 'ready' | 'failed';
+
+export interface ScopeSummaryRun {
+  id: string;
+  scope_type: ScopeSummaryScopeType;
+  scope_id: string;
+  window_type: ScopeSummaryWindowType;
+  window_start_at: string;
+  window_end_at: string;
+  language: string;
+  source_count: number;
+  source_hash: string;
+  status: ScopeSummaryStatus;
+  summary_md: string;
+  citations_json: string;
+  keywords_json: string | null;
+  model_name: string | null;
+  trigger_type: 'auto' | 'manual';
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScopeSummaryChunk {
+  id: string;
+  run_id: string;
+  chunk_index: number;
+  source_count: number;
+  source_refs_json: string;
+  chunk_summary_md: string;
+  keywords_json: string | null;
+  model_name: string | null;
+  created_at: string;
+}
+
 export interface FetchLog {
   id: string;
   feed_id: string | null;
@@ -201,6 +238,16 @@ export interface UserSettings {
   ai_auto_tagging: number; // SQLite boolean (0/1)
   ai_auto_tagging_start_at: string | null;
   tags_version: number;
+  scope_summary_enabled: number; // SQLite boolean (0/1)
+  scope_summary_auto_generate: number; // SQLite boolean (0/1)
+  scope_summary_auto_interval_minutes: number;
+  scope_summary_default_window: ScopeSummaryWindowType;
+  scope_summary_max_entries: number;
+  scope_summary_chunk_size: number;
+  scope_summary_model_name: string;
+  scope_summary_use_custom: number;
+  scope_summary_base_url: string;
+  scope_summary_api_key: string;
   created_at: string;
   updated_at: string;
 }

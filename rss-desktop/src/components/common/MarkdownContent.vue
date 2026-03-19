@@ -42,6 +42,7 @@ const safeHtml = computed(() => {
       'ol',
       'p',
       'pre',
+      'span',
       'strong',
       'table',
       'tbody',
@@ -51,7 +52,7 @@ const safeHtml = computed(() => {
       'tr',
       'ul',
     ],
-    ALLOWED_ATTR: ['href', 'title', 'target', 'rel'],
+    ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'class', 'entry_id', 'data-entry-id', 'data-index'],
     KEEP_CONTENT: true,
   })
 })

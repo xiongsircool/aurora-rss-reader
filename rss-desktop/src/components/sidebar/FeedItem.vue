@@ -28,7 +28,6 @@ const emit = defineEmits<{
   (e: 'set-custom-title', feedId: string, customTitle: string | null): void
   (e: 'quick-rerun-tagging', payload: { scope: 'feed' | 'group'; feedId?: string; groupName?: string; label: string }): void
   (e: 'open-automation-settings', payload: { scope_type: 'feed' | 'group'; scope_id: string; label: string }): void
-  (e: 'open-digest', payload: { scope_type: 'feed' | 'group'; scope_id: string; label: string }): void
 }>()
 
 const { t } = useI18n()
@@ -350,34 +349,6 @@ onUnmounted(() => {
 
       <div class="h-px bg-[var(--border-color)] my-1.5"></div>
 
-      <!-- 快速补打智能标签（当前订阅源） -->
-      <button
-        @click="emit('quick-rerun-tagging', { scope: 'feed', feedId: feed.id, label: displayName }); closeContextMenu()"
-        class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
-      >
-        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/>
-          <path d="M19 3v4"/>
-          <path d="M17 5h4"/>
-        </svg>
-        <span>{{ t('tags.quickRerunMenuFeed') }}</span>
-      </button>
-
-      <!-- 快速补打智能标签（该订阅所在分组） -->
-      <button
-        v-if="feed.group_name"
-        @click="emit('quick-rerun-tagging', { scope: 'group', groupName: feed.group_name || '', label: groupLabel }); closeContextMenu()"
-        class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
-      >
-        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7"/>
-          <path d="M11 14l-3 4h3l-1 4 5-6h-3l1-4z"/>
-        </svg>
-        <span>{{ t('tags.quickRerunMenuGroup') }}</span>
-      </button>
-
-      <div class="h-px bg-[var(--border-color)] my-1.5"></div>
-
       <button
         @click="emit('open-automation-settings', { scope_type: 'feed', scope_id: feed.id, label: displayName }); closeContextMenu()"
         class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
@@ -407,30 +378,30 @@ onUnmounted(() => {
 
       <div class="h-px bg-[var(--border-color)] my-1.5"></div>
 
+      <!-- 快速补打智能标签（当前订阅源） -->
       <button
-        @click="emit('open-digest', { scope_type: 'feed', scope_id: feed.id, label: displayName }); closeContextMenu()"
+        @click="emit('quick-rerun-tagging', { scope: 'feed', feedId: feed.id, label: displayName }); closeContextMenu()"
         class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
       >
         <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
+          <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/>
+          <path d="M19 3v4"/>
+          <path d="M17 5h4"/>
         </svg>
-        <span>{{ t('digests.feedDigestMenu') }}</span>
+        <span>{{ t('tags.quickRerunMenuFeed') }}</span>
       </button>
 
+      <!-- 快速补打智能标签（该订阅所在分组） -->
       <button
         v-if="feed.group_name"
-        @click="emit('open-digest', { scope_type: 'group', scope_id: feed.group_name, label: groupLabel }); closeContextMenu()"
+        @click="emit('quick-rerun-tagging', { scope: 'group', groupName: feed.group_name || '', label: groupLabel }); closeContextMenu()"
         class="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[rgba(255,122,24,0.1)] transition-colors c-[var(--text-primary)]"
       >
         <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-          <line x1="8" y1="11" x2="16" y2="11"/>
-          <line x1="8" y1="15" x2="13" y2="15"/>
+          <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7"/>
+          <path d="M11 14l-3 4h3l-1 4 5-6h-3l1-4z"/>
         </svg>
-        <span>{{ t('digests.groupDigestMenu') }}</span>
+        <span>{{ t('tags.quickRerunMenuGroup') }}</span>
       </button>
 
       <div class="h-px bg-[var(--border-color)] my-1.5"></div>

@@ -183,10 +183,19 @@ export function useSettingsModal() {
         localScopedAutomationRules.value = target ? buildAutomationRulesForScope(target) : []
     }
 
-    // Watch store config changes
+    // Watch store config changes - but only after initial sync is done
+    // to avoid race condition where syncFromStore runs before fetchAutomationRules completes
+    const isInitialized = ref(false)
     watch(() => aiStore.config, () => {
+        if (!isInitialized.value) return
         syncFromStore(currentAutomationTarget.value)
     }, { deep: true })
+
+    // Wrapper to mark as initialized after first sync
+    function syncFromStoreAndMarkInitialized(target?: AutomationTarget | null) {
+        syncFromStore(target)
+        isInitialized.value = true
+    }
 
     async function initializeSettings(
         onRSSHubFetch: () => Promise<void>,
@@ -198,11 +207,16 @@ export function useSettingsModal() {
             settingsStore.fetchSettings(),
             onRSSHubFetch()
         ])
-        syncFromStore()
+        syncFromStoreAndMarkInitialized()
         resetTestResults()
     }
 
     async function saveAIConfig() {
+        // Snapshot rules first to avoid being overwritten by aiStore.config watcher
+        // after updateConfig() mutates store state.
+        const globalRulesSnapshot = localAutomationRules.value.map((item) => ({ ...item }))
+        const scopedRulesSnapshot = localScopedAutomationRules.value.map((item) => ({ ...item }))
+
         const success = await aiStore.updateConfig({
             global: { ...localConfig.value.global },
             summary: { ...localConfig.value.summary },
@@ -222,8 +236,8 @@ export function useSettingsModal() {
         if (!success) return false
 
         const automationRulesToSave = [
-            ...localAutomationRules.value,
-            ...localScopedAutomationRules.value,
+            ...globalRulesSnapshot,
+            ...scopedRulesSnapshot,
         ]
 
         const automationSuccess = await aiStore.updateAutomationRules({

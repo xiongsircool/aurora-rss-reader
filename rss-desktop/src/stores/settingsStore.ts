@@ -26,6 +26,16 @@ export interface AppSettings {
   translation_prompt_preference: string
   outbound_proxy_mode: 'system' | 'custom' | 'off'
   outbound_proxy_url: string
+  scope_summary_enabled: boolean
+  scope_summary_auto_generate: boolean
+  scope_summary_auto_interval_minutes: number
+  scope_summary_default_window: '24h' | '3d' | '7d' | '30d'
+  scope_summary_max_entries: number
+  scope_summary_chunk_size: number
+  scope_summary_model_name: string
+  scope_summary_use_custom: boolean
+  scope_summary_base_url: string
+  scope_summary_api_key: string
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -46,7 +56,17 @@ export const useSettingsStore = defineStore('settings', () => {
     summary_prompt_preference: '',
     translation_prompt_preference: '',
     outbound_proxy_mode: 'system',
-    outbound_proxy_url: ''
+    outbound_proxy_url: '',
+    scope_summary_enabled: true,
+    scope_summary_auto_generate: true,
+    scope_summary_auto_interval_minutes: 60,
+    scope_summary_default_window: '24h',
+    scope_summary_max_entries: 100,
+    scope_summary_chunk_size: 10,
+    scope_summary_model_name: '',
+    scope_summary_use_custom: false,
+    scope_summary_base_url: '',
+    scope_summary_api_key: ''
   })
 
   const loading = ref(false)

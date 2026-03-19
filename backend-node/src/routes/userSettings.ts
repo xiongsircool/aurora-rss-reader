@@ -18,6 +18,9 @@ function normalizeSettings(settings: any) {
     show_description: !!settings.show_description,
     show_entry_summary: !!settings.show_entry_summary,
     enable_date_filter: !!settings.enable_date_filter,
+    scope_summary_enabled: !!settings.scope_summary_enabled,
+    scope_summary_auto_generate: !!settings.scope_summary_auto_generate,
+    scope_summary_use_custom: !!settings.scope_summary_use_custom,
   };
 }
 
