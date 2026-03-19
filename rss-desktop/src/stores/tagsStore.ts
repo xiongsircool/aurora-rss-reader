@@ -718,17 +718,6 @@ export const useTagsStore = defineStore('tags', () => {
         }
     }
 
-    async function fetchTimeline(tagId: string, groupBy: 'week' | 'month' = 'week'): Promise<any> {
-        try {
-            const params = new URLSearchParams({ group_by: groupBy, limit: '20' })
-            const res = await fetch(`${API_BASE}/tags/${tagId}/timeline?${params}`)
-            return await res.json()
-        } catch (error) {
-            console.error('Failed to fetch timeline:', error)
-            return { items: [] }
-        }
-    }
-
     async function fetchDigest(period: 'latest' | 'week' = 'latest', uiLanguage?: string): Promise<any> {
         try {
             const params = new URLSearchParams({ period, with_summary: '1' })
@@ -835,7 +824,6 @@ export const useTagsStore = defineStore('tags', () => {
         setView,
         // Aggregation
         fetchFilteredEntries,
-        fetchTimeline,
         fetchDigest,
         fetchDigestHistory,
         regenerateDigestSummary,

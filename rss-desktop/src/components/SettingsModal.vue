@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import axios from 'axios'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSettingsModal } from '../composables/useSettingsModal'
 import { useRSSHubSettings } from '../composables/useRSSHubSettings'
@@ -292,7 +293,15 @@ async function saveSettings() {
     emit('close')
   } catch (error) {
     console.error('保存设置失败:', error)
-    emit('notify', t('toast.settingsSaveFailed'), 'error')
+    const responseError = axios.isAxiosError(error)
+      ? (error.response?.data as { error?: string; invalid_fields?: string[] } | undefined)
+      : undefined
+    const detail = responseError?.error
+      ? Array.isArray(responseError.invalid_fields) && responseError.invalid_fields.length > 0
+        ? `${responseError.error}: ${responseError.invalid_fields.join(', ')}`
+        : responseError.error
+      : null
+    emit('notify', detail || t('toast.settingsSaveFailed'), 'error')
   }
 }
 </script>

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import axios from 'axios'
 import api from '../api/client'
 import { clampAutoTitleTranslationLimit, getDefaultAutoTitleTranslationLimit } from '../constants/translation'
 
@@ -72,6 +73,19 @@ export const useSettingsStore = defineStore('settings', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  function getApiErrorMessage(err: unknown, fallback: string) {
+    if (axios.isAxiosError(err)) {
+      const data = err.response?.data as { error?: string; invalid_fields?: string[] } | undefined
+      if (data?.error && Array.isArray(data.invalid_fields) && data.invalid_fields.length > 0) {
+        return `${data.error}: ${data.invalid_fields.join(', ')}`
+      }
+      if (data?.error) return data.error
+      if (err.message) return err.message
+    }
+    if (err instanceof Error && err.message) return err.message
+    return fallback
+  }
+
   // 获取应用设置
   async function fetchSettings() {
     loading.value = true
@@ -90,7 +104,7 @@ export const useSettingsStore = defineStore('settings', () => {
       return data
     } catch (err) {
       console.error('Failed to fetch settings:', err)
-      error.value = '获取设置失败'
+      error.value = getApiErrorMessage(err, '获取设置失败')
       throw err
     } finally {
       loading.value = false
@@ -118,7 +132,7 @@ export const useSettingsStore = defineStore('settings', () => {
       return data
     } catch (err) {
       console.error('Failed to update settings:', err)
-      error.value = '更新设置失败'
+      error.value = getApiErrorMessage(err, '更新设置失败')
       throw err
     } finally {
       loading.value = false
