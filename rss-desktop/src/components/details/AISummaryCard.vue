@@ -21,7 +21,12 @@ const { t } = useI18n()
   >
     <div class="flex-1">
       <p class="summary-card__label text-xs tracking-wide uppercase c-[var(--text-secondary)] mb-0.5 font-semibold">{{ t('ai.summaryLabel') }}</p>
-      <MarkdownContent v-if="summaryText" :content="summaryText" class="summary-card__text" />
+      <MarkdownContent
+        v-if="summaryText"
+        :content="summaryText"
+        :render-math="true"
+        class="summary-card__text"
+      />
       <p v-else class="summary-card__placeholder c-[var(--text-secondary)] text-xs leading-relaxed">
         {{ t('ai.summaryDescription') }}
       </p>

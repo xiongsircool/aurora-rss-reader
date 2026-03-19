@@ -1,61 +1,93 @@
 <script setup lang="ts">
-import DOMPurify from 'dompurify'
-import renderMathInElement from 'katex/contrib/auto-render'
-import 'katex/dist/katex.min.css'
-import { marked } from 'marked'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 
 const props = defineProps<{
   content: string
+  renderMath?: boolean
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
+const safeHtml = ref('')
+let renderToken = 0
+let markdownRuntimePromise: Promise<{
+  sanitize: (content: string) => string
+  parse: (content: string) => string
+}> | null = null
+let mathRuntimePromise: Promise<(element: HTMLElement, options: Record<string, unknown>) => void> | null = null
 
-marked.setOptions({
-  gfm: true,
-  breaks: true,
-})
+const allowedTags = [
+  'a',
+  'blockquote',
+  'br',
+  'code',
+  'del',
+  'em',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'hr',
+  'li',
+  'ol',
+  'p',
+  'pre',
+  'span',
+  'strong',
+  'table',
+  'tbody',
+  'td',
+  'th',
+  'thead',
+  'tr',
+  'ul',
+]
 
-const safeHtml = computed(() => {
-  const content = props.content?.trim()
-  if (!content) {
-    return ''
+const allowedAttrs = ['href', 'title', 'target', 'rel', 'class', 'entry_id', 'data-entry-id', 'data-index']
+
+function getMarkdownRuntime() {
+  if (!markdownRuntimePromise) {
+    markdownRuntimePromise = Promise.all([
+      import('dompurify'),
+      import('marked'),
+    ]).then(([domPurifyModule, markedModule]) => {
+      const DOMPurify = domPurifyModule.default
+      const { marked } = markedModule
+
+      marked.setOptions({
+        gfm: true,
+        breaks: true,
+      })
+
+      return {
+        sanitize: (content: string) => DOMPurify.sanitize(content, {
+          ALLOWED_TAGS: allowedTags,
+          ALLOWED_ATTR: allowedAttrs,
+          KEEP_CONTENT: true,
+        }),
+        parse: (content: string) => marked.parse(content) as string,
+      }
+    })
   }
 
-  const rendered = marked.parse(content) as string
-  return DOMPurify.sanitize(rendered, {
-    ALLOWED_TAGS: [
-      'a',
-      'blockquote',
-      'br',
-      'code',
-      'del',
-      'em',
-      'h1',
-      'h2',
-      'h3',
-      'h4',
-      'h5',
-      'h6',
-      'hr',
-      'li',
-      'ol',
-      'p',
-      'pre',
-      'span',
-      'strong',
-      'table',
-      'tbody',
-      'td',
-      'th',
-      'thead',
-      'tr',
-      'ul',
-    ],
-    ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'class', 'entry_id', 'data-entry-id', 'data-index'],
-    KEEP_CONTENT: true,
-  })
-})
+  return markdownRuntimePromise
+}
+
+function getMathRuntime() {
+  if (!mathRuntimePromise) {
+    mathRuntimePromise = Promise.all([
+      import('katex/dist/katex.min.css'),
+      import('katex/contrib/auto-render'),
+    ]).then(([, katexModule]) => katexModule.default)
+  }
+
+  return mathRuntimePromise
+}
+
+function hasMathSyntax(content: string) {
+  return /(\$\$[\s\S]+?\$\$)|(\$[^$\n]+?\$)|(\\\[[\s\S]+?\\\])|(\\\([\s\S]+?\\\))/.test(content)
+}
 
 async function renderMath() {
   await nextTick()
@@ -63,6 +95,8 @@ async function renderMath() {
   if (!containerRef.value) {
     return
   }
+
+  const renderMathInElement = await getMathRuntime()
 
   renderMathInElement(containerRef.value, {
     delimiters: [
@@ -76,13 +110,36 @@ async function renderMath() {
   })
 }
 
-watch(safeHtml, () => {
-  void renderMath()
-})
+async function renderContent() {
+  const currentToken = ++renderToken
+  const content = props.content?.trim()
 
-onMounted(() => {
-  void renderMath()
-})
+  if (!content) {
+    safeHtml.value = ''
+    return
+  }
+
+  const runtime = await getMarkdownRuntime()
+  if (currentToken !== renderToken) {
+    return
+  }
+
+  safeHtml.value = runtime.sanitize(runtime.parse(content))
+
+  if (!props.renderMath || !hasMathSyntax(content)) {
+    return
+  }
+
+  if (currentToken !== renderToken) {
+    return
+  }
+
+  await renderMath()
+}
+
+watch(() => [props.content, props.renderMath], () => {
+  void renderContent()
+}, { immediate: true })
 </script>
 
 <template>

@@ -37,7 +37,7 @@ async function handleCheckUpdate() {
       <!-- Header -->
       <div class="flex items-center gap-3 mb-3">
         <h4 class="m-0 text-5 font-700 bg-gradient-to-r from-[#ff7a18] to-[#5856d6] bg-clip-text text-transparent">{{ t('settings.appName', { name: 'Aurora Feeds' }) }}</h4>
-        <span class="inline-block py-1 px-2.5 bg-orange-500/10 text-orange-500 dark:text-orange-400 text-3 font-600 rounded-1.5 border border-orange-500/20">{{ t('settings.appVersion', { version: '0.1.7' }) }}</span>
+        <span class="inline-block py-1 px-2.5 bg-orange-500/10 text-orange-500 dark:text-orange-400 text-3 font-600 rounded-1.5 border border-orange-500/20">{{ t('settings.appVersion', { version: '0.1.8' }) }}</span>
       </div>
 
       <!-- App name note -->

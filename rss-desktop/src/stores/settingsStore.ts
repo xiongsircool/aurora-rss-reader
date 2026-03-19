@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import axios from 'axios'
 import api from '../api/client'
+import { getApiErrorMessage } from '../api/errors'
 import { clampAutoTitleTranslationLimit, getDefaultAutoTitleTranslationLimit } from '../constants/translation'
 
 export interface AppSettings {
@@ -72,19 +72,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const loading = ref(false)
   const error = ref<string | null>(null)
-
-  function getApiErrorMessage(err: unknown, fallback: string) {
-    if (axios.isAxiosError(err)) {
-      const data = err.response?.data as { error?: string; invalid_fields?: string[] } | undefined
-      if (data?.error && Array.isArray(data.invalid_fields) && data.invalid_fields.length > 0) {
-        return `${data.error}: ${data.invalid_fields.join(', ')}`
-      }
-      if (data?.error) return data.error
-      if (err.message) return err.message
-    }
-    if (err instanceof Error && err.message) return err.message
-    return fallback
-  }
 
   // 获取应用设置
   async function fetchSettings() {

@@ -17,6 +17,56 @@ function buildPreloadPlugin() {
   }
 }
 
+function manualChunks(id: string): string | undefined {
+  if (!id.includes('node_modules')) {
+    return undefined
+  }
+
+  if (
+    id.includes('/vue/dist/') ||
+    id.includes('/node_modules/vue/') ||
+    id.includes('/node_modules/@vue/')
+  ) {
+    return 'vue-core'
+  }
+
+  if (
+    id.includes('/node_modules/pinia/') ||
+    id.includes('/node_modules/vue-router/') ||
+    id.includes('/node_modules/vue-i18n/')
+  ) {
+    return 'app-framework'
+  }
+
+  if (
+    id.includes('/node_modules/marked/')
+  ) {
+    return 'markdown-core'
+  }
+
+  if (id.includes('/node_modules/dompurify/')) {
+    return 'html-sanitize'
+  }
+
+  if (id.includes('/node_modules/katex/')) {
+    return 'math-render'
+  }
+
+  if (id.includes('/node_modules/vue-virtual-scroller/')) {
+    return 'virtual-scroller'
+  }
+
+  if (
+    id.includes('/node_modules/dayjs/') ||
+    id.includes('/node_modules/axios/') ||
+    id.includes('/node_modules/@vueuse/core/')
+  ) {
+    return 'app-utils'
+  }
+
+  return 'vendor'
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
@@ -36,6 +86,13 @@ export default defineConfig({
       },
     ]),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks,
+      }
+    }
+  },
   server: {
     port: 5173,
     host: true,

@@ -28,14 +28,14 @@ import ConfirmModal from '../components/common/ConfirmModal.vue'
 import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
 import TimelinePanel from '../components/timeline/TimelinePanel.vue'
 import TimelineHeader from '../components/timeline/TimelineHeader.vue'
-import DigestView from '../components/tags/DigestView.vue'
-import ScopeSummaryView from '../components/summaries/ScopeSummaryView.vue'
-import DetailsPanel from '../components/details/DetailsPanel.vue'
 import type { Entry } from '../types'
 
 import { defineAsyncComponent } from 'vue'
 const SettingsModal = defineAsyncComponent(() => import('../components/SettingsModal.vue'))
 const AddToBookmarkGroupModal = defineAsyncComponent(() => import('../components/collections/AddToCollectionModal.vue'))
+const DigestView = defineAsyncComponent(() => import('../components/tags/DigestView.vue'))
+const ScopeSummaryView = defineAsyncComponent(() => import('../components/summaries/ScopeSummaryView.vue'))
+const DetailsPanel = defineAsyncComponent(() => import('../components/details/DetailsPanel.vue'))
 
 // === Stores ===
 const store = useFeedStore()

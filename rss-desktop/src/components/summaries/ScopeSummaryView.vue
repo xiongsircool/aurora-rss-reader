@@ -467,6 +467,7 @@ onUnmounted(() => {
         </div>
         <MarkdownContent
           :content="processedSummary()"
+          :render-math="true"
           class="scope-summary-body text-[13px] leading-6 c-[var(--text-primary)]"
           :class="!expandedSummary ? 'line-clamp-[14]' : ''"
           @click="handleSummaryClick"
@@ -517,6 +518,7 @@ onUnmounted(() => {
             </div>
             <MarkdownContent
               :content="item.summary_md || item.summary || ''"
+              :render-math="true"
               class="scope-summary-history-body mt-2 text-[12px] leading-6 c-[var(--text-primary)] line-clamp-[8]"
             />
           </div>
