@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { useFeedStore } from '../stores/feedStore'
 import { useAIStore } from '../stores/aiStore'
@@ -23,19 +23,51 @@ import { useFeedManagement } from '../composables/useFeedManagement'
 import { useEntryAI } from '../composables/useEntryAI'
 import type { AutomationTarget } from '../composables/useSettingsModal'
 
-import Toast from '../components/Toast.vue'
-import ConfirmModal from '../components/common/ConfirmModal.vue'
-import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
-import TimelinePanel from '../components/timeline/TimelinePanel.vue'
-import TimelineHeader from '../components/timeline/TimelineHeader.vue'
 import type { Entry } from '../types'
 
-import { defineAsyncComponent } from 'vue'
-const SettingsModal = defineAsyncComponent(() => import('../components/SettingsModal.vue'))
-const AddToBookmarkGroupModal = defineAsyncComponent(() => import('../components/collections/AddToCollectionModal.vue'))
-const DigestView = defineAsyncComponent(() => import('../components/tags/DigestView.vue'))
-const ScopeSummaryView = defineAsyncComponent(() => import('../components/summaries/ScopeSummaryView.vue'))
-const DetailsPanel = defineAsyncComponent(() => import('../components/details/DetailsPanel.vue'))
+const loadToast = () => import('../components/Toast.vue')
+const loadConfirmModal = () => import('../components/common/ConfirmModal.vue')
+const loadSidebarPanel = () => import('../components/sidebar/SidebarPanel.vue')
+const loadTimelinePanel = () => import('../components/timeline/TimelinePanel.vue')
+const loadTimelineHeader = () => import('../components/timeline/TimelineHeader.vue')
+const loadSettingsModal = () => import('../components/SettingsModal.vue')
+const loadAddToBookmarkGroupModal = () => import('../components/collections/AddToCollectionModal.vue')
+const loadDigestView = () => import('../components/tags/DigestView.vue')
+const loadScopeSummaryView = () => import('../components/summaries/ScopeSummaryView.vue')
+const loadDetailsPanel = () => import('../components/details/DetailsPanel.vue')
+
+const Toast = defineAsyncComponent(loadToast)
+const ConfirmModal = defineAsyncComponent(loadConfirmModal)
+const SidebarPanel = defineAsyncComponent(loadSidebarPanel)
+const TimelinePanel = defineAsyncComponent(loadTimelinePanel)
+const TimelineHeader = defineAsyncComponent(loadTimelineHeader)
+const SettingsModal = defineAsyncComponent(loadSettingsModal)
+const AddToBookmarkGroupModal = defineAsyncComponent(loadAddToBookmarkGroupModal)
+const DigestView = defineAsyncComponent(loadDigestView)
+const ScopeSummaryView = defineAsyncComponent(loadScopeSummaryView)
+const DetailsPanel = defineAsyncComponent(loadDetailsPanel)
+
+const prefetchedLoaders = new WeakMap<() => Promise<unknown>, Promise<unknown>>()
+
+function prefetchComponent(loader: () => Promise<unknown>) {
+  const existing = prefetchedLoaders.get(loader)
+  if (existing) return existing
+  const pending = loader().catch(() => undefined)
+  prefetchedLoaders.set(loader, pending)
+  return pending
+}
+
+function scheduleIdlePrefetch(loader: () => Promise<unknown>, timeout = 1200) {
+  if (typeof window === 'undefined') return
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number
+  }
+  if (typeof idleWindow.requestIdleCallback === 'function') {
+    idleWindow.requestIdleCallback(() => { void prefetchComponent(loader) }, { timeout })
+    return
+  }
+  window.setTimeout(() => { void prefetchComponent(loader) }, 300)
+}
 
 // === Stores ===
 const store = useFeedStore()
@@ -329,18 +361,21 @@ const showBookmarkGroupModal = ref(false)
 const bookmarkGroupEntryId = ref<string | null>(null)
 
 function openGeneralSettings() {
+  void prefetchComponent(loadSettingsModal)
   settingsInitialCategory.value = 'general'
   settingsAutomationTarget.value = null
   showSettings.value = true
 }
 
 function openTagSettings() {
+  void prefetchComponent(loadSettingsModal)
   settingsInitialCategory.value = 'intelligence'
   settingsAutomationTarget.value = null
   showSettings.value = true
 }
 
 function openScopedAutomationSettings(target: AutomationTarget) {
+  void prefetchComponent(loadSettingsModal)
   settingsInitialCategory.value = 'intelligence'
   settingsAutomationTarget.value = target
   showSettings.value = true
@@ -608,6 +643,7 @@ async function toggleStarFromList(entry: Entry) {
 }
 
 function handleAddToBookmarkGroup(entry: Entry) {
+  void prefetchComponent(loadAddToBookmarkGroupModal)
   bookmarkGroupEntryId.value = entry.id
   showBookmarkGroupModal.value = true
 }
@@ -694,6 +730,26 @@ const currentScopeSummaryTarget = computed<{ scope_type: 'feed' | 'group'; scope
 watch(currentScopeSummaryTarget, (target) => {
   if (!target) {
     feedDetailMode.value = 'articles'
+    return
+  }
+  void prefetchComponent(loadScopeSummaryView)
+})
+
+watch(() => activeTagView.value, (value) => {
+  if (value === 'digest') {
+    void prefetchComponent(loadDigestView)
+  }
+})
+
+watch(() => showSettings.value, (value) => {
+  if (value) {
+    void prefetchComponent(loadSettingsModal)
+  }
+})
+
+watch(() => currentSelectedEntry.value?.id ?? null, (entryId) => {
+  if (entryId) {
+    void prefetchComponent(loadDetailsPanel)
   }
 })
 
@@ -704,6 +760,7 @@ function handleToggleFeedDetailMode(mode: 'articles' | 'summary') {
 async function handleScopeSummaryEntrySelect(entryId: string) {
   // 直接选择文章并在右侧显示详情，不切换视图模式
   store.selectEntry(entryId)
+  void prefetchComponent(loadDetailsPanel)
   openDetails()
 }
 
@@ -718,6 +775,7 @@ function handleEntrySelect(entryId: string) {
   } else {
     store.selectEntry(entryId)
   }
+  void prefetchComponent(loadDetailsPanel)
   openDetails()
 }
 
@@ -758,6 +816,9 @@ onMounted(async () => {
   tagsStore.fetchTags()
   tagsStore.fetchStats()
   initSync()
+
+  scheduleIdlePrefetch(loadSettingsModal)
+  scheduleIdlePrefetch(loadDetailsPanel)
 })
 
 onMounted(() => {

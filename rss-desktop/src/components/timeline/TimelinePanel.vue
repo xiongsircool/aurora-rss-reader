@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, defineAsyncComponent, ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Entry, ViewType } from '../../types'
 import type { ViewMode } from '../../composables/useViewMode'
 import { getTimeRangeText } from '../../utils/date'
-import TimelineHeader from './TimelineHeader.vue'
-import TimelineFilters from './TimelineFilters.vue'
-import EntryCard from './EntryCard.vue'
-import PictureCard from './PictureCard.vue'
-import VideoCard from './VideoCard.vue'
-import AudioCard from './AudioCard.vue'
-import LoadingSpinner from '../LoadingSpinner.vue'
-import TagComboFilter from '../tags/TagComboFilter.vue'
+
+const TimelineHeader = defineAsyncComponent(() => import('./TimelineHeader.vue'))
+const TimelineFilters = defineAsyncComponent(() => import('./TimelineFilters.vue'))
+const EntryCard = defineAsyncComponent(() => import('./EntryCard.vue'))
+const PictureCard = defineAsyncComponent(() => import('./PictureCard.vue'))
+const VideoCard = defineAsyncComponent(() => import('./VideoCard.vue'))
+const AudioCard = defineAsyncComponent(() => import('./AudioCard.vue'))
+const LoadingSpinner = defineAsyncComponent(() => import('../LoadingSpinner.vue'))
+const TagComboFilter = defineAsyncComponent(() => import('../tags/TagComboFilter.vue'))
 
 const props = defineProps<{
   // Header props

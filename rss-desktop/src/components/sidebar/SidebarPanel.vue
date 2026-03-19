@@ -1,22 +1,23 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFeedStore } from '../../stores/feedStore'
 import { useFavoritesStore } from '../../stores/favoritesStore'
 import type { Feed, ViewType } from '../../types'
-import SidebarHeader from './SidebarHeader.vue'
-import AddFeedForm from './AddFeedForm.vue'
-import AddFeedPopover from './AddFeedPopover.vue'
-import OpmlActions from './OpmlActions.vue'
-import FavoritesSection from './FavoritesSection.vue'
-import CollectionsSection from './CollectionsSection.vue'
-import TagsSection from './TagsSection.vue'
-import QuickNavBar from './QuickNavBar.vue'
-import FeedGroup from './FeedGroup.vue'
-import ViewTypeNav from './ViewTypeNav.vue'
-import ConfirmModal from '../common/ConfirmModal.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import type { ViewMode } from '../../composables/useViewMode'
+
+const SidebarHeader = defineAsyncComponent(() => import('./SidebarHeader.vue'))
+const AddFeedForm = defineAsyncComponent(() => import('./AddFeedForm.vue'))
+const AddFeedPopover = defineAsyncComponent(() => import('./AddFeedPopover.vue'))
+const OpmlActions = defineAsyncComponent(() => import('./OpmlActions.vue'))
+const FavoritesSection = defineAsyncComponent(() => import('./FavoritesSection.vue'))
+const CollectionsSection = defineAsyncComponent(() => import('./CollectionsSection.vue'))
+const TagsSection = defineAsyncComponent(() => import('./TagsSection.vue'))
+const QuickNavBar = defineAsyncComponent(() => import('./QuickNavBar.vue'))
+const FeedGroup = defineAsyncComponent(() => import('./FeedGroup.vue'))
+const ViewTypeNav = defineAsyncComponent(() => import('./ViewTypeNav.vue'))
+const ConfirmModal = defineAsyncComponent(() => import('../common/ConfirmModal.vue'))
 
 export type { ViewMode }
 
