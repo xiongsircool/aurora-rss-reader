@@ -105,6 +105,7 @@ const openOriginalMode = computed({
 const autoTitleTranslationLimit = ref(settingsStore.settings.max_auto_title_translations)
 
 const summaryPromptPreference = ref(settingsStore.settings.summary_prompt_preference)
+const aiSummaryMaxTokens = ref(settingsStore.settings.ai_summary_max_tokens)
 const translationPromptPreference = ref(settingsStore.settings.translation_prompt_preference)
 const scopeSummaryEnabled = ref(settingsStore.settings.scope_summary_enabled)
 const scopeSummaryAutoGenerate = ref(settingsStore.settings.scope_summary_auto_generate)
@@ -174,12 +175,14 @@ watch(() => props.show, async (show) => {
         rsshub.resetTestResult()
       }
     )
+    rsshub.fetchRSSHubMirrors()
     refresh.syncFromStore()
     proxy.syncFromStore()
     await proxy.fetchProxyStatus()
     // Sync the local autoTitleTranslationLimit with store value
     autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
     summaryPromptPreference.value = settingsStore.settings.summary_prompt_preference
+    aiSummaryMaxTokens.value = settingsStore.settings.ai_summary_max_tokens
     translationPromptPreference.value = settingsStore.settings.translation_prompt_preference
     scopeSummaryEnabled.value = settingsStore.settings.scope_summary_enabled
     scopeSummaryAutoGenerate.value = settingsStore.settings.scope_summary_auto_generate
@@ -272,6 +275,7 @@ async function saveSettings() {
     const normalizedChunkSize = Math.max(5, Math.min(25, Number(scopeSummaryChunkSize.value) || 10))
     await settingsStore.updateSettings({
       max_auto_title_translations: clampedLimit,
+      ai_summary_max_tokens: aiSummaryMaxTokens.value,
       summary_prompt_preference: summaryPromptPreference.value,
       translation_prompt_preference: translationPromptPreference.value,
       scope_summary_enabled: scopeSummaryEnabled.value,
@@ -432,7 +436,10 @@ async function saveSettings() {
                       v-model:rsshubUrl="rsshub.rsshubUrl.value"
                       :isTestingRSSHub="rsshub.isTestingRSSHub.value"
                       :rsshubTestResult="rsshub.rsshubTestResult.value"
+                      :rsshubMirrors="rsshub.rsshubMirrors.value"
+                      :rsshubMirrorsLoading="rsshub.rsshubMirrorsLoading.value"
                       @testConnection="rsshub.testRSSHubConnection"
+                      @selectMirror="rsshub.selectMirror"
                     />
                     <div class="h-6"></div>
                     <SettingsRefresh
@@ -473,6 +480,7 @@ async function saveSettings() {
                       v-model:features="localConfig.features"
                       v-model:autoTitleTranslationLimit="autoTitleTranslationLimit"
                       v-model:summaryPromptPreference="summaryPromptPreference"
+                      v-model:aiSummaryMaxTokens="aiSummaryMaxTokens"
                       v-model:translationPromptPreference="translationPromptPreference"
                       v-model:scopeSummaryEnabled="scopeSummaryEnabled"
                       v-model:scopeSummaryAutoGenerate="scopeSummaryAutoGenerate"

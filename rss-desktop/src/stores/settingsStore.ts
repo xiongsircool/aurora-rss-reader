@@ -23,6 +23,7 @@ export interface AppSettings {
   timeline_filter_density: 'compact' | 'standard'
   // 语言设置
   language: string // 'zh' | 'en' | 'ja' | 'ko'
+  ai_summary_max_tokens: number // 0 = unlimited
   summary_prompt_preference: string
   translation_prompt_preference: string
   outbound_proxy_mode: 'system' | 'custom' | 'off'
@@ -54,6 +55,7 @@ export const useSettingsStore = defineStore('settings', () => {
     details_panel_mode: 'docked',
     timeline_filter_density: 'compact',
     language: 'zh',
+    ai_summary_max_tokens: 4096,
     summary_prompt_preference: '',
     translation_prompt_preference: '',
     outbound_proxy_mode: 'system',

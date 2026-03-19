@@ -495,7 +495,8 @@ export async function aiRoutes(app: FastifyInstance) {
       const client = createClient('summary');
       const settings = userSettingsService.getSettings();
       const userPreference = settings.summary_prompt_preference || '';
-      const summary = await client.summarize(combinedContent, { language: targetLanguage, userPreference });
+      const maxTokens = settings.ai_summary_max_tokens || 0;
+      const summary = await client.summarize(combinedContent, { language: targetLanguage, userPreference, maxTokens });
       summaryRepo.upsert({ entry_id, language: targetLanguage, summary });
       return { entry_id, language: targetLanguage, summary };
     } catch (error) {
@@ -739,7 +740,8 @@ export async function aiRoutes(app: FastifyInstance) {
 
       const client = createClient('summary');
       const userPreference = settings.summary_prompt_preference || '';
-      const summary = await client.summarize(content, { language: targetLanguage, userPreference });
+      const maxTokens = settings.ai_summary_max_tokens || 0;
+      const summary = await client.summarize(content, { language: targetLanguage, userPreference, maxTokens });
 
       if (entry_id) {
         summaryRepo.upsert({

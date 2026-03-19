@@ -222,6 +222,7 @@ export interface UserSettings {
   ai_auto_title_translation: number; // SQLite boolean (0/1)
   ai_title_display_mode: string;
   ai_translation_language: string;
+  ai_summary_max_tokens: number; // Max output tokens for AI summary (0 = unlimited)
   summary_prompt_preference: string; // User custom preference for summary prompts
   translation_prompt_preference: string; // User custom preference for translation prompts
   ai_prompt_preference?: string; // Legacy prompt preference kept for migration compatibility

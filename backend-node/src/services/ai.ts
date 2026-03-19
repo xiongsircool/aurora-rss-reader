@@ -101,7 +101,7 @@ export class AIClient {
     }
   }
 
-  async summarize(content: string, options: { language?: string; userPreference?: string } = {}): Promise<string> {
+  async summarize(content: string, options: { language?: string; userPreference?: string; maxTokens?: number } = {}): Promise<string> {
     this.ensureReady();
 
     const language = options.language || 'zh';
@@ -149,7 +149,7 @@ export class AIClient {
           },
           { role: 'user', content },
         ],
-        max_tokens: 1000,
+        max_tokens: options.maxTokens ?? 0, // 0 = unlimited
       });
 
       const message = completion.choices[0]?.message?.content || '';

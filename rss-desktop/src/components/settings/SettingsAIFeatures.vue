@@ -9,6 +9,7 @@ import {
 const features = defineModel<LocalFeatureConfig>('features', { required: true })
 const autoTitleTranslationLimit = defineModel<number>('autoTitleTranslationLimit', { required: true })
 const summaryPromptPreference = defineModel<string>('summaryPromptPreference', { required: true })
+const aiSummaryMaxTokens = defineModel<number>('aiSummaryMaxTokens', { required: true })
 const translationPromptPreference = defineModel<string>('translationPromptPreference', { required: true })
 const scopeSummaryEnabled = defineModel<boolean>('scopeSummaryEnabled', { required: true })
 const scopeSummaryAutoGenerate = defineModel<boolean>('scopeSummaryAutoGenerate', { required: true })
@@ -104,6 +105,22 @@ const limitBounds = {
         <span>{{ limitBounds.max }}</span>
       </div>
       <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.autoTitleTranslationLimitHint', { count: autoTitleTranslationLimit }) }}</p>
+    </div>
+
+    <!-- AI Summary Max Output Length -->
+    <div class="mb-4">
+      <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.aiSummaryMaxOutputLength') }}</label>
+      <select
+        v-model="aiSummaryMaxTokens"
+        class="w-full p-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all shadow-none focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
+      >
+        <option :value="0">{{ t('settings.aiSummaryMaxOutputLengthUnlimited') }}</option>
+        <option :value="1024">1024 {{ t('settings.tokens') }}</option>
+        <option :value="2048">2048 {{ t('settings.tokens') }}</option>
+        <option :value="4096">4096 {{ t('settings.tokens') }}</option>
+        <option :value="8192">8192 {{ t('settings.tokens') }}</option>
+      </select>
+      <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.aiSummaryMaxOutputLengthHint') }}</p>
     </div>
 
     <!-- Summary Prompt Preference -->

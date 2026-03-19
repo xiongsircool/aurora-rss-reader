@@ -219,6 +219,7 @@ function runMigrations(): void {
     { name: 'scope_summary_use_custom', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_use_custom INTEGER NOT NULL DEFAULT 0` },
     { name: 'scope_summary_base_url', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_base_url TEXT NOT NULL DEFAULT ''` },
     { name: 'scope_summary_api_key', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_api_key TEXT NOT NULL DEFAULT ''` },
+    { name: 'ai_summary_max_tokens', sql: `ALTER TABLE user_settings ADD COLUMN ai_summary_max_tokens INTEGER NOT NULL DEFAULT 4096` },
   ];
   const missingScopeSummaryColumns = scopeSummaryColumns.filter(({ name }) => !tableInfo.some((col) => col.name === name));
   if (missingScopeSummaryColumns.length > 0) {
@@ -487,6 +488,7 @@ export function initDatabase(): void {
       scope_summary_use_custom INTEGER NOT NULL DEFAULT 0,
       scope_summary_base_url TEXT NOT NULL DEFAULT '',
       scope_summary_api_key TEXT NOT NULL DEFAULT '',
+      ai_summary_max_tokens INTEGER NOT NULL DEFAULT 4096,
       summary_prompt_preference TEXT NOT NULL DEFAULT '',
       translation_prompt_preference TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
