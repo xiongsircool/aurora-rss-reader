@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, watch, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import axios from 'axios'
 import { useSettingsStore } from '../stores/settingsStore'
+import { getApiErrorMessage } from '../api/errors'
 import { useSettingsModal } from '../composables/useSettingsModal'
 import { useRSSHubSettings } from '../composables/useRSSHubSettings'
 import { useAIConfigSettings } from '../composables/useAIConfigSettings'
@@ -293,15 +293,7 @@ async function saveSettings() {
     emit('close')
   } catch (error) {
     console.error('保存设置失败:', error)
-    const responseError = axios.isAxiosError(error)
-      ? (error.response?.data as { error?: string; invalid_fields?: string[] } | undefined)
-      : undefined
-    const detail = responseError?.error
-      ? Array.isArray(responseError.invalid_fields) && responseError.invalid_fields.length > 0
-        ? `${responseError.error}: ${responseError.invalid_fields.join(', ')}`
-        : responseError.error
-      : null
-    emit('notify', detail || t('toast.settingsSaveFailed'), 'error')
+    emit('notify', getApiErrorMessage(error, t('toast.settingsSaveFailed')), 'error')
   }
 }
 </script>
@@ -313,7 +305,7 @@ async function saveSettings() {
       <!-- Main Modal Container -->
       <div
         class="
-          w-full max-w-full md:max-w-[min(96vw,1360px)] h-[85vh] md:h-[85vh] h-full
+          w-full max-w-full md:max-w-[min(96vw,1100px)] h-[85vh] md:h-[85vh] h-full
           flex flex-col md:flex-row
           rounded-none md:rounded-2xl overflow-hidden
           bg-[var(--bg-base)] md:bg-white/80 md:dark:bg-[#0f1115]/75
@@ -396,7 +388,7 @@ async function saveSettings() {
           <!-- Scrollable Content -->
           <div class="flex-1 overflow-y-auto p-6 md:p-8 scroll-smooth">
             <Transition name="fade" mode="out-in">
-              <div :key="activeCategory" class="w-full max-w-[min(100%,1120px)] mx-auto space-y-6 min-w-0">
+              <div :key="activeCategory" class="w-full max-w-[min(100%,900px)] mx-auto space-y-6 min-w-0">
                 
                 <!-- General Section -->
                 <div v-if="activeCategory === 'general'" class="space-y-6">
