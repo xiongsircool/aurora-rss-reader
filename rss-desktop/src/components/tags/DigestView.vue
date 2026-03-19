@@ -292,9 +292,9 @@ async function regenerateSummary(tagId: string) {
             </span>
             <button
               class="text-[11px] c-[#8b5cf6] hover:underline bg-transparent border-none cursor-pointer"
-              @click.stop="openHistory(item.tag.id)"
+              @click.stop="historyModalTagId === item.tag.id ? closeHistoryModal() : openHistory(item.tag.id)"
             >
-              {{ t('common.viewHistory') }}
+              {{ historyModalTagId === item.tag.id ? t('common.close') : t('common.viewHistory') }}
             </button>
           </div>
         </div>

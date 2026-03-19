@@ -253,9 +253,13 @@ async function loadHistory(reset = false) {
   }
 }
 
-async function openHistory() {
-  showHistory.value = true
-  await loadHistory(true)
+async function toggleHistory() {
+  if (showHistory.value) {
+    showHistory.value = false
+  } else {
+    showHistory.value = true
+    await loadHistory(true)
+  }
 }
 
 function switchWindow(nextWindow: ScopeSummaryWindowType) {
@@ -420,9 +424,9 @@ onUnmounted(() => {
             v-if="summary"
             class="text-[11px] bg-transparent border-none cursor-pointer px-0"
             :style="{ color: accentColor }"
-            @click="openHistory"
+            @click="toggleHistory"
           >
-            {{ t('common.viewHistory') }}
+            {{ showHistory ? t('common.close') : t('common.viewHistory') }}
           </button>
           <button
             class="px-2.5 py-1 rounded-md text-[11px] border transition-colors"
