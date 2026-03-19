@@ -29,8 +29,8 @@ const digestData = ref<Array<{
   entries: DigestEntryPreview[]
 }>>([])
 const loading = ref(false)
-const expandedSummary = ref<Set<string>>(new Set())
-const expandedHistorySummary = ref<Set<string>>(new Set())
+const expandedSummary = ref<Record<string, boolean>>({})
+const expandedHistorySummary = ref<Record<string, boolean>>({})
 const historyByTag = ref<Record<string, Array<{ id: string; period: 'latest' | 'week'; summary: string; citations: DigestCitation[]; keywords: string[]; created_at: string; source_count: number; model_name: string; time_range_key: string; trigger_type: string }>>>({})
 const historyCursorByTag = ref<Record<string, string | null>>({})
 const historyHasMoreByTag = ref<Record<string, boolean>>({})
@@ -59,16 +59,11 @@ watch(() => locale.value, () => {
 })
 
 function isSummaryExpanded(tagId: string) {
-  return expandedSummary.value.has(tagId)
+  return !!expandedSummary.value[tagId]
 }
 
 function toggleSummary(tagId: string) {
-  if (expandedSummary.value.has(tagId)) {
-    expandedSummary.value.delete(tagId)
-  } else {
-    expandedSummary.value.add(tagId)
-  }
-  expandedSummary.value = new Set(expandedSummary.value)
+  expandedSummary.value[tagId] = !expandedSummary.value[tagId]
 }
 
 function shouldShowSummaryToggle(summary: string | null) {
@@ -98,19 +93,17 @@ function formatRange(periodValue: 'latest' | 'week', rangeKey?: string | null) {
 }
 
 function isHistorySummaryExpanded(itemId: string) {
-  return expandedHistorySummary.value.has(itemId)
+  return !!expandedHistorySummary.value[itemId]
 }
 
 function toggleHistorySummary(itemId: string) {
-  if (expandedHistorySummary.value.has(itemId)) expandedHistorySummary.value.delete(itemId)
-  else expandedHistorySummary.value.add(itemId)
-  expandedHistorySummary.value = new Set(expandedHistorySummary.value)
+  expandedHistorySummary.value[itemId] = !expandedHistorySummary.value[itemId]
 }
 
 function switchPeriod(p: 'latest' | 'week') {
   period.value = p
-  expandedSummary.value = new Set()
-  expandedHistorySummary.value = new Set()
+  expandedSummary.value = {}
+  expandedHistorySummary.value = {}
   historyModalTagId.value = null
   historyByTag.value = {}
   historyCursorByTag.value = {}
