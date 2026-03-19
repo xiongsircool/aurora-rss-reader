@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch, ref, onMounted } from 'vue'
+import { computed, watch, ref, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import { getApiErrorMessage } from '../api/errors'
@@ -13,19 +13,16 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmModal from './common/ConfirmModal.vue'
 import type { AutomationTarget } from '../composables/useSettingsModal'
 
-// Section Components
-import {
-  SettingsLanguage,
-  SettingsProxy,
-  SettingsRSSHub,
-  SettingsAIConfig,
-  SettingsAIFeatures,
-  SettingsAIAutomation,
-  SettingsTagRerun,
-  SettingsRefresh,
-  SettingsDisplay,
-  SettingsAbout
-} from './settings'
+const SettingsLanguage = defineAsyncComponent(() => import('./settings/SettingsLanguage.vue'))
+const SettingsProxy = defineAsyncComponent(() => import('./settings/SettingsProxy.vue'))
+const SettingsRSSHub = defineAsyncComponent(() => import('./settings/SettingsRSSHub.vue'))
+const SettingsAIConfig = defineAsyncComponent(() => import('./settings/SettingsAIConfig.vue'))
+const SettingsAIFeatures = defineAsyncComponent(() => import('./settings/SettingsAIFeatures.vue'))
+const SettingsAIAutomation = defineAsyncComponent(() => import('./settings/SettingsAIAutomation.vue'))
+const SettingsTagRerun = defineAsyncComponent(() => import('./settings/SettingsTagRerun.vue'))
+const SettingsRefresh = defineAsyncComponent(() => import('./settings/SettingsRefresh.vue'))
+const SettingsDisplay = defineAsyncComponent(() => import('./settings/SettingsDisplay.vue'))
+const SettingsAbout = defineAsyncComponent(() => import('./settings/SettingsAbout.vue'))
 
 type Category = 'general' | 'display' | 'sync' | 'intelligence'
 
@@ -223,7 +220,6 @@ onMounted(() => {
   }
 })
 
-import { onUnmounted } from 'vue'
 onUnmounted(() => {
   document.body.style.overflow = ''
 })
