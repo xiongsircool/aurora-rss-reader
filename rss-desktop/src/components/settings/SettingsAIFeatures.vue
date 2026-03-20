@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppToggle from '../common/AppToggle.vue'
+import SummaryBackgroundStatusCard from './SummaryBackgroundStatusCard.vue'
 import type { LocalFeatureConfig } from '../../composables/useSettingsModal'
 import {
   MIN_AUTO_TITLE_TRANSLATIONS,
@@ -26,6 +27,10 @@ const scopeSummaryBaseUrl = defineModel<string>('scopeSummaryBaseUrl', { require
 const scopeSummaryApiKey = defineModel<string>('scopeSummaryApiKey', { required: true })
 
 const { t } = useI18n()
+defineProps<{
+  defaultDateRange: string
+  timeField: string
+}>()
 
 const limitBounds = {
   min: MIN_AUTO_TITLE_TRANSLATIONS,
@@ -181,6 +186,11 @@ const scopeSummaryUseCustom = computed({
       <p class="text-xs leading-5 text-[var(--text-secondary)]">
         {{ t('settings.summaryBackgroundDescription') }}
       </p>
+      <SummaryBackgroundStatusCard
+        :draft-enabled="summaryBackgroundEnabled"
+        :draft-date-range="defaultDateRange"
+        :draft-time-field="timeField"
+      />
     </div>
 
     <div class="mt-5 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)]">

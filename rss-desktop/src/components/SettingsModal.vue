@@ -511,6 +511,8 @@ async function saveSettings() {
                       v-model:scopeSummaryUseCustom="scopeSummaryUseCustom"
                       v-model:scopeSummaryBaseUrl="scopeSummaryBaseUrl"
                       v-model:scopeSummaryApiKey="scopeSummaryApiKey"
+                      :default-date-range="defaultDateRange"
+                      :time-field="timeField"
                     />
                     <div class="h-6"></div>
                     <SettingsAIAutomation

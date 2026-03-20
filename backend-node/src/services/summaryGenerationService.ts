@@ -76,6 +76,7 @@ function shouldRunForFeed(feed: Feed | null | undefined): boolean {
 function resolveBackgroundScanRange(now: Date = new Date()): {
   cutoffIso: string | null;
   nowIso: string;
+  dateRange: string;
   timeField: 'published_at' | 'inserted_at';
 } {
   const settings = userSettingsService.getSettings();
@@ -84,7 +85,34 @@ function resolveBackgroundScanRange(now: Date = new Date()): {
   return {
     cutoffIso: cutoff ? cutoff.toISOString() : null,
     nowIso: now.toISOString(),
+    dateRange: settings.default_date_range,
     timeField,
+  };
+}
+
+export interface SummaryBackgroundStatus {
+  enabled: boolean;
+  language: string;
+  range: {
+    date_range: string;
+    time_field: 'published_at' | 'inserted_at';
+    cutoff_at: string | null;
+  };
+  queue: {
+    eligible_in_range: number;
+    queued: number;
+    running: number;
+    failed: number;
+    succeeded: number;
+  };
+  activity: {
+    summaries_total: number;
+    summaries_last_24h: number;
+    jobs_last_24h: number;
+    last_job_at: string | null;
+    last_success_at: string | null;
+    last_failure_at: string | null;
+    last_error: string | null;
   };
 }
 
@@ -212,6 +240,125 @@ export class SummaryGenerationService {
     }
 
     return enqueued;
+  }
+
+  getBackgroundStatus(): SummaryBackgroundStatus {
+    const language = this.getTargetLanguage();
+    const range = resolveBackgroundScanRange();
+
+    const rangeWhere: string[] = [];
+    const rangeParams: Array<string | number> = [];
+    if (range.cutoffIso) {
+      if (range.timeField === 'published_at') {
+        rangeWhere.push(
+          '((e.published_at IS NOT NULL AND e.published_at <= ? AND e.published_at >= ?) OR (e.published_at IS NULL AND e.inserted_at >= ?))'
+        );
+        rangeParams.push(range.nowIso, range.cutoffIso, range.cutoffIso);
+      } else {
+        rangeWhere.push('e.inserted_at >= ?');
+        rangeParams.push(range.cutoffIso);
+      }
+    }
+
+    const rangeSql = rangeWhere.length > 0 ? ` AND ${rangeWhere.join(' AND ')}` : '';
+
+    const eligible = this.db.prepare(`
+      SELECT COUNT(*) as count
+      FROM entries e
+      LEFT JOIN summaries s
+        ON s.entry_id = e.id AND s.language = ?
+      WHERE e.read = 0
+        AND COALESCE(e.readability_content, e.content, e.summary) IS NOT NULL
+        AND (s.id IS NULL OR COALESCE(s.summary, '') = '')
+        ${rangeSql}
+    `).get(language, ...rangeParams) as { count: number };
+
+    const queueRows = this.db.prepare(`
+      SELECT status, COUNT(*) as count
+      FROM summary_generation_jobs
+      GROUP BY status
+    `).all() as Array<{ status: string; count: number }>;
+
+    const queue = {
+      eligible_in_range: eligible.count,
+      queued: 0,
+      running: 0,
+      failed: 0,
+      succeeded: 0,
+    };
+
+    for (const row of queueRows) {
+      if (row.status === 'queued') queue.queued = row.count;
+      if (row.status === 'running') queue.running = row.count;
+      if (row.status === 'failed') queue.failed = row.count;
+      if (row.status === 'succeeded') queue.succeeded = row.count;
+    }
+
+    const summariesTotal = this.db.prepare(`
+      SELECT COUNT(*) as count
+      FROM summaries
+      WHERE language = ?
+    `).get(language) as { count: number };
+
+    const summariesLastDay = this.db.prepare(`
+      SELECT COUNT(*) as count
+      FROM summaries
+      WHERE language = ?
+        AND created_at >= datetime('now', '-1 day')
+    `).get(language) as { count: number };
+
+    const jobsLastDay = this.db.prepare(`
+      SELECT COUNT(*) as count
+      FROM summary_generation_jobs
+      WHERE language = ?
+        AND created_at >= datetime('now', '-1 day')
+    `).get(language) as { count: number };
+
+    const lastJob = this.db.prepare(`
+      SELECT created_at
+      FROM summary_generation_jobs
+      WHERE language = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(language) as { created_at: string } | undefined;
+
+    const lastSuccess = this.db.prepare(`
+      SELECT updated_at
+      FROM summary_generation_jobs
+      WHERE language = ?
+        AND status = 'succeeded'
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `).get(language) as { updated_at: string } | undefined;
+
+    const lastFailure = this.db.prepare(`
+      SELECT updated_at, error
+      FROM summary_generation_jobs
+      WHERE language = ?
+        AND status = 'failed'
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `).get(language) as { updated_at: string; error: string | null } | undefined;
+
+    return {
+      enabled: this.isEnabled(),
+      language,
+      range: {
+        date_range: range.dateRange,
+        time_field: range.timeField,
+        cutoff_at: range.cutoffIso,
+      },
+      queue,
+      activity: {
+        summaries_total: summariesTotal.count,
+        summaries_last_24h: summariesLastDay.count,
+        jobs_last_24h: jobsLastDay.count,
+        last_job_at: lastJob?.created_at ?? null,
+        last_success_at: lastSuccess?.updated_at ?? null,
+        last_failure_at: lastFailure?.updated_at ?? null,
+        last_error: lastFailure?.error ?? null,
+      },
+    };
   }
 
   async pumpPendingJobs(limit: number = SUMMARY_CONCURRENCY): Promise<void> {

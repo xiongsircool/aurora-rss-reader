@@ -34,6 +34,10 @@ export async function userSettingsRoutes(app: FastifyInstance) {
     return normalizeSettings(settings);
   });
 
+  app.get('/settings/summary-background-status', async () => {
+    return summaryGenerationService.getBackgroundStatus();
+  });
+
   // PATCH /settings - Update user settings
   app.patch('/settings', async (request, reply) => {
     const updates = request.body;
