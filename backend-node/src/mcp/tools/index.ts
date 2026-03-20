@@ -29,6 +29,12 @@ import {
 } from "../../services/scopeSummary.js";
 import { analyzeEntryTags, getTaggingConfig } from "../../services/tagging.js";
 import type { AIAutomationMode, AIScopeType, AITaskKey } from "../../db/models.js";
+import {
+  aggregateDigestService,
+  buildDigestSourceHash,
+  buildDigestTimeWindow,
+  type DigestSourceItem,
+} from "../../services/aggregateDigest.js";
 
 const db = getDatabase();
 const feedRepo = new FeedRepository();
@@ -228,6 +234,80 @@ function getLegacyAutomationDefaults() {
     enabled: aiAutomationResolver.resolve({ taskKey: task_key, scopeType: "global" }),
     source: "legacy_fallback" as const,
   }));
+}
+
+function normalizeDigestLanguage(language?: string | null): "zh" | "en" | "ja" | "ko" {
+  const value = (language || "").toLowerCase();
+  if (value.startsWith("en")) return "en";
+  if (value.startsWith("ja")) return "ja";
+  if (value.startsWith("ko")) return "ko";
+  return "zh";
+}
+
+function parseJsonRecord<T>(raw: string | null | undefined, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function parseKeywordsJson(raw: string | null | undefined): string[] {
+  const parsed = parseJsonRecord<unknown>(raw, []);
+  return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string").slice(0, 8) : [];
+}
+
+function toDigestSourceItems(rows: Array<{
+  id: string;
+  title: string | null;
+  summary: string | null;
+  feed_title?: string | null;
+  group_name?: string | null;
+  published_at?: string | null;
+  inserted_at: string;
+}>): DigestSourceItem[] {
+  return rows.map((entry, index) => ({
+    ref: index + 1,
+    entry_id: entry.id,
+    title: entry.title || "Untitled",
+    summary: entry.summary,
+    feed_title: entry.feed_title || null,
+    group_name: entry.group_name || null,
+    published_at: entry.published_at || entry.inserted_at,
+  }));
+}
+
+function buildTagDigestEntries(tagId: string, period?: string) {
+  const { startDate, normalizedPeriod, periodKey } = buildDigestTimeWindow(period);
+  const rows = startDate
+    ? db.prepare(`
+        SELECT e.id, e.title, e.url, e.published_at, e.inserted_at, e.summary, f.title as feed_title, f.group_name as group_name
+        FROM entries e
+        INNER JOIN entry_tags et ON e.id = et.entry_id
+        LEFT JOIN feeds f ON e.feed_id = f.id
+        WHERE et.tag_id = ?
+          AND e.inserted_at >= ?
+        ORDER BY e.inserted_at DESC
+        LIMIT 20
+      `).all(tagId, startDate) as Array<any>
+    : db.prepare(`
+        SELECT e.id, e.title, e.url, e.published_at, e.inserted_at, e.summary, f.title as feed_title, f.group_name as group_name
+        FROM entries e
+        INNER JOIN entry_tags et ON e.id = et.entry_id
+        LEFT JOIN feeds f ON e.feed_id = f.id
+        WHERE et.tag_id = ?
+        ORDER BY e.inserted_at DESC
+        LIMIT 20
+      `).all(tagId) as Array<any>;
+
+  return {
+    rows,
+    startDate,
+    normalizedPeriod,
+    periodKey,
+    sourceHash: buildDigestSourceHash(toDigestSourceItems(rows)),
+  };
 }
 
 function buildEntryFilters(options: {
@@ -1332,6 +1412,31 @@ function registerTagTools(server: McpServer) {
   );
 
   server.registerTool(
+    "list_pending_tag_analysis",
+    {
+      title: "List Pending Tag Analysis",
+      description: "List entries that are pending AI tag analysis.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(100).default(20),
+        cursor: z.string().optional(),
+        date_range: z.string().optional(),
+        time_field: z.enum(["published_at", "inserted_at"]).default("inserted_at"),
+      },
+    },
+    async (args) => {
+      const config = getTaggingConfig();
+      const result = analysisRepo.getPendingEntries({
+        limit: args.limit,
+        cursor: args.cursor,
+        startAt: config.autoTaggingStartAt || undefined,
+        date_range: args.date_range,
+        time_field: args.time_field,
+      });
+      return ok(result);
+    }
+  );
+
+  server.registerTool(
     "list_untagged_entries",
     {
       title: "List Untagged Entries",
@@ -1408,6 +1513,197 @@ function registerTagTools(server: McpServer) {
         });
       } catch (error) {
         return fail(`analyze_entry_tags failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  server.registerTool(
+    "reanalyze_entry_tags",
+    {
+      title: "Reanalyze Entry Tags",
+      description: "Alias of analyze_entry_tags for explicit retry semantics.",
+      inputSchema: {
+        entry_id: z.string().describe("Entry ID"),
+      },
+    },
+    async (args) => {
+      const entry = entryRepo.findById(args.entry_id);
+      if (!entry) return fail("Entry not found");
+
+      const tags = tagRepo.findAllEnabled();
+      if (tags.length === 0) return fail("No enabled tags configured");
+
+      const config = getTaggingConfig();
+      if (!config.apiKey || !config.baseUrl || !config.modelName) {
+        return fail("Tagging AI config is incomplete");
+      }
+
+      try {
+        const result = await analyzeEntryTags(
+          {
+            title: entry.title || "",
+            summary: entry.summary,
+            content: entry.content,
+          },
+          tags
+        );
+
+        if (result.success) {
+          entryTagRepo.removeAllTags(args.entry_id);
+          if (result.tagIds.length > 0) {
+            entryTagRepo.addTags(args.entry_id, result.tagIds, false);
+          }
+          analysisRepo.updateStatus(args.entry_id, "analyzed", config.tagsVersion);
+        }
+
+        const tagNames = result.tagIds
+          .map((tagId) => tags.find((tag) => tag.id === tagId)?.name)
+          .filter((name): name is string => Boolean(name));
+
+        return ok({
+          success: result.success,
+          entry_id: args.entry_id,
+          tag_ids: result.tagIds,
+          tag_names: tagNames,
+          error: result.error,
+        });
+      } catch (error) {
+        return fail(`reanalyze_entry_tags failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  server.registerTool(
+    "skip_entry_tag_analysis",
+    {
+      title: "Skip Entry Tag Analysis",
+      description: "Mark an entry as skipped so auto-tagging will ignore it.",
+      inputSchema: {
+        entry_id: z.string().describe("Entry ID"),
+      },
+    },
+    async (args) => {
+      const entry = entryRepo.findById(args.entry_id);
+      if (!entry) return fail("Entry not found");
+      analysisRepo.updateStatus(args.entry_id, "skipped");
+      return ok({
+        success: true,
+        entry_id: args.entry_id,
+        status: "skipped",
+      });
+    }
+  );
+}
+
+function registerDigestTools(server: McpServer) {
+  server.registerTool(
+    "get_digest",
+    {
+      title: "Get Digest",
+      description: "Get the latest aggregate digest for a tag, including current source items and saved summary if available.",
+      inputSchema: {
+        tag_id: z.string().describe("Tag ID"),
+        period: z.enum(["latest", "week"]).default("latest").describe("Digest period"),
+        language: z.string().optional().describe("Digest language"),
+      },
+    },
+    async (args) => {
+      const tag = tagRepo.findById(args.tag_id);
+      if (!tag) return fail("Tag not found");
+
+      const language = normalizeDigestLanguage(args.language || userSettingsService.getSettings().language || "zh");
+      const digestState = buildTagDigestEntries(args.tag_id, args.period);
+      const latest = aggregateDigestService.getLatest({
+        scope_type: "tag",
+        scope_id: args.tag_id,
+        period: digestState.normalizedPeriod,
+        time_range_key: digestState.periodKey,
+        language,
+      });
+
+      return ok({
+        tag: {
+          id: tag.id,
+          name: tag.name,
+          color: tag.color,
+        },
+        period: digestState.normalizedPeriod,
+        time_range_key: digestState.periodKey,
+        source_count: digestState.rows.length,
+        entries: digestState.rows.slice(0, 5),
+        item: latest ? {
+          ...latest,
+          summary: latest.summary_md,
+          citations: parseJsonRecord(latest.citations_json, []),
+          keywords: parseKeywordsJson(latest.keywords_json),
+        } : null,
+      });
+    }
+  );
+
+  server.registerTool(
+    "regenerate_digest",
+    {
+      title: "Regenerate Digest",
+      description: "Force regenerate a digest for a tag and save it.",
+      inputSchema: {
+        tag_id: z.string().describe("Tag ID"),
+        period: z.enum(["latest", "week"]).default("latest").describe("Digest period"),
+        language: z.string().optional().describe("Digest language"),
+      },
+    },
+    async (args) => {
+      const tag = tagRepo.findById(args.tag_id);
+      if (!tag) return fail("Tag not found");
+
+      const language = normalizeDigestLanguage(args.language || userSettingsService.getSettings().language || "zh");
+      const digestState = buildTagDigestEntries(args.tag_id, args.period);
+      if (!digestState.rows.length) {
+        return fail("No entries available for digest generation in the selected period");
+      }
+
+      try {
+        const generated = await aggregateDigestService.generate({
+          scope_type: "tag",
+          scope_id: tag.id,
+          scope_label: tag.name,
+          period: digestState.normalizedPeriod,
+          time_range_key: digestState.periodKey,
+          language,
+          items: toDigestSourceItems(digestState.rows),
+          trigger_type: "manual",
+        });
+
+        aggregateDigestService.mirrorLegacyTagDigest({
+          tag_id: tag.id,
+          period: digestState.normalizedPeriod,
+          time_range_key: digestState.periodKey,
+          language: generated.language,
+          source_count: digestState.rows.length,
+          source_hash: generated.sourceHash,
+          summary: generated.payload.summary_md,
+          keywords: generated.payload.keywords || [],
+          model_name: generated.modelName,
+          trigger_type: "manual",
+        });
+
+        return ok({
+          tag: {
+            id: tag.id,
+            name: tag.name,
+          },
+          period: digestState.normalizedPeriod,
+          time_range_key: digestState.periodKey,
+          source_count: digestState.rows.length,
+          item: {
+            summary: generated.payload.summary_md,
+            citations: generated.payload.citations,
+            keywords: generated.payload.keywords || [],
+            summary_updated_at: generated.record.created_at,
+          },
+        });
+      } catch (error) {
+        return fail(`regenerate_digest failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   );
@@ -1633,5 +1929,6 @@ export function registerAllTools(server: McpServer) {
   registerOverviewTools(server);
   registerAITools(server);
   registerTagTools(server);
+  registerDigestTools(server);
   registerLegacyAliases(server);
 }
