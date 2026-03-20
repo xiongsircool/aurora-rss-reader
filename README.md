@@ -25,7 +25,7 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🚧 v0.1.9 Release Candidate | 预发布版本
+## 🎉 v0.1.9 Latest Release | 最新版本
 
 **Background Summary Queue, Modernized MCP & Deployment Polish | 后台摘要队列、MCP 现代化与部署完善**
 
@@ -183,6 +183,11 @@ Recommended (backend-node):
      ```
    - Then open the app again.
 
+**Update Limitation:**
+1. The current macOS build is still distributed as an unsigned app.
+2. Built-in version checking can work, but automatic in-place installation through ShipIt may fail signature validation.
+3. For macOS users, the recommended update path is still to download the latest `.dmg` or `.zip` from GitHub Releases manually.
+
 ### Performance
 **Q: The app is slow to start?**
 A: Check the backend service logs if possible. First launch may take longer to initialize the database.
@@ -243,6 +248,7 @@ Generated files:
 - Only create the public tag after macOS, Windows, and Linux builds all pass.
 - Use a fresh tag such as `v0.1.9`; do not reuse an occupied release tag like `v0.1.8`.
 - Auto-update continues to work only after the public GitHub Release is created with installers and `latest*.yml`.
+- For the current unsigned macOS build, in-app version checking is available, but users should still update via GitHub Releases manually.
 
 ## 📋 Documentation | 文档
 
@@ -297,7 +303,7 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 Give it a ⭐ if you find it useful!
 ## Changelog
 
-### v0.1.9 (Release Candidate)
+### v0.1.9 (Current Version)
 **Background Summary Queue + MCP Modernization + Docker Access**
 
 - Background summary queue can persist generated summaries locally and reuse them after restart

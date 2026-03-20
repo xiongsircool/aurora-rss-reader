@@ -23,7 +23,7 @@
 
 ## 📋 更新公告 | Update News
 
-### 🚧 v0.1.9 预发布版本 | Release Candidate
+### 🎉 v0.1.9 最新版本 | Latest Release
 
 **后台摘要队列、MCP 现代化与部署完善 | Background Summary Queue, Modernized MCP & Deployment Polish**
 
@@ -279,6 +279,7 @@ chmod +x build-release-app.sh
 - macOS、Windows、Linux 三个平台都通过后，再创建正式公开 tag。
 - 新版本请使用未占用的 tag，例如 `v0.1.9`，不要重复使用已经占用的 `v0.1.8`。
 - 自动更新只有在 public GitHub Release 带上安装包和 `latest*.yml` 后才会生效。
+- 当前 macOS 安装包仍为未签名分发，应用内版本检查可用，但建议用户通过 GitHub Releases 手动下载安装更新。
 
 ## 技术栈
 
@@ -301,7 +302,7 @@ aurora-rss-reader/
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.9 (预发布版本 | Release Candidate) 🚧
+### v0.1.9 (当前版本 | Current Version) 🎉
 **后台摘要队列 + MCP 现代化 + Docker 访问优化 | Background Summary Queue + MCP Modernization + Docker Access**
 
 #### ✨ 新增与优化 | New & Improved
@@ -425,6 +426,11 @@ A: 数据默认存储在系统应用数据目录：
      sudo xattr -rd com.apple.quarantine /Applications/AuroraRSSReader.app
      ```
    - 再次点击应用即可正常打开。
+
+**更新问题：**
+1. 当前 macOS 发布包依然是未签名应用。
+2. 应用内检查新版本可以工作，但自动安装更新时可能因为签名校验失败而报错。
+3. 目前更稳妥的更新方式仍然是从 GitHub Releases 手动下载最新 `.dmg` 或 `.zip`。
 
 ### 性能相关
 **Q: 应用启动慢怎么办？**
