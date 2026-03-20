@@ -359,8 +359,15 @@ function buildChunkPrompt(input: {
     return parts.join('\n');
   }).join('\n\n');
 
+  // Get user's personalized summary preference
+  const settings = userSettingsService.getSettings();
+  const userPreference = settings.summary_prompt_preference?.trim() || '';
+  const preferenceInstruction = userPreference
+    ? `\n\n【个性化风格要求】（请务必遵循）：\n${userPreference}`
+    : '';
+
   return {
-    systemPrompt: `你是资深RSS内容编辑，擅长从多篇文章中提取核心信息并生成结构化摘要。\n\n输出格式（严格JSON）：\n{"chunk_summary_md":"Markdown字符串","keywords":["关键词数组"]}\n\n【必须遵守的硬性规则】：\n1. 每提到一篇具体文章，就必须用 <span entry_id="编号">文章相关词语</span> 包裹该词语\n2. 编号必须是 0 到 ${input.items.length - 1} 之间的数字（0-based）\n3. 禁止使用 (0)、[1]、编号:X 等任何其他引用格式\n4. 不要输出参考文献或引用列表`,
+    systemPrompt: `你是资深RSS内容编辑，擅长从多篇文章中提取核心信息并生成结构化摘要。${preferenceInstruction}\n\n输出格式（严格JSON）：\n{"chunk_summary_md":"Markdown字符串","keywords":["关键词数组"]}\n\n【必须遵守的硬性规则】：\n1. 每提到一篇具体文章，就必须用 <span entry_id="编号">文章相关词语</span> 包裹该词语\n2. 编号必须是 0 到 ${input.items.length - 1} 之间的数字（0-based）\n3. 禁止使用 (0)、[1]、编号:X 等任何其他引用格式\n4. 不要输出参考文献或引用列表`,
     userPrompt: `${scopeDisplay}：${input.scope_label}\n时间范围：${input.window_type}\n输出语言：${languageDisplay}\n\n文章材料（共${input.items.length}篇，编号从0到${input.items.length - 1}）：\n${sourceLines}\n\n【生成规则 - 必须严格遵守】：\n1. chunk_summary_md 是 Markdown 总结\n2. 【关键】每提到一篇具体文章的内容，必须用 <span entry_id="0">关键词</span> 包裹\n3. 示例：<span entry_id="0">Kagi Translate</span>推出了新功能，<span entry_id="1,2">相关报道</span>指出...\n4. 【禁止】绝对不要使用 (0)、[1]、编号:X 等格式，只用 <span entry_id="...">\n5. 每句话最好都带引用\n6. 输出纯JSON格式，不要代码块`,
   };
 }
@@ -378,8 +385,15 @@ function buildMergePrompt(input: {
     return `### 分块 ${index + 1}\n${chunk.chunk_summary_md}`;
   }).join('\n\n');
 
+  // Get user's personalized summary preference
+  const settings = userSettingsService.getSettings();
+  const userPreference = settings.summary_prompt_preference?.trim() || '';
+  const preferenceInstruction = userPreference
+    ? `\n\n【个性化风格要求】（请务必遵循）：\n${userPreference}`
+    : '';
+
   return {
-    systemPrompt: `你是资深RSS内容编辑，擅长整合多个摘要片段生成连贯的结构化总结。\n\n输出格式（严格JSON）：\n{"summary_md":"Markdown字符串","keywords":["关键词数组"]}\n\n【必须遵守的硬性规则】：\n1. 保留所有原文中的 <span entry_id="编号"> 引用标签格式\n2. 编号必须是数字（0-based）\n3. 禁止使用 (0)、[1]、编号:X 等任何其他引用格式\n4. 不要输出参考文献或引用列表`,
+    systemPrompt: `你是资深RSS内容编辑，擅长整合多个摘要片段生成连贯的结构化总结。${preferenceInstruction}\n\n输出格式（严格JSON）：\n{"summary_md":"Markdown字符串","keywords":["关键词数组"]}\n\n【必须遵守的硬性规则】：\n1. 保留所有原文中的 <span entry_id="编号"> 引用标签格式\n2. 编号必须是数字（0-based）\n3. 禁止使用 (0)、[1]、编号:X 等任何其他引用格式\n4. 不要输出参考文献或引用列表`,
     userPrompt: `${scopeDisplay}：${input.scope_label}\n时间范围：${input.window_type}\n输出语言：${languageDisplay}\n\n分块摘要（来自${input.chunks.length}个批次）：\n${chunkLines}\n\n【整合规则 - 必须严格遵守】：\n1. 将多个分块整合为一个连贯的总结\n2. 【关键】保留所有 <span entry_id="0"> 引用标签，格式绝对不能改变\n3. 示例：<span entry_id="0">Kagi Translate</span>推出了新功能，<span entry_id="1,2">相关报道</span>指出...\n4. 【禁止】绝对不要使用 (0)、[1]、编号:X 等格式\n5. 突出主题脉络和关键信息点\n6. 不要添加参考文献部分\n7. 输出纯JSON格式，不要代码块`,
   };
 }

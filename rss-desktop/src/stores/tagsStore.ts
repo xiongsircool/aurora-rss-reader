@@ -601,6 +601,21 @@ export const useTagsStore = defineStore('tags', () => {
         }
     }
 
+    /**
+     * Update entry read/starred state in tagsStore entries
+     */
+    function updateEntryState(entryId: string, state: { read?: boolean; starred?: boolean }) {
+        const entry = entries.value.find(e => e.id === entryId)
+        if (entry) {
+            if (state.read !== undefined) {
+                entry.is_read = state.read ? 1 : 0
+            }
+            if (state.starred !== undefined) {
+                entry.is_starred = state.starred ? 1 : 0
+            }
+        }
+    }
+
     async function addTagToEntry(entryId: string, tagId: string) {
         try {
             await fetch(`${API_BASE}/entries/${entryId}/tags/${tagId}`, {
@@ -822,6 +837,7 @@ export const useTagsStore = defineStore('tags', () => {
         testConfig,
         selectTag,
         setView,
+        updateEntryState,
         // Aggregation
         fetchFilteredEntries,
         fetchDigest,

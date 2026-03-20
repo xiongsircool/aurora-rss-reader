@@ -2,6 +2,7 @@ export { FeedRepository } from './feed.js';
 export { EntryRepository } from './entry.js';
 export { TranslationRepository } from './translation.js';
 export { SummaryRepository } from './summary.js';
+export { SummaryGenerationJobRepository } from './summaryGenerationJob.js';
 export { FetchLogRepository } from './fetchLog.js';
 export { ArticleExtractionJobRepository } from './articleExtractionJob.js';
 export { CollectionRepository } from './collections.js';
@@ -30,6 +31,10 @@ export type {
   SummaryCreateInput,
   SummaryUpdateInput,
 } from './summary.js';
+
+export type {
+  SummaryGenerationJobCreateInput,
+} from './summaryGenerationJob.js';
 
 export type {
   FetchLogCreateInput,

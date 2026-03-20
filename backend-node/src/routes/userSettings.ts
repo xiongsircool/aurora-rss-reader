@@ -7,6 +7,8 @@ import { InvalidUserSettingsUpdateError, userSettingsService } from '../services
 import { fetch } from 'undici';
 import { getObjectBody } from '../utils/http.js';
 import { getProxyStatus, isValidProxyUrl } from '../services/outboundHttp.js';
+import { rsshubManager } from '../services/rsshubManager.js';
+import { summaryGenerationService } from '../services/summaryGenerationService.js';
 
 /**
  * Convert SQLite boolean fields (0/1) to JavaScript booleans
@@ -18,6 +20,7 @@ function normalizeSettings(settings: any) {
     show_description: !!settings.show_description,
     show_entry_summary: !!settings.show_entry_summary,
     enable_date_filter: !!settings.enable_date_filter,
+    summary_background_enabled: !!settings.summary_background_enabled,
     scope_summary_enabled: !!settings.scope_summary_enabled,
     scope_summary_auto_generate: !!settings.scope_summary_auto_generate,
     scope_summary_use_custom: !!settings.scope_summary_use_custom,
@@ -69,6 +72,10 @@ export async function userSettingsRoutes(app: FastifyInstance) {
       }
 
       const settings = userSettingsService.updateSettings(payload);
+      if (settings.summary_background_enabled === 1) {
+        summaryGenerationService.ensurePendingJobs();
+        void summaryGenerationService.pumpPendingJobs();
+      }
       return normalizeSettings(settings);
     } catch (error) {
       if (error instanceof InvalidUserSettingsUpdateError) {
@@ -83,6 +90,20 @@ export async function userSettingsRoutes(app: FastifyInstance) {
   app.get('/settings/rsshub-url', async () => {
     const url = userSettingsService.getRSSHubUrl();
     return { rsshub_url: url };
+  });
+
+  // GET /settings/rsshub-mirrors - Get preset RSSHub mirrors
+  app.get('/settings/rsshub-mirrors', async () => {
+    const currentUrl = userSettingsService.getRSSHubUrl();
+    const items = rsshubManager.getAvailableMirrors().map((mirror) => ({
+      ...mirror,
+      is_current: mirror.base_url.replace(/\/$/, '') === currentUrl.replace(/\/$/, ''),
+    }));
+
+    return {
+      current: currentUrl,
+      items,
+    };
   });
 
   // POST /settings/rsshub-url - Update RSSHub URL

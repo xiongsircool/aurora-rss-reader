@@ -1,0 +1,273 @@
+import { randomBytes } from 'node:crypto';
+import { AIClient } from './ai.js';
+import { getConfig } from '../config/index.js';
+import { Entry, Feed, SummaryGenerationJob } from '../db/models.js';
+import {
+  EntryRepository,
+  FeedRepository,
+  SummaryGenerationJobRepository,
+  SummaryRepository,
+} from '../db/repositories/index.js';
+import { getDatabase } from '../db/session.js';
+import { userSettingsService } from './userSettings.js';
+import { aiAutomationResolver } from './aiAutomationResolver.js';
+import { runWithConcurrency } from '../utils/concurrency.js';
+
+const SUMMARY_CONCURRENCY = 2;
+const SUMMARY_MAX_ATTEMPTS = 3;
+const SUMMARY_LEASE_TIMEOUT_MS = 10 * 60 * 1000;
+const SUMMARY_BACKOFF_MS = [5 * 60 * 1000, 30 * 60 * 1000, 6 * 60 * 60 * 1000];
+const SUMMARY_ENQUEUE_SCAN_LIMIT = 30;
+
+function normalizeSummaryLanguage(language?: string | null): string {
+  const value = (language || '').trim().toLowerCase();
+  if (!value) return 'zh';
+  return value;
+}
+
+function resolveSummaryClient() {
+  const settings = userSettingsService.getSettings();
+  const config = getConfig();
+  const useCustom = settings.summary_use_custom === 1;
+  const baseUrl = (useCustom ? settings.summary_base_url : settings.default_ai_base_url) || config.glmBaseUrl || '';
+  const apiKey = (useCustom ? settings.summary_api_key : settings.default_ai_api_key) || config.glmApiKey || '';
+  const modelName = (useCustom ? settings.summary_model_name : settings.default_ai_model) || config.glmModel || '';
+
+  return new AIClient({ baseUrl, apiKey, model: modelName });
+}
+
+function buildSummaryContent(entry: {
+  title?: string | null;
+  author?: string | null;
+  published_at?: string | null;
+  readability_content?: string | null;
+  content?: string | null;
+  summary?: string | null;
+}): string | null {
+  const content = entry.readability_content || entry.content || entry.summary;
+  if (!content) {
+    return null;
+  }
+
+  const metaLines: string[] = [];
+  if (entry.title) metaLines.push(`Title: ${entry.title}`);
+  if (entry.author) metaLines.push(`Author: ${entry.author}`);
+  if (entry.published_at) metaLines.push(`Published: ${entry.published_at}`);
+
+  if (!metaLines.length) {
+    return content;
+  }
+
+  return `Metadata:\n${metaLines.join('\n')}\n\nContent:\n${content}`;
+}
+
+function shouldRunForFeed(feed: Feed | null | undefined): boolean {
+  if (!feed) return false;
+  return aiAutomationResolver.resolve({
+    taskKey: 'entry_summary',
+    scopeType: 'feed',
+    scopeId: feed.id,
+    feedId: feed.id,
+    groupName: feed.group_name,
+  });
+}
+
+export class SummaryGenerationService {
+  private db = getDatabase();
+  private entryRepo = new EntryRepository();
+  private feedRepo = new FeedRepository();
+  private summaryRepo = new SummaryRepository();
+  private jobRepo = new SummaryGenerationJobRepository();
+  private pumpPromise: Promise<void> | null = null;
+  private leaseOwner = `${process.pid}-${randomBytes(4).toString('hex')}`;
+
+  isEnabled(): boolean {
+    return userSettingsService.getSettings().summary_background_enabled === 1;
+  }
+
+  getTargetLanguage(): string {
+    const settings = userSettingsService.getSettings();
+    return normalizeSummaryLanguage(settings.ai_translation_language || settings.language || 'zh');
+  }
+
+  enqueueEntry(entry: Entry, options: { language?: string | null } = {}): void {
+    if (!this.isEnabled() || entry.read === 1) {
+      return;
+    }
+
+    const feed = this.feedRepo.findById(entry.feed_id);
+    if (!shouldRunForFeed(feed)) {
+      return;
+    }
+
+    const language = normalizeSummaryLanguage(options.language || this.getTargetLanguage());
+    if (this.summaryRepo.findByEntryIdAndLanguage(entry.id, language)?.summary) {
+      return;
+    }
+
+    const existingJob = this.jobRepo.findByEntryIdAndLanguage(entry.id, language);
+    if (existingJob?.status === 'queued' || existingJob?.status === 'running') {
+      return;
+    }
+    if (existingJob?.status === 'failed' && existingJob.attempts >= existingJob.max_attempts) {
+      return;
+    }
+
+    if (!buildSummaryContent(entry)) {
+      return;
+    }
+
+    this.jobRepo.createOrReset({
+      entry_id: entry.id,
+      language,
+      max_attempts: SUMMARY_MAX_ATTEMPTS,
+    });
+  }
+
+  ensurePendingJobs(limit: number = SUMMARY_ENQUEUE_SCAN_LIMIT): number {
+    if (!this.isEnabled()) {
+      return 0;
+    }
+
+    const language = this.getTargetLanguage();
+    const rows = this.db.prepare(`
+      SELECT
+        e.id,
+        e.feed_id,
+        e.guid,
+        e.title,
+        e.url,
+        e.title_translations,
+        e.author,
+        e.summary,
+        e.content,
+        e.readability_content,
+        e.categories_json,
+        e.published_at,
+        e.inserted_at,
+        e.read,
+        e.starred,
+        e.enclosure_url,
+        e.enclosure_type,
+        e.enclosure_length,
+        e.duration,
+        e.image_url,
+        e.doi,
+        e.pmid,
+        e.content_extraction_status,
+        e.content_extraction_error,
+        e.content_extracted_at,
+        e.content_source_url
+      FROM entries e
+      LEFT JOIN summaries s
+        ON s.entry_id = e.id AND s.language = ?
+      WHERE e.read = 0
+        AND COALESCE(e.readability_content, e.content, e.summary) IS NOT NULL
+        AND (s.id IS NULL OR COALESCE(s.summary, '') = '')
+      ORDER BY e.inserted_at ASC
+      LIMIT ?
+    `).all(language, limit) as Entry[];
+
+    let enqueued = 0;
+    for (const entry of rows) {
+      const before = this.jobRepo.findByEntryIdAndLanguage(entry.id, language);
+      this.enqueueEntry(entry, { language });
+      const after = this.jobRepo.findByEntryIdAndLanguage(entry.id, language);
+      if (!before && after) {
+        enqueued += 1;
+      }
+    }
+
+    return enqueued;
+  }
+
+  async pumpPendingJobs(limit: number = SUMMARY_CONCURRENCY): Promise<void> {
+    if (!this.isEnabled()) {
+      return;
+    }
+
+    if (this.pumpPromise) {
+      return this.pumpPromise;
+    }
+
+    this.pumpPromise = this.doPump(limit).finally(() => {
+      this.pumpPromise = null;
+    });
+
+    return this.pumpPromise;
+  }
+
+  private async doPump(limit: number): Promise<void> {
+    this.jobRepo.requeueExpiredRunningJobs(SUMMARY_LEASE_TIMEOUT_MS);
+
+    while (true) {
+      const jobs = this.jobRepo.leaseDueJobs(limit, this.leaseOwner);
+      if (jobs.length === 0) {
+        return;
+      }
+
+      await runWithConcurrency(jobs, limit, async (job) => {
+        await this.processJob(job);
+      });
+    }
+  }
+
+  private async processJob(job: SummaryGenerationJob): Promise<void> {
+    const entry = this.entryRepo.findById(job.entry_id);
+    if (!entry) {
+      this.jobRepo.markSucceeded(job.id);
+      return;
+    }
+
+    if (entry.read === 1) {
+      this.jobRepo.markSucceeded(job.id);
+      return;
+    }
+
+    const existing = this.summaryRepo.findByEntryIdAndLanguage(job.entry_id, job.language);
+    if (existing?.summary) {
+      this.jobRepo.markSucceeded(job.id);
+      return;
+    }
+
+    const feed = this.feedRepo.findById(entry.feed_id);
+    if (!shouldRunForFeed(feed)) {
+      this.jobRepo.markSucceeded(job.id);
+      return;
+    }
+
+    const content = buildSummaryContent(entry);
+    if (!content) {
+      this.jobRepo.markSucceeded(job.id);
+      return;
+    }
+
+    try {
+      const client = resolveSummaryClient();
+      const settings = userSettingsService.getSettings();
+      const userPreference = settings.summary_prompt_preference || '';
+      const maxTokens = settings.ai_summary_max_tokens || 0;
+      const summary = await client.summarize(content, {
+        language: job.language,
+        userPreference,
+        maxTokens,
+      });
+
+      this.summaryRepo.upsert({
+        entry_id: job.entry_id,
+        language: job.language,
+        summary,
+      });
+      this.jobRepo.markSucceeded(job.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const nextRunAt = job.attempts < job.max_attempts
+        ? new Date(Date.now() + SUMMARY_BACKOFF_MS[Math.min(job.attempts - 1, SUMMARY_BACKOFF_MS.length - 1)]).toISOString()
+        : null;
+
+      this.jobRepo.markFailed(job.id, message, nextRunAt);
+    }
+  }
+}
+
+export const summaryGenerationService = new SummaryGenerationService();

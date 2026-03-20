@@ -1,5 +1,6 @@
 import { computed, nextTick, ref, watch, type Ref } from 'vue'
 import { useFeedStore } from '../stores/feedStore'
+import { useTagsStore } from '../stores/tagsStore'
 import { useArticleTranslation } from './useArticleTranslation'
 import { useTitleTranslation } from './useTitleTranslation'
 import { useAIAutomation } from './useAIAutomation'
@@ -45,6 +46,7 @@ export function useEntryAI(
   { notify, t }: UseEntryAIOptions,
 ) {
   const store = useFeedStore()
+  const tagsStore = useTagsStore()
   const { automationRevision, isEntryTaskEnabled } = useAIAutomation()
   const summaryText = ref('')
   const summaryLoading = ref(false)
@@ -193,7 +195,10 @@ export function useEntryAI(
           }
         }
       }
-      if (!selectedEntry.read) await store.toggleEntryState(selectedEntry, { read: true })
+      if (!selectedEntry.read) {
+        await store.toggleEntryState(selectedEntry, { read: true })
+        tagsStore.updateEntryState(selectedEntry.id, { read: true })
+      }
     },
     { immediate: true },
   )

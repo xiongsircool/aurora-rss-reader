@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import AppToggle from '../common/AppToggle.vue'
 import type { LocalFeatureConfig } from '../../composables/useSettingsModal'
 import {
   MIN_AUTO_TITLE_TRANSLATIONS,
@@ -11,14 +13,15 @@ const autoTitleTranslationLimit = defineModel<number>('autoTitleTranslationLimit
 const summaryPromptPreference = defineModel<string>('summaryPromptPreference', { required: true })
 const aiSummaryMaxTokens = defineModel<number>('aiSummaryMaxTokens', { required: true })
 const translationPromptPreference = defineModel<string>('translationPromptPreference', { required: true })
-const scopeSummaryEnabled = defineModel<boolean>('scopeSummaryEnabled', { required: true })
-const scopeSummaryAutoGenerate = defineModel<boolean>('scopeSummaryAutoGenerate', { required: true })
+const summaryBackgroundEnabledModel = defineModel<boolean>('summaryBackgroundEnabled', { default: false })
+const scopeSummaryEnabledModel = defineModel<boolean>('scopeSummaryEnabled', { default: false })
+const scopeSummaryAutoGenerateModel = defineModel<boolean>('scopeSummaryAutoGenerate', { default: false })
 const scopeSummaryAutoIntervalMinutes = defineModel<number>('scopeSummaryAutoIntervalMinutes', { required: true })
 const scopeSummaryDefaultWindow = defineModel<'24h' | '3d' | '7d' | '30d'>('scopeSummaryDefaultWindow', { required: true })
 const scopeSummaryMaxEntries = defineModel<number>('scopeSummaryMaxEntries', { required: true })
 const scopeSummaryChunkSize = defineModel<number>('scopeSummaryChunkSize', { required: true })
 const scopeSummaryModelName = defineModel<string>('scopeSummaryModelName', { required: true })
-const scopeSummaryUseCustom = defineModel<boolean>('scopeSummaryUseCustom', { required: true })
+const scopeSummaryUseCustomModel = defineModel<boolean>('scopeSummaryUseCustom', { default: false })
 const scopeSummaryBaseUrl = defineModel<string>('scopeSummaryBaseUrl', { required: true })
 const scopeSummaryApiKey = defineModel<string>('scopeSummaryApiKey', { required: true })
 
@@ -28,6 +31,26 @@ const limitBounds = {
   min: MIN_AUTO_TITLE_TRANSLATIONS,
   max: MAX_AUTO_TITLE_TRANSLATIONS
 }
+
+const summaryBackgroundEnabled = computed({
+  get: () => !!summaryBackgroundEnabledModel.value,
+  set: (value: boolean) => { summaryBackgroundEnabledModel.value = value },
+})
+
+const scopeSummaryEnabled = computed({
+  get: () => !!scopeSummaryEnabledModel.value,
+  set: (value: boolean) => { scopeSummaryEnabledModel.value = value },
+})
+
+const scopeSummaryAutoGenerate = computed({
+  get: () => !!scopeSummaryAutoGenerateModel.value,
+  set: (value: boolean) => { scopeSummaryAutoGenerateModel.value = value },
+})
+
+const scopeSummaryUseCustom = computed({
+  get: () => !!scopeSummaryUseCustomModel.value,
+  set: (value: boolean) => { scopeSummaryUseCustomModel.value = value },
+})
 
 </script>
 
@@ -147,29 +170,32 @@ const limitBounds = {
       <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.translationPromptPreferenceHint') }}</p>
     </div>
 
+    <div class="mb-4 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)]">
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <div>
+          <div class="text-sm font-semibold text-[var(--text-primary)]">{{ t('settings.summaryBackgroundTitle') }}</div>
+          <div class="text-xs text-[var(--text-secondary)] mt-1">{{ t('settings.summaryBackgroundHint') }}</div>
+        </div>
+        <AppToggle v-model="summaryBackgroundEnabled" />
+      </div>
+      <p class="text-xs leading-5 text-[var(--text-secondary)]">
+        {{ t('settings.summaryBackgroundDescription') }}
+      </p>
+    </div>
+
     <div class="mt-5 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)]">
       <div class="flex items-center justify-between gap-3 mb-2">
         <div>
           <div class="text-sm font-semibold text-[var(--text-primary)]">{{ t('settings.scopeSummaryTitle') }}</div>
           <div class="text-xs text-[var(--text-secondary)] mt-1">{{ t('settings.scopeSummaryHint') }}</div>
         </div>
-        <label class="inline-flex items-center cursor-pointer">
-          <input v-model="scopeSummaryEnabled" type="checkbox" class="sr-only peer">
-          <div class="relative w-11 h-6 bg-[var(--border-color)] rounded-full peer peer-checked:bg-orange-500 transition-colors">
-            <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
-          </div>
-        </label>
+        <AppToggle v-model="scopeSummaryEnabled" />
       </div>
 
       <div class="space-y-4 mt-3">
         <div class="flex items-center justify-between gap-2">
           <label class="text-sm text-[var(--text-primary)]">{{ t('settings.scopeSummaryAutoGenerate') }}</label>
-          <label class="inline-flex items-center cursor-pointer">
-            <input v-model="scopeSummaryAutoGenerate" type="checkbox" class="sr-only peer" :disabled="!scopeSummaryEnabled">
-            <div class="relative w-10 h-5 bg-[var(--border-color)] rounded-full peer peer-checked:bg-orange-500 transition-colors peer-disabled:opacity-50">
-              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
-            </div>
-          </label>
+          <AppToggle v-model="scopeSummaryAutoGenerate" :disabled="!scopeSummaryEnabled" size="sm" />
         </div>
 
         <div>

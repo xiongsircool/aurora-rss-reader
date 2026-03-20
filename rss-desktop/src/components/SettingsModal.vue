@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch, ref, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import { computed, watch, ref, onMounted, onUnmounted, defineAsyncComponent, onErrorCaptured } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import { getApiErrorMessage } from '../api/errors'
@@ -107,16 +107,18 @@ const autoTitleTranslationLimit = ref(settingsStore.settings.max_auto_title_tran
 const summaryPromptPreference = ref(settingsStore.settings.summary_prompt_preference)
 const aiSummaryMaxTokens = ref(settingsStore.settings.ai_summary_max_tokens)
 const translationPromptPreference = ref(settingsStore.settings.translation_prompt_preference)
-const scopeSummaryEnabled = ref(settingsStore.settings.scope_summary_enabled)
-const scopeSummaryAutoGenerate = ref(settingsStore.settings.scope_summary_auto_generate)
+const summaryBackgroundEnabled = ref(!!settingsStore.settings.summary_background_enabled)
+const scopeSummaryEnabled = ref(!!settingsStore.settings.scope_summary_enabled)
+const scopeSummaryAutoGenerate = ref(!!settingsStore.settings.scope_summary_auto_generate)
 const scopeSummaryAutoIntervalMinutes = ref(settingsStore.settings.scope_summary_auto_interval_minutes)
 const scopeSummaryDefaultWindow = ref<'24h' | '3d' | '7d' | '30d'>(settingsStore.settings.scope_summary_default_window)
 const scopeSummaryMaxEntries = ref(settingsStore.settings.scope_summary_max_entries)
 const scopeSummaryChunkSize = ref(settingsStore.settings.scope_summary_chunk_size)
 const scopeSummaryModelName = ref(settingsStore.settings.scope_summary_model_name)
-const scopeSummaryUseCustom = ref(settingsStore.settings.scope_summary_use_custom)
+const scopeSummaryUseCustom = ref(!!settingsStore.settings.scope_summary_use_custom)
 const scopeSummaryBaseUrl = ref(settingsStore.settings.scope_summary_base_url)
 const scopeSummaryApiKey = ref(settingsStore.settings.scope_summary_api_key)
+const settingsRenderError = ref<string | null>(null)
 
 const markAsReadRange = computed({
   get: () => settingsStore.settings.mark_as_read_range,
@@ -167,6 +169,7 @@ const automationScopeBadge = computed(() => {
 // Watch modal visibility
 watch(() => props.show, async (show) => {
   if (show) {
+    settingsRenderError.value = null
     await initializeSettings(
       rsshub.fetchRSSHubUrl,
       () => {
@@ -184,14 +187,15 @@ watch(() => props.show, async (show) => {
     summaryPromptPreference.value = settingsStore.settings.summary_prompt_preference
     aiSummaryMaxTokens.value = settingsStore.settings.ai_summary_max_tokens
     translationPromptPreference.value = settingsStore.settings.translation_prompt_preference
-    scopeSummaryEnabled.value = settingsStore.settings.scope_summary_enabled
-    scopeSummaryAutoGenerate.value = settingsStore.settings.scope_summary_auto_generate
+    summaryBackgroundEnabled.value = !!settingsStore.settings.summary_background_enabled
+    scopeSummaryEnabled.value = !!settingsStore.settings.scope_summary_enabled
+    scopeSummaryAutoGenerate.value = !!settingsStore.settings.scope_summary_auto_generate
     scopeSummaryAutoIntervalMinutes.value = settingsStore.settings.scope_summary_auto_interval_minutes
     scopeSummaryDefaultWindow.value = settingsStore.settings.scope_summary_default_window
     scopeSummaryMaxEntries.value = settingsStore.settings.scope_summary_max_entries
     scopeSummaryChunkSize.value = settingsStore.settings.scope_summary_chunk_size
     scopeSummaryModelName.value = settingsStore.settings.scope_summary_model_name
-    scopeSummaryUseCustom.value = settingsStore.settings.scope_summary_use_custom
+    scopeSummaryUseCustom.value = !!settingsStore.settings.scope_summary_use_custom
     scopeSummaryBaseUrl.value = settingsStore.settings.scope_summary_base_url
     scopeSummaryApiKey.value = settingsStore.settings.scope_summary_api_key
     syncFromStore(props.initialAutomationTarget ?? null)
@@ -209,6 +213,13 @@ watch(() => props.show, async (show) => {
     // Unlock body scroll
     document.body.style.overflow = ''
   }
+})
+
+onErrorCaptured((error, _instance, info) => {
+  const message = error instanceof Error ? error.message : String(error)
+  settingsRenderError.value = `${message}${info ? ` (${info})` : ''}`
+  console.error('[SettingsModal] render error:', error, info)
+  return false
 })
 
 watch(() => props.initialAutomationTarget, (target) => {
@@ -278,6 +289,7 @@ async function saveSettings() {
       ai_summary_max_tokens: aiSummaryMaxTokens.value,
       summary_prompt_preference: summaryPromptPreference.value,
       translation_prompt_preference: translationPromptPreference.value,
+      summary_background_enabled: summaryBackgroundEnabled.value,
       scope_summary_enabled: scopeSummaryEnabled.value,
       scope_summary_auto_generate: scopeSummaryAutoGenerate.value,
       scope_summary_auto_interval_minutes: normalizedAutoInterval,
@@ -389,6 +401,12 @@ async function saveSettings() {
           <div class="flex-1 overflow-y-auto p-6 md:p-8 scroll-smooth">
             <Transition name="fade" mode="out-in">
               <div :key="activeCategory" class="w-full max-w-[min(100%,900px)] mx-auto space-y-6 min-w-0">
+                <div
+                  v-if="settingsRenderError"
+                  class="p-4 rounded-xl border border-red-500/30 bg-red-500/8 text-red-600 dark:text-red-400 text-sm whitespace-pre-wrap break-words"
+                >
+                  {{ t('settings.renderErrorPrefix') }} {{ settingsRenderError }}
+                </div>
                 
                 <!-- General Section -->
                 <div v-if="activeCategory === 'general'" class="space-y-6">
@@ -482,6 +500,7 @@ async function saveSettings() {
                       v-model:summaryPromptPreference="summaryPromptPreference"
                       v-model:aiSummaryMaxTokens="aiSummaryMaxTokens"
                       v-model:translationPromptPreference="translationPromptPreference"
+                      v-model:summaryBackgroundEnabled="summaryBackgroundEnabled"
                       v-model:scopeSummaryEnabled="scopeSummaryEnabled"
                       v-model:scopeSummaryAutoGenerate="scopeSummaryAutoGenerate"
                       v-model:scopeSummaryAutoIntervalMinutes="scopeSummaryAutoIntervalMinutes"

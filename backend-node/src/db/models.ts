@@ -185,6 +185,23 @@ export interface ArticleExtractionJob {
   updated_at: string;
 }
 
+export type SummaryGenerationJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface SummaryGenerationJob {
+  id: string;
+  entry_id: string;
+  language: string;
+  status: SummaryGenerationJobStatus;
+  attempts: number;
+  max_attempts: number;
+  next_run_at: string | null;
+  leased_at: string | null;
+  lease_owner: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UserSettings {
   id: number; // Always 1 (singleton)
   rsshub_url: string;
@@ -227,6 +244,7 @@ export interface UserSettings {
   translation_prompt_preference: string; // User custom preference for translation prompts
   ai_prompt_preference?: string; // Legacy prompt preference kept for migration compatibility
   language: string; // 'zh' | 'en' | 'ja' | 'ko'
+  summary_background_enabled: number; // SQLite boolean (0/1)
   outbound_proxy_mode: 'system' | 'custom' | 'off';
   outbound_proxy_url: string;
   embedding_model: string;

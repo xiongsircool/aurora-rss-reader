@@ -25,12 +25,14 @@ const taskOptions: Array<{ key: LocalAutomationRule['task_key']; labelKey: strin
 ]
 
 function setRuleMode(taskKey: LocalAutomationRule['task_key'], mode: LocalAutomationRule['mode']) {
-  const next = rules.value.map((rule) => rule.task_key === taskKey ? { ...rule, mode } : rule)
+  const currentRules = Array.isArray(rules.value) ? rules.value : []
+  const next = currentRules.map((rule) => rule.task_key === taskKey ? { ...rule, mode } : rule)
   rules.value = next
 }
 
 function getRuleMode(taskKey: LocalAutomationRule['task_key']) {
-  return rules.value.find((rule) => rule.task_key === taskKey)?.mode || (props.allowInherit ? 'inherit' : 'disabled')
+  const currentRules = Array.isArray(rules.value) ? rules.value : []
+  return currentRules.find((rule) => rule.task_key === taskKey)?.mode || (props.allowInherit ? 'inherit' : 'disabled')
 }
 </script>
 

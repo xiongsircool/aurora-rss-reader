@@ -10,6 +10,7 @@ import { UserSettingsService } from './userSettings.js';
 import { syncEntriesToVectorDB } from './vector.js';
 import { runAutoTaggingBatch } from './autoTagging.js';
 import { articleExtractionService } from './articleExtractionService.js';
+import { summaryGenerationService } from './summaryGenerationService.js';
 import { runWithConcurrency } from '../utils/concurrency.js';
 
 const FEED_REFRESH_CONCURRENCY = 4;
@@ -43,6 +44,8 @@ export class SchedulerService {
 
     console.log('✅ Scheduler started (runs every 5 minutes)');
     void articleExtractionService.pumpPendingJobs(ARTICLE_EXTRACTION_CONCURRENCY);
+    summaryGenerationService.ensurePendingJobs();
+    void summaryGenerationService.pumpPendingJobs();
   }
 
   /**
@@ -72,12 +75,13 @@ export class SchedulerService {
       // Check if auto-refresh is enabled
       const settings = this.settingsService.getSettings();
       if (!settings.auto_refresh) {
-        console.log('⏸️  Auto-refresh is disabled, skipping');
-        return;
+        console.log('⏸️  Auto-refresh is disabled, skipping feed refresh');
       }
 
       const now = new Date();
-      const feeds = this.feedRepo.findAll().filter(feed => this.shouldRefreshFeed(feed, now));
+      const feeds = settings.auto_refresh
+        ? this.feedRepo.findAll().filter(feed => this.shouldRefreshFeed(feed, now))
+        : [];
       let refreshedCount = 0;
       let errorCount = 0;
 
@@ -123,6 +127,13 @@ export class SchedulerService {
         }
       } catch (e) {
         console.error('❌ Auto tagging error:', e);
+      }
+
+      try {
+        summaryGenerationService.ensurePendingJobs();
+        await summaryGenerationService.pumpPendingJobs();
+      } catch (e) {
+        console.error('❌ Summary background generation error:', e);
       }
 
     } catch (error) {

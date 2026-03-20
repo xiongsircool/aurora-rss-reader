@@ -88,6 +88,18 @@ function selectModel(model: string) {
   globalConfig.value.model_name = model
 }
 
+function setCurrentServiceUseCustom(enabled: boolean) {
+  const config = currentServiceConfig.value
+  if (!config) return
+  config.use_custom = enabled
+}
+
+function toggleServiceApiKeyVisibility() {
+  const key = activeTab.value
+  if (!(key in showServiceApiKey)) return
+  showServiceApiKey[key] = !showServiceApiKey[key]
+}
+
 function isServiceConfigured(tab: ServiceTab): boolean {
   if (tab === 'mcp') return props.mcpTestResult?.success ?? false
   const config = {
@@ -423,7 +435,7 @@ function isServiceConfigured(tab: ServiceTab): boolean {
               <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
                 <button
                   type="button"
-                  @click="currentServiceConfig && (currentServiceConfig.use_custom = false)"
+                  @click="setCurrentServiceUseCustom(false)"
                   class="flex-1 min-w-0 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all border-none cursor-pointer whitespace-normal break-words text-center"
                   :class="currentServiceConfig && !currentServiceConfig.use_custom
                     ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm'
@@ -434,7 +446,7 @@ function isServiceConfigured(tab: ServiceTab): boolean {
                 </button>
                 <button
                   type="button"
-                  @click="currentServiceConfig && (currentServiceConfig.use_custom = true)"
+                  @click="setCurrentServiceUseCustom(true)"
                   class="flex-1 min-w-0 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all border-none cursor-pointer whitespace-normal break-words text-center"
                   :class="currentServiceConfig && currentServiceConfig.use_custom
                     ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 shadow-sm'
@@ -475,7 +487,7 @@ function isServiceConfigured(tab: ServiceTab): boolean {
                   />
                   <button
                     type="button"
-                    @click="showServiceApiKey[activeTab] = !showServiceApiKey[activeTab]"
+                    @click="toggleServiceApiKeyVisibility"
                     class="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] bg-transparent border-none cursor-pointer transition-colors"
                   >
                     <span :class="showServiceApiKey[activeTab] ? 'i-carbon-view-off' : 'i-carbon-view'" class="text-lg"></span>

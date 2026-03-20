@@ -649,7 +649,9 @@ function handleAddToBookmarkGroup(entry: Entry) {
 }
 
 async function handleToggleReadFromList(entry: Entry) {
-  await store.toggleEntryState(entry, { read: !entry.read })
+  const newReadState = !entry.read
+  await store.toggleEntryState(entry, { read: newReadState })
+  tagsStore.updateEntryState(entry.id, { read: newReadState })
 }
 
 function handleCopyLink(entry: Entry) {

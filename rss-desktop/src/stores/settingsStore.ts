@@ -26,6 +26,7 @@ export interface AppSettings {
   ai_summary_max_tokens: number // 0 = unlimited
   summary_prompt_preference: string
   translation_prompt_preference: string
+  summary_background_enabled: boolean
   outbound_proxy_mode: 'system' | 'custom' | 'off'
   outbound_proxy_url: string
   scope_summary_enabled: boolean
@@ -58,6 +59,7 @@ export const useSettingsStore = defineStore('settings', () => {
     ai_summary_max_tokens: 4096,
     summary_prompt_preference: '',
     translation_prompt_preference: '',
+    summary_background_enabled: false,
     outbound_proxy_mode: 'system',
     outbound_proxy_url: '',
     scope_summary_enabled: true,

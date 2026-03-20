@@ -7,6 +7,7 @@ import { EntryRepository, FeedRepository, FetchLogRepository } from '../db/repos
 import { articleExtractionService } from './articleExtractionService.js';
 import { FeedIngestService } from './feedIngestService.js';
 import { normalizeFeedItem, selectFeedIcon, shouldExtractArticleContent } from './feedNormalizer.js';
+import { summaryGenerationService } from './summaryGenerationService.js';
 import { runWithConcurrency } from '../utils/concurrency.js';
 
 const FEED_REFRESH_CONCURRENCY = 4;
@@ -109,6 +110,8 @@ export async function refreshFeed(feedId: string): Promise<FetchResult> {
         articleExtractionService.enqueueEntry(entry);
       }
 
+      summaryGenerationService.enqueueEntry(entry);
+
       newItemCount += 1;
     }
 
@@ -120,6 +123,7 @@ export async function refreshFeed(feedId: string): Promise<FetchResult> {
     });
 
     void articleExtractionService.pumpPendingJobs();
+    void summaryGenerationService.pumpPendingJobs();
 
     return {
       success: true,

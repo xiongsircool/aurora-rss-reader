@@ -81,6 +81,7 @@ export class UserSettingsService {
           translation_api_key, translation_base_url, translation_model_name,
           ai_auto_summary, ai_auto_title_translation, ai_title_display_mode,
           ai_translation_language, summary_prompt_preference, translation_prompt_preference,
+          summary_background_enabled,
           outbound_proxy_mode, outbound_proxy_url, scope_summary_enabled,
           scope_summary_auto_generate, scope_summary_auto_interval_minutes,
           scope_summary_default_window, scope_summary_max_entries, scope_summary_chunk_size,
@@ -89,7 +90,7 @@ export class UserSettingsService {
           1, 'https://rsshub.app', 720, 1, 1, 50, 1, 'system', 1, '30d', 'inserted_at',
           10, 'current', 'docked', 'compact', '', 'https://open.bigmodel.cn/api/paas/v4/', 'glm-4-flash',
           '', 'https://open.bigmodel.cn/api/paas/v4/', 'glm-4-flash', 0, 0, 'original-first',
-          'zh', '', '', 'system', '', 1, 1, 60, '24h', 100, 10, ?, ?
+          'zh', '', '', 0, 'system', '', 1, 1, 60, '24h', 100, 10, ?, ?
         )
       `).run(now, now);
 

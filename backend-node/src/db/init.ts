@@ -208,6 +208,14 @@ function runMigrations(): void {
   }
 
   tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasSummaryBackgroundEnabled = tableInfo.some((col) => col.name === 'summary_background_enabled');
+  if (!hasSummaryBackgroundEnabled) {
+    console.log('Running migration: Adding summary_background_enabled column to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN summary_background_enabled INTEGER NOT NULL DEFAULT 0`);
+    console.log('Migration completed: summary_background_enabled column added');
+  }
+
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
   const scopeSummaryColumns: Array<{ name: string; sql: string }> = [
     { name: 'scope_summary_enabled', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_enabled INTEGER NOT NULL DEFAULT 1` },
     { name: 'scope_summary_auto_generate', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_auto_generate INTEGER NOT NULL DEFAULT 1` },
@@ -430,6 +438,28 @@ export function initDatabase(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_article_extraction_jobs_status_next_run_at ON article_extraction_jobs(status, next_run_at)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_article_extraction_jobs_lease ON article_extraction_jobs(status, leased_at)`);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS summary_generation_jobs (
+      id TEXT PRIMARY KEY,
+      entry_id TEXT NOT NULL,
+      language TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 3,
+      next_run_at TEXT,
+      leased_at TEXT,
+      lease_owner TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE,
+      UNIQUE(entry_id, language)
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_summary_generation_jobs_status_next_run_at ON summary_generation_jobs(status, next_run_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_summary_generation_jobs_lease ON summary_generation_jobs(status, leased_at)`);
+
   // Create user_settings table (singleton with id=1)
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_settings (
@@ -467,6 +497,7 @@ export function initDatabase(): void {
       ai_title_display_mode TEXT NOT NULL DEFAULT 'original-first',
       ai_translation_language TEXT NOT NULL DEFAULT 'zh',
       language TEXT NOT NULL DEFAULT 'zh',
+      summary_background_enabled INTEGER NOT NULL DEFAULT 0,
       outbound_proxy_mode TEXT NOT NULL DEFAULT 'system',
       outbound_proxy_url TEXT NOT NULL DEFAULT '',
       embedding_model TEXT NOT NULL DEFAULT 'netease-youdao/bce-embedding-base_v1',

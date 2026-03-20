@@ -42,6 +42,17 @@ type DigestEntryRow = {
     group_name?: string | null;
 };
 
+/**
+ * Normalize entry from database row (convert 0/1 to boolean)
+ */
+function normalizeEntry(row: any) {
+    return {
+        ...row,
+        read: !!row.read,
+        starred: !!row.starred,
+    };
+}
+
 type DigestSummaryRecord = {
     id: string;
     tag_id: string;
@@ -909,7 +920,8 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
 
         const rows = db.prepare(sql).all(...params) as any[];
         const hasMore = rows.length > safeLimit;
-        const items = hasMore ? rows.slice(0, safeLimit) : rows;
+        const rawItems = hasMore ? rows.slice(0, safeLimit) : rows;
+        const items = rawItems.map(normalizeEntry);
         const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].inserted_at : null;
 
         return { items, nextCursor, hasMore };
