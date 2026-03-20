@@ -167,6 +167,19 @@ function decodeCursor(cursor: string): { t: string; id: string } {
   return parsed;
 }
 
+function encodeSearchCursor(offset: number): string {
+  return Buffer.from(JSON.stringify({ o: offset }), "utf-8").toString("base64url");
+}
+
+function decodeSearchCursor(cursor: string): number {
+  const raw = Buffer.from(cursor, "base64url").toString("utf-8");
+  const parsed = JSON.parse(raw) as { o?: number };
+  if (!Number.isInteger(parsed?.o) || (parsed.o ?? 0) < 0) {
+    throw new Error("Invalid search cursor");
+  }
+  return parsed.o ?? 0;
+}
+
 function chunkArray<T>(items: T[], size: number): T[][] {
   if (items.length === 0) return [];
   const chunks: T[][] = [];
@@ -515,6 +528,7 @@ async function searchEntries(args: {
   feed_id?: string;
   group_name?: string;
   limit?: number;
+  cursor?: string;
 }): Promise<ToolResult> {
   try {
     const query = args.query.trim();
@@ -522,6 +536,8 @@ async function searchEntries(args: {
 
     const mode = args.mode ?? "hybrid";
     const limit = Math.max(1, Math.min(args.limit ?? 10, 50));
+    const offset = args.cursor ? decodeSearchCursor(args.cursor) : 0;
+    const fetchTarget = Math.max(limit + offset + 5, (limit + offset) * 2);
     const results: Array<{
       id: string;
       title: string | null;
@@ -568,7 +584,7 @@ async function searchEntries(args: {
           sqlParams.push(args.group_name);
         }
         sql += " ORDER BY rank ASC, e.published_at DESC LIMIT ?";
-        sqlParams.push(limit);
+        sqlParams.push(fetchTarget);
 
         const keywordRows = db.prepare(sql).all(...sqlParams) as Array<any>;
         const ranks = keywordRows.map((item) => item.rank).filter((item) => Number.isFinite(item));
@@ -616,7 +632,7 @@ async function searchEntries(args: {
           sqlParams.push(args.group_name);
         }
         sql += " ORDER BY e.published_at DESC, e.inserted_at DESC LIMIT ?";
-        sqlParams.push(limit);
+        sqlParams.push(fetchTarget);
 
         const keywordRows = db.prepare(sql).all(...sqlParams) as Array<any>;
         for (const row of keywordRows) {
@@ -639,7 +655,7 @@ async function searchEntries(args: {
 
     if (mode === "semantic" || mode === "hybrid") {
       try {
-        const vectorResults = await searchVectors(query, limit);
+        const vectorResults = await searchVectors(query, fetchTarget);
         for (const item of vectorResults) {
           if (results.some((row) => row.id === item.id)) continue;
 
@@ -682,12 +698,25 @@ async function searchEntries(args: {
       }
     }
 
-    const uniqueResults = results.sort((a, b) => b.score - a.score).slice(0, limit);
+    const uniqueResults = results.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aTime = a.published_at || a.inserted_at || "";
+      const bTime = b.published_at || b.inserted_at || "";
+      if (aTime !== bTime) return bTime.localeCompare(aTime);
+      return b.id.localeCompare(a.id);
+    });
+    const pageResults = uniqueResults.slice(offset, offset + limit);
+    const hasMore = uniqueResults.length > offset + limit;
+    const nextCursor = hasMore ? encodeSearchCursor(offset + limit) : null;
+
     return ok({
       query,
       mode,
       total: uniqueResults.length,
-      results: uniqueResults.map((item) => ({
+      returned: pageResults.length,
+      has_more: hasMore,
+      next_cursor: nextCursor,
+      results: pageResults.map((item) => ({
         ...item,
         content: item.content ? item.content.slice(0, 300) : "",
       })),
@@ -1091,13 +1120,14 @@ function registerEntryTools(server: McpServer) {
     "search_entries",
     {
       title: "Search Entries",
-      description: "Search entries using keyword, semantic, or hybrid retrieval.",
+      description: "Search entries using keyword, semantic, or hybrid retrieval. Supports opaque cursor pagination for candidate discovery.",
       inputSchema: {
         query: z.string().min(1).describe("Search query"),
         mode: z.enum(["keyword", "semantic", "hybrid"]).default("hybrid").describe("Search mode"),
         "feed_id": z.string().optional().describe("Restrict to a feed"),
         "group_name": z.string().optional().describe("Restrict to a group"),
         limit: z.number().int().min(1).max(50).default(10).describe("Result count"),
+        cursor: z.string().optional().describe("Opaque pagination cursor from previous search result"),
       },
     },
     async (args) => searchEntries(args)
@@ -1365,7 +1395,7 @@ function registerAITools(server: McpServer) {
     "generate_scope_summary",
     {
       title: "Generate Scope Summary",
-      description: "Generate a scope summary for a feed or group.",
+      description: "Generate a scope summary for a feed or group. Agent guidance: if you have enough capability, first discover the relevant article list for the requested scope and time window yourself; when the result set is large, page through it in batches, record the important candidates, read and compare the source material, and then produce a higher-quality summary focused on the user's chosen theme. When needed, follow original links for deeper reading before writing the final summary.",
       inputSchema: {
         "scope_type": z.enum(["feed", "group"]).describe("Scope type"),
         "scope_id": z.string().describe("Feed ID or group name"),
