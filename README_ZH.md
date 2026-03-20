@@ -124,26 +124,26 @@ chmod +x start.sh
 #### 🌟 当前版本界面亮点
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/MCP功能升级.png" alt="专门的 MCP 配置管理界面" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <img src="images/v.0.1.9/MCP功能升级.png" alt="专门的 MCP 配置管理界面" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
     <figcaption>MCP 独立配置页</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/增强了摘要和翻译分开设置偏好.png" alt="摘要和翻译偏好拆分设置" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>摘要与翻译偏好拆分设置</figcaption>
+    <img src="images/v.0.1.9/增加支持后台summary.png" alt="后台自动摘要队列" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>后台自动摘要队列</figcaption>
   </figure>
 </div>
 
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/支持单个订阅和分组的日报功能.png" alt="支持单个订阅和分组的日报功能" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <img src="images/v.0.1.9/支持单个订阅和分组的日报功能.png" alt="支持单个订阅和分组的日报功能" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
     <figcaption>单订阅与分组日报</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/支持代理网络的配置.png" alt="支持代理网络的配置" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>代理网络配置</figcaption>
+    <img src="images/v.0.1.9/增加rsshub预选.png" alt="RSSHub 预选配置" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>RSSHub 预选配置</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/AI摘要支持makedown渲染.png" alt="AI 摘要支持 Markdown 渲染" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <img src="images/v.0.1.9/AI摘要支持makedown渲染.png" alt="AI 摘要支持 Markdown 渲染" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
     <figcaption>AI 摘要 Markdown 渲染</figcaption>
   </figure>
 </div>

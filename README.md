@@ -71,26 +71,26 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 ### Current UI Highlights
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/MCP功能升级.png" alt="Dedicated MCP settings" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <img src="images/v.0.1.9/MCP功能升级.png" alt="Dedicated MCP settings" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
     <figcaption>Dedicated MCP Settings</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/增强了摘要和翻译分开设置偏好.png" alt="Summary and translation preferences" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Summary & Translation Preferences</figcaption>
+    <img src="images/v.0.1.9/增加支持后台summary.png" alt="Background summary queue" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Background Summary Queue</figcaption>
   </figure>
 </div>
 
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/支持单个订阅和分组的日报功能.png" alt="Scope summary and digest" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <img src="images/v.0.1.9/支持单个订阅和分组的日报功能.png" alt="Scope summary and digest" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
     <figcaption>Scope Summary & Digest</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/支持代理网络的配置.png" alt="Proxy configuration" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Proxy Configuration</figcaption>
+    <img src="images/v.0.1.9/增加rsshub预选.png" alt="RSSHub preset selection" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>RSSHub Preset Selection</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v.0.1.8/AI摘要支持makedown渲染.png" alt="Markdown summary rendering" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <img src="images/v.0.1.9/AI摘要支持makedown渲染.png" alt="Markdown summary rendering" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
     <figcaption>Markdown Summary Rendering</figcaption>
   </figure>
 </div>
