@@ -27,12 +27,19 @@ async function main() {
     }, {
       instructions: `Aurora RSS Reader - AI 可访问的 RSS 订阅管理服务
 
-可用工具:
-- query_entries: 查询文章（支持状态、时间、关键词过滤）
-- search: 智能搜索（关键词或语义）
-- manage_feeds: 订阅管理（增删改查刷新）
-- batch_update: 批量操作（已读、收藏）
-- get_overview: 获取统计概览`
+推荐工具:
+- list_feeds / get_feed / create_feed / update_feed / delete_feed / refresh_feed
+- list_entries / get_entry / update_entry / batch_update_entries
+- search_entries (keyword / semantic / hybrid)
+- get_reader_overview
+- get_summary_queue_status
+
+兼容别名:
+- query_entries
+- search
+- manage_feeds
+- batch_update
+- get_overview`
     });
 
     // Register all tools

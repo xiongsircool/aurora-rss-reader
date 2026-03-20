@@ -22,29 +22,33 @@ Aurora RSS Reader MCP 服务 - 让 AI 管理您的 RSS 订阅
 
 ## 可用功能
 
-1. **query_entries** - 查询文章
-   - 按状态（未读/已读/收藏）、时间、订阅源过滤
-   - 支持关键词搜索
-   - 可返回文章内容
+1. **list_feeds / get_feed / create_feed / update_feed / delete_feed / refresh_feed**
+   - 订阅管理工具，按资源拆分，适合智能体精确调用
 
-2. **search** - 智能搜索
-   - keyword: 关键词匹配
-   - semantic: 语义相似性搜索（需配置 embedding）
+2. **list_entries / get_entry / update_entry / batch_update_entries**
+   - 文章查询与状态更新
+   - 支持 date_range + time_field + cursor
 
-3. **manage_feeds** - 订阅管理
-   - 查看、添加、更新、删除、刷新订阅
+3. **search_entries**
+   - 支持 keyword / semantic / hybrid 三种检索模式
 
-4. **batch_update** - 批量操作
-   - 标记已读/未读、收藏
+4. **get_reader_overview**
+   - 获取全局、订阅、分组统计概览
 
-5. **get_overview** - 获取概览统计
+5. **get_summary_queue_status**
+   - 查看后台摘要队列、扫描范围与运行状态
+
+## 兼容说明
+
+- 仍保留 query_entries / search / manage_feeds / batch_update / get_overview 作为兼容别名
+- 新调用请优先使用拆分后的资源型工具
 
 ## 使用示例
 
-- "帮我看看今天有什么新闻" → query_entries(dateRange="today")
-- "搜索关于 AI 的文章" → search(query="AI", type="semantic")  
-- "把所有未读标记为已读" → batch_update(action="mark_read", filter={status="unread"})
-- "订阅这个网站" → manage_feeds(action="add", url="...")
+- "帮我看看最近 24 小时 AI 分组有什么新闻" → list_entries(group_name="AI", date_range="24h")
+- "搜索关于 AI 的文章" → search_entries(query="AI", mode="hybrid")
+- "把最近 7 天这个分组的未读标记为已读，先预览" → batch_update_entries(action="mark_read", group_name="...", status="unread", date_range="7d", dry_run=true)
+- "订阅这个网站" → create_feed(url="...")
 `.trim()
     });
 
