@@ -154,6 +154,22 @@ function parseBoolean(value: unknown): boolean {
   return value === true || value === "true" || value === "1";
 }
 
+function resolveMcpDateRange(dateRange?: string): string {
+  if (dateRange && dateRange.trim()) {
+    return dateRange.trim();
+  }
+  const settings = userSettingsService.getSettings();
+  return settings.default_date_range || "30d";
+}
+
+function resolveMcpTimeField(timeField?: string): "published_at" | "inserted_at" {
+  if (timeField) {
+    return normalizeTimeField(timeField);
+  }
+  const settings = userSettingsService.getSettings();
+  return normalizeTimeField(settings.time_field);
+}
+
 function encodeCursor(timeIso: string, id: string): string {
   return Buffer.from(JSON.stringify({ t: timeIso, id }), "utf-8").toString("base64url");
 }
@@ -416,6 +432,8 @@ function buildEntryFilters(options: {
   const where: string[] = [];
   const params: Array<string | number> = [];
   const status = options.status ?? "all";
+  const timeField = resolveMcpTimeField(options.time_field);
+  const dateRange = resolveMcpDateRange(options.date_range);
 
   if (options.feed_id) {
     where.push("e.feed_id = ?");
@@ -435,8 +453,7 @@ function buildEntryFilters(options: {
     params.push(value, value, value);
   }
 
-  const timeField = normalizeTimeField(options.time_field);
-  const cutoff = parseRelativeTime(options.date_range);
+  const cutoff = parseRelativeTime(dateRange);
   if (cutoff) {
     const cutoffIso = cutoff.toISOString();
     if (timeField === "published_at") {
@@ -457,7 +474,7 @@ function buildEntryFilters(options: {
     params.push(decoded.t, decoded.t, decoded.id);
   }
 
-  return { where, params, timeField };
+  return { where, params, timeField, dateRange };
 }
 
 function listEntries(args: {
@@ -475,7 +492,7 @@ function listEntries(args: {
   try {
     const limit = Math.max(1, Math.min(args.limit ?? 20, 100));
     const fetchLimit = limit + 1;
-    const { where, params } = buildEntryFilters(args);
+    const { where, params, timeField, dateRange } = buildEntryFilters(args);
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
     const rows = db.prepare(`
       SELECT e.*, f.title AS feed_title, f.group_name AS group_name
@@ -511,6 +528,8 @@ function listEntries(args: {
     `).get(...params) as { total: number };
 
     return ok({
+      date_range: dateRange,
+      time_field: timeField,
       total: countRow.total,
       returned: items.length,
       has_more: hasMore,
@@ -527,6 +546,8 @@ async function searchEntries(args: {
   mode?: SearchMode;
   feed_id?: string;
   group_name?: string;
+  date_range?: string;
+  time_field?: string;
   limit?: number;
   cursor?: string;
 }): Promise<ToolResult> {
@@ -538,6 +559,9 @@ async function searchEntries(args: {
     const limit = Math.max(1, Math.min(args.limit ?? 10, 50));
     const offset = args.cursor ? decodeSearchCursor(args.cursor) : 0;
     const fetchTarget = Math.max(limit + offset + 5, (limit + offset) * 2);
+    const timeField = resolveMcpTimeField(args.time_field);
+    const dateRange = resolveMcpDateRange(args.date_range);
+    const cutoff = parseRelativeTime(dateRange);
     const results: Array<{
       id: string;
       title: string | null;
@@ -582,6 +606,17 @@ async function searchEntries(args: {
         if (args.group_name) {
           sql += " AND f.group_name = ?";
           sqlParams.push(args.group_name);
+        }
+        if (cutoff) {
+          const cutoffIso = cutoff.toISOString();
+          if (timeField === "published_at") {
+            const nowIso = new Date().toISOString();
+            sql += " AND ((e.published_at IS NOT NULL AND e.published_at <= ? AND e.published_at >= ?) OR (e.published_at IS NULL AND e.inserted_at >= ?))";
+            sqlParams.push(nowIso, cutoffIso, cutoffIso);
+          } else {
+            sql += " AND e.inserted_at >= ?";
+            sqlParams.push(cutoffIso);
+          }
         }
         sql += " ORDER BY rank ASC, e.published_at DESC LIMIT ?";
         sqlParams.push(fetchTarget);
@@ -631,6 +666,17 @@ async function searchEntries(args: {
           sql += " AND f.group_name = ?";
           sqlParams.push(args.group_name);
         }
+        if (cutoff) {
+          const cutoffIso = cutoff.toISOString();
+          if (timeField === "published_at") {
+            const nowIso = new Date().toISOString();
+            sql += " AND ((e.published_at IS NOT NULL AND e.published_at <= ? AND e.published_at >= ?) OR (e.published_at IS NULL AND e.inserted_at >= ?))";
+            sqlParams.push(nowIso, cutoffIso, cutoffIso);
+          } else {
+            sql += " AND e.inserted_at >= ?";
+            sqlParams.push(cutoffIso);
+          }
+        }
         sql += " ORDER BY e.published_at DESC, e.inserted_at DESC LIMIT ?";
         sqlParams.push(fetchTarget);
 
@@ -678,6 +724,19 @@ async function searchEntries(args: {
           if (!row) continue;
           if (args.feed_id && row.feed_id !== args.feed_id) continue;
           if (args.group_name && row.group_name !== args.group_name) continue;
+          if (cutoff) {
+            const cutoffIso = cutoff.toISOString();
+            if (timeField === "published_at") {
+              const publishedAt = row.published_at as string | null | undefined;
+              const insertedAt = row.inserted_at as string | null | undefined;
+              const matchesPublished = publishedAt && publishedAt <= new Date().toISOString() && publishedAt >= cutoffIso;
+              const matchesFallback = !publishedAt && insertedAt && insertedAt >= cutoffIso;
+              if (!matchesPublished && !matchesFallback) continue;
+            } else {
+              const insertedAt = row.inserted_at as string | null | undefined;
+              if (!insertedAt || insertedAt < cutoffIso) continue;
+            }
+          }
 
           results.push({
             id: row.id,
@@ -712,6 +771,8 @@ async function searchEntries(args: {
     return ok({
       query,
       mode,
+      date_range: dateRange,
+      time_field: timeField,
       total: uniqueResults.length,
       returned: pageResults.length,
       has_more: hasMore,
@@ -1010,8 +1071,8 @@ function registerEntryTools(server: McpServer) {
         "group_name": z.string().optional().describe("Filter by group name"),
         status: z.enum(["all", "unread", "read", "starred"]).default("all").describe("Entry status"),
         keyword: z.string().optional().describe("Keyword filter on title, summary, or content"),
-        "date_range": z.string().optional().describe("Relative time range such as 24h, 3d, 7d, 30d, all"),
-        "time_field": z.enum(["published_at", "inserted_at"]).default("inserted_at").describe("Time field base"),
+        "date_range": z.string().optional().describe("Relative time range such as 24h, 3d, 7d, 30d, all. Defaults to app settings."),
+        "time_field": z.enum(["published_at", "inserted_at"]).optional().describe("Time field base. Defaults to app settings."),
         cursor: z.string().optional().describe("Opaque pagination cursor from previous response"),
         limit: z.number().int().min(1).max(100).default(20).describe("Page size"),
         "include_content": z.boolean().default(false).describe("Include content excerpt"),
@@ -1126,6 +1187,8 @@ function registerEntryTools(server: McpServer) {
         mode: z.enum(["keyword", "semantic", "hybrid"]).default("hybrid").describe("Search mode"),
         "feed_id": z.string().optional().describe("Restrict to a feed"),
         "group_name": z.string().optional().describe("Restrict to a group"),
+        "date_range": z.string().optional().describe("Relative time range such as 24h, 3d, 7d, 30d, all. Defaults to app settings."),
+        "time_field": z.enum(["published_at", "inserted_at"]).optional().describe("Time field base. Defaults to app settings."),
         limit: z.number().int().min(1).max(50).default(10).describe("Result count"),
         cursor: z.string().optional().describe("Opaque pagination cursor from previous search result"),
       },
