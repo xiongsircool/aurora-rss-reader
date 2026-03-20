@@ -322,3 +322,11 @@ Give it a ⭐ if you find it useful!
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=xiongsircool/aurora-rss-reader&type=Date)](https://www.star-history.com/#xiongsircool/aurora-rss-reader&Date)
+
+## Community
+
+If you want to discuss product ideas, report usage feedback, or join the user community, you can scan the QQ code below.
+
+<div align="center">
+  <img src="images/二维码/QQ537546690.jpeg" alt="Aurora RSS Reader QQ community" width="260" />
+</div>

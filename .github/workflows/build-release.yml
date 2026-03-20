@@ -54,9 +54,7 @@ jobs:
         working-directory: rss-desktop
         run: |
           pnpm build
-          pnpm exec electron-builder --mac --universal
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pnpm exec electron-builder --mac --universal --publish=never
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -105,9 +103,7 @@ jobs:
         working-directory: rss-desktop
         run: |
           pnpm build
-          pnpm exec electron-builder --win --x64 --arm64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pnpm exec electron-builder --win --x64 --arm64 --publish=never
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -155,9 +151,7 @@ jobs:
         working-directory: rss-desktop
         run: |
           pnpm build
-          pnpm exec electron-builder --linux --x64 --arm64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pnpm exec electron-builder --linux --x64 --arm64 --publish=never
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
