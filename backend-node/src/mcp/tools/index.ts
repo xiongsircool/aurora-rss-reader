@@ -95,6 +95,48 @@ export const MCP_LEGACY_ALIAS_TOOLS = [
   "get_overview",
 ] as const;
 
+export const MCP_TOOL_GROUPS = [
+  {
+    id: "feeds",
+    tools: ["list_feeds", "get_feed", "create_feed", "update_feed", "delete_feed", "refresh_feed"],
+  },
+  {
+    id: "entries",
+    tools: ["list_entries", "get_entry", "update_entry", "batch_update_entries", "search_entries"],
+  },
+  {
+    id: "overview",
+    tools: ["get_reader_overview", "get_summary_queue_status"],
+  },
+  {
+    id: "ai",
+    tools: [
+      "summarize_entry",
+      "translate_entry_title",
+      "translate_text",
+      "get_scope_summary",
+      "generate_scope_summary",
+      "get_ai_automation_rules",
+      "update_ai_automation_rules",
+    ],
+  },
+  {
+    id: "tags",
+    tools: [
+      "list_tags",
+      "list_pending_tag_analysis",
+      "list_untagged_entries",
+      "analyze_entry_tags",
+      "reanalyze_entry_tags",
+      "skip_entry_tag_analysis",
+    ],
+  },
+  {
+    id: "digest",
+    tools: ["get_digest", "regenerate_digest"],
+  },
+] as const;
+
 function ok(payload: unknown): ToolResult {
   return {
     content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],

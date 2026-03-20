@@ -9,7 +9,7 @@ import { getObjectBody } from '../utils/http.js';
 import { getProxyStatus, isValidProxyUrl } from '../services/outboundHttp.js';
 import { rsshubManager } from '../services/rsshubManager.js';
 import { summaryGenerationService } from '../services/summaryGenerationService.js';
-import { MCP_LEGACY_ALIAS_TOOLS, MCP_RECOMMENDED_TOOLS } from '../mcp/tools/index.js';
+import { MCP_LEGACY_ALIAS_TOOLS, MCP_RECOMMENDED_TOOLS, MCP_TOOL_GROUPS } from '../mcp/tools/index.js';
 
 /**
  * Convert SQLite boolean fields (0/1) to JavaScript booleans
@@ -53,9 +53,18 @@ export async function userSettingsRoutes(app: FastifyInstance) {
       endpoint_path: '/mcp',
       endpoint_url: `${protocol}://${host}/mcp`,
       recommended_tools: [...MCP_RECOMMENDED_TOOLS],
+      recommended_tool_groups: MCP_TOOL_GROUPS.map((group) => ({
+        id: group.id,
+        tools: [...group.tools],
+        count: group.tools.length,
+      })),
       legacy_aliases: [...MCP_LEGACY_ALIAS_TOOLS],
       recommended_tool_count: MCP_RECOMMENDED_TOOLS.length,
       legacy_alias_count: MCP_LEGACY_ALIAS_TOOLS.length,
+      documentation_urls: {
+        zh: 'https://github.com/xiongsircool/aurora-rss-reader/blob/main/README_ZH.md',
+        en: 'https://github.com/xiongsircool/aurora-rss-reader/blob/main/README.md',
+      },
     };
   });
 
