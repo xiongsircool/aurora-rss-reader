@@ -275,11 +275,11 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 ## 🎯 Future Roadmap
 
 ### Short-term Plans (v0.2)
-- [ ] **Mobile Support** - Develop iOS and Android mobile applications
-- [ ] **AI labeling** - for every feed, we can use AI to label the feed by pre set labels.
-- [ ] **AI Daily Briefing** - Smart daily news summaries and personalized recommendations
+- [x] **AI Daily Briefing / Scope Summary** - Tag digest, feed/group scope summaries, automation and rerun flows are already available ✅
 - [x] **Podcast Support** - Support for audio podcast subscription and playback ✅
 - [ ] **Reading Analytics** - Personal reading habits analysis and data visualization
+- [x] **RSSHub Support** - RSSHub URL configuration, mirror switching and RSSHub feed access are already supported ✅
+- [ ] **Browser Extension** - Use AI to analyze sites and generate RSSHub subscription rules
 
 ### Mid-term Plans (v0.3)
 - [ ] **Data Synchronization** - Cross-device data sync and cloud backup
