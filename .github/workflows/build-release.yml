@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., v0.1.3)'
+        description: 'Version to build (e.g., v0.1.9)'
         required: false
-        default: 'manual-build'
+        default: 'preflight-v0.1.9'
 
 # Required permissions for electron-builder to create releases
 permissions:

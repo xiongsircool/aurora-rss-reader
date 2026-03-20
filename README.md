@@ -25,7 +25,7 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.1.8 Latest Release | 最新版本
+## 🚧 v0.1.9 Release Candidate | 预发布版本
 
 **Background Summary Queue, Modernized MCP & Deployment Polish | 后台摘要队列、MCP 现代化与部署完善**
 
@@ -42,7 +42,7 @@
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.8**
+**Current Version: v0.1.9**
 
 ## Key Features
 
@@ -68,7 +68,7 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 
 ## Interface Preview
 
-### v0.1.8 Highlights
+### Current UI Highlights
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
     <img src="images/v.0.1.8/MCP功能升级.png" alt="Dedicated MCP settings" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
@@ -233,9 +233,16 @@ chmod +x build-release-app.sh
 ```
 
 Generated files:
-- macOS: `AuroraRSSReader-Mac-0.1.8.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.8-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.8-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.9.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.9-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.9-x64.AppImage`
+
+### Public Packaging Notes
+- Bump `rss-desktop/package.json` to the target release version before any public packaging or tagging.
+- Run the packaging preflight on `main` first with `workflow_dispatch`; this validates the build without creating a GitHub Release.
+- Only create the public tag after macOS, Windows, and Linux builds all pass.
+- Use a fresh tag such as `v0.1.9`; do not reuse an occupied release tag like `v0.1.8`.
+- Auto-update continues to work only after the public GitHub Release is created with installers and `latest*.yml`.
 
 ## 📋 Documentation | 文档
 
@@ -290,7 +297,7 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 Give it a ⭐ if you find it useful!
 ## Changelog
 
-### v0.1.8 (Current Version)
+### v0.1.9 (Release Candidate)
 **Background Summary Queue + MCP Modernization + Docker Access**
 
 - Background summary queue can persist generated summaries locally and reuse them after restart
@@ -299,6 +306,9 @@ Give it a ⭐ if you find it useful!
 - MCP tool surface modernized with grouped recommended tools, deprecation hints and cursor-based search pagination
 - MCP time defaults now follow the app's current date range and time field settings
 - Docker deployment now exposes the backend directly on `15432` for local `/api` and `/mcp` access
+
+### v0.1.8 (Previous Version)
+**Published release baseline before the current packaging cycle**
 
 ### v0.1.7
 **Digest Intelligence, Tag Workflow Polish & Update Experience**

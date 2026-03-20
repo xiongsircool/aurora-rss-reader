@@ -23,7 +23,7 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.8 最新版本 | Latest Version
+### 🚧 v0.1.9 预发布版本 | Release Candidate
 
 **后台摘要队列、MCP 现代化与部署完善 | Background Summary Queue, Modernized MCP & Deployment Polish**
 
@@ -38,7 +38,7 @@
 
 Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + Fastify (Node.js) stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.8**
+**Current Version: v0.1.9**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -49,7 +49,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.8**
+**Current Version: v0.1.9**
 
 ### Features | 功能特色
 
@@ -121,7 +121,7 @@ chmod +x start.sh
 
 ### 界面预览
 
-#### 🌟 v0.1.8 新增界面
+#### 🌟 当前版本界面亮点
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
     <img src="images/v.0.1.8/MCP功能升级.png" alt="专门的 MCP 配置管理界面" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
@@ -269,9 +269,16 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `AuroraRSSReader-Mac-0.1.8.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.8-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.8-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.9.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.9-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.9-x64.AppImage`
+
+### Public 打包注意事项
+- public 打包或打 tag 前，先确认 `rss-desktop/package.json` 已经切到目标版本号。
+- 先在 `main` 上用 `workflow_dispatch` 跑预检，只验证构建，不创建 GitHub Release。
+- macOS、Windows、Linux 三个平台都通过后，再创建正式公开 tag。
+- 新版本请使用未占用的 tag，例如 `v0.1.9`，不要重复使用已经占用的 `v0.1.8`。
+- 自动更新只有在 public GitHub Release 带上安装包和 `latest*.yml` 后才会生效。
 
 ## 技术栈
 
@@ -294,7 +301,7 @@ aurora-rss-reader/
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.8 (当前版本 | Current Version) 🎉
+### v0.1.9 (预发布版本 | Release Candidate) 🚧
 **后台摘要队列 + MCP 现代化 + Docker 访问优化 | Background Summary Queue + MCP Modernization + Docker Access**
 
 #### ✨ 新增与优化 | New & Improved
@@ -308,6 +315,9 @@ aurora-rss-reader/
 #### 🐞 稳定性修复 | Stability Fixes
 - **开发代理日志降噪** - 后端重启时不再被大量 `ECONNREFUSED` 刷屏
 - **删除兼容语义对齐** - MCP 的 feed 删除逻辑清理关联数据，避免残留脏数据
+
+### v0.1.8 (已发布上一版本 | Previous Published Version)
+**当前打包周期之前的正式发布版本**
 
 ### v0.1.7 (历史版本 | Previous Version)
 **信息简报智能化 + 标签流程稳定性修复 | Digest Intelligence + Tag Workflow Stabilization**
