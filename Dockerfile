@@ -82,12 +82,12 @@ RUN mkdir -p /data
 
 # Environment variables
 ENV NODE_ENV=production \
-    API_HOST=127.0.0.1 \
+    API_HOST=0.0.0.0 \
     API_PORT=15432 \
     DATABASE_PATH=/data/aurora-rss.db
 
-# Expose port (nginx)
-EXPOSE 80
+# Expose ports (nginx + backend)
+EXPOSE 80 15432
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
