@@ -12,6 +12,7 @@ import { getDatabase } from '../db/session.js';
 import { userSettingsService } from './userSettings.js';
 import { aiAutomationResolver } from './aiAutomationResolver.js';
 import { runWithConcurrency } from '../utils/concurrency.js';
+import { normalizeTimeField, parseRelativeTime } from '../utils/dateRange.js';
 
 const SUMMARY_CONCURRENCY = 2;
 const SUMMARY_MAX_ATTEMPTS = 3;
@@ -72,6 +73,21 @@ function shouldRunForFeed(feed: Feed | null | undefined): boolean {
   });
 }
 
+function resolveBackgroundScanRange(now: Date = new Date()): {
+  cutoffIso: string | null;
+  nowIso: string;
+  timeField: 'published_at' | 'inserted_at';
+} {
+  const settings = userSettingsService.getSettings();
+  const timeField = normalizeTimeField(settings.time_field);
+  const cutoff = parseRelativeTime(settings.default_date_range, now);
+  return {
+    cutoffIso: cutoff ? cutoff.toISOString() : null,
+    nowIso: now.toISOString(),
+    timeField,
+  };
+}
+
 export class SummaryGenerationService {
   private db = getDatabase();
   private entryRepo = new EntryRepository();
@@ -130,6 +146,22 @@ export class SummaryGenerationService {
     }
 
     const language = this.getTargetLanguage();
+    const range = resolveBackgroundScanRange();
+    const rangeWhere: string[] = [];
+    const rangeParams: Array<string | number> = [];
+    if (range.cutoffIso) {
+      if (range.timeField === 'published_at') {
+        rangeWhere.push(
+          '((e.published_at IS NOT NULL AND e.published_at <= ? AND e.published_at >= ?) OR (e.published_at IS NULL AND e.inserted_at >= ?))'
+        );
+        rangeParams.push(range.nowIso, range.cutoffIso, range.cutoffIso);
+      } else {
+        rangeWhere.push('e.inserted_at >= ?');
+        rangeParams.push(range.cutoffIso);
+      }
+    }
+
+    const rangeSql = rangeWhere.length > 0 ? `\n        AND ${rangeWhere.join(' AND ')}` : '';
     const rows = this.db.prepare(`
       SELECT
         e.id,
@@ -164,9 +196,10 @@ export class SummaryGenerationService {
       WHERE e.read = 0
         AND COALESCE(e.readability_content, e.content, e.summary) IS NOT NULL
         AND (s.id IS NULL OR COALESCE(s.summary, '') = '')
+        ${rangeSql}
       ORDER BY e.inserted_at ASC
       LIMIT ?
-    `).all(language, limit) as Entry[];
+    `).all(language, ...rangeParams, limit) as Entry[];
 
     let enqueued = 0;
     for (const entry of rows) {
