@@ -2,17 +2,43 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getDatabase } from "../../db/session.js";
 import {
+  AIAutomationRuleRepository,
+  AnalysisStatusRepository,
   EntryRepository,
+  EntryTagRepository,
   FeedRepository,
+  SummaryRepository,
+  TagRepository,
+  TranslationRepository,
 } from "../../db/repositories/index.js";
 import { refreshFeed, refreshAllFeeds } from "../../services/fetcher.js";
 import { searchVectors } from "../../services/vector.js";
 import { normalizeTimeField, parseRelativeTime } from "../../utils/dateRange.js";
 import { summaryGenerationService } from "../../services/summaryGenerationService.js";
+import { AIClient, type ServiceKey } from "../../services/ai.js";
+import { getConfig } from "../../config/index.js";
+import { userSettingsService } from "../../services/userSettings.js";
+import {
+  AUTOMATION_SCOPE_TYPES,
+  AUTOMATION_TASK_KEYS,
+  aiAutomationResolver,
+} from "../../services/aiAutomationResolver.js";
+import {
+  normalizeScopeSummaryWindowType,
+  scopeSummaryService,
+} from "../../services/scopeSummary.js";
+import { analyzeEntryTags, getTaggingConfig } from "../../services/tagging.js";
+import type { AIAutomationMode, AIScopeType, AITaskKey } from "../../db/models.js";
 
 const db = getDatabase();
 const feedRepo = new FeedRepository();
 const entryRepo = new EntryRepository();
+const translationRepo = new TranslationRepository();
+const summaryRepo = new SummaryRepository();
+const tagRepo = new TagRepository();
+const entryTagRepo = new EntryTagRepository();
+const analysisRepo = new AnalysisStatusRepository();
+const automationRuleRepo = new AIAutomationRuleRepository();
 const sortTimeExpr = "COALESCE(e.published_at, e.inserted_at)";
 const SQLITE_IN_CLAUSE_CHUNK_SIZE = 900;
 
@@ -111,6 +137,97 @@ function normalizeKeywordScore(rank: number, minRank: number, maxRank: number): 
 
   const normalized = (maxRank - rank) / range;
   return 0.65 + Math.max(0, Math.min(1, normalized)) * 0.25;
+}
+
+function resolveServiceConfig(service: ServiceKey) {
+  const settings = userSettingsService.getSettings();
+  const config = getConfig();
+
+  const globalApiKey = settings.default_ai_api_key || config.glmApiKey || "";
+  const globalBaseUrl = settings.default_ai_base_url || config.glmBaseUrl || "";
+  const globalModel = settings.default_ai_model || config.glmModel || "";
+
+  const serviceFields: Record<ServiceKey, { useCustom: string; apiKey: string; baseUrl: string; model: string }> = {
+    summary: {
+      useCustom: "summary_use_custom",
+      apiKey: "summary_api_key",
+      baseUrl: "summary_base_url",
+      model: "summary_model_name",
+    },
+    translation: {
+      useCustom: "translation_use_custom",
+      apiKey: "translation_api_key",
+      baseUrl: "translation_base_url",
+      model: "translation_model_name",
+    },
+    tagging: {
+      useCustom: "tagging_use_custom",
+      apiKey: "tagging_api_key",
+      baseUrl: "tagging_base_url",
+      model: "tagging_model_name",
+    },
+    embedding: {
+      useCustom: "embedding_use_custom",
+      apiKey: "embedding_api_key",
+      baseUrl: "embedding_base_url",
+      model: "embedding_model",
+    },
+  };
+
+  const fields = serviceFields[service];
+  const useCustom = service === "embedding" || (settings as any)[fields.useCustom] === 1;
+  if (useCustom) {
+    return {
+      apiKey: (settings as any)[fields.apiKey] || "",
+      baseUrl: (settings as any)[fields.baseUrl] || "",
+      modelName: (settings as any)[fields.model] || "",
+    };
+  }
+
+  return {
+    apiKey: globalApiKey,
+    baseUrl: globalBaseUrl,
+    modelName: globalModel,
+  };
+}
+
+function createClient(service: ServiceKey) {
+  const resolved = resolveServiceConfig(service);
+  return new AIClient({
+    apiKey: resolved.apiKey,
+    baseUrl: resolved.baseUrl,
+    model: resolved.modelName,
+  });
+}
+
+function buildSummaryContent(entry: {
+  title?: string | null;
+  author?: string | null;
+  published_at?: string | null;
+  readability_content?: string | null;
+  content?: string | null;
+  summary?: string | null;
+}): string | null {
+  const content = entry.readability_content || entry.content || entry.summary;
+  if (!content) return null;
+
+  const metaLines: string[] = [];
+  if (entry.title) metaLines.push(`Title: ${entry.title}`);
+  if (entry.author) metaLines.push(`Author: ${entry.author}`);
+  if (entry.published_at) metaLines.push(`Published: ${entry.published_at}`);
+
+  if (!metaLines.length) return content;
+  return `Metadata:\n${metaLines.join("\n")}\n\nContent:\n${content}`;
+}
+
+function getLegacyAutomationDefaults() {
+  return AUTOMATION_TASK_KEYS.map((task_key) => ({
+    task_key,
+    scope_type: "global" as const,
+    scope_id: null,
+    enabled: aiAutomationResolver.resolve({ taskKey: task_key, scopeType: "global" }),
+    source: "legacy_fallback" as const,
+  }));
 }
 
 function buildEntryFilters(options: {
@@ -906,6 +1023,396 @@ function registerOverviewTools(server: McpServer) {
   );
 }
 
+function registerAITools(server: McpServer) {
+  server.registerTool(
+    "summarize_entry",
+    {
+      title: "Summarize Entry",
+      description: "Generate or reuse a saved summary for an entry.",
+      inputSchema: {
+        "entry_id": z.string().describe("Entry ID"),
+        language: z.string().optional().describe("Target summary language"),
+        force: z.boolean().default(false).describe("Regenerate even if a saved summary exists"),
+      },
+    },
+    async (args) => {
+      const entry = entryRepo.findById(args.entry_id);
+      if (!entry) return fail("Entry not found");
+
+      const settings = userSettingsService.getSettings();
+      const language = args.language || settings.ai_translation_language || "zh";
+      const existing = summaryRepo.findByEntryIdAndLanguage(args.entry_id, language);
+      if (!args.force && existing?.summary) {
+        return ok({
+          entry_id: args.entry_id,
+          language,
+          summary: existing.summary,
+          from_cache: true,
+        });
+      }
+
+      const content = buildSummaryContent(entry);
+      if (!content) return fail("Entry has no content to summarize");
+
+      try {
+        const client = createClient("summary");
+        const summary = await client.summarize(content, {
+          language,
+          userPreference: settings.summary_prompt_preference || "",
+          maxTokens: settings.ai_summary_max_tokens || 0,
+        });
+        summaryRepo.upsert({ entry_id: args.entry_id, language, summary });
+        return ok({
+          entry_id: args.entry_id,
+          language,
+          summary,
+          from_cache: false,
+        });
+      } catch (error) {
+        return fail(`summarize_entry failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  server.registerTool(
+    "translate_entry_title",
+    {
+      title: "Translate Entry Title",
+      description: "Translate and save an entry title.",
+      inputSchema: {
+        "entry_id": z.string().describe("Entry ID"),
+        language: z.string().optional().describe("Target language"),
+        force: z.boolean().default(false).describe("Regenerate even if a saved translation exists"),
+      },
+    },
+    async (args) => {
+      const entry = entryRepo.findById(args.entry_id);
+      if (!entry) return fail("Entry not found");
+      if (!entry.title) {
+        return ok({ entry_id: args.entry_id, title: "", language: args.language || "zh" });
+      }
+
+      const settings = userSettingsService.getSettings();
+      const language = args.language || settings.ai_translation_language || "zh";
+      const existing = translationRepo.findByEntryIdAndLanguage(args.entry_id, language);
+      if (!args.force && existing?.title) {
+        return ok({
+          entry_id: args.entry_id,
+          language,
+          title: existing.title,
+          from_cache: true,
+        });
+      }
+
+      try {
+        const client = createClient("translation");
+        const title = await client.translate(entry.title, {
+          targetLanguage: language,
+          userPreference: settings.translation_prompt_preference || "",
+        });
+        translationRepo.upsert({ entry_id: args.entry_id, language, title });
+        return ok({
+          entry_id: args.entry_id,
+          language,
+          title,
+          from_cache: false,
+        });
+      } catch (error) {
+        return fail(`translate_entry_title failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  server.registerTool(
+    "translate_text",
+    {
+      title: "Translate Text",
+      description: "Translate freeform text using the configured translation model.",
+      inputSchema: {
+        text: z.string().min(1).describe("Text to translate"),
+        language: z.string().optional().describe("Target language"),
+      },
+    },
+    async (args) => {
+      const settings = userSettingsService.getSettings();
+      const language = args.language || settings.ai_translation_language || "zh";
+      try {
+        const client = createClient("translation");
+        const translation = await client.translate(args.text, {
+          targetLanguage: language,
+          userPreference: settings.translation_prompt_preference || "",
+        });
+        return ok({
+          language,
+          translation,
+        });
+      } catch (error) {
+        return fail(`translate_text failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_scope_summary",
+    {
+      title: "Get Scope Summary",
+      description: "Get feed or group scope summary state for a time window.",
+      inputSchema: {
+        "scope_type": z.enum(["feed", "group"]).describe("Scope type"),
+        "scope_id": z.string().describe("Feed ID or group name"),
+        "window_type": z.enum(["24h", "3d", "7d", "30d"]).optional().describe("Time window"),
+        language: z.string().optional().describe("Summary language"),
+      },
+    },
+    async (args) => {
+      const state = scopeSummaryService.buildScopeState({
+        scope_type: args.scope_type,
+        scope_id: args.scope_id,
+        window_type: args.window_type,
+        language: args.language || "zh",
+      });
+      if (!state) return fail("Scope summary scope not found");
+
+      const latest = scopeSummaryService.parseRun(state.latestRun);
+      const entryIndexMap: Record<number, string> = {};
+      state.items.forEach((item) => {
+        entryIndexMap[item.ref - 1] = item.entry_id;
+      });
+
+      return ok({
+        scope_label: state.scopeLabel,
+        scope_type: args.scope_type,
+        scope_id: args.scope_id,
+        window_type: state.windowType,
+        window_start_at: state.windowStartAt,
+        window_end_at: state.windowEndAt,
+        status: state.status,
+        recent_count: state.items.length,
+        entries: state.rows,
+        entry_index_map: entryIndexMap,
+        item: latest ? {
+          ...latest,
+          summary: latest.summary_md,
+          summary_updated_at: latest.updated_at,
+        } : null,
+        settings: state.settings,
+      });
+    }
+  );
+
+  server.registerTool(
+    "generate_scope_summary",
+    {
+      title: "Generate Scope Summary",
+      description: "Generate a scope summary for a feed or group.",
+      inputSchema: {
+        "scope_type": z.enum(["feed", "group"]).describe("Scope type"),
+        "scope_id": z.string().describe("Feed ID or group name"),
+        "window_type": z.enum(["24h", "3d", "7d", "30d"]).optional().describe("Time window"),
+        language: z.string().optional().describe("Summary language"),
+        "trigger_type": z.enum(["auto", "manual"]).default("manual").describe("Trigger type"),
+      },
+    },
+    async (args) => {
+      try {
+        const generated = await scopeSummaryService.generate({
+          scope_type: args.scope_type,
+          scope_id: args.scope_id,
+          window_type: normalizeScopeSummaryWindowType(args.window_type),
+          language: args.language || "zh",
+          trigger_type: args.trigger_type,
+        });
+        const parsed = scopeSummaryService.parseRun(generated.run);
+        return ok({
+          scope_label: generated.state.scopeLabel,
+          scope_type: args.scope_type,
+          scope_id: args.scope_id,
+          window_type: generated.state.windowType,
+          status: "ready",
+          recent_count: generated.state.items.length,
+          item: parsed ? {
+            ...parsed,
+            summary: parsed.summary_md,
+            summary_updated_at: parsed.updated_at,
+          } : null,
+          entries: generated.entries,
+        });
+      } catch (error) {
+        return fail(`generate_scope_summary failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_ai_automation_rules",
+    {
+      title: "Get AI Automation Rules",
+      description: "Get explicit automation rules and current global fallback defaults.",
+      inputSchema: {},
+    },
+    async () => ok({
+      items: automationRuleRepo.findAll(),
+      defaults: getLegacyAutomationDefaults(),
+    })
+  );
+
+  server.registerTool(
+    "update_ai_automation_rules",
+    {
+      title: "Update AI Automation Rules",
+      description: "Upsert or remove automation rules for global, feed, group, or tag scope.",
+      inputSchema: {
+        upserts: z.array(z.object({
+          task_key: z.enum(AUTOMATION_TASK_KEYS as [AITaskKey, ...AITaskKey[]]),
+          scope_type: z.enum(AUTOMATION_SCOPE_TYPES as [AIScopeType, ...AIScopeType[]]),
+          scope_id: z.string().nullable().optional(),
+          mode: z.enum(["inherit", "enabled", "disabled"] as [AIAutomationMode, ...AIAutomationMode[]]),
+        })).default([]),
+        removals: z.array(z.object({
+          task_key: z.enum(AUTOMATION_TASK_KEYS as [AITaskKey, ...AITaskKey[]]),
+          scope_type: z.enum(AUTOMATION_SCOPE_TYPES as [AIScopeType, ...AIScopeType[]]),
+          scope_id: z.string().nullable().optional(),
+        })).default([]),
+      },
+    },
+    async (args) => {
+      for (const item of args.upserts) {
+        const scopeId = item.scope_id && item.scope_id.trim() ? item.scope_id.trim() : null;
+        if (item.scope_type !== "global" && !scopeId) {
+          return fail("scope_id is required for non-global automation rules");
+        }
+        automationRuleRepo.upsert({
+          task_key: item.task_key,
+          scope_type: item.scope_type,
+          scope_id: scopeId,
+          mode: item.mode,
+        });
+      }
+
+      for (const item of args.removals) {
+        const scopeId = item.scope_id && item.scope_id.trim() ? item.scope_id.trim() : null;
+        if (item.scope_type !== "global" && !scopeId) {
+          return fail("scope_id is required for non-global automation removals");
+        }
+        automationRuleRepo.deleteByTaskAndScope(item.task_key, item.scope_type, scopeId);
+      }
+
+      return ok({
+        success: true,
+        items: automationRuleRepo.findAll(),
+        defaults: getLegacyAutomationDefaults(),
+      });
+    }
+  );
+}
+
+function registerTagTools(server: McpServer) {
+  server.registerTool(
+    "list_tags",
+    {
+      title: "List Tags",
+      description: "List user tags with entry counts.",
+      inputSchema: {
+        enabled_only: z.boolean().default(false).describe("Only enabled tags"),
+      },
+    },
+    async (args) => {
+      const tags = args.enabled_only ? tagRepo.findAllEnabled() : tagRepo.getAllWithEntryCounts();
+      const items = tags.map((tag: any) => ({
+        id: tag.id,
+        name: tag.name,
+        description: tag.description,
+        color: tag.color,
+        enabled: tag.enabled === 1,
+        match_mode: tag.match_mode,
+        entry_count: typeof tag.entry_count === "number" ? tag.entry_count : tagRepo.getTagCountWithEntries(tag.id),
+      }));
+      return ok({ total: items.length, items });
+    }
+  );
+
+  server.registerTool(
+    "list_untagged_entries",
+    {
+      title: "List Untagged Entries",
+      description: "List analyzed entries that still have no tags.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(100).default(20),
+        cursor: z.string().optional(),
+        date_range: z.string().optional(),
+        time_field: z.enum(["published_at", "inserted_at"]).default("inserted_at"),
+      },
+    },
+    async (args) => {
+      const config = getTaggingConfig();
+      const result = analysisRepo.getEntriesWithoutTags({
+        limit: args.limit,
+        cursor: args.cursor,
+        startAt: config.autoTaggingStartAt || undefined,
+        date_range: args.date_range,
+        time_field: args.time_field,
+      });
+      return ok(result);
+    }
+  );
+
+  server.registerTool(
+    "analyze_entry_tags",
+    {
+      title: "Analyze Entry Tags",
+      description: "Run tag analysis for a single entry and persist the result.",
+      inputSchema: {
+        entry_id: z.string().describe("Entry ID"),
+      },
+    },
+    async (args) => {
+      const entry = entryRepo.findById(args.entry_id);
+      if (!entry) return fail("Entry not found");
+
+      const tags = tagRepo.findAllEnabled();
+      if (tags.length === 0) return fail("No enabled tags configured");
+
+      const config = getTaggingConfig();
+      if (!config.apiKey || !config.baseUrl || !config.modelName) {
+        return fail("Tagging AI config is incomplete");
+      }
+
+      try {
+        const result = await analyzeEntryTags(
+          {
+            title: entry.title || "",
+            summary: entry.summary,
+            content: entry.content,
+          },
+          tags
+        );
+
+        if (result.success) {
+          entryTagRepo.removeAllTags(args.entry_id);
+          if (result.tagIds.length > 0) {
+            entryTagRepo.addTags(args.entry_id, result.tagIds, false);
+          }
+          analysisRepo.updateStatus(args.entry_id, "analyzed", config.tagsVersion);
+        }
+
+        const tagNames = result.tagIds
+          .map((tagId) => tags.find((tag) => tag.id === tagId)?.name)
+          .filter((name): name is string => Boolean(name));
+
+        return ok({
+          success: result.success,
+          entry_id: args.entry_id,
+          tag_ids: result.tagIds,
+          tag_names: tagNames,
+          error: result.error,
+        });
+      } catch (error) {
+        return fail(`analyze_entry_tags failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+}
+
 function registerLegacyAliases(server: McpServer) {
   server.registerTool(
     "query_entries",
@@ -1124,5 +1631,7 @@ export function registerAllTools(server: McpServer) {
   registerFeedTools(server);
   registerEntryTools(server);
   registerOverviewTools(server);
+  registerAITools(server);
+  registerTagTools(server);
   registerLegacyAliases(server);
 }
