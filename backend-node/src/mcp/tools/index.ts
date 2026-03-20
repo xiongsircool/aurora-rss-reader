@@ -56,6 +56,45 @@ type ToolResult = {
 type EntryStatus = "all" | "unread" | "read" | "starred";
 type SearchMode = "keyword" | "semantic" | "hybrid";
 
+export const MCP_RECOMMENDED_TOOLS = [
+  "list_feeds",
+  "get_feed",
+  "create_feed",
+  "update_feed",
+  "delete_feed",
+  "refresh_feed",
+  "list_entries",
+  "get_entry",
+  "update_entry",
+  "batch_update_entries",
+  "search_entries",
+  "get_reader_overview",
+  "get_summary_queue_status",
+  "summarize_entry",
+  "translate_entry_title",
+  "translate_text",
+  "get_scope_summary",
+  "generate_scope_summary",
+  "get_ai_automation_rules",
+  "update_ai_automation_rules",
+  "list_tags",
+  "list_pending_tag_analysis",
+  "list_untagged_entries",
+  "analyze_entry_tags",
+  "reanalyze_entry_tags",
+  "skip_entry_tag_analysis",
+  "get_digest",
+  "regenerate_digest",
+] as const;
+
+export const MCP_LEGACY_ALIAS_TOOLS = [
+  "query_entries",
+  "search",
+  "manage_feeds",
+  "batch_update",
+  "get_overview",
+] as const;
+
 function ok(payload: unknown): ToolResult {
   return {
     content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],

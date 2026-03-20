@@ -19,12 +19,13 @@ const SettingsRSSHub = defineAsyncComponent(() => import('./settings/SettingsRSS
 const SettingsAIConfig = defineAsyncComponent(() => import('./settings/SettingsAIConfig.vue'))
 const SettingsAIFeatures = defineAsyncComponent(() => import('./settings/SettingsAIFeatures.vue'))
 const SettingsAIAutomation = defineAsyncComponent(() => import('./settings/SettingsAIAutomation.vue'))
+const SettingsMCP = defineAsyncComponent(() => import('./settings/SettingsMCP.vue'))
 const SettingsTagRerun = defineAsyncComponent(() => import('./settings/SettingsTagRerun.vue'))
 const SettingsRefresh = defineAsyncComponent(() => import('./settings/SettingsRefresh.vue'))
 const SettingsDisplay = defineAsyncComponent(() => import('./settings/SettingsDisplay.vue'))
 const SettingsAbout = defineAsyncComponent(() => import('./settings/SettingsAbout.vue'))
 
-type Category = 'general' | 'display' | 'sync' | 'intelligence'
+type Category = 'general' | 'display' | 'sync' | 'intelligence' | 'mcp'
 
 const props = withDefaults(defineProps<{
   show: boolean
@@ -74,6 +75,7 @@ const categories = [
   { id: 'display', label: 'settings.displaySettings', icon: 'i-carbon-screen' },
   { id: 'sync', label: 'settings.sync', icon: 'i-carbon-renew' },
   { id: 'intelligence', label: 'settings.aiConfig', icon: 'i-carbon-machine-learning' },
+  { id: 'mcp', label: 'settings.mcpService', icon: 'i-carbon-plug' },
 ]
 
 // Display settings - synced with store
@@ -174,7 +176,6 @@ watch(() => props.show, async (show) => {
       rsshub.fetchRSSHubUrl,
       () => {
         aiConfig.resetTestResults()
-        aiConfig.resetMcpTestResult()
         rsshub.resetTestResult()
       }
     )
@@ -203,9 +204,6 @@ watch(() => props.show, async (show) => {
     // Reset view state
     activeCategory.value = props.initialCategory
     isMobileDetailOpen.value = false
-
-    // Auto-test MCP connection on modal open
-    aiConfig.testMcp()
 
     // Lock body scroll
     document.body.style.overflow = 'hidden'
@@ -486,12 +484,9 @@ async function saveSettings() {
                       :serviceTestResult="aiConfig.serviceTestResult.value"
                       :rebuildingVectors="aiConfig.rebuildingVectors.value"
                       :rebuildResult="aiConfig.rebuildResult.value"
-                      :mcpTesting="aiConfig.mcpTesting.value"
-                      :mcpTestResult="aiConfig.mcpTestResult.value"
                       @testGlobalConnection="aiConfig.testGlobalConnection"
                       @testConnection="aiConfig.testConnection"
                       @rebuildVectors="aiConfig.rebuildVectors"
-                      @testMcp="aiConfig.testMcp"
                     />
                     <div class="h-6"></div>
                     <SettingsAIFeatures
@@ -532,6 +527,13 @@ async function saveSettings() {
                     />
                     <div class="h-6"></div>
                     <SettingsTagRerun />
+                  </div>
+                </div>
+
+                <div v-if="activeCategory === 'mcp'" class="space-y-6">
+                  <div class="setting-group">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.mcpService') }}</h3>
+                    <SettingsMCP />
                   </div>
                 </div>
 

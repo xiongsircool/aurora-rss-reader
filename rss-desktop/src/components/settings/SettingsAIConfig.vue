@@ -5,22 +5,19 @@ import type { LocalGlobalConfig, LocalServiceConfig } from '../../composables/us
 import type { TestResult } from '../../composables/useAIConfigSettings'
 import { PROVIDER_PRESETS, type AIServiceKey } from '../../stores/aiStore'
 
-const props = defineProps<{
+defineProps<{
   globalTesting: boolean
   globalTestResult: TestResult | null
   serviceTesting: Record<AIServiceKey, boolean>
   serviceTestResult: Record<AIServiceKey, TestResult | null>
   rebuildingVectors: boolean
   rebuildResult: TestResult | null
-  mcpTesting: boolean
-  mcpTestResult: TestResult | null
 }>()
 
 const emit = defineEmits<{
   testGlobalConnection: []
   testConnection: [service: AIServiceKey]
   rebuildVectors: []
-  testMcp: []
 }>()
 
 const { t } = useI18n()
@@ -32,7 +29,7 @@ const taggingConfig = defineModel<LocalServiceConfig>('taggingConfig', { require
 const embeddingConfig = defineModel<LocalServiceConfig>('embeddingConfig', { required: true })
 
 // Tab navigation for service overrides
-type ServiceTab = 'summary' | 'translation' | 'tagging' | 'embedding' | 'mcp'
+type ServiceTab = 'summary' | 'translation' | 'tagging' | 'embedding'
 const activeTab = ref<ServiceTab>('summary')
 
 // API Key visibility state
@@ -41,8 +38,7 @@ const showServiceApiKey = reactive<Record<ServiceTab, boolean>>({
   summary: false,
   translation: false,
   tagging: false,
-  embedding: false,
-  mcp: false
+  embedding: false
 })
 
 // Provider dropdown
@@ -53,7 +49,6 @@ const serviceTabs: { id: ServiceTab; icon: string; labelKey: string }[] = [
   { id: 'translation', icon: 'i-carbon-translate', labelKey: 'settings.contentTranslation' },
   { id: 'tagging', icon: 'i-carbon-tag-group', labelKey: 'settings.taggingClassification' },
   { id: 'embedding', icon: 'i-carbon-data-vis-4', labelKey: 'settings.embeddingService' },
-  { id: 'mcp', icon: 'i-carbon-plug', labelKey: 'settings.mcpService' },
 ]
 
 // Embedding is always custom — it uses a different model type (not a chat/LLM model)
@@ -101,7 +96,6 @@ function toggleServiceApiKeyVisibility() {
 }
 
 function isServiceConfigured(tab: ServiceTab): boolean {
-  if (tab === 'mcp') return props.mcpTestResult?.success ?? false
   const config = {
     summary: summaryConfig.value,
     translation: translationConfig.value,
@@ -133,19 +127,37 @@ function isServiceConfigured(tab: ServiceTab): boolean {
       <div class="p-5 min-w-0">
         <!-- Provider Presets -->
         <div class="mb-5">
-          <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.providerPreset') }}</label>
+          <label class="flex items-center gap-2 mb-2">
+            <span class="text-sm font-medium text-[var(--text-primary)]">{{ t('settings.providerPreset') }}</span>
+            <span class="text-[10px] font-medium text-orange-500/70 bg-orange-500/8 px-1.5 py-0.5 rounded-full border border-orange-500/20 leading-none">{{ t('settings.clickToSelect') }}</span>
+          </label>
           <div class="relative">
             <button
               type="button"
               @click="showProviderDropdown = !showProviderDropdown"
-              class="w-full min-w-0 flex items-center justify-between gap-3 px-3.5 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] cursor-pointer hover:border-orange-500/50 transition-colors"
+              class="provider-select-btn w-full min-w-0 flex items-center justify-between gap-2 border rounded-lg text-sm cursor-pointer transition-all overflow-hidden"
+              :class="showProviderDropdown
+                ? 'border-orange-500 bg-[var(--bg-input)] shadow-[0_0_0_3px_rgba(255,122,24,0.15)]'
+                : 'border-[var(--border-color)] bg-[var(--bg-input)] hover:border-orange-500/60 hover:shadow-[0_0_0_2px_rgba(255,122,24,0.08)]'"
             >
-              <div class="flex items-center gap-2 min-w-0">
-                <span v-if="selectedPreset" :class="selectedPreset.icon" class="text-base text-orange-500"></span>
-                <span v-if="selectedPreset" class="truncate">{{ selectedPreset.name }}</span>
+              <!-- Left: selected value -->
+              <div class="flex items-center gap-2 min-w-0 flex-1 px-3.5 py-2.5">
+                <span v-if="selectedPreset" :class="selectedPreset.icon" class="text-base text-orange-500 shrink-0"></span>
+                <span v-if="selectedPreset" class="truncate text-[var(--text-primary)] font-medium">{{ selectedPreset.name }}</span>
                 <span v-else class="text-[var(--text-tertiary)] truncate">{{ t('settings.selectProvider') }}</span>
               </div>
-              <span class="i-carbon-chevron-down shrink-0 text-[var(--text-tertiary)] transition-transform" :class="{ 'rotate-180': showProviderDropdown }"></span>
+              <!-- Right: chevron area with divider -->
+              <div
+                class="flex items-center justify-center w-9 h-full self-stretch shrink-0 border-l transition-colors"
+                :class="showProviderDropdown
+                  ? 'border-orange-500/30 bg-orange-500/10'
+                  : 'border-[var(--border-color)] bg-[var(--bg-surface)] group-hover:border-orange-500/20'"
+              >
+                <span
+                  class="i-carbon-chevron-down text-base transition-all duration-200"
+                  :class="showProviderDropdown ? 'text-orange-500 rotate-180' : 'text-[var(--text-tertiary)]'"
+                ></span>
+              </div>
             </button>
 
             <!-- Dropdown -->
@@ -288,59 +300,8 @@ function isServiceConfigured(tab: ServiceTab): boolean {
       <!-- Tab Content -->
       <div class="p-5 pt-6">
         <Transition name="fade" mode="out-in">
-          <!-- MCP Tab -->
-          <div v-if="activeTab === 'mcp'" key="mcp">
-            <p class="m-0 mb-5 text-sm text-[var(--text-secondary)]">{{ t('settings.mcpSubtitle') }}</p>
-
-            <div class="space-y-4">
-              <div class="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label class="block mb-1.5 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpEndpoint') }}</label>
-                  <div class="px-3.5 py-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-secondary)] font-mono">
-                    http://127.0.0.1:15432/mcp
-                  </div>
-                </div>
-                <div>
-                  <label class="block mb-1.5 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpStatus') }}</label>
-                  <div class="flex items-center gap-2 px-3.5 py-2.5">
-                    <span class="w-2 h-2 rounded-full" :class="mcpTestResult?.success ? 'bg-green-500' : 'bg-gray-400'"></span>
-                    <span class="text-sm" :class="mcpTestResult?.success ? 'text-green-600 dark:text-green-400' : 'text-[var(--text-secondary)]'">
-                      {{ mcpTestResult?.success ? t('settings.mcpConnected') : t('settings.mcpDisconnected') }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label class="block mb-1.5 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpTools') }}</label>
-                <p class="m-0 text-sm text-[var(--text-secondary)]">{{ t('settings.mcpToolsList') }}</p>
-              </div>
-            </div>
-
-            <div
-              v-if="mcpTestResult"
-              class="mt-4 p-3 rounded-lg text-sm"
-              :class="mcpTestResult.success ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'"
-            >
-              {{ mcpTestResult.message }}
-            </div>
-
-            <div class="mt-6 pt-4 border-t border-[var(--border-color)] flex flex-wrap items-center justify-end gap-3">
-              <button
-                @click="emit('testMcp')"
-                :disabled="mcpTesting"
-                class="w-full sm:w-auto px-5 py-2 rounded-lg text-sm font-medium transition-all border-none cursor-pointer bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:not-disabled:shadow-lg hover:not-disabled:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none whitespace-normal break-words text-center"
-                :class="{
-                  'from-green-500! to-green-600!': mcpTestResult?.success,
-                  'from-red-500! to-red-600!': mcpTestResult?.success === false
-                }"
-              >
-                {{ mcpTesting ? t('common.testing') : t('settings.testMcp') }}
-              </button>
-            </div>
-          </div>
-
           <!-- Embedding Tab (always independent — not a chat/LLM model) -->
-          <div v-else-if="activeTab === 'embedding'" key="embedding">
+          <div v-if="activeTab === 'embedding'" key="embedding">
             <p class="m-0 mb-5 text-sm text-[var(--text-secondary)]">{{ t('settings.embeddingSubtitle') }}</p>
 
             <div class="space-y-4 mb-5">

@@ -9,6 +9,7 @@ import { getObjectBody } from '../utils/http.js';
 import { getProxyStatus, isValidProxyUrl } from '../services/outboundHttp.js';
 import { rsshubManager } from '../services/rsshubManager.js';
 import { summaryGenerationService } from '../services/summaryGenerationService.js';
+import { MCP_LEGACY_ALIAS_TOOLS, MCP_RECOMMENDED_TOOLS } from '../mcp/tools/index.js';
 
 /**
  * Convert SQLite boolean fields (0/1) to JavaScript booleans
@@ -36,6 +37,26 @@ export async function userSettingsRoutes(app: FastifyInstance) {
 
   app.get('/settings/summary-background-status', async () => {
     return summaryGenerationService.getBackgroundStatus();
+  });
+
+  app.get('/settings/mcp-status', async (request) => {
+    const host = request.headers.host || '127.0.0.1:15432';
+    const forwardedProto = request.headers['x-forwarded-proto'];
+    const protocol = typeof forwardedProto === 'string'
+      ? forwardedProto
+      : request.protocol || 'http';
+
+    return {
+      connected: true,
+      message: 'MCP endpoint ready',
+      transport: 'streamable-http',
+      endpoint_path: '/mcp',
+      endpoint_url: `${protocol}://${host}/mcp`,
+      recommended_tools: [...MCP_RECOMMENDED_TOOLS],
+      legacy_aliases: [...MCP_LEGACY_ALIAS_TOOLS],
+      recommended_tool_count: MCP_RECOMMENDED_TOOLS.length,
+      legacy_alias_count: MCP_LEGACY_ALIAS_TOOLS.length,
+    };
   });
 
   // PATCH /settings - Update user settings

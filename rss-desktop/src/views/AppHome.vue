@@ -354,7 +354,7 @@ const {
 const { showToast, toastMessage, toastType, showNotification } = useNotification()
 const { darkMode, toggleTheme, loadTheme } = useTheme()
 const showSettings = ref(false)
-const settingsInitialCategory = ref<'general' | 'display' | 'sync' | 'intelligence'>('general')
+const settingsInitialCategory = ref<'general' | 'display' | 'sync' | 'intelligence' | 'mcp'>('general')
 const settingsAutomationTarget = ref<AutomationTarget | null>(null)
 const feedDetailMode = ref<'articles' | 'summary'>('articles')
 const showBookmarkGroupModal = ref(false)
