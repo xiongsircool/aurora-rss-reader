@@ -4,6 +4,7 @@ import { execSync } from 'node:child_process'
 import vue from '@vitejs/plugin-vue'
 import electron from 'vite-plugin-electron'
 import UnoCSS from 'unocss/vite'
+import type { ProxyOptions } from 'vite'
 
 // Custom plugin to build preload with esbuild (ensures CJS format)
 function buildPreloadPlugin() {
@@ -67,6 +68,37 @@ function manualChunks(id: string): string | undefined {
   return 'vendor'
 }
 
+function createApiProxyConfig(): ProxyOptions {
+  let backendUnavailableLogged = false
+
+  return {
+    target: 'http://localhost:15432',
+    changeOrigin: true,
+    secure: false,
+    configure(proxy) {
+      proxy.on('error', (error) => {
+        const code = (error as NodeJS.ErrnoException).code || 'UNKNOWN'
+        if (code === 'ECONNREFUSED') {
+          if (!backendUnavailableLogged) {
+            backendUnavailableLogged = true
+            console.warn('[vite-proxy] backend unavailable at http://localhost:15432, waiting for restart')
+          }
+          return
+        }
+
+        console.error(`[vite-proxy] /api proxy error: ${code}`)
+      })
+
+      proxy.on('proxyRes', () => {
+        if (backendUnavailableLogged) {
+          backendUnavailableLogged = false
+          console.info('[vite-proxy] backend connection restored')
+        }
+      })
+    }
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
@@ -97,11 +129,7 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      '/api': {
-        target: 'http://localhost:15432',
-        changeOrigin: true,
-        secure: false,
-      }
+      '/api': createApiProxyConfig()
     }
   },
 })
