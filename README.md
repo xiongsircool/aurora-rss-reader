@@ -308,3 +308,7 @@ Give it a ⭐ if you find it useful!
 - Analyze-all full pagination fix
 - Summary prompting quality upgrade
 - Manual update-check entry in settings
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=xiongsircool/aurora-rss-reader&type=Date)](https://www.star-history.com/#xiongsircool/aurora-rss-reader&Date)
