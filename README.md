@@ -25,16 +25,16 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.1.7 Latest Release | 最新版本
+## 🎉 v0.1.8 Latest Release | 最新版本
 
-**Digest Intelligence, Tag Workflow Polish & Update Experience | 信息简报智能化、标签流程优化与更新体验升级**
+**Background Summary Queue, Modernized MCP & Deployment Polish | 后台摘要队列、MCP 现代化与部署完善**
 
-- 🧠 **Digest 2.0** - LLM summaries with history, manual regenerate, language aligned with current UI locale
-- 🕒 **Latest + Week Modes** - Digest now supports `Latest` view so tags stay visible even when no items arrive today
-- 🏷️ **Tag Analyze-All Fix** - Analyze-all now loads full pending pages instead of only the currently visible subset
-- 🧾 **Summary Quality Upgrade** - Prompting tuned for conclusion-first, fact-dense output with explicit time context
-- 🔄 **Manual Update Check Entry** - Added update-check button in `Settings > About`
-- 🧩 **Sidebar & Tag UX Polish** - Better left-panel actions and smarter tag/digest interaction flow
+- 🤖 **Background Summary Queue** - Unread articles can now enter a saved local summary queue and reuse generated summaries after restart
+- 📊 **Runtime Status Panel** - Added live queue status in settings so you can inspect queued, running, succeeded and failed summary jobs
+- 🔌 **Modernized MCP Surface** - Reworked MCP into split resource tools, added AI/tag/digest workflows, and moved MCP into its own settings section
+- 📚 **MCP Usability Upgrade** - Recommended tools are grouped, legacy aliases are marked for removal, and search now supports cursor pagination
+- 🕒 **Time Semantics Aligned** - MCP list/search defaults now follow the app's current `date_range + time_field` settings
+- 🐳 **Docker Backend Port Exposure** - Local Docker deployment now exposes the backend directly on `15432`, including `/api` and `/mcp`
 
 ---
 
@@ -42,7 +42,7 @@
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.7**
+**Current Version: v0.1.8**
 
 ## Key Features
 
@@ -68,30 +68,30 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 
 ## Interface Preview
 
-### v0.1.7 Highlights
+### v0.1.8 Highlights
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/智能标签和简约日报功能.png" alt="Smart tags and digest upgrades" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Smart Tags + Digest Upgrades</figcaption>
+    <img src="images/v.0.1.8/MCP功能升级.png" alt="Dedicated MCP settings" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Dedicated MCP Settings</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧键功能增强支持自定义别名修改分组.png" alt="Sidebar action enhancements" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Sidebar Actions & Group Alias Enhancements</figcaption>
+    <img src="images/v.0.1.8/增强了摘要和翻译分开设置偏好.png" alt="Summary and translation preferences" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Summary & Translation Preferences</figcaption>
   </figure>
 </div>
 
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧风格切换按钮.png" alt="Sidebar style switch button" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Sidebar Style Switch</figcaption>
+    <img src="images/v.0.1.8/支持单个订阅和分组的日报功能.png" alt="Scope summary and digest" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Scope Summary & Digest</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧切换后风格.png" alt="Sidebar switched style" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Switched Sidebar Style</figcaption>
+    <img src="images/v.0.1.8/支持代理网络的配置.png" alt="Proxy configuration" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Proxy Configuration</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/通过新的字符串可以创建新的分组.png" alt="Create group by string" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Create Group via String Shortcut</figcaption>
+    <img src="images/v.0.1.8/AI摘要支持makedown渲染.png" alt="Markdown summary rendering" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Markdown Summary Rendering</figcaption>
   </figure>
 </div>
 
@@ -215,7 +215,9 @@ git clone https://github.com/xiongsircool/aurora-rss-reader.git
 cd aurora-rss-reader
 docker-compose up -d
 
-# Access: http://localhost:8080
+# Access Web UI: http://localhost:8080
+# Access Backend API: http://localhost:15432/api
+# Access MCP Endpoint: http://localhost:15432/mcp
 ```
 
 For detailed Docker configuration, see [Docker README](docker/README.md).
@@ -231,13 +233,12 @@ chmod +x build-release-app.sh
 ```
 
 Generated files:
-- macOS: `AuroraRSSReader-Mac-0.1.7-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.7-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.7-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.8.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.8-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.8-x64.AppImage`
 
 ## 📋 Documentation | 文档
 
-- **[Update Details](UPDATE_README.md)** - Detailed update content | 详细更新内容
 - **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
 ## Tech Stack
@@ -287,3 +288,23 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 ---
 
 Give it a ⭐ if you find it useful!
+## Changelog
+
+### v0.1.8 (Current Version)
+**Background Summary Queue + MCP Modernization + Docker Access**
+
+- Background summary queue can persist generated summaries locally and reuse them after restart
+- Added queue runtime status panel in settings for live inspection of summary jobs
+- MCP moved out of AI provider config into a dedicated settings section
+- MCP tool surface modernized with grouped recommended tools, deprecation hints and cursor-based search pagination
+- MCP time defaults now follow the app's current date range and time field settings
+- Docker deployment now exposes the backend directly on `15432` for local `/api` and `/mcp` access
+
+### v0.1.7
+**Digest Intelligence, Tag Workflow Polish & Update Experience**
+
+- Digest 2.0 with history, manual regenerate and locale-aligned language
+- Latest + Week digest modes
+- Analyze-all full pagination fix
+- Summary prompting quality upgrade
+- Manual update-check entry in settings

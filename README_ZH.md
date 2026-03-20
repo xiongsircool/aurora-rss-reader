@@ -23,22 +23,22 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.7 最新版本 | Latest Version
+### 🎉 v0.1.8 最新版本 | Latest Version
 
-**信息简报智能化、标签流程优化与更新体验升级 | Digest Intelligence, Tag Workflow Polish & Update Experience**
+**后台摘要队列、MCP 现代化与部署完善 | Background Summary Queue, Modernized MCP & Deployment Polish**
 
-- 🧠 **信息简报 2.0** - 支持 LLM 摘要历史、手动重生成、关键词展示、与界面语言一致
-- 🕒 **最新 + 本周模式** - 将“今日”优化为“最新”，避免无当日内容时标签消失
-- 🏷️ **分析全部修复** - 改为拉取待分类全量分页，不再只分析前端可见一页
-- 🧾 **摘要质量提升** - 提示词改为结论优先、事实密集、包含明确时间上下文
-- 🔄 **手动检查更新入口** - 设置 > 关于中新增“检查更新”按钮
-- 🧩 **侧边栏与标签交互优化** - 左侧操作与标签/简报联动体验增强
+- 🤖 **后台摘要队列** - 未读文章可进入本地持久化摘要队列，生成后重启仍可复用
+- 📊 **运行状态面板** - 设置中可直接查看摘要队列的排队、运行、成功、失败状态
+- 🔌 **MCP 工具面现代化** - MCP 改为资源型拆分工具，补齐 AI、标签、Digest 等工作流，并迁移到独立设置页
+- 📚 **MCP 使用体验升级** - 推荐工具分组展示，兼容别名标记为下版本移除，搜索支持分页
+- 🕒 **时间语义与应用设置对齐** - MCP 的列表与搜索默认继承应用当前的时间范围与时间字段
+- 🐳 **Docker 后端端口开放** - 本地 Docker 部署可直接通过 `15432` 访问 `/api` 与 `/mcp`
 
 ---
 
 Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + Fastify (Node.js) stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.7**
+**Current Version: v0.1.8**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -49,7 +49,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.7**
+**Current Version: v0.1.8**
 
 ### Features | 功能特色
 
@@ -121,30 +121,30 @@ chmod +x start.sh
 
 ### 界面预览
 
-#### 🌟 v0.1.7 新增界面
+#### 🌟 v0.1.8 新增界面
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/智能标签和简约日报功能.png" alt="智能标签与信息简报升级" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>智能标签与信息简报升级</figcaption>
+    <img src="images/v.0.1.8/MCP功能升级.png" alt="专门的 MCP 配置管理界面" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>MCP 独立配置页</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧键功能增强支持自定义别名修改分组.png" alt="左侧操作增强与分组别名" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>左侧操作增强与分组别名</figcaption>
+    <img src="images/v.0.1.8/增强了摘要和翻译分开设置偏好.png" alt="摘要和翻译偏好拆分设置" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>摘要与翻译偏好拆分设置</figcaption>
   </figure>
 </div>
 
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧风格切换按钮.png" alt="左侧风格切换按钮" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>左侧风格切换按钮</figcaption>
+    <img src="images/v.0.1.8/支持单个订阅和分组的日报功能.png" alt="支持单个订阅和分组的日报功能" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>单订阅与分组日报</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧切换后风格.png" alt="切换后的左侧样式" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>切换后的左侧样式</figcaption>
+    <img src="images/v.0.1.8/支持代理网络的配置.png" alt="支持代理网络的配置" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>代理网络配置</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/通过新的字符串可以创建新的分组.png" alt="通过字符串快速创建分组" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>通过字符串快速创建分组</figcaption>
+    <img src="images/v.0.1.8/AI摘要支持makedown渲染.png" alt="AI 摘要支持 Markdown 渲染" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>AI 摘要 Markdown 渲染</figcaption>
   </figure>
 </div>
 
@@ -251,7 +251,9 @@ git clone https://github.com/xiongsircool/aurora-rss-reader.git
 cd aurora-rss-reader
 docker-compose up -d
 
-# 访问: http://localhost:8080
+# 访问 Web: http://localhost:8080
+# 访问 API: http://localhost:15432/api
+# 访问 MCP: http://localhost:15432/mcp
 ```
 
 详细配置请参考 [Docker 部署文档](docker/README.md)。
@@ -267,9 +269,9 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `AuroraRSSReader-Mac-0.1.7-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.7-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.7-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.1.8.dmg`
+- Windows: `AuroraRSSReader-Windows-0.1.8-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.1.8-x64.AppImage`
 
 ## 技术栈
 
@@ -292,20 +294,23 @@ aurora-rss-reader/
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.7 (当前版本 | Current Version) 🎉
-**信息简报智能化 + 标签流程稳定性修复 | Digest Intelligence + Tag Workflow Stabilization**
+### v0.1.8 (当前版本 | Current Version) 🎉
+**后台摘要队列 + MCP 现代化 + Docker 访问优化 | Background Summary Queue + MCP Modernization + Docker Access**
 
 #### ✨ 新增与优化 | New & Improved
-- **信息简报历史弹窗** - 支持摘要历史、关键词、触发来源展示
-- **摘要手动重生成** - 支持按当前语言手动生成并立即刷新
-- **最新/本周双模式** - “最新”模式避免当日无文时简报空白
-- **摘要提示词升级** - 结论优先、事实密集、减少空泛表达
-- **分析全部全量化** - 待分类分页全部拉取后再分析
-- **设置-关于手动检查更新** - 增加“检查更新”入口
+- **后台摘要队列** - 未读文章支持自动排队摘要并保存到本地数据库
+- **摘要队列状态面板** - 设置页显示 queued/running/succeeded/failed 与时间范围
+- **MCP 独立设置页** - 从 AI 配置中拆出，提供端点、分组工具、文档入口、兼容提示
+- **MCP 搜索分页** - `search_entries` 现已支持 cursor 分页
+- **MCP 时间设置对齐** - `list_entries/search_entries` 默认继承应用当前的 `date_range + time_field`
+- **Docker 后端端口开放** - 容器模式直接暴露 `15432`，便于本地 API/MCP 接入
 
 #### 🐞 稳定性修复 | Stability Fixes
-- **SSE/JSON 解析兼容** - 分析流式响应解析更稳
-- **分析全部循环保护** - 分页失败时避免无限循环
+- **开发代理日志降噪** - 后端重启时不再被大量 `ECONNREFUSED` 刷屏
+- **删除兼容语义对齐** - MCP 的 feed 删除逻辑清理关联数据，避免残留脏数据
+
+### v0.1.7 (历史版本 | Previous Version)
+**信息简报智能化 + 标签流程稳定性修复 | Digest Intelligence + Tag Workflow Stabilization**
 
 ### v0.1.6 (历史版本 | Previous Version)
 **重大UI升级与新功能 | Major UI Enhancement & New Features**
