@@ -12,6 +12,7 @@
     "mcp": "tsx src/mcp-server.ts",
     "build": "tsc",
     "test": "node --import tsx --test test/**/*.test.ts",
+    "db:reset-dev": "tsx src/scripts/resetDevData.ts",
     "start": "node dist/main.js"
   },
   "dependencies": {

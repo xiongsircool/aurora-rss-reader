@@ -48,6 +48,12 @@ npm run dev    # Run Fastify server (http://127.0.0.1:15432)
 ### Mobile API
 The backend serves mobile clients over HTTP at `/api/mobile` ([routes/mobile.ts](backend-node/src/routes/mobile.ts)): cursor-paginated, presentation-shaped payloads. CORS already allows LAN origins and Capacitor schemes, so a self-hosted or LAN backend can serve phone clients.
 
+### Development Data Reset (from backend-node/)
+```bash
+npm run db:reset-dev -- --confirm-reset
+```
+Use this before mobile/client development when a deterministic feed dataset is needed. It creates a timestamped SQLite backup before deleting anything, preserves credentials/display preferences plus tag and collection definitions, disables background automation, and seeds six view types with 36 representative entries. The command refuses to run without `--confirm-reset` or when `NODE_ENV=production`.
+
 ### Testing (from backend-node/)
 ```bash
 npm test                                         # Run all tests (node --test + tsx)
