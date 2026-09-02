@@ -67,7 +67,7 @@ jobs:
           retention-days: 7
 
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
       - name: Checkout code
