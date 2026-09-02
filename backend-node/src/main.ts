@@ -14,6 +14,7 @@ import { schedulerRoutes } from './routes/scheduler.js';
 import { zoteroRoutes } from './routes/zotero.js';
 import { collectionsRoutes } from './routes/collections.js';
 import tagsRoutes from './routes/tags.js';
+import { mobileRoutes } from './routes/mobile.js';
 import { scheduler } from './services/scheduler.js';
 import { handleMcpRequest, handleMcpGetRequest, handleMcpDeleteRequest } from './mcp/server.js';
 
@@ -26,12 +27,21 @@ let isShuttingDown = false;
 await app.register(cors, {
   origin: (origin, cb) => {
     // Allow all localhost origins in development
-    if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    if (
+      !origin ||
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+      /^https?:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin)
+    ) {
       cb(null, true);
       return;
     }
-    // Allow Electron origins
-    if (origin === 'null' || origin.startsWith('app://')) {
+    // Allow Electron and Capacitor origins
+    if (
+      origin === 'null' ||
+      origin.startsWith('app://') ||
+      origin.startsWith('capacitor://') ||
+      origin.startsWith('ionic://')
+    ) {
       cb(null, true);
       return;
     }
@@ -105,6 +115,7 @@ await app.register(schedulerRoutes, { prefix: '/api' });
 await app.register(zoteroRoutes, { prefix: '/api' });
 await app.register(collectionsRoutes, { prefix: '/api' });
 await app.register(tagsRoutes, { prefix: '/api' });
+await app.register(mobileRoutes, { prefix: '/api' });
 
 // ============================================
 // MCP (Model Context Protocol) Endpoint
