@@ -1,0 +1,50 @@
+{
+  "name": "rss-mobile",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "vue-tsc --noEmit",
+    "cap:sync": "pnpm build && cap sync",
+    "cap:copy": "pnpm build && cap copy",
+    "ios:open": "cap open ios",
+    "android:open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.0",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/browser": "^8.0.3",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/keyboard": "^8.0.3",
+    "@capacitor/status-bar": "^8.0.2",
+    "@mozilla/readability": "^0.6.0",
+    "dompurify": "^3.4.2",
+    "fast-xml-parser": "^5.8.0",
+    "jeep-sqlite": "^2.8.0",
+    "lucide-vue-next": "^1.0.0",
+    "marked": "^18.0.4",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.32",
+    "vue-router": "^5.0.6"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/ios": "^8.3.1",
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "^24.12.2",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/tsconfig": "^0.9.1",
+    "jsdom": "^29.1.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.10",
+    "vitest": "^4.1.7",
+    "vue-tsc": "^3.2.7"
+  }
+}
