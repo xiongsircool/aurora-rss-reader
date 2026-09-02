@@ -1,0 +1,104 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
+import '../../application/ports/feed_http_client.dart';
+
+final class FeedHttpException implements Exception {
+  const FeedHttpException(this.message, {this.statusCode});
+
+  final String message;
+  final int? statusCode;
+
+  @override
+  String toString() => statusCode == null
+      ? 'FeedHttpException: $message'
+      : 'FeedHttpException($statusCode): $message';
+}
+
+final class IoFeedHttpClient implements FeedHttpClient {
+  IoFeedHttpClient({HttpClient? client}) : _client = client ?? HttpClient();
+
+  static const _userAgent = 'AuroraRSSMobile/0.1';
+  final HttpClient _client;
+
+  @override
+  Future<FeedHttpResponse> get(
+    Uri uri, {
+    Duration timeout = const Duration(seconds: 20),
+    int maxBytes = 10 * 1024 * 1024,
+  }) async {
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      throw FeedHttpException('Unsupported URL scheme: ${uri.scheme}');
+    }
+    if (maxBytes <= 0) {
+      throw const FeedHttpException('Response size limit must be positive');
+    }
+
+    try {
+      final request = await _client.getUrl(uri).timeout(timeout);
+      request
+        ..followRedirects = true
+        ..maxRedirects = 5
+        ..headers.set(HttpHeaders.userAgentHeader, _userAgent)
+        ..headers.set(
+          HttpHeaders.acceptHeader,
+          'application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.5',
+        );
+
+      final response = await request.close().timeout(timeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        await response.drain<void>();
+        throw FeedHttpException(
+          'Feed request failed',
+          statusCode: response.statusCode,
+        );
+      }
+
+      final declaredLength = response.contentLength;
+      if (declaredLength > maxBytes) {
+        await response.drain<void>();
+        throw FeedHttpException(
+          'Feed response exceeds $maxBytes bytes',
+          statusCode: response.statusCode,
+        );
+      }
+
+      final body = BytesBuilder(copy: false);
+      await for (final chunk in response.timeout(timeout)) {
+        if (body.length + chunk.length > maxBytes) {
+          throw FeedHttpException(
+            'Feed response exceeds $maxBytes bytes',
+            statusCode: response.statusCode,
+          );
+        }
+        body.add(chunk);
+      }
+
+      final headers = <String, List<String>>{};
+      response.headers.forEach((name, values) {
+        headers[name.toLowerCase()] = List.unmodifiable(values);
+      });
+      final finalUri = response.redirects.isEmpty
+          ? uri
+          : response.redirects.last.location;
+
+      return FeedHttpResponse(
+        requestedUri: uri,
+        finalUri: finalUri,
+        statusCode: response.statusCode,
+        headers: Map.unmodifiable(headers),
+        body: Uint8List.fromList(body.takeBytes()),
+      );
+    } on TimeoutException catch (error) {
+      throw FeedHttpException('Feed request timed out: $error');
+    } on SocketException catch (error) {
+      throw FeedHttpException('Feed network error: ${error.message}');
+    }
+  }
+
+  @override
+  void close() {
+    _client.close(force: true);
+  }
+}

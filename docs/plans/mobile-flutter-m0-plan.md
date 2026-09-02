@@ -8,19 +8,23 @@
 - [x] v0.2.0 桌面版已推送并触发发布流水线
 - [x] 旧 Capacitor 客户端归档到 `archive/mobile-plan-d-v1`
 - [x] 创建开发分支 `feature/mobile-flutter-v1`
-- [ ] 安装 Flutter stable SDK
+- [x] 安装 Flutter stable SDK(3.47.2 / Dart 3.13.2)
 - [ ] 安装完整 Xcode并完成首次启动/许可证
-- [ ] 安装 Android Studio、Android SDK与 JDK 17+
-- [ ] `flutter doctor -v` 的 Android/iOS 项全部通过
+- [x] 安装 CocoaPods 1.17.0
+- [x] 安装 Android command-line SDK 36、Build Tools 36、Platform Tools与 JDK 17
+- [ ] 安装 Android Studio/模拟器(命令行构建不依赖此项)
+- [ ] `flutter doctor -v` 的 Android/iOS 项全部通过(Android 已通过,iOS 待 Xcode)
 
 环境限制不阻塞纯 Dart 单测和项目分层,但 M0 不能在真机检查完成前宣布结束。
 
 ## 1. 脚手架
 
-- [ ] 使用 `flutter create --platforms=android,ios` 创建 `rss-mobile/`
-- [ ] 应用标识统一为 `com.xiongsircool.aurora.mobile`
-- [ ] 建立 `app/domain/application/data/platform/features/shared` 目录
-- [ ] 配置静态检查、单测和集成测试
+- [x] 使用 `flutter create --platforms=android,ios` 创建 `rss-mobile/`
+- [x] 应用标识统一为 `com.xiongsircool.aurora.mobile`
+- [ ] 建立 `app/domain/application/data/platform/features/shared` 目录(已建立首批实际使用目录)
+- [x] 配置静态检查和单元/Widget 测试
+- [x] Android debug APK 构建通过
+- [ ] 配置真机集成测试
 - [ ] 增加开发/测试环境配置,禁止真实凭据进入仓库
 
 验收:
@@ -36,11 +40,11 @@ flutter build ios --debug --no-codesign
 
 验证项:
 
-- [ ] 原始字节响应,不提前假设 UTF-8
+- [x] 原始字节响应,不提前假设 UTF-8
 - [ ] gzip/deflate
-- [ ] 301/302/307/308 重定向
-- [ ] 超时和主动取消
-- [ ] User-Agent与常用请求头
+- [x] 301/302/307/308 重定向(已完成通用重定向单测,真实状态码语料待补)
+- [x] 超时和响应体大小限制;主动取消待补
+- [x] User-Agent与常用请求头
 - [ ] UTF-8、GBK/GB18030、Big5、Shift-JIS 编码
 - [ ] TLS、HTTP 错误和响应体大小限制
 
