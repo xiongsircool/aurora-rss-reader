@@ -12,7 +12,8 @@
 - [ ] 安装完整 Xcode并完成首次启动/许可证
 - [x] 安装 CocoaPods 1.17.0
 - [x] 安装 Android command-line SDK 36、Build Tools 36、Platform Tools与 JDK 17
-- [ ] 安装 Android Studio/模拟器(命令行构建不依赖此项)
+- [x] 安装 Android Emulator与 API 36 ARM64 系统镜像
+- [ ] 安装 Android Studio(命令行构建和模拟器不依赖此项)
 - [ ] `flutter doctor -v` 的 Android/iOS 项全部通过(Android 已通过,iOS 待 Xcode)
 
 环境限制不阻塞纯 Dart 单测和项目分层,但 M0 不能在真机检查完成前宣布结束。
@@ -24,6 +25,7 @@
 - [ ] 建立 `app/domain/application/data/platform/features/shared` 目录(已建立首批实际使用目录)
 - [x] 配置静态检查和单元/Widget 测试
 - [x] Android debug APK 构建通过
+- [x] Android 36 ARM64 模拟器安装、冷启动、四标签导航与无崩溃冒烟通过
 - [ ] 配置真机集成测试
 - [ ] 增加开发/测试环境配置,禁止真实凭据进入仓库
 
