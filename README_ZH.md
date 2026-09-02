@@ -23,22 +23,22 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.9 最新版本 | Latest Release
+### 🎉 v0.2.0 最新版本 | Latest Release
 
-**后台摘要队列、MCP 现代化与部署完善 | Background Summary Queue, Modernized MCP & Deployment Polish**
+**阅读统计、订阅稳定性与移动 API 基础 | Reading Analytics, Feed Reliability & Mobile API Foundation**
 
-- 🤖 **后台摘要队列** - 未读文章可进入本地持久化摘要队列，生成后重启仍可复用
-- 📊 **运行状态面板** - 设置中可直接查看摘要队列的排队、运行、成功、失败状态
-- 🔌 **MCP 工具面现代化** - MCP 改为资源型拆分工具，补齐 AI、标签、Digest 等工作流，并迁移到独立设置页
-- 📚 **MCP 使用体验升级** - 推荐工具分组展示，兼容别名标记为下版本移除，搜索支持分页
-- 🕒 **时间语义与应用设置对齐** - MCP 的列表与搜索默认继承应用当前的时间范围与时间字段
-- 🐳 **Docker 后端端口开放** - 本地 Docker 部署可直接通过 `15432` 访问 `/api` 与 `/mcp`
+- 📊 **阅读统计** - 新增文章总量、阅读率、30 天趋势、主要订阅源和常用标签可视化
+- 🕒 **阅读时间记录** - 已读操作开始在本地记录时间，为趋势分析积累数据，不上传阅读行为
+- 📰 **Feed 解析稳定性** - 提前识别 HTML/非 RSS 响应，并支持更多 Media RSS 与直接图片字段
+- 🎬 **视频订阅优化** - 改进视频链接提取和时间线视频卡片展示
+- 📱 **移动 API 基础** - 为后续局域网或自托管移动客户端提供游标分页与展示数据接口
+- 🧩 **v0.2 路线图收官** - 阅读统计已内置；AI 辅助 RSSHub 浏览器工具位于独立项目 [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator)
 
 ---
 
 Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + Fastify (Node.js) stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.9**
+**Current Version: v0.2.0**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -49,7 +49,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.9**
+**Current Version: v0.2.0**
 
 ### Features | 功能特色
 
@@ -269,15 +269,15 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `AuroraRSSReader-Mac-0.1.9.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.9-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.9-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.2.0.dmg`
+- Windows: `AuroraRSSReader-Windows-0.2.0-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.2.0-x64.AppImage`
 
 ### Public 打包注意事项
 - public 打包或打 tag 前，先确认 `rss-desktop/package.json` 已经切到目标版本号。
 - 先在 `main` 上用 `workflow_dispatch` 跑预检，只验证构建，不创建 GitHub Release。
 - macOS、Windows、Linux 三个平台都通过后，再创建正式公开 tag。
-- 新版本请使用未占用的 tag，例如 `v0.1.9`，不要重复使用已经占用的 `v0.1.8`。
+- 新版本请使用未占用的 tag，例如 `v0.2.0`，不要重复使用已经占用的 `v0.1.9`。
 - 自动更新只有在 public GitHub Release 带上安装包和 `latest*.yml` 后才会生效。
 - 当前 macOS 安装包仍为未签名分发，应用内版本检查可用，但建议用户通过 GitHub Releases 手动下载安装更新。
 
@@ -302,7 +302,17 @@ aurora-rss-reader/
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.9 (当前版本 | Current Version) 🎉
+### v0.2.0 (当前版本 | Current Version) 🎉
+**阅读统计 + Feed 稳定性 + 移动 API 基础 | Reading Analytics + Feed Reliability + Mobile API Foundation**
+
+#### ✨ 新增与优化 | New & Improved
+- **阅读统计面板** - 展示文章总量、阅读率、30 天趋势、主要订阅源和常用标签
+- **阅读时间记录** - 新增本地 `read_at` 字段及兼容旧数据库的幂等迁移
+- **Feed 与媒体解析优化** - 改进非 RSS 响应识别、Media RSS 图片提取、视频链接与视频卡片展示
+- **移动 API 基础** - 新增游标分页的 `/api/mobile` 接口，为后续局域网/自托管客户端保留选择
+- **v0.2 路线图完成** - 浏览器工具由独立项目 [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator) 提供
+
+### v0.1.9 (已发布上一版本 | Previous Version)
 **后台摘要队列 + MCP 现代化 + Docker 访问优化 | Background Summary Queue + MCP Modernization + Docker Access**
 
 #### ✨ 新增与优化 | New & Improved

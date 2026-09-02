@@ -25,16 +25,16 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.1.9 Latest Release | 最新版本
+## 🎉 v0.2.0 Latest Release | 最新版本
 
-**Background Summary Queue, Modernized MCP & Deployment Polish | 后台摘要队列、MCP 现代化与部署完善**
+**Reading Analytics, Feed Reliability & Mobile API Foundation | 阅读统计、订阅稳定性与移动 API 基础**
 
-- 🤖 **Background Summary Queue** - Unread articles can now enter a saved local summary queue and reuse generated summaries after restart
-- 📊 **Runtime Status Panel** - Added live queue status in settings so you can inspect queued, running, succeeded and failed summary jobs
-- 🔌 **Modernized MCP Surface** - Reworked MCP into split resource tools, added AI/tag/digest workflows, and moved MCP into its own settings section
-- 📚 **MCP Usability Upgrade** - Recommended tools are grouped, legacy aliases are marked for removal, and search now supports cursor pagination
-- 🕒 **Time Semantics Aligned** - MCP list/search defaults now follow the app's current `date_range + time_field` settings
-- 🐳 **Docker Backend Port Exposure** - Local Docker deployment now exposes the backend directly on `15432`, including `/api` and `/mcp`
+- 📊 **Reading Analytics** - Added totals, read rate, 30-day activity, top feeds, and tag visualizations
+- 🕒 **Read Activity Tracking** - Read timestamps now accumulate locally for meaningful trends without uploading reading data
+- 📰 **More Reliable Feed Parsing** - Rejects HTML/non-RSS responses early and extracts more direct and Media RSS images
+- 🎬 **Video Feed Polish** - Improved video extraction and timeline card presentation
+- 📱 **Mobile API Foundation** - Added cursor-paginated presentation endpoints for future LAN or self-hosted mobile clients
+- 🧩 **v0.2 Roadmap Complete** - Reading analytics ships in-app; the AI-assisted RSSHub browser tool lives in [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator)
 
 ---
 
@@ -42,7 +42,7 @@
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.9**
+**Current Version: v0.2.0**
 
 ## Key Features
 
@@ -238,15 +238,15 @@ chmod +x build-release-app.sh
 ```
 
 Generated files:
-- macOS: `AuroraRSSReader-Mac-0.1.9.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.9-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.9-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.2.0.dmg`
+- Windows: `AuroraRSSReader-Windows-0.2.0-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.2.0-x64.AppImage`
 
 ### Public Packaging Notes
 - Bump `rss-desktop/package.json` to the target release version before any public packaging or tagging.
 - Run the packaging preflight on `main` first with `workflow_dispatch`; this validates the build without creating a GitHub Release.
 - Only create the public tag after macOS, Windows, and Linux builds all pass.
-- Use a fresh tag such as `v0.1.9`; do not reuse an occupied release tag like `v0.1.8`.
+- Use a fresh tag such as `v0.2.0`; do not reuse an occupied release tag like `v0.1.9`.
 - Auto-update continues to work only after the public GitHub Release is created with installers and `latest*.yml`.
 - For the current unsigned macOS build, in-app version checking is available, but users should still update via GitHub Releases manually.
 
@@ -303,7 +303,16 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 Give it a ⭐ if you find it useful!
 ## Changelog
 
-### v0.1.9 (Current Version)
+### v0.2.0 (Current Version)
+**Reading Analytics + Feed Reliability + Mobile API Foundation**
+
+- Added a localized reading statistics dashboard with totals, read rate, 30-day activity, top feeds, and top tags
+- Added local `read_at` tracking and an idempotent migration for existing databases
+- Improved feed validation, Media RSS image extraction, video URL extraction, and timeline video cards
+- Added cursor-paginated `/api/mobile` endpoints for future LAN or self-hosted mobile clients
+- Completed the v0.2 roadmap; the AI-assisted browser tool is maintained separately as [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator)
+
+### v0.1.9 (Previous Version)
 **Background Summary Queue + MCP Modernization + Docker Access**
 
 - Background summary queue can persist generated summaries locally and reuse them after restart
