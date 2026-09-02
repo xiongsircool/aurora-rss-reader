@@ -189,13 +189,18 @@ onMounted(() => {
     </div>
 
     <div class="mt-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4">
-      <div class="text-sm font-medium text-[var(--text-primary)] mb-2">{{ t('settings.mcpLegacyAliases') }}</div>
+      <div class="flex items-center gap-2 mb-2">
+        <div class="text-sm font-medium text-[var(--text-primary)]">{{ t('settings.mcpLegacyAliases') }}</div>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium border border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400">
+          {{ t('settings.mcpDeprecatedNextVersion') }}
+        </span>
+      </div>
       <p class="m-0 text-xs leading-5 text-[var(--text-secondary)]">{{ t('settings.mcpLegacyAliasesHint') }}</p>
       <div class="flex flex-wrap gap-2 mt-3">
         <span
           v-for="tool in status?.legacy_aliases || []"
           :key="tool"
-          class="px-2.5 py-1 rounded-lg text-xs border border-[var(--border-color)] bg-[var(--bg-base)] text-[var(--text-secondary)]"
+          class="px-2.5 py-1 rounded-lg text-xs border border-red-500/20 bg-red-500/8 text-red-600 dark:text-red-400"
         >
           {{ tool }}
         </span>

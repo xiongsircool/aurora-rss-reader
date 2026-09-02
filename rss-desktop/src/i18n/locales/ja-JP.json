@@ -283,6 +283,7 @@
     "globalDefaultConfig": "グローバルデフォルト設定",
     "globalDefaultConfigHint": "すべてのAIサービスはデフォルトでこの設定を使用し、各サービスは個別に上書きできます",
     "providerPreset": "プロバイダープリセット",
+    "clickToSelect": "クリックして選択",
     "selectProvider": "AIプロバイダーを選択...",
     "globalApiKeyPlaceholder": "API Keyを入力",
     "allProvidersOpenAICompat": "すべてのプロバイダーはOpenAI互換APIで呼び出されます",

@@ -287,6 +287,7 @@
     "globalDefaultConfig": "글로벌 기본 설정",
     "globalDefaultConfigHint": "모든 AI 서비스는 기본적으로 이 설정을 사용하며, 각 서비스에서 개별적으로 재정의할 수 있습니다",
     "providerPreset": "제공업체 프리셋",
+    "clickToSelect": "클릭하여 선택",
     "selectProvider": "AI 제공업체 선택...",
     "globalApiKeyPlaceholder": "API Key 입력",
     "allProvidersOpenAICompat": "모든 제공업체는 OpenAI 호환 API로 호출됩니다",
