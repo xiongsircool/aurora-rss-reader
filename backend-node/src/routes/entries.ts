@@ -517,10 +517,11 @@ export async function entriesRoutes(app: FastifyInstance) {
     }
 
     const ids = rows.map((row) => row.id);
+    const markedAt = new Date().toISOString();
     const idChunks = chunkArray(ids, SQLITE_IN_CLAUSE_CHUNK_SIZE);
     for (const chunk of idChunks) {
       const placeholders = chunk.map(() => '?').join(', ');
-      db.prepare(`UPDATE entries SET read = 1 WHERE id IN (${placeholders})`).run(...chunk);
+      db.prepare(`UPDATE entries SET read = 1, read_at = ? WHERE id IN (${placeholders})`).run(markedAt, ...chunk);
     }
 
     return {

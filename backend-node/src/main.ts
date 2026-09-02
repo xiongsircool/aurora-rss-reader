@@ -15,6 +15,7 @@ import { zoteroRoutes } from './routes/zotero.js';
 import { collectionsRoutes } from './routes/collections.js';
 import tagsRoutes from './routes/tags.js';
 import { mobileRoutes } from './routes/mobile.js';
+import { statsRoutes } from './routes/stats.js';
 import { scheduler } from './services/scheduler.js';
 import { handleMcpRequest, handleMcpGetRequest, handleMcpDeleteRequest } from './mcp/server.js';
 
@@ -114,6 +115,7 @@ await app.register(iconsRoutes, { prefix: '/api' });
 await app.register(schedulerRoutes, { prefix: '/api' });
 await app.register(zoteroRoutes, { prefix: '/api' });
 await app.register(collectionsRoutes, { prefix: '/api' });
+await app.register(statsRoutes, { prefix: '/api' });
 await app.register(tagsRoutes, { prefix: '/api' });
 await app.register(mobileRoutes, { prefix: '/api' });
 

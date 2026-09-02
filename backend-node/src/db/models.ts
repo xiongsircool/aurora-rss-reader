@@ -47,6 +47,7 @@ export interface Entry {
   published_at: string | null;
   inserted_at: string;
   read: number; // SQLite boolean (0/1)
+  read_at: string | null;
   starred: number; // SQLite boolean (0/1)
   // Enclosure fields for audio/video
   enclosure_url: string | null;

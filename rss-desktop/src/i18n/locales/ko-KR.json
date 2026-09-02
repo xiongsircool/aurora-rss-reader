@@ -411,6 +411,23 @@
     "baseUrl": "API 주소",
     "baseUrlPlaceholder": "예: https://open.bigmodel.cn/api/paas/v4/"
   },
+  "readingStats": {
+    "title": "읽기 통계",
+    "subtitle": "구독 규모, 읽기 진행률 및 최근 30일 활동을 확인합니다.",
+    "loadFailed": "읽기 통계를 불러오지 못했습니다",
+    "totalEntries": "전체 기사",
+    "readEntries": "읽음",
+    "unreadEntries": "읽지 않음",
+    "starredEntries": "즐겨찾기",
+    "totalFeeds": "피드",
+    "last30Days": "최근 30일",
+    "timelineHint": "읽기 활동은 v0.2부터 기록되며 이전 읽음 기록에는 시간이 없습니다.",
+    "ingested": "추가",
+    "read": "읽기",
+    "topFeeds": "주요 피드",
+    "overallReadRate": "전체 읽기율",
+    "topTags": "자주 쓰는 태그"
+  },
   "groups": {
     "title": "그룹",
     "createGroup": "그룹 생성",

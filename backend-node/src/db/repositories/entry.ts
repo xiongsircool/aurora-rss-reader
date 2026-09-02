@@ -73,6 +73,7 @@ export class EntryRepository {
       published_at: input.published_at ?? null,
       inserted_at: now,
       read: 0,
+      read_at: null,
       starred: 0,
       enclosure_url: input.enclosure_url ?? null,
       enclosure_type: input.enclosure_type ?? null,
@@ -265,13 +266,13 @@ export class EntryRepository {
   }
 
   markAsRead(id: string): boolean {
-    const stmt = this.db.prepare('UPDATE entries SET read = 1 WHERE id = ?');
-    const result = stmt.run(id);
+    const stmt = this.db.prepare('UPDATE entries SET read = 1, read_at = ? WHERE id = ?');
+    const result = stmt.run(new Date().toISOString(), id);
     return result.changes > 0;
   }
 
   markAsUnread(id: string): boolean {
-    const stmt = this.db.prepare('UPDATE entries SET read = 0 WHERE id = ?');
+    const stmt = this.db.prepare('UPDATE entries SET read = 0, read_at = NULL WHERE id = ?');
     const result = stmt.run(id);
     return result.changes > 0;
   }

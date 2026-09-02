@@ -290,9 +290,9 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 ### Short-term Plans (v0.2)
 - [x] **AI Daily Briefing / Scope Summary** - Tag digest, feed/group scope summaries, automation and rerun flows are already available ✅
 - [x] **Podcast Support** - Support for audio podcast subscription and playback ✅
-- [ ] **Reading Analytics** - Personal reading habits analysis and data visualization
+- [x] **Reading Analytics** - Subscription totals, read rate, 30-day trends, top feeds, and tag visualizations are available ✅
 - [x] **RSSHub Support** - RSSHub URL configuration, mirror switching and RSSHub feed access are already supported ✅
-- [ ] **Browser Extension** - Use AI to analyze sites and generate RSSHub subscription rules
+- [x] **Browser Extension** - AI-assisted RSSHub rule generation is available in the separate [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator) project ✅
 
 ### Mid-term Plans (v0.3)
 - [ ] **Data Synchronization** - Cross-device data sync and cloud backup

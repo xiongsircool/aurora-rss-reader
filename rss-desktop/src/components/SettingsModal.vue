@@ -20,12 +20,13 @@ const SettingsAIConfig = defineAsyncComponent(() => import('./settings/SettingsA
 const SettingsAIFeatures = defineAsyncComponent(() => import('./settings/SettingsAIFeatures.vue'))
 const SettingsAIAutomation = defineAsyncComponent(() => import('./settings/SettingsAIAutomation.vue'))
 const SettingsMCP = defineAsyncComponent(() => import('./settings/SettingsMCP.vue'))
+const SettingsStats = defineAsyncComponent(() => import('./settings/SettingsStats.vue'))
 const SettingsTagRerun = defineAsyncComponent(() => import('./settings/SettingsTagRerun.vue'))
 const SettingsRefresh = defineAsyncComponent(() => import('./settings/SettingsRefresh.vue'))
 const SettingsDisplay = defineAsyncComponent(() => import('./settings/SettingsDisplay.vue'))
 const SettingsAbout = defineAsyncComponent(() => import('./settings/SettingsAbout.vue'))
 
-type Category = 'general' | 'display' | 'sync' | 'intelligence' | 'mcp'
+type Category = 'general' | 'display' | 'sync' | 'stats' | 'intelligence' | 'mcp'
 
 const props = withDefaults(defineProps<{
   show: boolean
@@ -74,6 +75,7 @@ const categories = [
   { id: 'general', label: 'settings.general', icon: 'i-carbon-settings' },
   { id: 'display', label: 'settings.displaySettings', icon: 'i-carbon-screen' },
   { id: 'sync', label: 'settings.sync', icon: 'i-carbon-renew' },
+  { id: 'stats', label: 'readingStats.title', icon: 'i-carbon-chart-column' },
   { id: 'intelligence', label: 'settings.aiConfig', icon: 'i-carbon-machine-learning' },
   { id: 'mcp', label: 'settings.mcpService', icon: 'i-carbon-plug' },
 ]
@@ -465,6 +467,13 @@ async function saveSettings() {
                       @change="refresh.handleFetchIntervalChange"
                       @auto-refresh-change="refresh.handleAutoRefreshChange"
                     />
+                  </div>
+                </div>
+
+                <!-- Reading Statistics Section -->
+                <div v-if="activeCategory === 'stats'" class="space-y-6">
+                  <div class="setting-group">
+                    <SettingsStats />
                   </div>
                 </div>
 

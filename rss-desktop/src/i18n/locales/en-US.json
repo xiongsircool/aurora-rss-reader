@@ -508,6 +508,23 @@
     "baseUrl": "API Base URL",
     "baseUrlPlaceholder": "e.g. https://open.bigmodel.cn/api/paas/v4/"
   },
+  "readingStats": {
+    "title": "Reading Statistics",
+    "subtitle": "Review your subscription volume, reading progress, and activity over the last 30 days.",
+    "loadFailed": "Failed to load reading statistics",
+    "totalEntries": "Total Articles",
+    "readEntries": "Read",
+    "unreadEntries": "Unread",
+    "starredEntries": "Starred",
+    "totalFeeds": "Feeds",
+    "last30Days": "Last 30 Days",
+    "timelineHint": "Reading activity is recorded from v0.2 onward; historical reads have no timestamp.",
+    "ingested": "Added",
+    "read": "Read",
+    "topFeeds": "Top Feeds",
+    "overallReadRate": "Overall read rate",
+    "topTags": "Top Tags"
+  },
   "groups": {
     "title": "Groups",
     "createGroup": "Create Group",

@@ -106,6 +106,15 @@ function runMigrations(): void {
     console.log('Migration completed: fetch metadata columns added');
   }
 
+  // Check if read_at column exists in entries (for reading statistics)
+  const hasReadAt = entriesTableInfo.some((col) => col.name === 'read_at');
+  if (!hasReadAt) {
+    console.log('Running migration: Adding read_at column to entries');
+    db.exec(`ALTER TABLE entries ADD COLUMN read_at TEXT`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_read_at ON entries(read_at)`);
+    console.log('Migration completed: read_at column added');
+  }
+
   const hasExtractionStatus = entriesTableInfo.some((col) => col.name === 'content_extraction_status');
   if (!hasExtractionStatus) {
     console.log('Running migration: Adding content extraction columns to entries');
@@ -344,6 +353,7 @@ export function initDatabase(): void {
       published_at TEXT,
       inserted_at TEXT NOT NULL,
       read INTEGER DEFAULT 0,
+      read_at TEXT,
       starred INTEGER DEFAULT 0,
       enclosure_url TEXT,
       enclosure_type TEXT,
@@ -708,6 +718,7 @@ export function initDatabase(): void {
 
   // Create indexes that depend on migrated columns after schema upgrades finish.
   db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_content_extraction_status ON entries(content_extraction_status)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_read_at ON entries(read_at)`);
 
   // Create local full-text search index and sync triggers.
   createFtsTables();

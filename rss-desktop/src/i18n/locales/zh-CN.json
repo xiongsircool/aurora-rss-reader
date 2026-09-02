@@ -512,6 +512,23 @@
     "baseUrl": "API 地址",
     "baseUrlPlaceholder": "例如: https://open.bigmodel.cn/api/paas/v4/"
   },
+  "readingStats": {
+    "title": "阅读统计",
+    "subtitle": "了解订阅规模、阅读进度与最近 30 天的阅读趋势。",
+    "loadFailed": "读取统计数据失败",
+    "totalEntries": "文章总数",
+    "readEntries": "已读",
+    "unreadEntries": "未读",
+    "starredEntries": "收藏",
+    "totalFeeds": "订阅源",
+    "last30Days": "最近 30 天",
+    "timelineHint": "阅读趋势从 v0.2 开始记录，历史已读文章不补写时间。",
+    "ingested": "新增",
+    "read": "阅读",
+    "topFeeds": "主要订阅源",
+    "overallReadRate": "总阅读率",
+    "topTags": "常用标签"
+  },
   "groups": {
     "title": "分组",
     "createGroup": "创建分组",

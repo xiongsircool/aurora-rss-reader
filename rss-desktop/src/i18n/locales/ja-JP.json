@@ -407,6 +407,23 @@
     "baseUrl": "API アドレス",
     "baseUrlPlaceholder": "例: https://open.bigmodel.cn/api/paas/v4/"
   },
+  "readingStats": {
+    "title": "閲覧統計",
+    "subtitle": "購読規模、閲覧進捗、過去30日間のアクティビティを確認します。",
+    "loadFailed": "閲覧統計を読み込めませんでした",
+    "totalEntries": "記事総数",
+    "readEntries": "既読",
+    "unreadEntries": "未読",
+    "starredEntries": "お気に入り",
+    "totalFeeds": "フィード",
+    "last30Days": "過去30日間",
+    "timelineHint": "閲覧履歴は v0.2 以降に記録され、過去の既読記事には日時がありません。",
+    "ingested": "追加",
+    "read": "閲覧",
+    "topFeeds": "主なフィード",
+    "overallReadRate": "全体既読率",
+    "topTags": "よく使うタグ"
+  },
   "groups": {
     "title": "グループ",
     "createGroup": "グループを作成",
