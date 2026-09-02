@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { formatDate } from '../../utils/date'
 import { extractEntryVideo, getPlatformLabel, getPlatformColor } from '../../composables/useVideoExtractor'
 import { getEntryPlaceholderColor, getEntryInitial } from '../../composables/useImageExtractor'
@@ -26,6 +26,14 @@ const platformColor = computed(() => videoInfo.value ? getPlatformColor(videoInf
 
 const showPlaceholder = computed(() =>
   !videoInfo.value?.thumbnail || thumbnailError.value
+)
+
+watch(
+  () => [props.entry.id, videoInfo.value?.thumbnail] as const,
+  () => {
+    thumbnailLoaded.value = false
+    thumbnailError.value = false
+  },
 )
 
 function handleThumbnailLoad() {

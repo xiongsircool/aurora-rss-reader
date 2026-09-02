@@ -1,4 +1,5 @@
 import type { Entry } from '../types'
+import { extractFirstImage } from './useImageExtractor'
 
 export interface VideoInfo {
   url: string
@@ -104,13 +105,15 @@ function extractVimeo(html: string): VideoInfo | null {
  * Extract Bilibili video info
  */
 function extractBilibili(html: string): VideoInfo | null {
-  // Match Bilibili iframe
-  const iframeMatch = html.match(/player\.bilibili\.com\/player\.html\?[^"']*bvid=([a-zA-Z0-9]+)/i)
+  const thumbnail = extractFirstImage(html)
+
+  // Match Bilibili iframe or RSSHub mobile player iframe
+  const iframeMatch = html.match(/bilibili\.com\/(?:player\.html|blackboard\/html5mobileplayer\.html)\?[^"']*bvid=([a-zA-Z0-9]+)/i)
   if (iframeMatch?.[1]) {
     const videoId = iframeMatch[1]
     return {
       url: `https://www.bilibili.com/video/${videoId}`,
-      thumbnail: null,
+      thumbnail,
       platform: 'bilibili',
       videoId,
     }
@@ -122,7 +125,7 @@ function extractBilibili(html: string): VideoInfo | null {
     const videoId = linkMatch[1]
     return {
       url: `https://www.bilibili.com/video/${videoId}`,
-      thumbnail: null,
+      thumbnail,
       platform: 'bilibili',
       videoId,
     }
@@ -222,15 +225,26 @@ function normalizeVideoUrl(url: string): string | null {
  */
 export function extractEntryVideo(entry: Entry): VideoInfo | null {
   const contentVideo = extractVideoInfo(entry.content)
-  if (contentVideo) return contentVideo
+  if (contentVideo) return withEntryThumbnail(contentVideo, entry)
 
   const readabilityVideo = extractVideoInfo(entry.readability_content)
-  if (readabilityVideo) return readabilityVideo
+  if (readabilityVideo) return withEntryThumbnail(readabilityVideo, entry)
 
   const summaryVideo = extractVideoInfo(entry.summary)
-  if (summaryVideo) return summaryVideo
+  if (summaryVideo) return withEntryThumbnail(summaryVideo, entry)
 
   return null
+}
+
+function withEntryThumbnail(video: VideoInfo, entry: Entry): VideoInfo {
+  if (video.thumbnail || !entry.image_url) {
+    return video
+  }
+
+  return {
+    ...video,
+    thumbnail: entry.image_url,
+  }
 }
 
 /**
