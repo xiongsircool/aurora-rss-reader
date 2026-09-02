@@ -158,7 +158,21 @@ export function extractPmid(item: any): string | null {
   return null;
 }
 
-function extractImageUrl(item: any, feedData: any): string | null {
+function extractItemImageUrl(item: any): string | null {
+  const directImage =
+    item.image ||
+    item.image_url ||
+    item.imageUrl ||
+    item.thumbnail ||
+    item.thumb;
+
+  if (directImage) {
+    const image = typeof directImage === 'string' ? directImage : directImage.href || directImage.url;
+    if (typeof image === 'string') {
+      return image;
+    }
+  }
+
   if (item.itunes?.image) {
     const image = item.itunes.image;
     return typeof image === 'string' ? image : image.href || image.url || null;
@@ -171,13 +185,74 @@ function extractImageUrl(item: any, feedData: any): string | null {
     const thumbnail = item['media:thumbnail'];
     return thumbnail.url || thumbnail.$?.url || null;
   }
-  if (feedData?.itunes?.image) {
-    const image = feedData.itunes.image;
-    return typeof image === 'string' ? image : image.href || image.url || null;
+
+  if (item['media:content']) {
+    const mediaItems = Array.isArray(item['media:content']) ? item['media:content'] : [item['media:content']];
+    for (const media of mediaItems) {
+      const url = media?.url || media?.$?.url;
+      const type = String(media?.type || media?.$?.type || '').toLowerCase();
+      const medium = String(media?.medium || media?.$?.medium || '').toLowerCase();
+      if (url && (type.startsWith('image/') || medium === 'image')) {
+        return url;
+      }
+    }
   }
-  if (feedData?.image?.url) {
-    return feedData.image.url;
+
+  if (item.enclosure) {
+    const enclosure = item.enclosure;
+    const url = enclosure.url || enclosure.href || enclosure;
+    const type = String(enclosure.type || '').toLowerCase();
+    if (typeof url === 'string' && url.startsWith('http') && type.startsWith('image/')) {
+      return url;
+    }
   }
+
+  return null;
+}
+
+function extractImageUrlFromHtml(html: string | null | undefined, baseUrl: string | null): string | null {
+  if (!html) return null;
+
+  try {
+    const dom = new JSDOM(html, baseUrl ? { url: baseUrl } : undefined);
+    const images = Array.from(dom.window.document.querySelectorAll('img'));
+
+    for (const image of images) {
+      const rawSrc =
+        image.getAttribute('src') ||
+        image.getAttribute('data-src') ||
+        image.getAttribute('data-original') ||
+        image.getAttribute('data-actual') ||
+        image.getAttribute('data-lazy-src');
+
+      if (!rawSrc || rawSrc.startsWith('data:')) {
+        continue;
+      }
+
+      const lowerSrc = rawSrc.toLowerCase();
+      if (lowerSrc.includes('pixel') || lowerSrc.includes('tracking') || lowerSrc.includes('1x1')) {
+        continue;
+      }
+
+      if (rawSrc.startsWith('//')) {
+        dom.window.close();
+        return `https:${rawSrc}`;
+      }
+
+      try {
+        const resolved = baseUrl ? new URL(rawSrc, baseUrl).toString() : new URL(rawSrc).toString();
+        dom.window.close();
+        return resolved;
+      } catch (error) {
+        continue;
+      }
+    }
+
+    dom.window.close();
+  } catch (error) {
+    return null;
+  }
+
   return null;
 }
 
@@ -295,6 +370,9 @@ export function normalizeFeedItem({ feed, item, feedData }: NormalizeFeedItemOpt
 
   const summary = cleanHtmlText(item.contentSnippet || item.summary || item.content || item['content:encoded']);
   const enclosure = extractEnclosure(item);
+  const imageUrl =
+    extractItemImageUrl(item) ||
+    extractImageUrlFromHtml(contentHtml, item.link || feed.url || null);
 
   return {
     guid,
@@ -307,7 +385,7 @@ export function normalizeFeedItem({ feed, item, feedData }: NormalizeFeedItemOpt
     categories_json: item.categories ? JSON.stringify(item.categories) : null,
     published_at: publishedAt,
     duration: extractDuration(item),
-    image_url: extractImageUrl(item, feedData),
+    image_url: imageUrl,
     doi: extractDoi(item),
     pmid: extractPmid(item),
     content_source_url: item.link || null,

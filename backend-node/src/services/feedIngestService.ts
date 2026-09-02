@@ -72,6 +72,12 @@ export class FeedIngestService {
           };
         }
 
+        const contentType = getResponseHeader(response.headers, 'content-type') ?? '';
+        const bodyStart = response.body.trimStart();
+        if (!bodyStart.startsWith('<') || contentType.includes('text/html')) {
+          throw new Error(`Feed returned non-RSS content (Content-Type: ${contentType || 'unknown'})`);
+        }
+
         const feedData = await parser.parseString(response.body);
         return {
           kind: 'fetched',
