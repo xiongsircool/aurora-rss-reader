@@ -75,6 +75,10 @@ test('/stats aggregates reading activity and read timestamps', async () => {
     const unmarked = entryRepo.findById(readEntry.id);
     assert.equal(unmarked?.read, 0);
     assert.equal(unmarked?.read_at, null);
+
+    const updatedThroughGenericPath = entryRepo.update(readEntry.id, { read: true });
+    assert.equal(updatedThroughGenericPath?.read, 1);
+    assert.ok(updatedThroughGenericPath?.read_at);
   } finally {
     await app.close();
     closeDatabase();

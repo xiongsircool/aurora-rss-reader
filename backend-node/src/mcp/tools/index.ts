@@ -1163,8 +1163,8 @@ function registerEntryTools(server: McpServer) {
       }
 
       const sqlByAction: Record<string, string> = {
-        mark_read: `UPDATE entries SET read = 1 WHERE ${where}`,
-        mark_unread: `UPDATE entries SET read = 0 WHERE ${where}`,
+        mark_read: `UPDATE entries SET read = 1, read_at = COALESCE(read_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) WHERE ${where}`,
+        mark_unread: `UPDATE entries SET read = 0, read_at = NULL WHERE ${where}`,
         star: `UPDATE entries SET starred = 1 WHERE ${where}`,
         unstar: `UPDATE entries SET starred = 0 WHERE ${where}`,
       };
@@ -2052,8 +2052,8 @@ function registerLegacyAliases(server: McpServer) {
       if (!finalWhere) return fail("batch_update requires entryIds or a filter");
 
       const sqlByAction: Record<string, string> = {
-        mark_read: `UPDATE entries SET read = 1 WHERE ${finalWhere}`,
-        mark_unread: `UPDATE entries SET read = 0 WHERE ${finalWhere}`,
+        mark_read: `UPDATE entries SET read = 1, read_at = COALESCE(read_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) WHERE ${finalWhere}`,
+        mark_unread: `UPDATE entries SET read = 0, read_at = NULL WHERE ${finalWhere}`,
         star: `UPDATE entries SET starred = 1 WHERE ${finalWhere}`,
         unstar: `UPDATE entries SET starred = 0 WHERE ${finalWhere}`,
       };

@@ -211,6 +211,9 @@ export class EntryRepository {
       categories_json: input.categories_json !== undefined ? input.categories_json : existing.categories_json,
       published_at: input.published_at !== undefined ? input.published_at : existing.published_at,
       read: input.read !== undefined ? (input.read ? 1 : 0) : existing.read,
+      read_at: input.read !== undefined
+        ? (input.read ? (existing.read_at ?? new Date().toISOString()) : null)
+        : existing.read_at,
       starred: input.starred !== undefined ? (input.starred ? 1 : 0) : existing.starred,
       enclosure_url: input.enclosure_url !== undefined ? input.enclosure_url : existing.enclosure_url,
       enclosure_type: input.enclosure_type !== undefined ? input.enclosure_type : existing.enclosure_type,
@@ -229,7 +232,7 @@ export class EntryRepository {
       UPDATE entries SET
         title = ?, url = ?, title_translations = ?, author = ?,
         summary = ?, content = ?, readability_content = ?,
-        categories_json = ?, published_at = ?, read = ?, starred = ?,
+        categories_json = ?, published_at = ?, read = ?, read_at = ?, starred = ?,
         enclosure_url = ?, enclosure_type = ?, enclosure_length = ?, duration = ?,
         image_url = ?, doi = ?, pmid = ?, content_extraction_status = ?,
         content_extraction_error = ?, content_extracted_at = ?, content_source_url = ?
@@ -247,6 +250,7 @@ export class EntryRepository {
       updated.categories_json,
       updated.published_at,
       updated.read,
+      updated.read_at,
       updated.starred,
       updated.enclosure_url,
       updated.enclosure_type,
@@ -266,7 +270,7 @@ export class EntryRepository {
   }
 
   markAsRead(id: string): boolean {
-    const stmt = this.db.prepare('UPDATE entries SET read = 1, read_at = ? WHERE id = ?');
+    const stmt = this.db.prepare('UPDATE entries SET read = 1, read_at = COALESCE(read_at, ?) WHERE id = ?');
     const result = stmt.run(new Date().toISOString(), id);
     return result.changes > 0;
   }
