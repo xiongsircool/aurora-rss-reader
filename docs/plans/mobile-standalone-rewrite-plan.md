@@ -1,7 +1,9 @@
 # 移动端独立化重写计划(方案 D:端上轻后端)
 
-> 状态:草案 · 创建于 2026-05-31 · 关联 issue #16 #13
-> 目标:把 `rss-mobile/` 从「依赖局域网内 Node 后端」重写为**完全独立、端上自洽**的移动 App。
+> 状态:已归档/被替代 · 创建于 2026-05-31 · 归档实现见分支 `archive/mobile-plan-d-v1`
+> 替代方案:Flutter 本地优先架构,见 `docs/adr/0001-mobile-local-first-flutter.md` 与 `docs/plans/mobile-flutter-m0-plan.md`
+> 说明:本文只保留为历史决策和踩坑参考,不得作为新移动端实现依据。
+> 原目标:把 `rss-mobile/` 从「依赖局域网内 Node 后端」重写为**完全独立、端上自洽**的移动 App。
 > 手机端自己抓 RSS、自己归一化、自己存本地、直连 AI 接口,**不依赖任何后端进程**。
 
 ---
