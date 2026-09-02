@@ -9,10 +9,13 @@ services:
     container_name: aurora-rss-reader
     ports:
       - "8080:80"
+      - "15432:15432"
     volumes:
       - aurora-data:/data
     environment:
       - NODE_ENV=production
+      - API_HOST=0.0.0.0
+      - API_PORT=15432
       - DATABASE_PATH=/data/aurora-rss.db
       - RSSHUB_BASE_URL=https://rsshub.app
       # AI Configuration (optional)

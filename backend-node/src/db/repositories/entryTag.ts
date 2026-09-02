@@ -6,6 +6,17 @@ export interface EntryWithTags extends Entry {
     tags: UserTag[];
 }
 
+/**
+ * Normalize entry from database row (convert 0/1 to boolean)
+ */
+function normalizeEntryRow(row: any): Entry {
+    return {
+        ...row,
+        read: !!row.read,
+        starred: !!row.starred,
+    };
+}
+
 export class EntryTagRepository {
     private db = getDatabase();
 
@@ -138,7 +149,8 @@ export class EntryTagRepository {
         const rows = stmt.all(...params) as Entry[];
 
         const hasMore = rows.length > limit;
-        const items = hasMore ? rows.slice(0, limit) : rows;
+        const rawItems = hasMore ? rows.slice(0, limit) : rows;
+        const items = rawItems.map(normalizeEntryRow);
         const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].inserted_at : null;
 
         return { items, nextCursor, hasMore };

@@ -22,10 +22,15 @@ export interface Feed {
   ai_tagging_enabled: number; // SQLite boolean (0/1)
   last_checked_at: string | null;
   last_error: string | null;
+  fetch_etag: string | null;
+  fetch_last_modified: string | null;
+  last_fetch_url: string | null;
   update_interval_minutes: number;
   created_at: string;
   updated_at: string;
 }
+
+export type ContentExtractionStatus = 'pending' | 'queued' | 'running' | 'succeeded' | 'failed' | 'skipped';
 
 export interface Entry {
   id: string;
@@ -42,6 +47,7 @@ export interface Entry {
   published_at: string | null;
   inserted_at: string;
   read: number; // SQLite boolean (0/1)
+  read_at: string | null;
   starred: number; // SQLite boolean (0/1)
   // Enclosure fields for audio/video
   enclosure_url: string | null;
@@ -52,6 +58,10 @@ export interface Entry {
   // Academic article identifiers
   doi: string | null;
   pmid: string | null;
+  content_extraction_status: ContentExtractionStatus;
+  content_extraction_error: string | null;
+  content_extracted_at: string | null;
+  content_source_url: string | null;
 }
 
 export interface Translation {
@@ -73,6 +83,82 @@ export interface Summary {
   created_at: string;
 }
 
+export type AITaskKey =
+  | 'entry_summary'
+  | 'title_translation'
+  | 'fulltext_translation'
+  | 'aggregate_digest'
+  | 'smart_tagging';
+
+export type AIScopeType = 'global' | 'feed' | 'group' | 'tag';
+
+export type AIAutomationMode = 'inherit' | 'enabled' | 'disabled';
+
+export interface AIAutomationRule {
+  id: string;
+  task_key: AITaskKey;
+  scope_type: AIScopeType;
+  scope_id: string | null;
+  mode: AIAutomationMode;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AggregateDigest {
+  id: string;
+  task_key: 'aggregate_digest';
+  scope_type: Exclude<AIScopeType, 'global'>;
+  scope_id: string;
+  period: string;
+  time_range_key: string;
+  language: string;
+  source_count: number;
+  source_hash: string;
+  summary_md: string;
+  citations_json: string;
+  keywords_json: string | null;
+  model_name: string;
+  trigger_type: string;
+  created_at: string;
+}
+
+export type ScopeSummaryScopeType = 'feed' | 'group';
+export type ScopeSummaryWindowType = '24h' | '3d' | '7d' | '30d';
+export type ScopeSummaryStatus = 'generating' | 'ready' | 'failed';
+
+export interface ScopeSummaryRun {
+  id: string;
+  scope_type: ScopeSummaryScopeType;
+  scope_id: string;
+  window_type: ScopeSummaryWindowType;
+  window_start_at: string;
+  window_end_at: string;
+  language: string;
+  source_count: number;
+  source_hash: string;
+  status: ScopeSummaryStatus;
+  summary_md: string;
+  citations_json: string;
+  keywords_json: string | null;
+  model_name: string | null;
+  trigger_type: 'auto' | 'manual';
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScopeSummaryChunk {
+  id: string;
+  run_id: string;
+  chunk_index: number;
+  source_count: number;
+  source_refs_json: string;
+  chunk_summary_md: string;
+  keywords_json: string | null;
+  model_name: string | null;
+  created_at: string;
+}
+
 export interface FetchLog {
   id: string;
   feed_id: string | null;
@@ -82,6 +168,39 @@ export interface FetchLog {
   finished_at: string | null;
   duration_ms: number | null;
   item_count: number;
+}
+
+export type ArticleExtractionJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface ArticleExtractionJob {
+  id: string;
+  entry_id: string;
+  status: ArticleExtractionJobStatus;
+  attempts: number;
+  max_attempts: number;
+  next_run_at: string | null;
+  leased_at: string | null;
+  lease_owner: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SummaryGenerationJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface SummaryGenerationJob {
+  id: string;
+  entry_id: string;
+  language: string;
+  status: SummaryGenerationJobStatus;
+  attempts: number;
+  max_attempts: number;
+  next_run_at: string | null;
+  leased_at: string | null;
+  lease_owner: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserSettings {
@@ -99,6 +218,7 @@ export interface UserSettings {
   max_auto_title_translations: number;
   mark_as_read_range: string;
   details_panel_mode: string; // 'docked' | 'click'
+  timeline_filter_density: 'compact' | 'standard';
   // Global default AI configuration
   default_ai_provider: string; // Provider preset ID (e.g. 'openai', 'deepseek', 'gemini')
   default_ai_api_key: string;
@@ -120,8 +240,14 @@ export interface UserSettings {
   ai_auto_title_translation: number; // SQLite boolean (0/1)
   ai_title_display_mode: string;
   ai_translation_language: string;
-  ai_prompt_preference: string; // User custom preference for AI prompts
+  ai_summary_max_tokens: number; // Max output tokens for AI summary (0 = unlimited)
+  summary_prompt_preference: string; // User custom preference for summary prompts
+  translation_prompt_preference: string; // User custom preference for translation prompts
+  ai_prompt_preference?: string; // Legacy prompt preference kept for migration compatibility
   language: string; // 'zh' | 'en' | 'ja' | 'ko'
+  summary_background_enabled: number; // SQLite boolean (0/1)
+  outbound_proxy_mode: 'system' | 'custom' | 'off';
+  outbound_proxy_url: string;
   embedding_model: string;
   embedding_api_key: string;
   embedding_base_url: string;
@@ -132,6 +258,16 @@ export interface UserSettings {
   ai_auto_tagging: number; // SQLite boolean (0/1)
   ai_auto_tagging_start_at: string | null;
   tags_version: number;
+  scope_summary_enabled: number; // SQLite boolean (0/1)
+  scope_summary_auto_generate: number; // SQLite boolean (0/1)
+  scope_summary_auto_interval_minutes: number;
+  scope_summary_default_window: ScopeSummaryWindowType;
+  scope_summary_max_entries: number;
+  scope_summary_chunk_size: number;
+  scope_summary_model_name: string;
+  scope_summary_use_custom: number;
+  scope_summary_base_url: string;
+  scope_summary_api_key: string;
   created_at: string;
   updated_at: string;
 }

@@ -1,39 +1,60 @@
 <script setup lang="ts">
-import { computed, watch, ref, onMounted } from 'vue'
+import { computed, watch, ref, onMounted, onUnmounted, defineAsyncComponent, onErrorCaptured } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settingsStore'
+import { getApiErrorMessage } from '../api/errors'
 import { useSettingsModal } from '../composables/useSettingsModal'
 import { useRSSHubSettings } from '../composables/useRSSHubSettings'
 import { useAIConfigSettings } from '../composables/useAIConfigSettings'
 import { useRefreshSettings } from '../composables/useRefreshSettings'
+import { useProxySettings } from '../composables/useProxySettings'
 import { clampAutoTitleTranslationLimit } from '../constants/translation'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import ConfirmModal from './common/ConfirmModal.vue'
+import type { AutomationTarget } from '../composables/useSettingsModal'
 
-// Section Components
-import {
-  SettingsLanguage,
-  SettingsRSSHub,
-  SettingsAIConfig,
-  SettingsAIFeatures,
-  SettingsRefresh,
-  SettingsDisplay,
-  SettingsAbout
-} from './settings'
+const SettingsLanguage = defineAsyncComponent(() => import('./settings/SettingsLanguage.vue'))
+const SettingsProxy = defineAsyncComponent(() => import('./settings/SettingsProxy.vue'))
+const SettingsRSSHub = defineAsyncComponent(() => import('./settings/SettingsRSSHub.vue'))
+const SettingsAIConfig = defineAsyncComponent(() => import('./settings/SettingsAIConfig.vue'))
+const SettingsAIFeatures = defineAsyncComponent(() => import('./settings/SettingsAIFeatures.vue'))
+const SettingsAIAutomation = defineAsyncComponent(() => import('./settings/SettingsAIAutomation.vue'))
+const SettingsMCP = defineAsyncComponent(() => import('./settings/SettingsMCP.vue'))
+const SettingsStats = defineAsyncComponent(() => import('./settings/SettingsStats.vue'))
+const SettingsTagRerun = defineAsyncComponent(() => import('./settings/SettingsTagRerun.vue'))
+const SettingsRefresh = defineAsyncComponent(() => import('./settings/SettingsRefresh.vue'))
+const SettingsDisplay = defineAsyncComponent(() => import('./settings/SettingsDisplay.vue'))
+const SettingsAbout = defineAsyncComponent(() => import('./settings/SettingsAbout.vue'))
 
-const props = defineProps<{
+type Category = 'general' | 'display' | 'sync' | 'stats' | 'intelligence' | 'mcp'
+
+const props = withDefaults(defineProps<{
   show: boolean
-}>()
+  initialCategory?: Category
+  initialAutomationTarget?: AutomationTarget | null
+}>(), {
+  initialCategory: 'general',
+  initialAutomationTarget: null,
+})
 
 const emit = defineEmits<{
   close: []
+  notify: [message: string, type: 'success' | 'error' | 'info']
 }>()
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
 // Initialize composables
-const { localConfig, initializeSettings, saveAIConfig } = useSettingsModal()
+const {
+  localConfig,
+  localAutomationRules,
+  localScopedAutomationRules,
+  currentAutomationTarget,
+  initializeSettings,
+  saveAIConfig,
+  syncFromStore,
+} = useSettingsModal()
 const rsshub = useRSSHubSettings()
 const {
   show: confirmShow,
@@ -44,17 +65,19 @@ const {
 } = useConfirmDialog()
 const aiConfig = useAIConfigSettings(localConfig, requestConfirm)
 const refresh = useRefreshSettings()
+const proxy = useProxySettings()
 
 // Navigation
-type Category = 'general' | 'display' | 'sync' | 'intelligence'
-const activeCategory = ref<Category>('general')
+const activeCategory = ref<Category>(props.initialCategory)
 const isMobileDetailOpen = ref(false)
 
 const categories = [
   { id: 'general', label: 'settings.general', icon: 'i-carbon-settings' },
   { id: 'display', label: 'settings.displaySettings', icon: 'i-carbon-screen' },
   { id: 'sync', label: 'settings.sync', icon: 'i-carbon-renew' },
+  { id: 'stats', label: 'readingStats.title', icon: 'i-carbon-chart-column' },
   { id: 'intelligence', label: 'settings.aiConfig', icon: 'i-carbon-machine-learning' },
+  { id: 'mcp', label: 'settings.mcpService', icon: 'i-carbon-plug' },
 ]
 
 // Display settings - synced with store
@@ -85,7 +108,21 @@ const openOriginalMode = computed({
 
 const autoTitleTranslationLimit = ref(settingsStore.settings.max_auto_title_translations)
 
-const aiPromptPreference = ref(settingsStore.settings.ai_prompt_preference)
+const summaryPromptPreference = ref(settingsStore.settings.summary_prompt_preference)
+const aiSummaryMaxTokens = ref(settingsStore.settings.ai_summary_max_tokens)
+const translationPromptPreference = ref(settingsStore.settings.translation_prompt_preference)
+const summaryBackgroundEnabled = ref(!!settingsStore.settings.summary_background_enabled)
+const scopeSummaryEnabled = ref(!!settingsStore.settings.scope_summary_enabled)
+const scopeSummaryAutoGenerate = ref(!!settingsStore.settings.scope_summary_auto_generate)
+const scopeSummaryAutoIntervalMinutes = ref(settingsStore.settings.scope_summary_auto_interval_minutes)
+const scopeSummaryDefaultWindow = ref<'24h' | '3d' | '7d' | '30d'>(settingsStore.settings.scope_summary_default_window)
+const scopeSummaryMaxEntries = ref(settingsStore.settings.scope_summary_max_entries)
+const scopeSummaryChunkSize = ref(settingsStore.settings.scope_summary_chunk_size)
+const scopeSummaryModelName = ref(settingsStore.settings.scope_summary_model_name)
+const scopeSummaryUseCustom = ref(!!settingsStore.settings.scope_summary_use_custom)
+const scopeSummaryBaseUrl = ref(settingsStore.settings.scope_summary_base_url)
+const scopeSummaryApiKey = ref(settingsStore.settings.scope_summary_api_key)
+const settingsRenderError = ref<string | null>(null)
 
 const markAsReadRange = computed({
   get: () => settingsStore.settings.mark_as_read_range,
@@ -97,29 +134,78 @@ const detailsPanelMode = computed({
   set: (value) => settingsStore.updateSettings({ details_panel_mode: value })
 })
 
+const timelineFilterDensity = computed({
+  get: () => settingsStore.settings.timeline_filter_density,
+  set: (value) => settingsStore.updateSettings({ timeline_filter_density: value })
+})
+
+const automationScopeTitle = computed(() => {
+  const target = currentAutomationTarget.value
+  if (!target) return ''
+  const label = target.scope_type === 'feed'
+    ? t('settings.aiAutomationFeedTitle')
+    : target.scope_type === 'group'
+      ? t('settings.aiAutomationGroupTitle')
+      : t('settings.aiAutomationTagTitle')
+  return `${label} · ${target.label}`
+})
+
+const automationScopeHint = computed(() => {
+  const target = currentAutomationTarget.value
+  if (!target) return ''
+  return target.scope_type === 'feed'
+    ? t('settings.aiAutomationFeedHint')
+    : target.scope_type === 'group'
+      ? t('settings.aiAutomationGroupHint')
+      : t('settings.aiAutomationTagHint')
+})
+
+const automationScopeBadge = computed(() => {
+  const target = currentAutomationTarget.value
+  if (!target) return ''
+  return target.scope_type === 'feed'
+    ? t('settings.aiAutomationFeedBadge')
+    : target.scope_type === 'group'
+      ? t('settings.aiAutomationGroupBadge')
+      : t('settings.aiAutomationTagBadge')
+})
+
 // Watch modal visibility
 watch(() => props.show, async (show) => {
   if (show) {
+    settingsRenderError.value = null
     await initializeSettings(
       rsshub.fetchRSSHubUrl,
       () => {
         aiConfig.resetTestResults()
-        aiConfig.resetMcpTestResult()
         rsshub.resetTestResult()
       }
     )
+    rsshub.fetchRSSHubMirrors()
     refresh.syncFromStore()
+    proxy.syncFromStore()
+    await proxy.fetchProxyStatus()
     // Sync the local autoTitleTranslationLimit with store value
     autoTitleTranslationLimit.value = settingsStore.settings.max_auto_title_translations
-    // Sync the local aiPromptPreference with store value
-    aiPromptPreference.value = settingsStore.settings.ai_prompt_preference
+    summaryPromptPreference.value = settingsStore.settings.summary_prompt_preference
+    aiSummaryMaxTokens.value = settingsStore.settings.ai_summary_max_tokens
+    translationPromptPreference.value = settingsStore.settings.translation_prompt_preference
+    summaryBackgroundEnabled.value = !!settingsStore.settings.summary_background_enabled
+    scopeSummaryEnabled.value = !!settingsStore.settings.scope_summary_enabled
+    scopeSummaryAutoGenerate.value = !!settingsStore.settings.scope_summary_auto_generate
+    scopeSummaryAutoIntervalMinutes.value = settingsStore.settings.scope_summary_auto_interval_minutes
+    scopeSummaryDefaultWindow.value = settingsStore.settings.scope_summary_default_window
+    scopeSummaryMaxEntries.value = settingsStore.settings.scope_summary_max_entries
+    scopeSummaryChunkSize.value = settingsStore.settings.scope_summary_chunk_size
+    scopeSummaryModelName.value = settingsStore.settings.scope_summary_model_name
+    scopeSummaryUseCustom.value = !!settingsStore.settings.scope_summary_use_custom
+    scopeSummaryBaseUrl.value = settingsStore.settings.scope_summary_base_url
+    scopeSummaryApiKey.value = settingsStore.settings.scope_summary_api_key
+    syncFromStore(props.initialAutomationTarget ?? null)
 
     // Reset view state
-    activeCategory.value = 'general'
+    activeCategory.value = props.initialCategory
     isMobileDetailOpen.value = false
-
-    // Auto-test MCP connection on modal open
-    aiConfig.testMcp()
 
     // Lock body scroll
     document.body.style.overflow = 'hidden'
@@ -129,6 +215,18 @@ watch(() => props.show, async (show) => {
   }
 })
 
+onErrorCaptured((error, _instance, info) => {
+  const message = error instanceof Error ? error.message : String(error)
+  settingsRenderError.value = `${message}${info ? ` (${info})` : ''}`
+  console.error('[SettingsModal] render error:', error, info)
+  return false
+})
+
+watch(() => props.initialAutomationTarget, (target) => {
+  if (!props.show) return
+  syncFromStore(target ?? null)
+}, { deep: true })
+
 // Ensure scroll is unlocked when component is unmounted
 onMounted(() => {
   if (props.show) {
@@ -136,7 +234,6 @@ onMounted(() => {
   }
 })
 
-import { onUnmounted } from 'vue'
 onUnmounted(() => {
   document.body.style.overflow = ''
 })
@@ -173,18 +270,42 @@ async function saveSettings() {
       await rsshub.saveRSSHubUrl()
     }
 
-    await saveAIConfig()
+    const proxyValid = await proxy.commitProxySettings()
+    if (!proxyValid) return
+
+    const aiSaved = await saveAIConfig()
+    if (!aiSaved) {
+      emit('notify', t('toast.settingsSaveFailed'), 'error')
+      return
+    }
     
     // Save autoTitleTranslationLimit to store
     const clampedLimit = clampAutoTitleTranslationLimit(autoTitleTranslationLimit.value)
+    const normalizedAutoInterval = Math.max(5, Math.min(240, Number(scopeSummaryAutoIntervalMinutes.value) || 60))
+    const normalizedMaxEntries = Math.max(20, Math.min(200, Number(scopeSummaryMaxEntries.value) || 100))
+    const normalizedChunkSize = Math.max(5, Math.min(25, Number(scopeSummaryChunkSize.value) || 10))
     await settingsStore.updateSettings({
       max_auto_title_translations: clampedLimit,
-      ai_prompt_preference: aiPromptPreference.value
+      ai_summary_max_tokens: aiSummaryMaxTokens.value,
+      summary_prompt_preference: summaryPromptPreference.value,
+      translation_prompt_preference: translationPromptPreference.value,
+      summary_background_enabled: summaryBackgroundEnabled.value,
+      scope_summary_enabled: scopeSummaryEnabled.value,
+      scope_summary_auto_generate: scopeSummaryAutoGenerate.value,
+      scope_summary_auto_interval_minutes: normalizedAutoInterval,
+      scope_summary_default_window: scopeSummaryDefaultWindow.value,
+      scope_summary_max_entries: normalizedMaxEntries,
+      scope_summary_chunk_size: normalizedChunkSize,
+      scope_summary_model_name: scopeSummaryModelName.value,
+      scope_summary_use_custom: scopeSummaryUseCustom.value,
+      scope_summary_base_url: scopeSummaryBaseUrl.value,
+      scope_summary_api_key: scopeSummaryApiKey.value
     })
-    
+    emit('notify', t('toast.settingsSaved'), 'success')
     emit('close')
   } catch (error) {
     console.error('保存设置失败:', error)
+    emit('notify', getApiErrorMessage(error, t('toast.settingsSaveFailed')), 'error')
   }
 }
 </script>
@@ -196,7 +317,7 @@ async function saveSettings() {
       <!-- Main Modal Container -->
       <div
         class="
-          w-full max-w-4xl h-[85vh] md:h-[85vh] h-full
+          w-full max-w-full md:max-w-[min(96vw,1100px)] h-[85vh] md:h-[85vh] h-full
           flex flex-col md:flex-row
           rounded-none md:rounded-2xl overflow-hidden
           bg-[var(--bg-base)] md:bg-white/80 md:dark:bg-[#0f1115]/75
@@ -240,9 +361,9 @@ async function saveSettings() {
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] border-l-3 border-transparent'
               "
             >
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-3 min-w-0">
                 <span :class="[cat.icon, 'text-lg transition-colors', activeCategory === cat.id ? 'text-orange-500 dark:text-white' : 'text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]']"></span>
-                <span>{{ t(cat.label) }}</span>
+                <span class="min-w-0 break-words text-left leading-snug">{{ t(cat.label) }}</span>
               </div>
               <span class="i-carbon-chevron-right text-[var(--text-tertiary)] md:hidden"></span>
             </button>
@@ -279,13 +400,28 @@ async function saveSettings() {
           <!-- Scrollable Content -->
           <div class="flex-1 overflow-y-auto p-6 md:p-8 scroll-smooth">
             <Transition name="fade" mode="out-in">
-              <div :key="activeCategory" class="max-w-2xl mx-auto space-y-6">
+              <div :key="activeCategory" class="w-full max-w-[min(100%,900px)] mx-auto space-y-6 min-w-0">
+                <div
+                  v-if="settingsRenderError"
+                  class="p-4 rounded-xl border border-red-500/30 bg-red-500/8 text-red-600 dark:text-red-400 text-sm whitespace-pre-wrap break-words"
+                >
+                  {{ t('settings.renderErrorPrefix') }} {{ settingsRenderError }}
+                </div>
                 
                 <!-- General Section -->
                 <div v-if="activeCategory === 'general'" class="space-y-6">
                    <div class="setting-group">
                       <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.general') }}</h3>
                       <SettingsLanguage />
+                      <div class="h-6"></div>
+                      <SettingsProxy
+                        v-model:proxyMode="proxy.proxyMode.value"
+                        v-model:proxyUrl="proxy.proxyUrl.value"
+                        :proxyStatus="proxy.proxyStatus.value"
+                        :proxyStatusLoading="proxy.proxyStatusLoading.value"
+                        :proxyError="proxy.proxyError.value"
+                        @refreshStatus="proxy.fetchProxyStatus"
+                      />
                    </div>
                    <div class="setting-group">
                       <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.about') }}</h3>
@@ -305,6 +441,7 @@ async function saveSettings() {
                       v-model:openOriginalMode="openOriginalMode"
                       v-model:markAsReadRange="markAsReadRange"
                       v-model:detailsPanelMode="detailsPanelMode"
+                      v-model:timelineFilterDensity="timelineFilterDensity"
                     />
                   </div>
                 </div>
@@ -317,7 +454,10 @@ async function saveSettings() {
                       v-model:rsshubUrl="rsshub.rsshubUrl.value"
                       :isTestingRSSHub="rsshub.isTestingRSSHub.value"
                       :rsshubTestResult="rsshub.rsshubTestResult.value"
+                      :rsshubMirrors="rsshub.rsshubMirrors.value"
+                      :rsshubMirrorsLoading="rsshub.rsshubMirrorsLoading.value"
                       @testConnection="rsshub.testRSSHubConnection"
+                      @selectMirror="rsshub.selectMirror"
                     />
                     <div class="h-6"></div>
                     <SettingsRefresh
@@ -327,6 +467,13 @@ async function saveSettings() {
                       @change="refresh.handleFetchIntervalChange"
                       @auto-refresh-change="refresh.handleAutoRefreshChange"
                     />
+                  </div>
+                </div>
+
+                <!-- Reading Statistics Section -->
+                <div v-if="activeCategory === 'stats'" class="space-y-6">
+                  <div class="setting-group">
+                    <SettingsStats />
                   </div>
                 </div>
 
@@ -346,19 +493,56 @@ async function saveSettings() {
                       :serviceTestResult="aiConfig.serviceTestResult.value"
                       :rebuildingVectors="aiConfig.rebuildingVectors.value"
                       :rebuildResult="aiConfig.rebuildResult.value"
-                      :mcpTesting="aiConfig.mcpTesting.value"
-                      :mcpTestResult="aiConfig.mcpTestResult.value"
                       @testGlobalConnection="aiConfig.testGlobalConnection"
                       @testConnection="aiConfig.testConnection"
                       @rebuildVectors="aiConfig.rebuildVectors"
-                      @testMcp="aiConfig.testMcp"
                     />
                     <div class="h-6"></div>
                     <SettingsAIFeatures
                       v-model:features="localConfig.features"
                       v-model:autoTitleTranslationLimit="autoTitleTranslationLimit"
-                      v-model:aiPromptPreference="aiPromptPreference"
+                      v-model:summaryPromptPreference="summaryPromptPreference"
+                      v-model:aiSummaryMaxTokens="aiSummaryMaxTokens"
+                      v-model:translationPromptPreference="translationPromptPreference"
+                      v-model:summaryBackgroundEnabled="summaryBackgroundEnabled"
+                      v-model:scopeSummaryEnabled="scopeSummaryEnabled"
+                      v-model:scopeSummaryAutoGenerate="scopeSummaryAutoGenerate"
+                      v-model:scopeSummaryAutoIntervalMinutes="scopeSummaryAutoIntervalMinutes"
+                      v-model:scopeSummaryDefaultWindow="scopeSummaryDefaultWindow"
+                      v-model:scopeSummaryMaxEntries="scopeSummaryMaxEntries"
+                      v-model:scopeSummaryChunkSize="scopeSummaryChunkSize"
+                      v-model:scopeSummaryModelName="scopeSummaryModelName"
+                      v-model:scopeSummaryUseCustom="scopeSummaryUseCustom"
+                      v-model:scopeSummaryBaseUrl="scopeSummaryBaseUrl"
+                      v-model:scopeSummaryApiKey="scopeSummaryApiKey"
+                      :default-date-range="defaultDateRange"
+                      :time-field="timeField"
                     />
+                    <div class="h-6"></div>
+                    <SettingsAIAutomation
+                      v-model:rules="localAutomationRules"
+                      :title="t('settings.aiAutomation')"
+                      :hint="t('settings.aiAutomationHint')"
+                      :badge="t('settings.aiAutomationGlobalOnly')"
+                    />
+                    <div v-if="currentAutomationTarget" class="h-6"></div>
+                    <SettingsAIAutomation
+                      v-if="currentAutomationTarget"
+                      v-model:rules="localScopedAutomationRules"
+                      :title="automationScopeTitle"
+                      :hint="automationScopeHint"
+                      :badge="automationScopeBadge"
+                      :allow-inherit="true"
+                    />
+                    <div class="h-6"></div>
+                    <SettingsTagRerun />
+                  </div>
+                </div>
+
+                <div v-if="activeCategory === 'mcp'" class="space-y-6">
+                  <div class="setting-group">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider hidden md:block">{{ t('settings.mcpService') }}</h3>
+                    <SettingsMCP />
                   </div>
                 </div>
 
@@ -367,11 +551,11 @@ async function saveSettings() {
           </div>
 
           <!-- Desktop Actions Footer -->
-          <div class="hidden md:flex items-center justify-end gap-3 p-6 border-t border-[var(--border-color)] bg-white/50 dark:bg-[var(--bg-surface)]/50 backdrop-blur-sm">
+          <div class="hidden md:flex flex-wrap items-center justify-end gap-3 p-6 border-t border-[var(--border-color)] bg-white/50 dark:bg-[var(--bg-surface)]/50 backdrop-blur-sm">
             <button
               @click="handleClose"
               class="
-                px-5 py-2.5 rounded-xl font-medium text-sm transition-all
+                px-5 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-normal text-center
                 text-[var(--text-primary)] hover:bg-[var(--bg-hover)]
               "
             >
@@ -380,7 +564,7 @@ async function saveSettings() {
             <button
               @click="saveSettings"
               class="
-                px-6 py-2.5 rounded-xl font-medium text-sm text-white transition-all
+                px-6 py-2.5 rounded-xl font-medium text-sm text-white transition-all whitespace-normal text-center
                 bg-gradient-to-r from-orange-500 to-orange-600
                 hover:shadow-lg hover:shadow-orange-500/25 hover:-translate-y-0.5
                 active:translate-y-0

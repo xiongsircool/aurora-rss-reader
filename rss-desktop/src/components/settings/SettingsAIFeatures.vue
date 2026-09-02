@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import AppToggle from '../common/AppToggle.vue'
+import SummaryBackgroundStatusCard from './SummaryBackgroundStatusCard.vue'
 import type { LocalFeatureConfig } from '../../composables/useSettingsModal'
 import {
   MIN_AUTO_TITLE_TRANSLATIONS,
@@ -8,56 +11,63 @@ import {
 
 const features = defineModel<LocalFeatureConfig>('features', { required: true })
 const autoTitleTranslationLimit = defineModel<number>('autoTitleTranslationLimit', { required: true })
-const aiPromptPreference = defineModel<string>('aiPromptPreference', { required: true })
+const summaryPromptPreference = defineModel<string>('summaryPromptPreference', { required: true })
+const aiSummaryMaxTokens = defineModel<number>('aiSummaryMaxTokens', { required: true })
+const translationPromptPreference = defineModel<string>('translationPromptPreference', { required: true })
+const summaryBackgroundEnabledModel = defineModel<boolean>('summaryBackgroundEnabled', { default: false })
+const scopeSummaryEnabledModel = defineModel<boolean>('scopeSummaryEnabled', { default: false })
+const scopeSummaryAutoGenerateModel = defineModel<boolean>('scopeSummaryAutoGenerate', { default: false })
+const scopeSummaryAutoIntervalMinutes = defineModel<number>('scopeSummaryAutoIntervalMinutes', { required: true })
+const scopeSummaryDefaultWindow = defineModel<'24h' | '3d' | '7d' | '30d'>('scopeSummaryDefaultWindow', { required: true })
+const scopeSummaryMaxEntries = defineModel<number>('scopeSummaryMaxEntries', { required: true })
+const scopeSummaryChunkSize = defineModel<number>('scopeSummaryChunkSize', { required: true })
+const scopeSummaryModelName = defineModel<string>('scopeSummaryModelName', { required: true })
+const scopeSummaryUseCustomModel = defineModel<boolean>('scopeSummaryUseCustom', { default: false })
+const scopeSummaryBaseUrl = defineModel<string>('scopeSummaryBaseUrl', { required: true })
+const scopeSummaryApiKey = defineModel<string>('scopeSummaryApiKey', { required: true })
 
 const { t } = useI18n()
+defineProps<{
+  defaultDateRange: string
+  timeField: string
+}>()
 
 const limitBounds = {
   min: MIN_AUTO_TITLE_TRANSLATIONS,
   max: MAX_AUTO_TITLE_TRANSLATIONS
 }
 
+const summaryBackgroundEnabled = computed({
+  get: () => !!summaryBackgroundEnabledModel.value,
+  set: (value: boolean) => { summaryBackgroundEnabledModel.value = value },
+})
+
+const scopeSummaryEnabled = computed({
+  get: () => !!scopeSummaryEnabledModel.value,
+  set: (value: boolean) => { scopeSummaryEnabledModel.value = value },
+})
+
+const scopeSummaryAutoGenerate = computed({
+  get: () => !!scopeSummaryAutoGenerateModel.value,
+  set: (value: boolean) => { scopeSummaryAutoGenerateModel.value = value },
+})
+
+const scopeSummaryUseCustom = computed({
+  get: () => !!scopeSummaryUseCustomModel.value,
+  set: (value: boolean) => { scopeSummaryUseCustomModel.value = value },
+})
+
 </script>
 
 <template>
   <section class="mb-6 p-5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] last:mb-0">
     <h3 class="m-[0_0_16px_0] text-base font-semibold text-[var(--text-primary)] hidden md:block">{{ t('settings.aiFeatures') }}</h3>
-
-    <!-- Auto Summary -->
-    <div class="mb-4">
-      <label class="flex items-start gap-2 cursor-pointer py-1 text-[var(--text-primary)]">
-        <input v-model="features.auto_summary" type="checkbox" class="mr-2 accent-orange-500" />
-        <div>
-          {{ t('settings.autoSummary') }}
-          <span class="text-xs text-[var(--text-secondary)] block mt-0.5 leading-snug">{{ t('settings.autoSummaryHint') }}</span>
-        </div>
-      </label>
-    </div>
-
-    <!-- Auto Title Translation -->
-    <div class="mb-4">
-      <label class="flex items-start gap-2 cursor-pointer py-1 text-[var(--text-primary)]">
-        <input v-model="features.auto_title_translation" type="checkbox" class="mr-2 accent-orange-500" />
-        <div>
-          {{ t('settings.autoTitleTranslation') }}
-          <span class="text-xs text-[var(--text-secondary)] block mt-0.5 leading-snug">{{ t('settings.autoTitleTranslationHint') }}</span>
-        </div>
-      </label>
-    </div>
-
-    <!-- Auto Tagging -->
-    <div class="mb-4">
-      <label class="flex items-start gap-2 cursor-pointer py-1 text-[var(--text-primary)]">
-        <input v-model="features.auto_tagging" type="checkbox" class="mr-2 accent-orange-500" />
-        <div>
-          {{ t('settings.autoTagging') }}
-          <span class="text-xs text-[var(--text-secondary)] block mt-0.5 leading-snug">{{ t('settings.autoTaggingHint') }}</span>
-        </div>
-      </label>
-    </div>
+    <p class="m-[0_0_16px_0] text-xs leading-5 text-[var(--text-secondary)]">
+      {{ t('settings.aiFeaturesHint') }}
+    </p>
 
     <!-- Title Display Mode -->
-    <div class="mb-4" v-if="features.auto_title_translation">
+    <div class="mb-4">
       <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.titleDisplayMode') }}</label>
       <div class="flex gap-2 mt-2">
         <button
@@ -91,7 +101,7 @@ const limitBounds = {
     </div>
 
     <!-- Translation Target Language -->
-    <div class="mb-4" v-if="features.auto_title_translation">
+    <div class="mb-4">
       <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.translationTargetLanguage') }}</label>
       <select v-model="features.translation_language" class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all shadow-none focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]">
         <option value="zh">{{ t('languages.zh') }}</option>
@@ -117,7 +127,6 @@ const limitBounds = {
         @input="autoTitleTranslationLimit = Number(($event.target as HTMLInputElement).value)"
         :min="limitBounds.min"
         :max="limitBounds.max"
-        :disabled="!features.auto_title_translation"
       />
       <div class="flex justify-between text-[11px] text-[var(--text-secondary)] mt-1">
         <span>{{ limitBounds.min }}</span>
@@ -126,16 +135,190 @@ const limitBounds = {
       <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.autoTitleTranslationLimitHint', { count: autoTitleTranslationLimit }) }}</p>
     </div>
 
-    <!-- AI Prompt Preference -->
+    <!-- AI Summary Max Output Length -->
     <div class="mb-4">
-      <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.aiPromptPreference') }}</label>
+      <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.aiSummaryMaxOutputLength') }}</label>
+      <select
+        v-model="aiSummaryMaxTokens"
+        class="w-full p-2.5 border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all shadow-none focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]"
+      >
+        <option :value="0">{{ t('settings.aiSummaryMaxOutputLengthUnlimited') }}</option>
+        <option :value="1024">1024 {{ t('settings.tokens') }}</option>
+        <option :value="2048">2048 {{ t('settings.tokens') }}</option>
+        <option :value="4096">4096 {{ t('settings.tokens') }}</option>
+        <option :value="8192">8192 {{ t('settings.tokens') }}</option>
+      </select>
+      <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.aiSummaryMaxOutputLengthHint') }}</p>
+    </div>
+
+    <!-- Summary Prompt Preference -->
+    <div class="mb-4">
+      <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.summaryPromptPreference') }}</label>
       <textarea
-        v-model="aiPromptPreference"
+        v-model="summaryPromptPreference"
         class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all shadow-none focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)] resize-none"
         rows="3"
-        :placeholder="t('settings.aiPromptPreferencePlaceholder')"
+        :placeholder="t('settings.summaryPromptPreferencePlaceholder')"
       ></textarea>
-      <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.aiPromptPreferenceHint') }}</p>
+      <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.summaryPromptPreferenceHint') }}</p>
+    </div>
+
+    <!-- Translation Prompt Preference -->
+    <div class="mb-4">
+      <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.translationPromptPreference') }}</label>
+      <textarea
+        v-model="translationPromptPreference"
+        class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all shadow-none focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)] resize-none"
+        rows="3"
+        :placeholder="t('settings.translationPromptPreferencePlaceholder')"
+      ></textarea>
+      <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.translationPromptPreferenceHint') }}</p>
+    </div>
+
+    <div class="mb-4 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)]">
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <div>
+          <div class="text-sm font-semibold text-[var(--text-primary)]">{{ t('settings.summaryBackgroundTitle') }}</div>
+          <div class="text-xs text-[var(--text-secondary)] mt-1">{{ t('settings.summaryBackgroundHint') }}</div>
+        </div>
+        <AppToggle v-model="summaryBackgroundEnabled" />
+      </div>
+      <p class="text-xs leading-5 text-[var(--text-secondary)]">
+        {{ t('settings.summaryBackgroundDescription') }}
+      </p>
+      <SummaryBackgroundStatusCard
+        :draft-enabled="summaryBackgroundEnabled"
+        :draft-date-range="defaultDateRange"
+        :draft-time-field="timeField"
+      />
+    </div>
+
+    <div class="mt-5 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)]">
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <div>
+          <div class="text-sm font-semibold text-[var(--text-primary)]">{{ t('settings.scopeSummaryTitle') }}</div>
+          <div class="text-xs text-[var(--text-secondary)] mt-1">{{ t('settings.scopeSummaryHint') }}</div>
+        </div>
+        <AppToggle v-model="scopeSummaryEnabled" />
+      </div>
+
+      <div class="space-y-4 mt-3">
+        <div class="flex items-center justify-between gap-2">
+          <label class="text-sm text-[var(--text-primary)]">{{ t('settings.scopeSummaryAutoGenerate') }}</label>
+          <AppToggle v-model="scopeSummaryAutoGenerate" :disabled="!scopeSummaryEnabled" size="sm" />
+        </div>
+
+        <div>
+          <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.scopeSummaryDefaultWindow') }}</label>
+          <select
+            v-model="scopeSummaryDefaultWindow"
+            :disabled="!scopeSummaryEnabled"
+            class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all shadow-none focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)] disabled:opacity-60"
+          >
+            <option value="24h">{{ t('scopeSummary.windows.24h') }}</option>
+            <option value="3d">{{ t('scopeSummary.windows.3d') }}</option>
+            <option value="7d">{{ t('scopeSummary.windows.7d') }}</option>
+            <option value="30d">{{ t('scopeSummary.windows.30d') }}</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="block text-sm font-medium text-[var(--text-primary)]">{{ t('settings.scopeSummaryAutoInterval', { minutes: scopeSummaryAutoIntervalMinutes }) }}</label>
+            <span class="text-sm font-semibold text-orange-500">{{ scopeSummaryAutoIntervalMinutes }}m</span>
+          </div>
+          <input
+            type="range"
+            :value="scopeSummaryAutoIntervalMinutes"
+            @input="scopeSummaryAutoIntervalMinutes = Number(($event.target as HTMLInputElement).value)"
+            min="5"
+            max="240"
+            step="5"
+            :disabled="!scopeSummaryEnabled || !scopeSummaryAutoGenerate"
+            class="w-full mt-1 accent-orange-500 disabled:opacity-60"
+          />
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="block text-sm font-medium text-[var(--text-primary)]">{{ t('settings.scopeSummaryMaxEntries', { count: scopeSummaryMaxEntries }) }}</label>
+            <span class="text-sm font-semibold text-orange-500">{{ scopeSummaryMaxEntries }}</span>
+          </div>
+          <input
+            type="range"
+            :value="scopeSummaryMaxEntries"
+            @input="scopeSummaryMaxEntries = Number(($event.target as HTMLInputElement).value)"
+            min="20"
+            max="200"
+            step="10"
+            :disabled="!scopeSummaryEnabled"
+            class="w-full mt-1 accent-orange-500 disabled:opacity-60"
+          />
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="block text-sm font-medium text-[var(--text-primary)]">{{ t('settings.scopeSummaryChunkSize', { count: scopeSummaryChunkSize }) }}</label>
+            <span class="text-sm font-semibold text-orange-500">{{ scopeSummaryChunkSize }}</span>
+          </div>
+          <input
+            type="range"
+            :value="scopeSummaryChunkSize"
+            @input="scopeSummaryChunkSize = Number(($event.target as HTMLInputElement).value)"
+            min="5"
+            max="25"
+            step="1"
+            :disabled="!scopeSummaryEnabled"
+            class="w-full mt-1 accent-orange-500 disabled:opacity-60"
+          />
+        </div>
+
+        <!-- Scope Summary Custom Model -->
+        <div v-if="scopeSummaryUseCustom && scopeSummaryEnabled" class="mt-4 pt-4 border-t border-[var(--border-color)]">
+          <div class="mb-3">
+            <label class="block mb-1.5 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.baseUrl') }}</label>
+            <input
+              v-model="scopeSummaryBaseUrl"
+              type="text"
+              :placeholder="t('settings.baseUrlPlaceholder')"
+              class="w-full px-3 py-2 text-sm border rounded-lg bg-[var(--bg-input)] text-[var(--text-primary)] border-[var(--border-color)]"
+            />
+          </div>
+          <div class="mb-3">
+            <label class="block mb-1.5 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.apiKey') }}</label>
+            <input
+              v-model="scopeSummaryApiKey"
+              type="password"
+              :placeholder="t('settings.apiKeyPlaceholder')"
+              class="w-full px-3 py-2 text-sm border rounded-lg bg-[var(--bg-input)] text-[var(--text-primary)] border-[var(--border-color)]"
+            />
+          </div>
+          <div>
+            <label class="block mb-1.5 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.modelName') }}</label>
+            <input
+              v-model="scopeSummaryModelName"
+              type="text"
+              :placeholder="t('settings.modelPlaceholder')"
+              class="w-full px-3 py-2 text-sm border rounded-lg bg-[var(--bg-input)] text-[var(--text-primary)] border-[var(--border-color)]"
+            />
+          </div>
+        </div>
+        <div v-else class="mt-4 pt-4 border-t border-[var(--border-color)]">
+          <div class="flex items-center justify-between">
+            <label class="block text-sm font-medium text-[var(--text-primary)]">{{ t('settings.scopeSummaryModel') }}</label>
+            <label class="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
+              <input
+                v-model="scopeSummaryUseCustom"
+                type="checkbox"
+                :disabled="!scopeSummaryEnabled"
+                class="accent-orange-500 disabled:opacity-60"
+              />
+              {{ t('settings.useCustomModel') }}
+            </label>
+          </div>
+          <p class="mt-1 text-xs text-[var(--text-secondary)]">{{ t('settings.scopeSummaryModelHint') }}</p>
+        </div>
+      </div>
     </div>
   </section>
 </template>

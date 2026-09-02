@@ -1,7 +1,7 @@
 {
   "name": "aurora-rss-reader",
   "private": true,
-  "version": "0.1.8",
+  "version": "0.2.0",
   "type": "module",
   "description": "🌟 Aurora RSS Reader - AI-powered cross-platform desktop RSS reader with translation and summarization features",
   "author": {
@@ -35,7 +35,7 @@
   ],
   "license": "ARSL",
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.0.0 <23",
     "pnpm": ">=8.0.0"
   },
   "pnpm": {
@@ -64,6 +64,8 @@
     "dompurify": "^3.3.1",
     "electron-log": "^5.4.3",
     "electron-updater": "^6.7.3",
+    "katex": "^0.16.38",
+    "marked": "^17.0.4",
     "pinia": "^3.0.4",
     "vue": "^3.4.21",
     "vue-i18n": "^9.14.5",

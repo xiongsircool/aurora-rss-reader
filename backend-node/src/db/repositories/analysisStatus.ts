@@ -10,6 +10,17 @@ export interface AnalysisStats {
     withoutTags: number;
 }
 
+/**
+ * Normalize entry from database row (convert 0/1 to boolean)
+ */
+function normalizeEntryRow(row: any): Entry {
+    return {
+        ...row,
+        read: !!row.read,
+        starred: !!row.starred,
+    };
+}
+
 export class AnalysisStatusRepository {
     private db = getDatabase();
 
@@ -160,7 +171,8 @@ export class AnalysisStatusRepository {
         const rows = stmt.all(...params) as Entry[];
 
         const hasMore = rows.length > limit;
-        const items = hasMore ? rows.slice(0, limit) : rows;
+        const rawItems = hasMore ? rows.slice(0, limit) : rows;
+        const items = rawItems.map(normalizeEntryRow);
         const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].inserted_at : null;
 
         return { items, nextCursor, hasMore };
@@ -230,7 +242,8 @@ export class AnalysisStatusRepository {
         const rows = stmt.all(...params) as Entry[];
 
         const hasMore = rows.length > limit;
-        const items = hasMore ? rows.slice(0, limit) : rows;
+        const rawItems = hasMore ? rows.slice(0, limit) : rows;
+        const items = rawItems.map(normalizeEntryRow);
         const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].inserted_at : null;
 
         return { items, nextCursor, hasMore };

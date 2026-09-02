@@ -143,9 +143,11 @@ export const useFeedStore = defineStore('feed', () => {
         dateRange: lastEntryFilters.value?.dateRange,
         timeField: lastEntryFilters.value?.timeField,
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      errorMessage.value = '添加订阅失败，请检查链接'
+      const message = error.response?.data?.error || error.message || '添加订阅失败，请检查链接'
+      errorMessage.value = message
+      throw error
     } finally {
       addingFeed.value = false
     }
@@ -387,13 +389,27 @@ export const useFeedStore = defineStore('feed', () => {
 
   // === AI ===
 
-  async function requestSummary(entryId: string, language = 'zh') {
-    if (summaryCache.value[entryId]) return summaryCache.value[entryId]
+  function getSummaryCacheKey(entryId: string, language = 'zh') {
+    return `${entryId}:${language}`
+  }
+
+  function getCachedSummary(entryId: string, language = 'zh') {
+    return summaryCache.value[getSummaryCacheKey(entryId, language)] ?? null
+  }
+
+  async function requestSummary(
+    entryId: string,
+    language = 'zh',
+    options: { force?: boolean } = {}
+  ) {
+    const cacheKey = getSummaryCacheKey(entryId, language)
+    if (!options.force && summaryCache.value[cacheKey]) return summaryCache.value[cacheKey]
     const { data } = await api.post<SummaryResult>('/ai/summary', {
       entry_id: entryId,
       language,
+      force: !!options.force,
     }, { timeout: 90000 })
-    summaryCache.value[entryId] = data
+    summaryCache.value[cacheKey] = data
     return data
   }
 
@@ -511,6 +527,7 @@ export const useFeedStore = defineStore('feed', () => {
     bulkUpdateFeedTagging,
     updateFeedViewType,
     toggleEntryState,
+    getCachedSummary,
     requestSummary,
     requestTitleTranslation,
     exportOpml,

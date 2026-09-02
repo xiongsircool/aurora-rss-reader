@@ -9,6 +9,12 @@ import { refreshFeed } from './fetcher.js';
 import { UserSettingsService } from './userSettings.js';
 import { syncEntriesToVectorDB } from './vector.js';
 import { runAutoTaggingBatch } from './autoTagging.js';
+import { articleExtractionService } from './articleExtractionService.js';
+import { summaryGenerationService } from './summaryGenerationService.js';
+import { runWithConcurrency } from '../utils/concurrency.js';
+
+const FEED_REFRESH_CONCURRENCY = 4;
+const ARTICLE_EXTRACTION_CONCURRENCY = 2;
 
 export class SchedulerService {
   private cronJob: cron.ScheduledTask | null = null;
@@ -37,6 +43,9 @@ export class SchedulerService {
     });
 
     console.log('✅ Scheduler started (runs every 5 minutes)');
+    void articleExtractionService.pumpPendingJobs(ARTICLE_EXTRACTION_CONCURRENCY);
+    summaryGenerationService.ensurePendingJobs();
+    void summaryGenerationService.pumpPendingJobs();
   }
 
   /**
@@ -66,39 +75,39 @@ export class SchedulerService {
       // Check if auto-refresh is enabled
       const settings = this.settingsService.getSettings();
       if (!settings.auto_refresh) {
-        console.log('⏸️  Auto-refresh is disabled, skipping');
-        return;
+        console.log('⏸️  Auto-refresh is disabled, skipping feed refresh');
       }
 
-      const feeds = this.feedRepo.findAll();
       const now = new Date();
+      const feeds = settings.auto_refresh
+        ? this.feedRepo.findAll().filter(feed => this.shouldRefreshFeed(feed, now))
+        : [];
       let refreshedCount = 0;
       let errorCount = 0;
 
-      for (const feed of feeds) {
+      await runWithConcurrency(feeds, FEED_REFRESH_CONCURRENCY, async (feed) => {
         try {
-          // Check if feed needs refreshing
-          if (this.shouldRefreshFeed(feed, now)) {
-            console.log(`🔄 Refreshing feed: ${feed.title || feed.url}`);
-            const result = await refreshFeed(feed.id);
+          console.log(`🔄 Refreshing feed: ${feed.title || feed.url}`);
+          const result = await refreshFeed(feed.id);
 
-            if (result.success) {
-              refreshedCount++;
-              console.log(`✅ Refreshed: ${feed.title || feed.url} (${result.itemCount} new items)`);
-            } else {
-              errorCount++;
-              console.log(`❌ Failed to refresh: ${feed.title || feed.url} - ${result.error}`);
-            }
+          if (result.success) {
+            refreshedCount++;
+            console.log(`✅ Refreshed: ${feed.title || feed.url} (${result.itemCount} new items)`);
+          } else {
+            errorCount++;
+            console.log(`❌ Failed to refresh: ${feed.title || feed.url} - ${result.error}`);
           }
         } catch (error) {
           errorCount++;
           console.error(`❌ Error refreshing feed ${feed.id}:`, error);
         }
-      }
+      });
 
       if (refreshedCount > 0 || errorCount > 0) {
         console.log(`📊 Scheduler run complete: ${refreshedCount} refreshed, ${errorCount} errors`);
       }
+
+      await articleExtractionService.pumpPendingJobs(ARTICLE_EXTRACTION_CONCURRENCY);
 
       // Sync vectors for new content
       // Runs every scheduler loop
@@ -118,6 +127,13 @@ export class SchedulerService {
         }
       } catch (e) {
         console.error('❌ Auto tagging error:', e);
+      }
+
+      try {
+        summaryGenerationService.ensurePendingJobs();
+        await summaryGenerationService.pumpPendingJobs();
+      } catch (e) {
+        console.error('❌ Summary background generation error:', e);
       }
 
     } catch (error) {

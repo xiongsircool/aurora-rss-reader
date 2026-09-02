@@ -23,22 +23,22 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.1.7 最新版本 | Latest Version
+### 🎉 v0.2.0 最新版本 | Latest Release
 
-**信息简报智能化、标签流程优化与更新体验升级 | Digest Intelligence, Tag Workflow Polish & Update Experience**
+**阅读统计、订阅稳定性与移动 API 基础 | Reading Analytics, Feed Reliability & Mobile API Foundation**
 
-- 🧠 **信息简报 2.0** - 支持 LLM 摘要历史、手动重生成、关键词展示、与界面语言一致
-- 🕒 **最新 + 本周模式** - 将“今日”优化为“最新”，避免无当日内容时标签消失
-- 🏷️ **分析全部修复** - 改为拉取待分类全量分页，不再只分析前端可见一页
-- 🧾 **摘要质量提升** - 提示词改为结论优先、事实密集、包含明确时间上下文
-- 🔄 **手动检查更新入口** - 设置 > 关于中新增“检查更新”按钮
-- 🧩 **侧边栏与标签交互优化** - 左侧操作与标签/简报联动体验增强
+- 📊 **阅读统计** - 新增文章总量、阅读率、30 天趋势、主要订阅源和常用标签可视化
+- 🕒 **阅读时间记录** - 已读操作开始在本地记录时间，为趋势分析积累数据，不上传阅读行为
+- 📰 **Feed 解析稳定性** - 提前识别 HTML/非 RSS 响应，并支持更多 Media RSS 与直接图片字段
+- 🎬 **视频订阅优化** - 改进视频链接提取和时间线视频卡片展示
+- 📱 **移动 API 基础** - 为后续局域网或自托管移动客户端提供游标分页与展示数据接口
+- 🧩 **v0.2 路线图收官** - 阅读统计已内置；AI 辅助 RSSHub 浏览器工具位于独立项目 [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator)
 
 ---
 
 Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with AI translation and summarization features. Built with Electron + Vue 3 + Fastify (Node.js) stack, providing smooth user experience and powerful functionality.
 
-**Current Version: v0.1.7**
+**Current Version: v0.2.0**
 
 ## 🇨🇳 中文 | 🇺🇸 English
 
@@ -49,7 +49,7 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.7**
+**Current Version: v0.2.0**
 
 ### Features | 功能特色
 
@@ -121,30 +121,30 @@ chmod +x start.sh
 
 ### 界面预览
 
-#### 🌟 v0.1.7 新增界面
+#### 🌟 当前版本界面亮点
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/智能标签和简约日报功能.png" alt="智能标签与信息简报升级" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>智能标签与信息简报升级</figcaption>
+    <img src="images/v.0.1.9/MCP功能升级.png" alt="专门的 MCP 配置管理界面" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>MCP 独立配置页</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧键功能增强支持自定义别名修改分组.png" alt="左侧操作增强与分组别名" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>左侧操作增强与分组别名</figcaption>
+    <img src="images/v.0.1.9/增加支持后台summary.png" alt="后台自动摘要队列" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>后台自动摘要队列</figcaption>
   </figure>
 </div>
 
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧风格切换按钮.png" alt="左侧风格切换按钮" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>左侧风格切换按钮</figcaption>
+    <img src="images/v.0.1.9/支持单个订阅和分组的日报功能.png" alt="支持单个订阅和分组的日报功能" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>单订阅与分组日报</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧切换后风格.png" alt="切换后的左侧样式" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>切换后的左侧样式</figcaption>
+    <img src="images/v.0.1.9/增加rsshub预选.png" alt="RSSHub 预选配置" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>RSSHub 预选配置</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/通过新的字符串可以创建新的分组.png" alt="通过字符串快速创建分组" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>通过字符串快速创建分组</figcaption>
+    <img src="images/v.0.1.9/AI摘要支持makedown渲染.png" alt="AI 摘要支持 Markdown 渲染" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>AI 摘要 Markdown 渲染</figcaption>
   </figure>
 </div>
 
@@ -195,7 +195,7 @@ chmod +x start.sh
 ## 快速开始
 
 ### 系统要求
-- Node.js 18+
+- Node.js 22
 - pnpm 8+
 
 ### 安装运行
@@ -251,7 +251,9 @@ git clone https://github.com/xiongsircool/aurora-rss-reader.git
 cd aurora-rss-reader
 docker-compose up -d
 
-# 访问: http://localhost:8080
+# 访问 Web: http://localhost:8080
+# 访问 API: http://localhost:15432/api
+# 访问 MCP: http://localhost:15432/mcp
 ```
 
 详细配置请参考 [Docker 部署文档](docker/README.md)。
@@ -267,9 +269,17 @@ chmod +x build-release-app.sh
 ```
 
 生成的文件：
-- macOS: `AuroraRSSReader-Mac-0.1.7-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.7-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.7-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.2.0.dmg`
+- Windows: `AuroraRSSReader-Windows-0.2.0-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.2.0-x64.AppImage`
+
+### Public 打包注意事项
+- public 打包或打 tag 前，先确认 `rss-desktop/package.json` 已经切到目标版本号。
+- 先在 `main` 上用 `workflow_dispatch` 跑预检，只验证构建，不创建 GitHub Release。
+- macOS、Windows、Linux 三个平台都通过后，再创建正式公开 tag。
+- 新版本请使用未占用的 tag，例如 `v0.2.0`，不要重复使用已经占用的 `v0.1.9`。
+- 自动更新只有在 public GitHub Release 带上安装包和 `latest*.yml` 后才会生效。
+- 当前 macOS 安装包仍为未签名分发，应用内版本检查可用，但建议用户通过 GitHub Releases 手动下载安装更新。
 
 ## 技术栈
 
@@ -292,20 +302,36 @@ aurora-rss-reader/
 
 ## 📋 更新日志 | Changelog
 
-### v0.1.7 (当前版本 | Current Version) 🎉
-**信息简报智能化 + 标签流程稳定性修复 | Digest Intelligence + Tag Workflow Stabilization**
+### v0.2.0 (当前版本 | Current Version) 🎉
+**阅读统计 + Feed 稳定性 + 移动 API 基础 | Reading Analytics + Feed Reliability + Mobile API Foundation**
 
 #### ✨ 新增与优化 | New & Improved
-- **信息简报历史弹窗** - 支持摘要历史、关键词、触发来源展示
-- **摘要手动重生成** - 支持按当前语言手动生成并立即刷新
-- **最新/本周双模式** - “最新”模式避免当日无文时简报空白
-- **摘要提示词升级** - 结论优先、事实密集、减少空泛表达
-- **分析全部全量化** - 待分类分页全部拉取后再分析
-- **设置-关于手动检查更新** - 增加“检查更新”入口
+- **阅读统计面板** - 展示文章总量、阅读率、30 天趋势、主要订阅源和常用标签
+- **阅读时间记录** - 新增本地 `read_at` 字段及兼容旧数据库的幂等迁移
+- **Feed 与媒体解析优化** - 改进非 RSS 响应识别、Media RSS 图片提取、视频链接与视频卡片展示
+- **移动 API 基础** - 新增游标分页的 `/api/mobile` 接口，为后续局域网/自托管客户端保留选择
+- **v0.2 路线图完成** - 浏览器工具由独立项目 [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator) 提供
+
+### v0.1.9 (已发布上一版本 | Previous Version)
+**后台摘要队列 + MCP 现代化 + Docker 访问优化 | Background Summary Queue + MCP Modernization + Docker Access**
+
+#### ✨ 新增与优化 | New & Improved
+- **后台摘要队列** - 未读文章支持自动排队摘要并保存到本地数据库
+- **摘要队列状态面板** - 设置页显示 queued/running/succeeded/failed 与时间范围
+- **MCP 独立设置页** - 从 AI 配置中拆出，提供端点、分组工具、文档入口、兼容提示
+- **MCP 搜索分页** - `search_entries` 现已支持 cursor 分页
+- **MCP 时间设置对齐** - `list_entries/search_entries` 默认继承应用当前的 `date_range + time_field`
+- **Docker 后端端口开放** - 容器模式直接暴露 `15432`，便于本地 API/MCP 接入
 
 #### 🐞 稳定性修复 | Stability Fixes
-- **SSE/JSON 解析兼容** - 分析流式响应解析更稳
-- **分析全部循环保护** - 分页失败时避免无限循环
+- **开发代理日志降噪** - 后端重启时不再被大量 `ECONNREFUSED` 刷屏
+- **删除兼容语义对齐** - MCP 的 feed 删除逻辑清理关联数据，避免残留脏数据
+
+### v0.1.8 (已发布上一版本 | Previous Published Version)
+**当前打包周期之前的正式发布版本**
+
+### v0.1.7 (历史版本 | Previous Version)
+**信息简报智能化 + 标签流程稳定性修复 | Digest Intelligence + Tag Workflow Stabilization**
 
 ### v0.1.6 (历史版本 | Previous Version)
 **重大UI升级与新功能 | Major UI Enhancement & New Features**
@@ -411,6 +437,11 @@ A: 数据默认存储在系统应用数据目录：
      ```
    - 再次点击应用即可正常打开。
 
+**更新问题：**
+1. 当前 macOS 发布包依然是未签名应用。
+2. 应用内检查新版本可以工作，但自动安装更新时可能因为签名校验失败而报错。
+3. 目前更稳妥的更新方式仍然是从 GitHub Releases 手动下载最新 `.dmg` 或 `.zip`。
+
 ### 性能相关
 **Q: 应用启动慢怎么办？**
 A: 检查后端服务是否正常启动，可以查看终端输出的启动日志。
@@ -430,11 +461,11 @@ A: 检查后端服务是否正常启动，可以查看终端输出的启动日�
 ## 🎯 未来规划
 
 ### 近期计划 (v0.2)
-- [ ] **AI日报功能** - 智能生成每日热点新闻摘要和个性化推荐
+- [x] **AI日报功能 / 范围摘要** - 已支持 Tag Digest、订阅/分组范围摘要、自动生成与手动重跑 ✅
 - [x] **播客支持** - 支持音频播客订阅和播放功能 ✅
-- [ ] **阅读统计** - 个人阅读习惯分析和数据可视化
-- [ ] **兼容性开发** - 兼容RssHub支持RssHUB导入订阅
-- [ ] **开发浏览器插件** - AI解析网站出Rsshub的订阅规则
+- [x] **阅读统计** - 已支持订阅规模、阅读率、30 天趋势、主要订阅源和常用标签可视化 ✅
+- [x] **RSSHub 支持** - 已支持 RSSHub 地址配置、镜像切换与 RSSHub 源接入 ✅
+- [x] **浏览器插件** - AI 解析网站并生成 RSSHub 订阅规则，见独立项目 [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator) ✅
 
 ### 中期计划 (v0.3)
 - [ ] **数据同步** - 跨设备数据同步和云备份
@@ -443,3 +474,15 @@ A: 检查后端服务是否正常启动，可以查看终端输出的启动日�
 ---
 
 觉得有用就给个 ⭐ 吧！
+
+## Star 历史趋势
+
+[![Star History Chart](https://api.star-history.com/svg?repos=xiongsircool/aurora-rss-reader&type=Date)](https://www.star-history.com/#xiongsircool/aurora-rss-reader&Date)
+
+## 社区交流
+
+如果你想交流产品想法、反馈使用问题，或者加入用户社群，可以直接扫码加入 QQ 交流群。
+
+<div align="center">
+  <img src="images/二维码/QQ537546690.jpeg" alt="Aurora RSS Reader QQ 社区二维码" width="260" />
+</div>

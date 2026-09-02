@@ -12,29 +12,17 @@ export interface RSSHubMirror {
 
 const DEFAULT_RSSHUB_MIRRORS: RSSHubMirror[] = [
   {
-    name: '主镜像 (官方)',
-    base_url: 'https://rsshub.app',
+    name: '主镜像',
+    base_url: 'https://rsshub.rssforever.com',
     priority: 1,
     is_default: true,
-    description: 'RSSHub官方镜像',
+    description: '公开镜像，当前实测可返回 RSS 路由',
   },
   {
     name: '备用镜像1',
-    base_url: 'https://rsshub.rssforever.com',
-    priority: 2,
-    description: 'RSSHub备用镜像1',
-  },
-  {
-    name: '备用镜像2',
     base_url: 'https://rsshub.ktachibana.party',
-    priority: 3,
-    description: 'RSSHub备用镜像2',
-  },
-  {
-    name: '备用镜像3',
-    base_url: 'https://rsshub.cskaoyan.com',
-    priority: 4,
-    description: 'RSSHub备用镜像3',
+    priority: 2,
+    description: '公开镜像，当前实测可返回 RSS 路由',
   },
 ];
 

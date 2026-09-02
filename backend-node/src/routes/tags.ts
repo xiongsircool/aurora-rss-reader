@@ -4,7 +4,6 @@
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { createHash } from 'crypto';
 import {
     TagRepository,
     EntryTagRepository,
@@ -21,9 +20,16 @@ import {
 import { runRuleMatchingForEntry } from '../services/ruleMatching.js';
 import { TagMatchRule } from '../db/models.js';
 import { getDatabase } from '../db/session.js';
-import { AIClient } from '../services/ai.js';
 import { userSettingsService } from '../services/userSettings.js';
-import { getConfig } from '../config/index.js';
+import { getObjectBody } from '../utils/http.js';
+import { aiAutomationResolver } from '../services/aiAutomationResolver.js';
+import {
+    aggregateDigestService,
+    buildDigestSourceHash,
+    buildDigestTimeWindow,
+    parseAggregateDigestRecord,
+    type DigestSourceItem,
+} from '../services/aggregateDigest.js';
 
 type DigestEntryRow = {
     id: string;
@@ -33,7 +39,19 @@ type DigestEntryRow = {
     inserted_at: string;
     summary: string | null;
     feed_title: string | null;
+    group_name?: string | null;
 };
+
+/**
+ * Normalize entry from database row (convert 0/1 to boolean)
+ */
+function normalizeEntry(row: any) {
+    return {
+        ...row,
+        read: !!row.read,
+        starred: !!row.starred,
+    };
+}
 
 type DigestSummaryRecord = {
     id: string;
@@ -61,56 +79,17 @@ function normalizeDigestLanguage(language?: string | null): 'zh' | 'en' | 'ja' |
     return 'zh';
 }
 
-function getLanguageDisplayName(language: 'zh' | 'en' | 'ja' | 'ko') {
-    switch (language) {
-        case 'en': return 'English';
-        case 'ja': return '日本語';
-        case 'ko': return '한국어';
-        default: return '简体中文';
-    }
-}
-
-function resolveSummaryClient() {
-    const settings = userSettingsService.getSettings();
-    const config = getConfig();
-
-    const useCustom = settings.summary_use_custom === 1;
-    const baseUrl = (useCustom ? settings.summary_base_url : settings.default_ai_base_url) || config.glmBaseUrl || '';
-    const apiKey = (useCustom ? settings.summary_api_key : settings.default_ai_api_key) || config.glmApiKey || '';
-    const modelName = (useCustom ? settings.summary_model_name : settings.default_ai_model) || config.glmModel || '';
-    return {
-        client: new AIClient({ baseUrl, apiKey, model: modelName }),
-        modelName,
-    };
-}
-
-function buildDigestTimeWindow(period?: string) {
-    const now = new Date();
-    if (period === 'week') {
-        const weekStart = new Date(now);
-        const day = weekStart.getDay();
-        const diff = day === 0 ? -6 : 1 - day; // Monday as first day
-        weekStart.setDate(weekStart.getDate() + diff);
-        weekStart.setHours(0, 0, 0, 0);
-
-        // ISO week key
-        const isoDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-        const isoDay = isoDate.getUTCDay() || 7;
-        isoDate.setUTCDate(isoDate.getUTCDate() + 4 - isoDay);
-        const isoYear = isoDate.getUTCFullYear();
-        const yearStart = new Date(Date.UTC(isoYear, 0, 1));
-        const weekNo = Math.ceil((((isoDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-        const weekKey = `${isoYear}-W${String(weekNo).padStart(2, '0')}`;
-
-        return { startDate: weekStart.toISOString(), periodKey: weekKey, normalizedPeriod: 'week' as const };
-    }
-    // latest mode: no hard time filter, always use newest entries for each tag
-    return { startDate: null, periodKey: 'latest', normalizedPeriod: 'latest' as const };
-}
-
 function buildSourceHash(entries: DigestEntryRow[]) {
-    const titlePayload = entries.map((e) => (e.title || '').trim()).join('\n');
-    return createHash('sha256').update(titlePayload).digest('hex');
+    const items: DigestSourceItem[] = entries.map((entry, index) => ({
+        ref: index + 1,
+        entry_id: entry.id,
+        title: entry.title || 'Untitled',
+        summary: entry.summary,
+        feed_title: entry.feed_title,
+        group_name: entry.group_name || null,
+        published_at: entry.published_at || entry.inserted_at,
+    }));
+    return buildDigestSourceHash(items);
 }
 
 function parseKeywordsJson(raw: string | null | undefined): string[] {
@@ -123,92 +102,16 @@ function parseKeywordsJson(raw: string | null | undefined): string[] {
     }
 }
 
-function parseDigestSummaryPayload(raw: string): { summary?: string; keywords?: string[] } | null {
-    const trimmed = raw.trim();
-    if (!trimmed) return null;
-
-    const tryParse = (candidate: string) => {
-        try {
-            return JSON.parse(candidate) as { summary?: string; keywords?: string[] };
-        } catch {
-            return null;
-        }
-    };
-
-    const direct = tryParse(trimmed);
-    if (direct) return direct;
-
-    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    if (fencedMatch?.[1]) {
-        const fencedParsed = tryParse(fencedMatch[1].trim());
-        if (fencedParsed) return fencedParsed;
-    }
-
-    const start = trimmed.indexOf('{');
-    const end = trimmed.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-        const objectChunk = trimmed.slice(start, end + 1);
-        const chunkParsed = tryParse(objectChunk);
-        if (chunkParsed) return chunkParsed;
-    }
-
-    return null;
-}
-
-async function generateDigestSummary(input: {
-    tagName: string;
-    period: 'latest' | 'week';
-    timeRangeKey: string;
-    entries: DigestEntryRow[];
-    language: string;
-}): Promise<{ summary: string; keywords: string[] }> {
-    const { client } = resolveSummaryClient();
-    const titleLines = input.entries
-        .map((e, idx) => {
-            const feed = e.feed_title || 'Unknown Source';
-            const publishedAt = e.published_at || e.inserted_at || '';
-            const snippet = (e.summary || '').replace(/\s+/g, ' ').trim().slice(0, 180);
-            return `${idx + 1}. 标题: ${e.title || 'Untitled'}\n来源: ${feed}\n时间: ${publishedAt}\n线索: ${snippet || '无'}\n`;
-        })
-        .join('\n');
-    const periodText = input.period === 'week' ? '本周' : '最新';
-    const languageDisplay = getLanguageDisplayName(normalizeDigestLanguage(input.language));
-    const systemPrompt = `你是信息分析助手。基于给定标题生成“标签简报摘要”，只能依据输入，不得编造。
-输出必须是 JSON 对象，格式：
-{"summary":"320-700字","keywords":["关键词1","关键词2"]}`;
-    const userPrompt = `标签：${input.tagName}
-时间范围：${periodText}
-时间标识：${input.timeRangeKey}
-信息源（最多20条）：
-${titleLines}
-
-要求：
-1) summary 必须使用 ${languageDisplay} 输出，不能混用其他语言。
-2) summary 只写“新知识/新结果/新结论”，优先保留可验证事实：研究对象、方法、数据范围、结果方向、边界条件。
-3) 表达必须去评价化，禁止使用以下低信息短语：具有重要意义、值得关注、进展活跃、有望、突破性、显著提升（若无量化证据）。
-4) summary 按单段组织：时间范围一句 + 3-6个高信息点 + 结论句；每个信息点尽量包含“谁/做了什么/得到什么”。
-5) 结论句为必填，必须使用“结论：...”开头，明确给出本时间窗内最可靠的新结果与限制条件。
-6) 若输入中没有明确结果或结论，不要补写推断，只说明“标题未提供明确结果”。
-7) keywords 4-8个，短词，尽量覆盖核心主题与方法名。
-8) 输出必须是严格 JSON，不要 Markdown，不要代码块。`;
-
-    const raw = await client.chat(
-        [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-        ],
-        { maxTokens: 2000, temperature: 0.2 },
-    );
-
-    const parsed = parseDigestSummaryPayload(raw);
-    if (parsed) {
-        return {
-            summary: (parsed.summary || '').trim(),
-            keywords: Array.isArray(parsed.keywords) ? parsed.keywords.filter(Boolean).slice(0, 8) : [],
-        };
-    }
-
-    return { summary: raw.trim(), keywords: [] };
+function toDigestSourceItems(entries: DigestEntryRow[]): DigestSourceItem[] {
+    return entries.map((entry, index) => ({
+        ref: index + 1,
+        entry_id: entry.id,
+        title: entry.title || 'Untitled',
+        summary: entry.summary,
+        feed_title: entry.feed_title,
+        group_name: entry.group_name || null,
+        published_at: entry.published_at || entry.inserted_at,
+    }));
 }
 
 const tagsRoutes: FastifyPluginAsync = async (app) => {
@@ -240,7 +143,18 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             match_rules?: TagMatchRule[];
         };
     }>('/tags', async (request, reply) => {
-        const { name, description, color, match_mode, match_rules } = request.body;
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const name = typeof body.name === 'string' ? body.name : '';
+        const description = typeof body.description === 'string' ? body.description : undefined;
+        const color = typeof body.color === 'string' ? body.color : undefined;
+        const match_mode = body.match_mode === 'ai' || body.match_mode === 'rule' || body.match_mode === 'both'
+            ? body.match_mode
+            : undefined;
+        const match_rules = Array.isArray(body.match_rules) ? body.match_rules as TagMatchRule[] : undefined;
 
         if (!name || !name.trim()) {
             return reply.status(400).send({ error: '标签名称不能为空' });
@@ -281,7 +195,19 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
         };
     }>('/tags/:id', async (request, reply) => {
         const { id } = request.params;
-        const { name, description, color, enabled, match_mode, match_rules } = request.body;
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const name = typeof body.name === 'string' ? body.name : undefined;
+        const description = typeof body.description === 'string' ? body.description : undefined;
+        const color = typeof body.color === 'string' ? body.color : undefined;
+        const enabled = typeof body.enabled === 'boolean' ? body.enabled : undefined;
+        const match_mode = body.match_mode === 'ai' || body.match_mode === 'rule' || body.match_mode === 'both'
+            ? body.match_mode
+            : undefined;
+        const match_rules = Array.isArray(body.match_rules) ? body.match_rules as TagMatchRule[] : undefined;
 
         const existing = tagRepo.findById(id);
         if (!existing) {
@@ -474,7 +400,14 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
     app.post<{
         Body: { entryIds: string[] };
     }>('/ai/tags/analyze', async (request, reply) => {
-        const { entryIds } = request.body;
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const entryIds = Array.isArray(body.entryIds)
+            ? body.entryIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+            : [];
 
         if (!entryIds || entryIds.length === 0) {
             return reply.status(400).send({ error: '请提供要分析的文章ID' });
@@ -626,7 +559,17 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             mode?: 'missing' | 'all';
         };
     }>('/ai/tags/rerun-range', async (request, reply) => {
-        const { from, to, cursor, limit, feedIds, mode } = request.body;
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const from = typeof body.from === 'string' ? body.from : '';
+        const to = typeof body.to === 'string' ? body.to : '';
+        const cursor = typeof body.cursor === 'string' ? body.cursor : undefined;
+        const limit = typeof body.limit === 'number' ? body.limit : body.limit;
+        const feedIds = Array.isArray(body.feedIds) ? body.feedIds : undefined;
+        const mode = body.mode === 'all' ? 'all' : 'missing';
 
         if (!from || !to) {
             return reply.status(400).send({ error: '请提供 from/to (ISO 时间字符串)' });
@@ -644,7 +587,7 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
         const parsedLimit =
             typeof limit === 'number' ? limit : Number.parseInt(String(limit ?? ''), 10);
         const safeLimit = Math.max(1, Math.min(Number.isFinite(parsedLimit) ? parsedLimit : 50, 200));
-        const nextMode: 'missing' | 'all' = mode === 'all' ? 'all' : 'missing';
+        const nextMode: 'missing' | 'all' = mode;
 
         // Get enabled tags
         const tags = tagRepo.findAllEnabled();
@@ -857,8 +800,16 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
             modelName?: string;
             autoTagging?: boolean;
         };
-    }>('/ai/tags/config', async (request) => {
-        const { apiKey, baseUrl, modelName, autoTagging } = request.body;
+    }>('/ai/tags/config', async (request, reply) => {
+        const body = getObjectBody(request.body);
+        if (!body) {
+            return reply.status(400).send({ error: '请求体必须是对象' });
+        }
+
+        const apiKey = typeof body.apiKey === 'string' ? body.apiKey : undefined;
+        const baseUrl = typeof body.baseUrl === 'string' ? body.baseUrl : undefined;
+        const modelName = typeof body.modelName === 'string' ? body.modelName : undefined;
+        const autoTagging = typeof body.autoTagging === 'boolean' ? body.autoTagging : undefined;
 
         updateTaggingConfig({
             apiKey,
@@ -969,7 +920,8 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
 
         const rows = db.prepare(sql).all(...params) as any[];
         const hasMore = rows.length > safeLimit;
-        const items = hasMore ? rows.slice(0, safeLimit) : rows;
+        const rawItems = hasMore ? rows.slice(0, safeLimit) : rows;
+        const items = rawItems.map(normalizeEntry);
         const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].inserted_at : null;
 
         return { items, nextCursor, hasMore };
@@ -1060,54 +1012,13 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
         const shouldGenerateSummary = with_summary !== '0' && with_summary !== false;
 
         const allTags = tagRepo.getAllWithEntryCounts();
-        const generateAndStoreSummary = async (args: {
-            tagId: string;
-            tagName: string;
-            normalizedPeriod: 'latest' | 'week';
-            periodKey: string;
-            language: string;
-            sourceHash: string;
-            entries: DigestEntryRow[];
-            triggerType: 'auto' | 'manual';
-        }) => {
-            const generated = await generateDigestSummary({
-                tagName: args.tagName,
-                period: args.normalizedPeriod,
-                timeRangeKey: args.periodKey,
-                entries: args.entries,
-                language: args.language,
-            });
-            if (!generated.summary) return null;
-
-            const { modelName } = resolveSummaryClient();
-            const now = new Date().toISOString();
-            db.prepare(`
-                INSERT INTO digest_tag_summaries (
-                    id, tag_id, period, time_range_key, language, source_count, source_hash,
-                    summary, keywords_json, model_name, trigger_type, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(
-                `${args.tagId}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-                args.tagId,
-                args.normalizedPeriod,
-                args.periodKey,
-                args.language,
-                args.entries.length,
-                args.sourceHash,
-                generated.summary,
-                JSON.stringify(generated.keywords || []),
-                modelName || 'unknown',
-                args.triggerType,
-                now,
-            );
-            return { summary: generated.summary, keywords: generated.keywords || [], createdAt: now };
-        };
 
         const result: Array<{
             tag: typeof allTags[number];
             recentCount: number;
             entries: DigestEntryRow[];
             llm_summary: string | null;
+            citations: Array<{ ref: number; entry_id: string }>;
             keywords: string[];
             summary_updated_at: string | null;
             time_range_key: string;
@@ -1146,10 +1057,18 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
                 ORDER BY created_at DESC
                 LIMIT 1
             `).get(tag.id, normalizedPeriod, periodKey, language) as DigestSummaryRecord | undefined;
+            const latestAggregateRecord = aggregateDigestService.getLatest({
+                scope_type: 'tag',
+                scope_id: tag.id,
+                period: normalizedPeriod,
+                time_range_key: periodKey,
+                language,
+            });
 
-            let summary = latest?.summary ?? null;
-            let keywords: string[] = parseKeywordsJson(latest?.keywords_json);
-            let summaryUpdatedAt = latest?.created_at ?? null;
+            let summary = latestAggregateRecord?.summary_md ?? latest?.summary ?? null;
+            let citations = parseAggregateDigestRecord(latestAggregateRecord?.citations_json, [] as Array<{ ref: number; entry_id: string }>);
+            let keywords: string[] = parseAggregateDigestRecord(latestAggregateRecord?.keywords_json, parseKeywordsJson(latest?.keywords_json));
+            let summaryUpdatedAt = latestAggregateRecord?.created_at ?? latest?.created_at ?? null;
 
             const latestSummaryText = latest?.summary?.trim() || '';
             const looksLikeRawJsonSummary =
@@ -1181,24 +1100,41 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
                 || unsummarizedCount >= DIGEST_AUTO_REGEN_NEW_ENTRIES_THRESHOLD
                 || summaryAgeMs >= DIGEST_AUTO_REGEN_COOLDOWN_MS
                 || looksLikeRawJsonSummary;
-            const needGenerate = shouldGenerateSummary && changedSinceLastSummary && passAutoRegenPolicy;
+            const autoDigestEnabled = aiAutomationResolver.resolve({
+                taskKey: 'aggregate_digest',
+                scopeType: 'tag',
+                scopeId: tag.id,
+                tagId: tag.id,
+            });
+            const needGenerate = shouldGenerateSummary && autoDigestEnabled && changedSinceLastSummary && passAutoRegenPolicy;
             if (needGenerate) {
                 try {
-                    const generated = await generateAndStoreSummary({
-                        tagId: tag.id,
-                        tagName: tag.name,
-                        normalizedPeriod,
-                        periodKey,
+                    const generated = await aggregateDigestService.generate({
+                        scope_type: 'tag',
+                        scope_id: tag.id,
+                        scope_label: tag.name,
+                        period: normalizedPeriod,
+                        time_range_key: periodKey,
                         language,
-                        sourceHash,
-                        entries,
-                        triggerType: 'auto',
+                        items: toDigestSourceItems(entries),
+                        trigger_type: 'auto',
                     });
-                    if (generated) {
-                        summary = generated.summary;
-                        keywords = generated.keywords;
-                        summaryUpdatedAt = generated.createdAt;
-                    }
+                    aggregateDigestService.mirrorLegacyTagDigest({
+                        tag_id: tag.id,
+                        period: normalizedPeriod,
+                        time_range_key: periodKey,
+                        language: generated.language,
+                        source_count: entries.length,
+                        source_hash: generated.sourceHash,
+                        summary: generated.payload.summary_md,
+                        keywords: generated.payload.keywords || [],
+                        model_name: generated.modelName,
+                        trigger_type: 'auto',
+                    });
+                    summary = generated.payload.summary_md;
+                    citations = generated.payload.citations || [];
+                    keywords = generated.payload.keywords || [];
+                    summaryUpdatedAt = generated.record.created_at;
                 } catch (error) {
                     console.warn(`[Digest] Summary generation failed for tag ${tag.name}:`, error);
                 }
@@ -1209,6 +1145,7 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
                 recentCount: entries.length,
                 entries: entries.slice(0, 5),
                 llm_summary: summary,
+                citations,
                 keywords,
                 summary_updated_at: summaryUpdatedAt,
                 time_range_key: periodKey,
@@ -1268,42 +1205,34 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
 
         const sourceHash = buildSourceHash(entries);
         try {
-            const generated = await generateDigestSummary({
-                tagName: tag.name,
+            const generated = await aggregateDigestService.generate({
+                scope_type: 'tag',
+                scope_id: tag.id,
+                scope_label: tag.name,
                 period: normalizedPeriod,
-                timeRangeKey: periodKey,
-                entries,
+                time_range_key: periodKey,
                 language,
+                items: toDigestSourceItems(entries),
+                trigger_type: 'manual',
             });
-            if (!generated.summary) {
-                return reply.status(500).send({ error: '摘要生成失败' });
-            }
-            const { modelName } = resolveSummaryClient();
-            const now = new Date().toISOString();
-            db.prepare(`
-                INSERT INTO digest_tag_summaries (
-                    id, tag_id, period, time_range_key, language, source_count, source_hash,
-                    summary, keywords_json, model_name, trigger_type, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(
-                `${tag.id}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-                tag.id,
-                normalizedPeriod,
-                periodKey,
-                language,
-                entries.length,
-                sourceHash,
-                generated.summary,
-                JSON.stringify(generated.keywords || []),
-                modelName || 'unknown',
-                'manual',
-                now,
-            );
+            aggregateDigestService.mirrorLegacyTagDigest({
+                tag_id: tag.id,
+                period: normalizedPeriod,
+                time_range_key: periodKey,
+                language: generated.language,
+                source_count: entries.length,
+                source_hash: generated.sourceHash,
+                summary: generated.payload.summary_md,
+                keywords: generated.payload.keywords || [],
+                model_name: generated.modelName,
+                trigger_type: 'manual',
+            });
             return {
                 item: {
-                    summary: generated.summary,
-                    keywords: generated.keywords || [],
-                    summary_updated_at: now,
+                    summary: generated.payload.summary_md,
+                    citations: generated.payload.citations,
+                    keywords: generated.payload.keywords || [],
+                    summary_updated_at: generated.record.created_at,
                     time_range_key: periodKey,
                     source_count: entries.length,
                 },
@@ -1357,6 +1286,7 @@ const tagsRoutes: FastifyPluginAsync = async (app) => {
                 time_range_key: row.time_range_key,
                 source_count: row.source_count,
                 summary: row.summary,
+                citations: [],
                 keywords: parseKeywordsJson(row.keywords_json),
                 model_name: row.model_name,
                 trigger_type: row.trigger_type,

@@ -36,6 +36,8 @@ const emit = defineEmits<{
   (e: 'move-to-group', feedId: string, groupName: string): void
   (e: 'set-custom-title', feedId: string, customTitle: string | null): void
   (e: 'delete-group', groupName: string): void
+  (e: 'quick-rerun-tagging', payload: { scope: 'feed' | 'group'; feedId?: string; groupName?: string; label: string }): void
+  (e: 'open-automation-settings', payload: { scope_type: 'feed' | 'group'; scope_id: string; label: string }): void
 }>()
 
 </script>
@@ -120,6 +122,8 @@ const emit = defineEmits<{
         @change-view-type="(feedId, viewType) => emit('change-view-type', feedId, viewType)"
         @move-to-group="(feedId, groupName) => emit('move-to-group', feedId, groupName)"
         @set-custom-title="(feedId, customTitle) => emit('set-custom-title', feedId, customTitle)"
+        @quick-rerun-tagging="emit('quick-rerun-tagging', $event)"
+        @open-automation-settings="emit('open-automation-settings', $event)"
       />
     </div>
   </div>

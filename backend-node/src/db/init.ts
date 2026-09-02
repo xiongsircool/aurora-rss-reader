@@ -97,6 +97,37 @@ function runMigrations(): void {
     console.log('Migration completed: ai_tagging_enabled column added');
   }
 
+  const hasFetchEtag = feedsTableInfo.some((col) => col.name === 'fetch_etag');
+  if (!hasFetchEtag) {
+    console.log('Running migration: Adding fetch metadata columns to feeds');
+    db.exec(`ALTER TABLE feeds ADD COLUMN fetch_etag TEXT`);
+    db.exec(`ALTER TABLE feeds ADD COLUMN fetch_last_modified TEXT`);
+    db.exec(`ALTER TABLE feeds ADD COLUMN last_fetch_url TEXT`);
+    console.log('Migration completed: fetch metadata columns added');
+  }
+
+  // Check if read_at column exists in entries (for reading statistics)
+  const hasReadAt = entriesTableInfo.some((col) => col.name === 'read_at');
+  if (!hasReadAt) {
+    console.log('Running migration: Adding read_at column to entries');
+    db.exec(`ALTER TABLE entries ADD COLUMN read_at TEXT`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_read_at ON entries(read_at)`);
+    console.log('Migration completed: read_at column added');
+  }
+
+  const hasExtractionStatus = entriesTableInfo.some((col) => col.name === 'content_extraction_status');
+  if (!hasExtractionStatus) {
+    console.log('Running migration: Adding content extraction columns to entries');
+    db.exec(`ALTER TABLE entries ADD COLUMN content_extraction_status TEXT NOT NULL DEFAULT 'skipped'`);
+    db.exec(`ALTER TABLE entries ADD COLUMN content_extraction_error TEXT`);
+    db.exec(`ALTER TABLE entries ADD COLUMN content_extracted_at TEXT`);
+    db.exec(`ALTER TABLE entries ADD COLUMN content_source_url TEXT`);
+    db.exec(`UPDATE entries SET content_extraction_status = 'succeeded', content_extracted_at = inserted_at WHERE readability_content IS NOT NULL`);
+    db.exec(`UPDATE entries SET content_source_url = url WHERE content_source_url IS NULL`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_content_extraction_status ON entries(content_extraction_status)`);
+    console.log('Migration completed: content extraction columns added');
+  }
+
   // Check if tagging columns exist in user_settings (for smart tagging feature)
   const hasTaggingApiKey = tableInfo.some((col) => col.name === 'tagging_api_key');
   if (!hasTaggingApiKey) {
@@ -121,12 +152,99 @@ function runMigrations(): void {
     console.log('Migration completed: ai_auto_tagging_start_at column added');
   }
 
-  // Check if ai_prompt_preference column exists in user_settings
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasTimelineFilterDensity = tableInfo.some((col) => col.name === 'timeline_filter_density');
+  if (!hasTimelineFilterDensity) {
+    console.log('Running migration: Adding timeline_filter_density column to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN timeline_filter_density TEXT NOT NULL DEFAULT 'compact'`);
+    console.log('Migration completed: timeline_filter_density column added');
+  }
+
+  // Check if legacy ai_prompt_preference column exists in user_settings
   const hasAiPromptPreference = tableInfo.some((col) => col.name === 'ai_prompt_preference');
   if (!hasAiPromptPreference) {
     console.log('Running migration: Adding ai_prompt_preference column to user_settings');
     db.exec(`ALTER TABLE user_settings ADD COLUMN ai_prompt_preference TEXT DEFAULT ''`);
     console.log('Migration completed: ai_prompt_preference column added');
+  }
+
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasSummaryPromptPreference = tableInfo.some((col) => col.name === 'summary_prompt_preference');
+  const hasTranslationPromptPreference = tableInfo.some((col) => col.name === 'translation_prompt_preference');
+  if (!hasSummaryPromptPreference || !hasTranslationPromptPreference) {
+    console.log('Running migration: Adding split AI prompt preference columns to user_settings');
+    if (!hasSummaryPromptPreference) {
+      db.exec(`ALTER TABLE user_settings ADD COLUMN summary_prompt_preference TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!hasTranslationPromptPreference) {
+      db.exec(`ALTER TABLE user_settings ADD COLUMN translation_prompt_preference TEXT NOT NULL DEFAULT ''`);
+    }
+
+    const legacyPromptPreference = db
+      .prepare('SELECT ai_prompt_preference, summary_prompt_preference, translation_prompt_preference FROM user_settings WHERE id = 1')
+      .get() as {
+        ai_prompt_preference?: string;
+        summary_prompt_preference?: string;
+        translation_prompt_preference?: string;
+      } | undefined;
+
+    const legacyPrompt = legacyPromptPreference?.ai_prompt_preference?.trim() || '';
+    if (legacyPrompt) {
+      db.prepare(`
+        UPDATE user_settings
+        SET summary_prompt_preference = CASE
+              WHEN COALESCE(summary_prompt_preference, '') = '' THEN ?
+              ELSE summary_prompt_preference
+            END,
+            translation_prompt_preference = CASE
+              WHEN COALESCE(translation_prompt_preference, '') = '' THEN ?
+              ELSE translation_prompt_preference
+            END
+        WHERE id = 1
+      `).run(legacyPrompt, legacyPrompt);
+    }
+
+    console.log('Migration completed: split AI prompt preference columns added');
+  }
+
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasOutboundProxyMode = tableInfo.some((col) => col.name === 'outbound_proxy_mode');
+  if (!hasOutboundProxyMode) {
+    console.log('Running migration: Adding outbound proxy columns to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN outbound_proxy_mode TEXT NOT NULL DEFAULT 'system'`);
+    db.exec(`ALTER TABLE user_settings ADD COLUMN outbound_proxy_url TEXT NOT NULL DEFAULT ''`);
+    console.log('Migration completed: outbound proxy columns added');
+  }
+
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const hasSummaryBackgroundEnabled = tableInfo.some((col) => col.name === 'summary_background_enabled');
+  if (!hasSummaryBackgroundEnabled) {
+    console.log('Running migration: Adding summary_background_enabled column to user_settings');
+    db.exec(`ALTER TABLE user_settings ADD COLUMN summary_background_enabled INTEGER NOT NULL DEFAULT 0`);
+    console.log('Migration completed: summary_background_enabled column added');
+  }
+
+  tableInfo = db.pragma('table_info(user_settings)') as Array<{ name: string }>;
+  const scopeSummaryColumns: Array<{ name: string; sql: string }> = [
+    { name: 'scope_summary_enabled', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_enabled INTEGER NOT NULL DEFAULT 1` },
+    { name: 'scope_summary_auto_generate', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_auto_generate INTEGER NOT NULL DEFAULT 1` },
+    { name: 'scope_summary_auto_interval_minutes', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_auto_interval_minutes INTEGER NOT NULL DEFAULT 60` },
+    { name: 'scope_summary_default_window', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_default_window TEXT NOT NULL DEFAULT '24h'` },
+    { name: 'scope_summary_max_entries', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_max_entries INTEGER NOT NULL DEFAULT 100` },
+    { name: 'scope_summary_chunk_size', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_chunk_size INTEGER NOT NULL DEFAULT 10` },
+    { name: 'scope_summary_model_name', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_model_name TEXT NOT NULL DEFAULT ''` },
+    { name: 'scope_summary_use_custom', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_use_custom INTEGER NOT NULL DEFAULT 0` },
+    { name: 'scope_summary_base_url', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_base_url TEXT NOT NULL DEFAULT ''` },
+    { name: 'scope_summary_api_key', sql: `ALTER TABLE user_settings ADD COLUMN scope_summary_api_key TEXT NOT NULL DEFAULT ''` },
+    { name: 'ai_summary_max_tokens', sql: `ALTER TABLE user_settings ADD COLUMN ai_summary_max_tokens INTEGER NOT NULL DEFAULT 4096` },
+  ];
+  const missingScopeSummaryColumns = scopeSummaryColumns.filter(({ name }) => !tableInfo.some((col) => col.name === name));
+  if (missingScopeSummaryColumns.length > 0) {
+    console.log(`Running migration: Adding missing scope summary settings to user_settings (${missingScopeSummaryColumns.map((col) => col.name).join(', ')})`);
+    for (const column of missingScopeSummaryColumns) {
+      db.exec(column.sql);
+    }
+    console.log('Migration completed: scope summary settings added');
   }
 
   // Check if match_mode / match_rules columns exist in user_tags (dual-mode tagging)
@@ -206,6 +324,9 @@ export function initDatabase(): void {
       ai_tagging_enabled INTEGER NOT NULL DEFAULT 1,
       last_checked_at TEXT,
       last_error TEXT,
+      fetch_etag TEXT,
+      fetch_last_modified TEXT,
+      last_fetch_url TEXT,
       update_interval_minutes INTEGER DEFAULT 60,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -232,7 +353,19 @@ export function initDatabase(): void {
       published_at TEXT,
       inserted_at TEXT NOT NULL,
       read INTEGER DEFAULT 0,
+      read_at TEXT,
       starred INTEGER DEFAULT 0,
+      enclosure_url TEXT,
+      enclosure_type TEXT,
+      enclosure_length INTEGER,
+      duration TEXT,
+      image_url TEXT,
+      doi TEXT,
+      pmid TEXT,
+      content_extraction_status TEXT NOT NULL DEFAULT 'skipped',
+      content_extraction_error TEXT,
+      content_extracted_at TEXT,
+      content_source_url TEXT,
       FOREIGN KEY (feed_id) REFERENCES feeds(id),
       UNIQUE(feed_id, guid)
     )
@@ -295,6 +428,48 @@ export function initDatabase(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_fetch_logs_feed_id ON fetch_logs(feed_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_fetch_logs_status ON fetch_logs(status)`);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS article_extraction_jobs (
+      id TEXT PRIMARY KEY,
+      entry_id TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'queued',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 3,
+      next_run_at TEXT,
+      leased_at TEXT,
+      lease_owner TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_article_extraction_jobs_status_next_run_at ON article_extraction_jobs(status, next_run_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_article_extraction_jobs_lease ON article_extraction_jobs(status, leased_at)`);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS summary_generation_jobs (
+      id TEXT PRIMARY KEY,
+      entry_id TEXT NOT NULL,
+      language TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 3,
+      next_run_at TEXT,
+      leased_at TEXT,
+      lease_owner TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE,
+      UNIQUE(entry_id, language)
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_summary_generation_jobs_status_next_run_at ON summary_generation_jobs(status, next_run_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_summary_generation_jobs_lease ON summary_generation_jobs(status, leased_at)`);
+
   // Create user_settings table (singleton with id=1)
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_settings (
@@ -312,6 +487,7 @@ export function initDatabase(): void {
       max_auto_title_translations INTEGER NOT NULL DEFAULT 10,
       mark_as_read_range TEXT NOT NULL DEFAULT 'current',
       details_panel_mode TEXT NOT NULL DEFAULT 'docked',
+      timeline_filter_density TEXT NOT NULL DEFAULT 'compact',
       default_ai_provider TEXT NOT NULL DEFAULT '',
       default_ai_api_key TEXT NOT NULL DEFAULT '',
       default_ai_base_url TEXT NOT NULL DEFAULT '',
@@ -331,6 +507,9 @@ export function initDatabase(): void {
       ai_title_display_mode TEXT NOT NULL DEFAULT 'original-first',
       ai_translation_language TEXT NOT NULL DEFAULT 'zh',
       language TEXT NOT NULL DEFAULT 'zh',
+      summary_background_enabled INTEGER NOT NULL DEFAULT 0,
+      outbound_proxy_mode TEXT NOT NULL DEFAULT 'system',
+      outbound_proxy_url TEXT NOT NULL DEFAULT '',
       embedding_model TEXT NOT NULL DEFAULT 'netease-youdao/bce-embedding-base_v1',
       embedding_api_key TEXT NOT NULL DEFAULT '',
       embedding_base_url TEXT NOT NULL DEFAULT 'https://api.siliconflow.cn/v1',
@@ -340,7 +519,19 @@ export function initDatabase(): void {
       ai_auto_tagging INTEGER NOT NULL DEFAULT 0,
       ai_auto_tagging_start_at TEXT,
       tags_version INTEGER NOT NULL DEFAULT 1,
-      ai_prompt_preference TEXT NOT NULL DEFAULT '',
+      scope_summary_enabled INTEGER NOT NULL DEFAULT 1,
+      scope_summary_auto_generate INTEGER NOT NULL DEFAULT 1,
+      scope_summary_auto_interval_minutes INTEGER NOT NULL DEFAULT 60,
+      scope_summary_default_window TEXT NOT NULL DEFAULT '24h',
+      scope_summary_max_entries INTEGER NOT NULL DEFAULT 100,
+      scope_summary_chunk_size INTEGER NOT NULL DEFAULT 10,
+      scope_summary_model_name TEXT NOT NULL DEFAULT '',
+      scope_summary_use_custom INTEGER NOT NULL DEFAULT 0,
+      scope_summary_base_url TEXT NOT NULL DEFAULT '',
+      scope_summary_api_key TEXT NOT NULL DEFAULT '',
+      ai_summary_max_tokens INTEGER NOT NULL DEFAULT 4096,
+      summary_prompt_preference TEXT NOT NULL DEFAULT '',
+      translation_prompt_preference TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       CHECK (id = 1)
@@ -447,13 +638,181 @@ export function initDatabase(): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_digest_tag_summaries_tag_period_time ON digest_tag_summaries(tag_id, period, time_range_key, language)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_digest_tag_summaries_created_at ON digest_tag_summaries(created_at DESC)`);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_automation_rules (
+      id TEXT PRIMARY KEY,
+      task_key TEXT NOT NULL,
+      scope_type TEXT NOT NULL,
+      scope_id TEXT,
+      mode TEXT NOT NULL DEFAULT 'inherit',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_automation_rules_task_scope ON ai_automation_rules(task_key, scope_type, scope_id)`);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS aggregate_digests (
+      id TEXT PRIMARY KEY,
+      task_key TEXT NOT NULL DEFAULT 'aggregate_digest',
+      scope_type TEXT NOT NULL,
+      scope_id TEXT NOT NULL,
+      period TEXT NOT NULL,
+      time_range_key TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'zh',
+      source_count INTEGER NOT NULL DEFAULT 0,
+      source_hash TEXT NOT NULL,
+      summary_md TEXT NOT NULL,
+      citations_json TEXT NOT NULL,
+      keywords_json TEXT,
+      model_name TEXT NOT NULL,
+      trigger_type TEXT NOT NULL DEFAULT 'auto',
+      created_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_aggregate_digests_scope_period ON aggregate_digests(scope_type, scope_id, period, time_range_key, language)`);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scope_summary_runs (
+      id TEXT PRIMARY KEY,
+      scope_type TEXT NOT NULL,
+      scope_id TEXT NOT NULL,
+      window_type TEXT NOT NULL,
+      window_start_at TEXT NOT NULL,
+      window_end_at TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'zh',
+      source_count INTEGER NOT NULL DEFAULT 0,
+      source_hash TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'generating',
+      summary_md TEXT NOT NULL DEFAULT '',
+      citations_json TEXT NOT NULL DEFAULT '[]',
+      keywords_json TEXT,
+      model_name TEXT,
+      trigger_type TEXT NOT NULL DEFAULT 'manual',
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_scope_summary_runs_scope_window ON scope_summary_runs(scope_type, scope_id, window_type, window_start_at, window_end_at, language)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_scope_summary_runs_status ON scope_summary_runs(status, updated_at DESC)`);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scope_summary_chunks (
+      id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      source_count INTEGER NOT NULL DEFAULT 0,
+      source_refs_json TEXT NOT NULL,
+      chunk_summary_md TEXT NOT NULL,
+      keywords_json TEXT,
+      model_name TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (run_id) REFERENCES scope_summary_runs(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_scope_summary_chunks_run_id ON scope_summary_chunks(run_id, chunk_index)`);
+
   // Run migrations for existing databases
   runMigrations();
 
+  // Create indexes that depend on migrated columns after schema upgrades finish.
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_content_extraction_status ON entries(content_extraction_status)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_entries_read_at ON entries(read_at)`);
+
+  // Create local full-text search index and sync triggers.
+  createFtsTables();
 
   // Load sqlite-vss extension and create vector tables
   loadVssExtension();
   createVectorTables();
+}
+
+/**
+ * Create local full-text search tables (FTS5)
+ */
+function createFtsTables(): void {
+  const db = getDatabase();
+
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS search_index_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
+    db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
+        title,
+        summary,
+        content,
+        readability_content,
+        content='entries',
+        content_rowid='rowid'
+      )
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS entries_fts_ai
+      AFTER INSERT ON entries
+      BEGIN
+        INSERT INTO entries_fts(rowid, title, summary, content, readability_content)
+        VALUES (new.rowid, new.title, new.summary, new.content, new.readability_content);
+      END
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS entries_fts_ad
+      AFTER DELETE ON entries
+      BEGIN
+        INSERT INTO entries_fts(entries_fts, rowid, title, summary, content, readability_content)
+        VALUES ('delete', old.rowid, old.title, old.summary, old.content, old.readability_content);
+      END
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS entries_fts_au
+      AFTER UPDATE ON entries
+      BEGIN
+        INSERT INTO entries_fts(entries_fts, rowid, title, summary, content, readability_content)
+        VALUES ('delete', old.rowid, old.title, old.summary, old.content, old.readability_content);
+        INSERT INTO entries_fts(rowid, title, summary, content, readability_content)
+        VALUES (new.rowid, new.title, new.summary, new.content, new.readability_content);
+      END
+    `);
+
+    const entriesCount = db.prepare('SELECT COUNT(*) as count FROM entries').get() as { count: number };
+    const ftsVersionRow = db.prepare(`
+      SELECT value
+      FROM search_index_meta
+      WHERE key = 'entries_fts_version'
+    `).get() as { value: string } | undefined;
+
+    // For external-content FTS, COUNT(*) mirrors the content table even when the
+    // index is empty, so use an explicit version marker instead of row counts.
+    if (ftsVersionRow?.value !== '1') {
+      db.exec(`INSERT INTO entries_fts(entries_fts) VALUES ('rebuild')`);
+      db.prepare(`
+        INSERT INTO search_index_meta(key, value, updated_at)
+        VALUES ('entries_fts_version', '1', datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET
+          value = excluded.value,
+          updated_at = excluded.updated_at
+      `).run();
+
+      if (entriesCount.count > 0) {
+        console.log(`✅ FTS backfill completed (${entriesCount.count} entries indexed)`);
+      } else {
+        console.log('✅ FTS tables ready');
+      }
+    } else {
+      console.log('✅ FTS tables ready');
+    }
+  } catch (error) {
+    console.warn('⚠️  Could not create FTS tables:', error);
+  }
 }
 
 /**

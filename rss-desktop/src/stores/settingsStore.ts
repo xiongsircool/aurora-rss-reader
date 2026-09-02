@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '../api/client'
+import { getApiErrorMessage } from '../api/errors'
 import { clampAutoTitleTranslationLimit, getDefaultAutoTitleTranslationLimit } from '../constants/translation'
 
 export interface AppSettings {
@@ -18,10 +19,26 @@ export interface AppSettings {
   mark_as_read_range: string // 'current' | '3d' | '7d' | '30d' | 'all'
   // 详情栏显示模式
   details_panel_mode: 'docked' | 'click'
+  // 时间线筛选区密度
+  timeline_filter_density: 'compact' | 'standard'
   // 语言设置
   language: string // 'zh' | 'en' | 'ja' | 'ko'
-  // AI 提示词偏好
-  ai_prompt_preference: string
+  ai_summary_max_tokens: number // 0 = unlimited
+  summary_prompt_preference: string
+  translation_prompt_preference: string
+  summary_background_enabled: boolean
+  outbound_proxy_mode: 'system' | 'custom' | 'off'
+  outbound_proxy_url: string
+  scope_summary_enabled: boolean
+  scope_summary_auto_generate: boolean
+  scope_summary_auto_interval_minutes: number
+  scope_summary_default_window: '24h' | '3d' | '7d' | '30d'
+  scope_summary_max_entries: number
+  scope_summary_chunk_size: number
+  scope_summary_model_name: string
+  scope_summary_use_custom: boolean
+  scope_summary_base_url: string
+  scope_summary_api_key: string
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -37,8 +54,24 @@ export const useSettingsStore = defineStore('settings', () => {
     max_auto_title_translations: getDefaultAutoTitleTranslationLimit(),
     mark_as_read_range: 'current',
     details_panel_mode: 'docked',
+    timeline_filter_density: 'compact',
     language: 'zh',
-    ai_prompt_preference: ''
+    ai_summary_max_tokens: 4096,
+    summary_prompt_preference: '',
+    translation_prompt_preference: '',
+    summary_background_enabled: false,
+    outbound_proxy_mode: 'system',
+    outbound_proxy_url: '',
+    scope_summary_enabled: true,
+    scope_summary_auto_generate: true,
+    scope_summary_auto_interval_minutes: 60,
+    scope_summary_default_window: '24h',
+    scope_summary_max_entries: 100,
+    scope_summary_chunk_size: 10,
+    scope_summary_model_name: '',
+    scope_summary_use_custom: false,
+    scope_summary_base_url: '',
+    scope_summary_api_key: ''
   })
 
   const loading = ref(false)
@@ -62,7 +95,7 @@ export const useSettingsStore = defineStore('settings', () => {
       return data
     } catch (err) {
       console.error('Failed to fetch settings:', err)
-      error.value = '获取设置失败'
+      error.value = getApiErrorMessage(err, '获取设置失败')
       throw err
     } finally {
       loading.value = false
@@ -90,7 +123,7 @@ export const useSettingsStore = defineStore('settings', () => {
       return data
     } catch (err) {
       console.error('Failed to update settings:', err)
-      error.value = '更新设置失败'
+      error.value = getApiErrorMessage(err, '更新设置失败')
       throw err
     } finally {
       loading.value = false

@@ -6,9 +6,21 @@ import { FastifyInstance } from 'fastify';
 import { AIClient, type ServiceKey } from '../services/ai.js';
 import { generateEmbedding } from '../services/vector.js';
 import { EntryRepository, TranslationRepository, SummaryRepository } from '../db/repositories/index.js';
+import { AIAutomationRuleRepository } from '../db/repositories/aiAutomationRule.js';
 import { userSettingsService } from '../services/userSettings.js';
 import { getConfig } from '../config/index.js';
 import { initTaggingClient } from '../services/tagging.js';
+import { getObjectBody } from '../utils/http.js';
+import { AIAutomationMode, AIScopeType, AITaskKey } from '../db/models.js';
+import {
+  AUTOMATION_SCOPE_TYPES,
+  AUTOMATION_TASK_KEYS,
+  aiAutomationResolver,
+} from '../services/aiAutomationResolver.js';
+import {
+  scopeSummaryService,
+  normalizeScopeSummaryWindowType,
+} from '../services/scopeSummary.js';
 
 function resolveServiceConfig(service: ServiceKey) {
   const settings = userSettingsService.getSettings();
@@ -106,15 +118,359 @@ function buildSummaryContent(entry: {
   return `Metadata:\n${metaLines.join('\n')}\n\nContent:\n${content}`;
 }
 
+function buildSafeFtsQuery(rawQuery: string): string | null {
+  const tokens = rawQuery
+    .trim()
+    .split(/\s+/)
+    .map((token) => token.replaceAll('"', '').trim())
+    .filter(Boolean);
+
+  if (!tokens.length) {
+    return null;
+  }
+
+  // Quote every token so user input can't break MATCH grammar.
+  return tokens.map((token) => `"${token}"`).join(' ');
+}
+
+function normalizeKeywordScore(rank: number, minRank: number, maxRank: number): number {
+  if (!Number.isFinite(rank) || !Number.isFinite(minRank) || !Number.isFinite(maxRank)) {
+    return 0.8;
+  }
+
+  const range = maxRank - minRank;
+  if (Math.abs(range) < 1e-9) {
+    return 0.8;
+  }
+
+  // Lower bm25 rank is better; map to a stable score band.
+  const normalized = (maxRank - rank) / range;
+  return 0.65 + Math.max(0, Math.min(1, normalized)) * 0.25;
+}
+
 export async function aiRoutes(app: FastifyInstance) {
   const entryRepo = new EntryRepository();
   const translationRepo = new TranslationRepository();
   const summaryRepo = new SummaryRepository();
+  const automationRuleRepo = new AIAutomationRuleRepository();
+
+  const isTaskKey = (value: unknown): value is AITaskKey =>
+    typeof value === 'string' && AUTOMATION_TASK_KEYS.includes(value as AITaskKey);
+  const isScopeType = (value: unknown): value is AIScopeType =>
+    typeof value === 'string' && AUTOMATION_SCOPE_TYPES.includes(value as AIScopeType);
+  const isAutomationMode = (value: unknown): value is AIAutomationMode =>
+    value === 'inherit' || value === 'enabled' || value === 'disabled';
+  const scopeSummaryJobs = new Set<string>();
+
+  function getLegacyDefaults() {
+    return AUTOMATION_TASK_KEYS.map((taskKey) => ({
+      task_key: taskKey,
+      scope_type: 'global' as const,
+      scope_id: null,
+      enabled: aiAutomationResolver.resolve({ taskKey, scopeType: 'global' }),
+      source: 'legacy_fallback' as const,
+    }));
+  }
+
+  app.get('/ai/automation-rules', async () => {
+    return {
+      items: automationRuleRepo.findAll(),
+      defaults: getLegacyDefaults(),
+    };
+  });
+
+  app.patch('/ai/automation-rules', async (request, reply) => {
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const upserts = Array.isArray(body.upserts) ? body.upserts : [];
+    const removals = Array.isArray(body.removals) ? body.removals : [];
+
+    for (const item of upserts) {
+      const payload = getObjectBody(item);
+      if (!payload || !isTaskKey(payload.task_key) || !isScopeType(payload.scope_type) || !isAutomationMode(payload.mode)) {
+        return reply.code(400).send({ error: 'Invalid automation rule in upserts' });
+      }
+      const scopeId = typeof payload.scope_id === 'string' && payload.scope_id.trim()
+        ? payload.scope_id.trim()
+        : null;
+      if (payload.scope_type !== 'global' && !scopeId) {
+        return reply.code(400).send({ error: 'scope_id is required for non-global automation rules' });
+      }
+      automationRuleRepo.upsert({
+        task_key: payload.task_key,
+        scope_type: payload.scope_type,
+        scope_id: scopeId,
+        mode: payload.mode,
+      });
+    }
+
+    for (const item of removals) {
+      const payload = getObjectBody(item);
+      if (!payload || !isTaskKey(payload.task_key) || !isScopeType(payload.scope_type)) {
+        return reply.code(400).send({ error: 'Invalid automation rule in removals' });
+      }
+      const scopeId = typeof payload.scope_id === 'string' && payload.scope_id.trim()
+        ? payload.scope_id.trim()
+        : null;
+      if (payload.scope_type !== 'global' && !scopeId) {
+        return reply.code(400).send({ error: 'scope_id is required for non-global automation removals' });
+      }
+      automationRuleRepo.deleteByTaskAndScope(payload.task_key, payload.scope_type, scopeId);
+    }
+
+    return {
+      success: true,
+      items: automationRuleRepo.findAll(),
+      defaults: getLegacyDefaults(),
+    };
+  });
+
+
+  app.get('/ai/scope-summary', async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    const scope_type = query.scope_type;
+    const scope_id = typeof query.scope_id === 'string' ? query.scope_id.trim() : '';
+    const window_type = typeof query.window_type === 'string' ? query.window_type.trim() : undefined;
+    const language = typeof query.language === 'string' ? query.language.trim() : 'zh';
+
+    if (scope_type !== 'feed' && scope_type !== 'group') {
+      return reply.code(400).send({ error: 'scope_type must be feed or group' });
+    }
+    if (!scope_id) {
+      return reply.code(400).send({ error: 'scope_id is required' });
+    }
+
+    const state = scopeSummaryService.buildScopeState({
+      scope_type,
+      scope_id,
+      window_type,
+      language,
+    });
+    if (!state) {
+      return reply.code(404).send({ error: 'scope summary scope not found' });
+    }
+
+    const latest = scopeSummaryService.parseRun(state.latestRun);
+    const canAutoGenerate = state.settings.enabled
+      && state.settings.auto_generate
+      && (state.status === 'idle' || state.status === 'stale');
+
+    const entryIndexMap: Record<number, string> = {};
+    state.items.forEach((item) => {
+      entryIndexMap[item.ref - 1] = item.entry_id;
+    });
+
+    return {
+      scope_label: state.scopeLabel,
+      scope_type,
+      scope_id,
+      window_type: state.windowType,
+      window_start_at: state.windowStartAt,
+      window_end_at: state.windowEndAt,
+      status: state.status,
+      recentCount: state.items.length,
+      entries: state.rows,
+      entry_index_map: entryIndexMap,
+      item: latest ? {
+        ...latest,
+        summary: latest.summary_md,
+        summary_updated_at: latest.updated_at,
+      } : null,
+      settings: state.settings,
+      can_auto_generate: canAutoGenerate,
+      suggested_windows: state.items.length === 0 && state.windowType === '24h'
+        ? ['3d', '7d']
+        : [],
+    };
+  });
+
+  app.get('/ai/scope-summary/history', async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+    const scope_type = query.scope_type;
+    const scope_id = typeof query.scope_id === 'string' ? query.scope_id.trim() : '';
+    const window_type = normalizeScopeSummaryWindowType(
+      typeof query.window_type === 'string' ? query.window_type.trim() : undefined,
+    );
+    const language = typeof query.language === 'string' ? query.language.trim() : 'zh';
+    const cursor = typeof query.cursor === 'string' && query.cursor.trim() ? query.cursor.trim() : null;
+    const limit = Math.max(1, Math.min(Number(query.limit) || 10, 50));
+
+    if (scope_type !== 'feed' && scope_type !== 'group') {
+      return reply.code(400).send({ error: 'scope_type must be feed or group' });
+    }
+    if (!scope_id) {
+      return reply.code(400).send({ error: 'scope_id is required' });
+    }
+
+    const result = scopeSummaryService.getHistory({
+      scope_type,
+      scope_id,
+      window_type,
+      language,
+      limit,
+      cursor,
+    });
+
+    return {
+      items: result.items.map((item) => {
+        const parsed = scopeSummaryService.parseRun(item);
+        return parsed ? { ...parsed, summary: parsed.summary_md, summary_updated_at: parsed.updated_at } : item;
+      }),
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
+    };
+  });
+
+  app.post('/ai/scope-summary/generate', async (request, reply) => {
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const scope_type = body.scope_type;
+    const scope_id = typeof body.scope_id === 'string' ? body.scope_id.trim() : '';
+    const window_type = typeof body.window_type === 'string' ? body.window_type.trim() : undefined;
+    const uiLanguage = typeof body.ui_language === 'string' && body.ui_language.trim() ? body.ui_language.trim() : 'zh';
+    const triggerType = body.trigger_type === 'auto' ? 'auto' : 'manual';
+    const background = body.background !== false;
+
+    if (scope_type !== 'feed' && scope_type !== 'group') {
+      return reply.code(400).send({ error: 'scope_type must be feed or group' });
+    }
+    if (!scope_id) {
+      return reply.code(400).send({ error: 'scope_id is required' });
+    }
+
+    const state = scopeSummaryService.buildScopeState({
+      scope_type,
+      scope_id,
+      window_type,
+      language: uiLanguage,
+    });
+    if (!state) {
+      return reply.code(404).send({ error: 'scope summary scope not found' });
+    }
+    if (!state.items.length) {
+      return reply.code(400).send({ error: '当前时间范围内暂无可用于生成摘要的文章' });
+    }
+
+    const jobKey = `${scope_type}:${scope_id}:${state.windowType}:${state.language}`;
+    const toGeneratingResponse = () => {
+      const latest = scopeSummaryService.parseRun(state.latestRun);
+      const entryIndexMap: Record<number, string> = {};
+      state.items.forEach((item) => {
+        entryIndexMap[item.ref - 1] = item.entry_id;
+      });
+      return {
+        scope_label: state.scopeLabel,
+        scope_type,
+        scope_id,
+        window_type: state.windowType,
+        window_start_at: state.windowStartAt,
+        window_end_at: state.windowEndAt,
+        status: 'generating',
+        recentCount: state.items.length,
+        entries: state.rows,
+        entry_index_map: entryIndexMap,
+        item: latest ? {
+          ...latest,
+          summary: latest.summary_md,
+          summary_updated_at: latest.updated_at,
+        } : null,
+        settings: state.settings,
+        can_auto_generate: false,
+      };
+    };
+
+    if (background) {
+      if (state.latestRun?.status === 'generating' || scopeSummaryJobs.has(jobKey)) {
+        return {
+          ...toGeneratingResponse(),
+          queue_state: 'already_running' as const,
+        };
+      }
+
+      scopeSummaryJobs.add(jobKey);
+      void scopeSummaryService.generate({
+        scope_type,
+        scope_id,
+        window_type: state.windowType,
+        language: state.language,
+        trigger_type: triggerType,
+      }).catch((error) => {
+        console.error('Background scope summary generation failed:', error);
+      }).finally(() => {
+        scopeSummaryJobs.delete(jobKey);
+      });
+
+      return {
+        ...toGeneratingResponse(),
+        queue_state: 'queued' as const,
+      };
+    }
+
+    try {
+      const generated = await scopeSummaryService.generate({
+        scope_type,
+        scope_id,
+        window_type: state.windowType,
+        language: state.language,
+        trigger_type: triggerType,
+      });
+
+      const entryIndexMap: Record<number, string> = {};
+      generated.state.items.forEach((item) => {
+        entryIndexMap[item.ref - 1] = item.entry_id;
+      });
+
+      return {
+        scope_label: generated.state.scopeLabel,
+        scope_type,
+        scope_id,
+        window_type: generated.state.windowType,
+        window_start_at: generated.state.windowStartAt,
+        window_end_at: generated.state.windowEndAt,
+        status: 'ready',
+        recentCount: generated.state.items.length,
+        entries: generated.entries,
+        entry_index_map: entryIndexMap,
+        item: {
+          ...scopeSummaryService.parseRun(generated.run),
+          summary: generated.payload.summary_md,
+          summary_updated_at: generated.run.updated_at,
+        },
+        settings: generated.state.settings,
+        can_auto_generate: false,
+        queue_state: 'completed' as const,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '生成范围摘要失败';
+      if (message === 'scope not found') {
+        return reply.code(404).send({ error: 'scope summary scope not found' });
+      }
+      if (message === 'empty scope window') {
+        return reply.code(400).send({ error: '当前时间范围内暂无可用于生成摘要的文章' });
+      }
+      console.error('Failed to generate scope summary:', error);
+      return reply.code(500).send({ error: '生成范围摘要失败' });
+    }
+  });
 
   // POST /ai/summary - Generate summary (frontend expects entry_id)
   app.post('/ai/summary', async (request, reply) => {
-    const { entry_id, language } = request.body as { entry_id?: string; language?: string };
-    const targetLanguage = language || 'zh';
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
+    const language = typeof body.language === 'string' ? body.language : undefined;
+    const force = typeof body.force === 'boolean' ? body.force : false;
+    const settings = userSettingsService.getSettings();
+    const targetLanguage = language || settings.ai_translation_language || 'zh';
 
     if (!entry_id) {
       return reply.code(400).send({ error: 'entry_id is required' });
@@ -126,7 +482,7 @@ export async function aiRoutes(app: FastifyInstance) {
     }
 
     const existing = summaryRepo.findByEntryIdAndLanguage(entry_id, targetLanguage);
-    if (existing?.summary) {
+    if (!force && existing?.summary) {
       return { entry_id, language: targetLanguage, summary: existing.summary };
     }
 
@@ -138,8 +494,9 @@ export async function aiRoutes(app: FastifyInstance) {
     try {
       const client = createClient('summary');
       const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
-      const summary = await client.summarize(combinedContent, { language: targetLanguage, userPreference });
+      const userPreference = settings.summary_prompt_preference || '';
+      const maxTokens = settings.ai_summary_max_tokens || 0;
+      const summary = await client.summarize(combinedContent, { language: targetLanguage, userPreference, maxTokens });
       summaryRepo.upsert({ entry_id, language: targetLanguage, summary });
       return { entry_id, language: targetLanguage, summary };
     } catch (error) {
@@ -150,8 +507,15 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // POST /ai/translate-title - Translate entry title
   app.post('/ai/translate-title', async (request, reply) => {
-    const { entry_id, language } = request.body as { entry_id?: string; language?: string };
-    const targetLanguage = language || 'zh';
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
+    const language = typeof body.language === 'string' ? body.language : undefined;
+    const settings = userSettingsService.getSettings();
+    const targetLanguage = language || settings.ai_translation_language || 'zh';
 
     if (!entry_id) {
       return reply.code(400).send({ error: 'entry_id is required' });
@@ -174,7 +538,7 @@ export async function aiRoutes(app: FastifyInstance) {
     try {
       const client = createClient('translation');
       const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
+      const userPreference = settings.translation_prompt_preference || '';
       const title = await client.translate(entry.title, { targetLanguage, userPreference });
       translationRepo.upsert({ entry_id, language: targetLanguage, title });
       return { entry_id, title, language: targetLanguage, from_cache: false };
@@ -186,17 +550,23 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // POST /ai/translate-blocks - SSE translation
   app.post('/ai/translate-blocks', async (request, reply) => {
-    const body = request.body as {
-      entry_id?: string;
-      source_lang?: string;
-      target_lang?: string;
-      blocks?: Array<{ id: string; text: string }>;
-    };
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
 
-    const entryId = body.entry_id;
-    const sourceLang = body.source_lang || 'en';
-    const targetLang = body.target_lang || 'zh';
-    const blocks = Array.isArray(body.blocks) ? body.blocks : [];
+    const entryId = typeof body.entry_id === 'string' ? body.entry_id : undefined;
+    const sourceLang = typeof body.source_lang === 'string' ? body.source_lang : 'en';
+    const targetLang = typeof body.target_lang === 'string' ? body.target_lang : 'zh';
+    const blocks = Array.isArray(body.blocks)
+      ? body.blocks.filter(
+          (block): block is { id: string; text: string } =>
+            typeof block === 'object' &&
+            block !== null &&
+            typeof (block as { id?: unknown }).id === 'string' &&
+            typeof (block as { text?: unknown }).text === 'string'
+        )
+      : [];
 
     if (!entryId || blocks.length === 0) {
       return reply.code(400).send({ error: 'entry_id and blocks are required' });
@@ -259,7 +629,7 @@ export async function aiRoutes(app: FastifyInstance) {
     try {
       const client = createClient('translation');
       const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
+      const userPreference = settings.translation_prompt_preference || '';
 
       for (const block of misses) {
         if (request.raw.aborted) {
@@ -301,7 +671,14 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // POST /ai/translate - Translate text
   app.post('/ai/translate', async (request, reply) => {
-    const { text, target_language, entry_id } = request.body as any;
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const text = typeof body.text === 'string' ? body.text : '';
+    const target_language = typeof body.target_language === 'string' ? body.target_language : undefined;
+    const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
 
     if (!text) {
       return reply.code(400).send({ error: 'Text is required' });
@@ -317,7 +694,7 @@ export async function aiRoutes(app: FastifyInstance) {
 
       const client = createClient('translation');
       const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
+      const userPreference = settings.translation_prompt_preference || '';
       const translation = await client.translate(text, { targetLanguage: target_language || 'zh', userPreference });
 
       if (entry_id) {
@@ -337,29 +714,39 @@ export async function aiRoutes(app: FastifyInstance) {
 
   // POST /ai/summarize - Generate summary
   app.post('/ai/summarize', async (request, reply) => {
-    const { content, language, entry_id } = request.body as any;
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const content = typeof body.content === 'string' ? body.content : '';
+    const language = typeof body.language === 'string' ? body.language : undefined;
+    const entry_id = typeof body.entry_id === 'string' ? body.entry_id : undefined;
 
     if (!content) {
       return reply.code(400).send({ error: 'Content is required' });
     }
 
+    const settings = userSettingsService.getSettings();
+    const targetLanguage = language || settings.ai_translation_language || 'zh';
+
     try {
       if (entry_id) {
-        const existing = summaryRepo.findByEntryIdAndLanguage(entry_id, language || 'zh');
+        const existing = summaryRepo.findByEntryIdAndLanguage(entry_id, targetLanguage);
         if (existing?.summary) {
           return { summary: existing.summary, cached: true };
         }
       }
 
       const client = createClient('summary');
-      const settings = userSettingsService.getSettings();
-      const userPreference = settings.ai_prompt_preference || '';
-      const summary = await client.summarize(content, { language: language || 'zh', userPreference });
+      const userPreference = settings.summary_prompt_preference || '';
+      const maxTokens = settings.ai_summary_max_tokens || 0;
+      const summary = await client.summarize(content, { language: targetLanguage, userPreference, maxTokens });
 
       if (entry_id) {
         summaryRepo.upsert({
           entry_id,
-          language: language || 'zh',
+          language: targetLanguage,
           summary,
         });
       }
@@ -418,14 +805,18 @@ export async function aiRoutes(app: FastifyInstance) {
   });
 
   // PATCH /ai/config - Update AI configuration
-  app.patch('/ai/config', async (request) => {
-    const body = request.body as any;
-    const globalConfig = body.global || {};
-    const summaryConfig = body.summary || {};
-    const translationConfig = body.translation || {};
-    const taggingConfig = body.tagging || {};
-    const embeddingConfig = body.embedding || {};
-    const features = body.features || {};
+  app.patch('/ai/config', async (request, reply) => {
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const globalConfig = getObjectBody(body.global) || {};
+    const summaryConfig = getObjectBody(body.summary) || {};
+    const translationConfig = getObjectBody(body.translation) || {};
+    const taggingConfig = getObjectBody(body.tagging) || {};
+    const embeddingConfig = getObjectBody(body.embedding) || {};
+    const features = getObjectBody(body.features) || {};
 
     const updates: Record<string, any> = {};
     const settings = userSettingsService.getSettings();
@@ -480,13 +871,16 @@ export async function aiRoutes(app: FastifyInstance) {
   });
 
   // POST /ai/test - Test AI connection
-  app.post('/ai/test', async (request) => {
-    const body = request.body as any;
+  app.post('/ai/test', async (request, reply) => {
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.code(400).send({ success: false, message: 'Invalid request body: expected an object' });
+    }
 
-    const service = (body.service || 'summary') as ServiceKey;
-    const apiKey = body.api_key;
-    const baseUrl = body.base_url;
-    const modelName = body.model_name;
+    const service = (typeof body.service === 'string' ? body.service : 'summary') as ServiceKey;
+    const apiKey = typeof body.api_key === 'string' ? body.api_key : undefined;
+    const baseUrl = typeof body.base_url === 'string' ? body.base_url : undefined;
+    const modelName = typeof body.model_name === 'string' ? body.model_name : undefined;
 
     if (!apiKey || !baseUrl || !modelName) {
       return {
@@ -581,7 +975,16 @@ export async function aiRoutes(app: FastifyInstance) {
   app.post<{
     Body: { query: string; limit?: number; type?: 'semantic' | 'keyword' | 'hybrid' }
   }>('/ai/search', async (request, reply) => {
-    const { query, limit = 20, type = 'hybrid' } = request.body;
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.status(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const query = typeof body.query === 'string' ? body.query : '';
+    const limit = typeof body.limit === 'number' ? body.limit : 20;
+    const type = body.type === 'semantic' || body.type === 'keyword' || body.type === 'hybrid'
+      ? body.type
+      : 'hybrid';
 
     if (!query || query.trim().length === 0) {
       return reply.status(400).send({ error: 'Query is required' });
@@ -600,33 +1003,88 @@ export async function aiRoutes(app: FastifyInstance) {
         match_type: 'semantic' | 'keyword';
       }> = [];
 
-      // Keyword search using SQL LIKE
+      // Keyword search using FTS5 (fallback to LIKE if unavailable)
       if (type === 'keyword' || type === 'hybrid') {
         const db = (await import('../db/session.js')).getDatabase();
-        const keywordResults = db.prepare(`
-          SELECT e.id, e.title, e.content, e.feed_id, f.title as feed_title,
-                 e.published_at, e.url
-          FROM entries e
-          LEFT JOIN feeds f ON e.feed_id = f.id
-          WHERE e.title LIKE ? OR e.content LIKE ?
-          ORDER BY e.published_at DESC
-          LIMIT ?
-        `).all(`%${query}%`, `%${query}%`, limit) as Array<{
-          id: string;
-          title: string;
-          content: string;
-          feed_id: string;
-          feed_title: string;
-          published_at: string | null;
-          url: string | null;
-        }>;
+        const ftsQuery = buildSafeFtsQuery(query);
 
-        for (const r of keywordResults) {
-          results.push({
-            ...r,
-            score: 0.8,
-            match_type: 'keyword'
-          });
+        try {
+          if (!ftsQuery) {
+            throw new Error('Invalid FTS query');
+          }
+
+          const keywordResults = db.prepare(`
+            SELECT
+              e.id,
+              e.title,
+              COALESCE(e.readability_content, e.content, e.summary) AS content,
+              e.feed_id,
+              f.title as feed_title,
+              e.published_at,
+              e.url,
+              bm25(entries_fts, 12.0, 4.0, 1.0, 2.0) AS rank
+            FROM entries_fts
+            JOIN entries e ON e.rowid = entries_fts.rowid
+            LEFT JOIN feeds f ON e.feed_id = f.id
+            WHERE entries_fts MATCH ?
+            ORDER BY rank ASC, e.published_at DESC
+            LIMIT ?
+          `).all(ftsQuery, limit) as Array<{
+            id: string;
+            title: string;
+            content: string | null;
+            feed_id: string;
+            feed_title: string;
+            published_at: string | null;
+            url: string | null;
+            rank: number;
+          }>;
+
+          const rankValues = keywordResults.map((item) => item.rank).filter((item) => Number.isFinite(item));
+          const minRank = rankValues.length ? Math.min(...rankValues) : 0;
+          const maxRank = rankValues.length ? Math.max(...rankValues) : 0;
+
+          for (const r of keywordResults) {
+            results.push({
+              id: r.id,
+              title: r.title,
+              content: r.content ?? '',
+              feed_id: r.feed_id,
+              feed_title: r.feed_title,
+              published_at: r.published_at,
+              url: r.url,
+              score: normalizeKeywordScore(r.rank, minRank, maxRank),
+              match_type: 'keyword'
+            });
+          }
+        } catch (ftsError) {
+          console.warn('[Search] FTS search failed, fallback to LIKE:', ftsError);
+
+          const keywordResults = db.prepare(`
+            SELECT e.id, e.title, e.content, e.feed_id, f.title as feed_title,
+                   e.published_at, e.url
+            FROM entries e
+            LEFT JOIN feeds f ON e.feed_id = f.id
+            WHERE e.title LIKE ? OR e.content LIKE ?
+            ORDER BY e.published_at DESC
+            LIMIT ?
+          `).all(`%${query}%`, `%${query}%`, limit) as Array<{
+            id: string;
+            title: string;
+            content: string;
+            feed_id: string;
+            feed_title: string;
+            published_at: string | null;
+            url: string | null;
+          }>;
+
+          for (const r of keywordResults) {
+            results.push({
+              ...r,
+              score: 0.8,
+              match_type: 'keyword'
+            });
+          }
         }
       }
 

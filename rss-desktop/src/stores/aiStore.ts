@@ -132,6 +132,33 @@ export interface AIFeatureConfig {
   translation_language: string
 }
 
+export type AITaskKey =
+  | 'entry_summary'
+  | 'title_translation'
+  | 'fulltext_translation'
+  | 'aggregate_digest'
+  | 'smart_tagging'
+
+export type AIScopeType = 'global' | 'feed' | 'group' | 'tag'
+
+export type AIAutomationMode = 'inherit' | 'enabled' | 'disabled'
+
+export interface AIAutomationRule {
+  id?: string
+  task_key: AITaskKey
+  scope_type: AIScopeType
+  scope_id: string | null
+  mode: AIAutomationMode
+}
+
+export interface AIAutomationDefault {
+  task_key: AITaskKey
+  scope_type: 'global'
+  scope_id: null
+  enabled: boolean
+  source: 'legacy_fallback'
+}
+
 export interface AIConfig {
   global: AIGlobalConfig
   summary: AIServiceConfig
@@ -139,6 +166,75 @@ export interface AIConfig {
   tagging: AIServiceConfig
   embedding: AIServiceConfig
   features: AIFeatureConfig
+}
+
+export type ScopeSummaryWindowType = '24h' | '3d' | '7d' | '30d'
+export type ScopeSummaryStatus = 'empty' | 'idle' | 'stale' | 'generating' | 'ready' | 'failed'
+
+export interface ScopeSummaryCitation {
+  ref: number
+  entry_id: string
+}
+
+export interface ScopeSummaryEntryPreview {
+  id: string
+  feed_id: string
+  title: string | null
+  url: string | null
+  published_at: string | null
+  inserted_at: string
+  summary: string | null
+  content?: string | null
+  readability_content?: string | null
+  feed_title: string | null
+}
+
+export interface ScopeSummarySettingsSnapshot {
+  enabled: boolean
+  auto_generate: boolean
+  auto_generate_interval_minutes: number
+  default_window: ScopeSummaryWindowType
+  max_entries: number
+  chunk_size: number
+}
+
+export interface ScopeSummaryRecord {
+  id?: string
+  scope_type?: 'feed' | 'group'
+  scope_id?: string
+  window_type: ScopeSummaryWindowType
+  window_start_at: string
+  window_end_at: string
+  status?: 'generating' | 'ready' | 'failed'
+  summary_md?: string
+  summary?: string
+  citations: ScopeSummaryCitation[]
+  keywords: string[]
+  created_at?: string
+  updated_at?: string
+  summary_updated_at?: string
+  source_count?: number
+  model_name?: string | null
+  trigger_type?: 'auto' | 'manual'
+  error_message?: string | null
+}
+
+export interface ScopeSummaryResponse {
+  scope_label: string
+  scope_type: 'feed' | 'group'
+  scope_id: string
+  window_type: ScopeSummaryWindowType
+  window_start_at: string
+  window_end_at: string
+  status: ScopeSummaryStatus
+  recentCount: number
+  entries: ScopeSummaryEntryPreview[]
+  entry_index_map: Record<number, string>
+  item: ScopeSummaryRecord | null
+  settings: ScopeSummarySettingsSnapshot
+  can_auto_generate: boolean
+  suggested_windows: ScopeSummaryWindowType[]
+  queue_state?: 'queued' | 'already_running' | 'completed'
 }
 
 export type PartialAIConfig = {
@@ -191,6 +287,8 @@ function mergeConfig(target: AIConfig, updates: PartialAIConfig): AIConfig {
 
 export const useAIStore = defineStore('ai', () => {
   const config = ref<AIConfig>(createDefaultConfig())
+  const automationRules = ref<AIAutomationRule[]>([])
+  const automationDefaults = ref<AIAutomationDefault[]>([])
 
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -224,6 +322,54 @@ export const useAIStore = defineStore('ai', () => {
     } catch (err) {
       console.error('Failed to update AI config:', err)
       error.value = '更新AI配置失败'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchAutomationRules() {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.get<{ items: AIAutomationRule[]; defaults: AIAutomationDefault[] }>('/ai/automation-rules')
+      automationRules.value = data.items || []
+      automationDefaults.value = data.defaults || []
+      return true
+    } catch (err) {
+      console.error('Failed to fetch automation rules:', err)
+      error.value = '获取AI自动化规则失败'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateAutomationRules(input: {
+    upserts?: AIAutomationRule[]
+    removals?: Array<Pick<AIAutomationRule, 'task_key' | 'scope_type' | 'scope_id'>>
+  }) {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.patch<{
+        success: boolean
+        items: AIAutomationRule[]
+        defaults: AIAutomationDefault[]
+      }>('/ai/automation-rules', {
+        upserts: input.upserts || [],
+        removals: input.removals || [],
+      })
+      if (!data.success) {
+        error.value = '更新AI自动化规则失败'
+        return false
+      }
+      automationRules.value = data.items || []
+      automationDefaults.value = data.defaults || []
+      return true
+    } catch (err) {
+      console.error('Failed to update automation rules:', err)
+      error.value = '更新AI自动化规则失败'
       return false
     } finally {
       loading.value = false
@@ -377,17 +523,117 @@ export const useAIStore = defineStore('ai', () => {
     }
   }
 
+  async function fetchScopeSummary(input: {
+    scope_type: 'feed' | 'group'
+    scope_id: string
+    window_type?: ScopeSummaryWindowType
+    language?: string
+  }) {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.get<ScopeSummaryResponse>('/ai/scope-summary', { params: input })
+      return data
+    } catch (err) {
+      console.error('Failed to fetch scope summary:', err)
+      error.value = '获取范围摘要失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchScopeSummaryHistory(input: {
+    scope_type: 'feed' | 'group'
+    scope_id: string
+    window_type?: ScopeSummaryWindowType
+    language?: string
+    limit?: number
+    cursor?: string | null
+  }) {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await api.get<{
+        items: ScopeSummaryRecord[]
+        nextCursor: string | null
+        hasMore: boolean
+      }>('/ai/scope-summary/history', { params: input })
+      return data
+    } catch (err) {
+      console.error('Failed to fetch scope summary history:', err)
+      error.value = '获取范围摘要历史失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function generateScopeSummary(input: {
+    scope_type: 'feed' | 'group'
+    scope_id: string
+    window_type?: ScopeSummaryWindowType
+    ui_language?: string
+    trigger_type?: 'auto' | 'manual'
+    background?: boolean
+  }) {
+    loading.value = true
+    error.value = null
+    const background = input.background ?? true
+    try {
+      const { data } = await api.post<ScopeSummaryResponse>(
+        '/ai/scope-summary/generate',
+        {
+          ...input,
+          background,
+        },
+        { timeout: 30000 },
+      )
+      return data
+    } catch (err) {
+      const timeoutCode = (err as { code?: string } | null)?.code
+      if (background && timeoutCode === 'ECONNABORTED') {
+        try {
+          const fallback = await fetchScopeSummary({
+            scope_type: input.scope_type,
+            scope_id: input.scope_id,
+            window_type: input.window_type,
+            language: input.ui_language,
+          })
+          return {
+            ...fallback,
+            status: 'generating' as ScopeSummaryStatus,
+          }
+        } catch (fallbackErr) {
+          console.error('Failed to fallback after scope summary timeout:', fallbackErr)
+        }
+      }
+      console.error('Failed to generate scope summary:', err)
+      error.value = '生成范围摘要失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     config,
+    automationRules,
+    automationDefaults,
     loading,
     error,
     fetchConfig,
     updateConfig,
+    fetchAutomationRules,
+    updateAutomationRules,
     testConnection,
     testGlobalConnection,
     clearError,
     resetConfig,
     rebuildVectors,
-    getVectorStats
+    getVectorStats,
+    fetchScopeSummary,
+    fetchScopeSummaryHistory,
+    generateScopeSummary,
   }
 })

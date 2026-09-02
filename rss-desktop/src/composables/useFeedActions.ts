@@ -1,11 +1,13 @@
 import { useFeedStore } from '../stores/feedStore'
 import { useFavoritesStore } from '../stores/favoritesStore'
+import { useTagsStore } from '../stores/tagsStore'
 import { useNotification } from '../composables/useNotification'
 import type { Entry } from '../types'
 
 export function useFeedActions() {
     const store = useFeedStore()
     const favoritesStore = useFavoritesStore()
+    const tagsStore = useTagsStore()
     const { showNotification } = useNotification()
 
     async function handleToggleStar(entry: Entry | null, showFavoritesOnly: boolean, afterActionCallback?: () => Promise<void>) {
@@ -25,6 +27,8 @@ export function useFeedActions() {
 
             // Update store state
             await store.toggleEntryState(entry, { starred: willBeStarred })
+            // Sync to tagsStore
+            tagsStore.updateEntryState(entry.id, { starred: willBeStarred })
 
             // Reload favorites if in favorites mode
             if (showFavoritesOnly && afterActionCallback) {

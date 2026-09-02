@@ -147,7 +147,7 @@ A: 检查以下几点：
 A: 已经实现了以下优化：
 - 使用 `compression: "maximum"` 最大压缩
 - 过滤掉 source map 文件
-- 使用 `tools/optimize-backend.mjs` 脚本优化后端打包
+- 使用 `tools/prepare-backend-node.mjs` 准备 Electron 打包所需的后端资源
 
 ### Q: 支持哪些 CPU 架构？
 

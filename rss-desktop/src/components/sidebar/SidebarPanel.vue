@@ -1,22 +1,23 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFeedStore } from '../../stores/feedStore'
 import { useFavoritesStore } from '../../stores/favoritesStore'
 import type { Feed, ViewType } from '../../types'
-import SidebarHeader from './SidebarHeader.vue'
-import AddFeedForm from './AddFeedForm.vue'
-import AddFeedPopover from './AddFeedPopover.vue'
-import OpmlActions from './OpmlActions.vue'
-import FavoritesSection from './FavoritesSection.vue'
-import CollectionsSection from './CollectionsSection.vue'
-import TagsSection from './TagsSection.vue'
-import QuickNavBar from './QuickNavBar.vue'
-import FeedGroup from './FeedGroup.vue'
-import ViewTypeNav from './ViewTypeNav.vue'
-import ConfirmModal from '../common/ConfirmModal.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import type { ViewMode } from '../../composables/useViewMode'
+
+const SidebarHeader = defineAsyncComponent(() => import('./SidebarHeader.vue'))
+const AddFeedForm = defineAsyncComponent(() => import('./AddFeedForm.vue'))
+const AddFeedPopover = defineAsyncComponent(() => import('./AddFeedPopover.vue'))
+const OpmlActions = defineAsyncComponent(() => import('./OpmlActions.vue'))
+const FavoritesSection = defineAsyncComponent(() => import('./FavoritesSection.vue'))
+const CollectionsSection = defineAsyncComponent(() => import('./CollectionsSection.vue'))
+const TagsSection = defineAsyncComponent(() => import('./TagsSection.vue'))
+const QuickNavBar = defineAsyncComponent(() => import('./QuickNavBar.vue'))
+const FeedGroup = defineAsyncComponent(() => import('./FeedGroup.vue'))
+const ViewTypeNav = defineAsyncComponent(() => import('./ViewTypeNav.vue'))
+const ConfirmModal = defineAsyncComponent(() => import('../common/ConfirmModal.vue'))
 
 export type { ViewMode }
 
@@ -100,6 +101,8 @@ const emit = defineEmits<{
   (e: 'select-tag', id: string): void
   (e: 'select-tag-view', view: 'pending' | 'untagged' | 'digest'): void
   (e: 'open-tag-settings'): void
+  (e: 'quick-rerun-tagging', payload: { scope: 'feed' | 'tag' | 'group'; feedId?: string; tagId?: string; groupName?: string; label: string }): void
+  (e: 'open-automation-settings', payload: { scope_type: 'feed' | 'group' | 'tag'; scope_id: string; label: string }): void
 }>()
 
 const { t } = useI18n()
@@ -238,6 +241,18 @@ function isGroupCollapsed(groupName: string): boolean {
   return !!props.collapsedGroups[groupName]
 }
 
+function handleGroupFeedViewType(feedId: string, viewType: ViewType) {
+  emit('change-view-type', feedId, viewType)
+}
+
+function handleGroupMoveTo(feedId: string, groupName: string) {
+  emit('move-to-group', feedId, groupName)
+}
+
+function handleGroupSetCustomTitle(feedId: string, customTitle: string | null) {
+  emit('set-custom-title', feedId, customTitle)
+}
+
 watch(showCreateGroupModal, (visible) => {
   if (!visible) return
   nextTick(() => groupNameInput.value?.focus())
@@ -343,6 +358,8 @@ watch(showCreateGroupModal, (visible) => {
         @select-tag="emit('select-tag', $event)"
         @select-tag-view="emit('select-tag-view', $event)"
         @open-tag-settings="emit('open-tag-settings')"
+        @quick-rerun-tagging="emit('quick-rerun-tagging', $event)"
+        @open-automation-settings="emit('open-automation-settings', $event)"
       />
     </template>
 
@@ -397,6 +414,8 @@ watch(showCreateGroupModal, (visible) => {
         @select-tag="emit('select-tag', $event)"
         @select-tag-view="emit('select-tag-view', $event)"
         @open-tag-settings="emit('open-tag-settings')"
+        @quick-rerun-tagging="emit('quick-rerun-tagging', $event)"
+        @open-automation-settings="emit('open-automation-settings', $event)"
       />
     </template>
 
@@ -453,9 +472,11 @@ watch(showCreateGroupModal, (visible) => {
         @update:editing-group-name="emit('update:editingGroupName', $event)"
         @mark-group-read="emit('mark-group-read', $event)"
         @mark-feed-read="emit('mark-feed-read', $event)"
-        @change-view-type="(feedId, viewType) => emit('change-view-type', feedId, viewType)"
-        @move-to-group="(feedId, groupName) => emit('move-to-group', feedId, groupName)"
-        @set-custom-title="(feedId, customTitle) => emit('set-custom-title', feedId, customTitle)"
+        @change-view-type="handleGroupFeedViewType"
+        @move-to-group="handleGroupMoveTo"
+        @set-custom-title="handleGroupSetCustomTitle"
+        @quick-rerun-tagging="emit('quick-rerun-tagging', $event)"
+        @open-automation-settings="emit('open-automation-settings', $event)"
         @delete-group="handleDeleteGroup"
       />
     </div>

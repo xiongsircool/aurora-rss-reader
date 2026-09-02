@@ -3,9 +3,9 @@
  */
 
 import { FastifyInstance } from 'fastify';
-import { FeedRepository } from '../db/repositories/index.js';
-import { request as undiciRequest } from 'undici';
 import { JSDOM } from 'jsdom';
+import { FeedRepository } from '../db/repositories/index.js';
+import { getResponseHeader, requestBuffer, requestText } from '../services/outboundHttp.js';
 
 const TRANSPARENT_GIF = Buffer.from(
   'R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==',
@@ -21,7 +21,7 @@ function buildProxyHeaders(targetUrl: string): Record<string, string> {
       'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*;q=0.8,*/*;q=0.5',
       'Referer': origin || targetUrl,
     };
-  } catch {
+  } catch (error) {
     return {
       'User-Agent': 'Mozilla/5.0 (compatible; Aurora RSS Reader)',
       'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*;q=0.8,*/*;q=0.5',
@@ -30,18 +30,79 @@ function buildProxyHeaders(targetUrl: string): Record<string, string> {
   }
 }
 
-async function readBody(body: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of body) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+function resolveHref(href: string, baseUrl: URL): string {
+  if (href.startsWith('http')) return href;
+  if (href.startsWith('//')) return `${baseUrl.protocol}${href}`;
+  if (href.startsWith('/')) return `${baseUrl.protocol}//${baseUrl.host}${href}`;
+  return `${baseUrl.protocol}//${baseUrl.host}/${href}`;
+}
+
+async function discoverFaviconUrl(feedUrl: string): Promise<string> {
+  const parsedFeedUrl = new URL(feedUrl);
+  const domain = `${parsedFeedUrl.protocol}//${parsedFeedUrl.hostname}`;
+
+  try {
+    const faviconIcoUrl = `${domain}/favicon.ico`;
+    const headResponse = await requestBuffer(faviconIcoUrl, {
+      method: 'HEAD',
+      maxRedirects: 3,
+      maxRetries: 1,
+      acceptedStatusCodes: [200],
+      networkPolicy: 'public',
+      maxResponseBytes: 0,
+      headers: buildProxyHeaders(faviconIcoUrl),
+      logContext: 'favicon-head',
+    });
+
+    const contentType = getResponseHeader(headResponse.headers, 'content-type');
+    if (!contentType || contentType.startsWith('image/')) {
+      return faviconIcoUrl;
+    }
+  } catch (error) {
+    // Fall through to HTML parsing.
   }
-  return Buffer.concat(chunks);
+
+  try {
+    const response = await requestText(domain, {
+      maxRedirects: 3,
+      maxRetries: 1,
+      acceptedStatusCodes: [200],
+      networkPolicy: 'public',
+      maxResponseBytes: 512 * 1024,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Aurora RSS Reader)',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      logContext: 'favicon-html',
+    });
+
+    const dom = new JSDOM(response.body, { url: response.url });
+    try {
+      const selectors = [
+        'link[rel="icon"]',
+        'link[rel="shortcut icon"]',
+        'link[rel="apple-touch-icon"]',
+      ];
+
+      for (const selector of selectors) {
+        const href = dom.window.document.querySelector(selector)?.getAttribute('href');
+        if (href) {
+          return resolveHref(href, new URL(response.url));
+        }
+      }
+    } finally {
+      dom.window.close();
+    }
+  } catch (error) {
+    // Fall through to Google fallback.
+  }
+
+  return `https://www.google.com/s2/favicons?domain=${parsedFeedUrl.hostname}&sz=64`;
 }
 
 export async function iconsRoutes(app: FastifyInstance) {
   const feedRepo = new FeedRepository();
 
-  // GET /icons/proxy - Proxy remote icon to avoid mixed content errors
   app.get('/icons/proxy', async (req, reply) => {
     const query = req.query as { url?: string };
     const targetUrl = query?.url;
@@ -54,32 +115,31 @@ export async function iconsRoutes(app: FastifyInstance) {
     }
 
     try {
-      const response = await undiciRequest(targetUrl, {
+      const response = await requestBuffer(targetUrl, {
         headers: buildProxyHeaders(targetUrl),
-        maxRedirections: 3,
-        headersTimeout: 5000,
+        maxRedirects: 3,
+        maxRetries: 1,
+        maxResponseBytes: 512 * 1024,
+        acceptedStatusCodes: [200],
+        networkPolicy: 'public',
+        logContext: 'icons-proxy',
       });
 
-      const contentType = String(response.headers['content-type'] || '').toLowerCase();
-      if (response.statusCode === 200 && contentType.startsWith('image/')) {
-        const buffer = await readBody(response.body);
-        if (buffer.length > 0) {
-          reply.type(contentType.split(';')[0]);
-          return reply.send(buffer);
-        }
+      const contentType = String(getResponseHeader(response.headers, 'content-type') || '').toLowerCase();
+      if (contentType.startsWith('image/') && response.body.length > 0) {
+        reply.type(contentType.split(';')[0]);
+        return reply.send(response.body);
       }
     } catch (error) {
-      // fall through to transparent gif
+      // Fall through to transparent gif.
     }
 
     reply.type('image/gif');
     return reply.send(TRANSPARENT_GIF);
   });
 
-  // GET /icons/:feed_id - Get favicon for a feed
   app.get('/icons/:feed_id', async (req, reply) => {
     const { feed_id } = req.params as { feed_id: string };
-
     const feed = feedRepo.findById(feed_id);
 
     if (!feed) {
@@ -87,7 +147,6 @@ export async function iconsRoutes(app: FastifyInstance) {
     }
 
     try {
-      // Check if we already have a cached favicon URL
       if (feed.favicon_url) {
         return {
           success: true,
@@ -96,79 +155,8 @@ export async function iconsRoutes(app: FastifyInstance) {
         };
       }
 
-      // Extract domain from feed URL
-      const feedUrl = new URL(feed.url);
-      const domain = `${feedUrl.protocol}//${feedUrl.hostname}`;
-
-      let faviconUrl: string | null = null;
-
-      // Strategy 1: Try common favicon.ico location
-      try {
-        const faviconIcoUrl = `${domain}/favicon.ico`;
-        const response = await undiciRequest(faviconIcoUrl, {
-          method: 'HEAD',
-          maxRedirections: 3,
-        });
-
-        if (response.statusCode === 200) {
-          faviconUrl = faviconIcoUrl;
-        }
-      } catch (error) {
-        // Favicon.ico not found, continue to next strategy
-      }
-
-      // Strategy 2: Parse HTML for <link rel="icon"> tags
-      if (!faviconUrl) {
-        try {
-          const response = await undiciRequest(domain, {
-            maxRedirections: 3,
-            headersTimeout: 10000,
-          });
-
-          const html = await response.body.text();
-          const dom = new JSDOM(html);
-          const document = dom.window.document;
-
-          // Look for various icon link tags
-          const iconSelectors = [
-            'link[rel="icon"]',
-            'link[rel="shortcut icon"]',
-            'link[rel="apple-touch-icon"]',
-          ];
-
-          for (const selector of iconSelectors) {
-            const iconLink = document.querySelector(selector);
-            if (iconLink) {
-              const href = iconLink.getAttribute('href');
-              if (href) {
-                // Handle relative URLs
-                if (href.startsWith('http')) {
-                  faviconUrl = href;
-                } else if (href.startsWith('//')) {
-                  faviconUrl = `${feedUrl.protocol}${href}`;
-                } else if (href.startsWith('/')) {
-                  faviconUrl = `${domain}${href}`;
-                } else {
-                  faviconUrl = `${domain}/${href}`;
-                }
-                break;
-              }
-            }
-          }
-        } catch (error) {
-          // HTML parsing failed, continue
-        }
-      }
-
-      // Strategy 3: Use Google's favicon service as fallback
-      if (!faviconUrl) {
-        faviconUrl = `https://www.google.com/s2/favicons?domain=${feedUrl.hostname}&sz=64`;
-      }
-
-      // Cache the favicon URL in the database
-      if (faviconUrl) {
-        feedRepo.update(feed_id, { favicon_url: faviconUrl });
-      }
+      const faviconUrl = await discoverFaviconUrl(feed.url);
+      feedRepo.update(feed_id, { favicon_url: faviconUrl });
 
       return {
         success: true,
@@ -182,10 +170,8 @@ export async function iconsRoutes(app: FastifyInstance) {
     }
   });
 
-  // DELETE /icons/:feed_id - Clear cached favicon
   app.delete('/icons/:feed_id', async (req) => {
     const { feed_id } = req.params as { feed_id: string };
-
     const feed = feedRepo.findById(feed_id);
 
     if (!feed) {
@@ -193,7 +179,6 @@ export async function iconsRoutes(app: FastifyInstance) {
     }
 
     feedRepo.update(feed_id, { favicon_url: null });
-
     return { success: true };
   });
 }

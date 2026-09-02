@@ -28,6 +28,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_NODE_DIR="$PROJECT_ROOT/backend-node"
 FRONTEND_DIR="$PROJECT_ROOT/rss-desktop"
 BACKEND_RESOURCES_DIR="$FRONTEND_DIR/resources/backend-node"
+APP_VERSION="$(node -p "require('$FRONTEND_DIR/package.json').version")"
 
 log "🚀 开始构建 Aurora RSS Reader..."
 log "📂 项目目录: $PROJECT_ROOT"
@@ -169,11 +170,11 @@ show_results() {
         log "💡 使用说明:"
         if [ "$(uname)" == "Darwin" ]; then
             log "   macOS: 双击 .dmg 文件安装应用"
-            if [ -d "$FRONTEND_DIR/release/0.1.2/mac" ]; then
-                log "   或直接运行: $FRONTEND_DIR/release/0.1.2/mac/Aurora RSS Reader.app"
+            if [ -d "$FRONTEND_DIR/release/$APP_VERSION/mac" ]; then
+                log "   或直接运行: $FRONTEND_DIR/release/$APP_VERSION/mac/Aurora RSS Reader.app"
             fi
-            if [ -d "$FRONTEND_DIR/release/0.1.2/mac-arm64" ]; then
-                log "   Apple Silicon: $FRONTEND_DIR/release/0.1.2/mac-arm64/Aurora RSS Reader.app"
+            if [ -d "$FRONTEND_DIR/release/$APP_VERSION/mac-arm64" ]; then
+                log "   Apple Silicon: $FRONTEND_DIR/release/$APP_VERSION/mac-arm64/Aurora RSS Reader.app"
             fi
         elif [ "$(uname)" == "Linux" ]; then
             log "   Linux: 运行 .AppImage 或安装 .deb 包"

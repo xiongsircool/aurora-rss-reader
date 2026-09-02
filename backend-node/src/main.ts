@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { getConfig } from './config/index.js';
 import { initDatabase } from './db/init.js';
+import { closeDatabase } from './db/session.js';
 import { userSettingsRoutes } from './routes/userSettings.js';
 import { feedsRoutes } from './routes/feeds.js';
 import { entriesRoutes } from './routes/entries.js';
@@ -13,23 +14,35 @@ import { schedulerRoutes } from './routes/scheduler.js';
 import { zoteroRoutes } from './routes/zotero.js';
 import { collectionsRoutes } from './routes/collections.js';
 import tagsRoutes from './routes/tags.js';
+import { mobileRoutes } from './routes/mobile.js';
+import { statsRoutes } from './routes/stats.js';
 import { scheduler } from './services/scheduler.js';
 import { handleMcpRequest, handleMcpGetRequest, handleMcpDeleteRequest } from './mcp/server.js';
 
 const app = Fastify({
   logger: true
 });
+let isShuttingDown = false;
 
 // CORS configuration
 await app.register(cors, {
   origin: (origin, cb) => {
     // Allow all localhost origins in development
-    if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    if (
+      !origin ||
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+      /^https?:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin)
+    ) {
       cb(null, true);
       return;
     }
-    // Allow Electron origins
-    if (origin === 'null' || origin.startsWith('app://')) {
+    // Allow Electron and Capacitor origins
+    if (
+      origin === 'null' ||
+      origin.startsWith('app://') ||
+      origin.startsWith('capacitor://') ||
+      origin.startsWith('ionic://')
+    ) {
       cb(null, true);
       return;
     }
@@ -83,7 +96,7 @@ app.get('/api/health', async () => healthCheck());
 try {
   initDatabase();
   console.log('✅ Database initialized');
-  console.log('✅ Vector DB initialized (sqlite-vss)');
+  console.log('ℹ️  Vector DB initialization completed; check startup logs for sqlite-vss availability');
 } catch (error) {
   console.error('❌ Database initialization failed:', error);
   process.exit(1);
@@ -102,7 +115,9 @@ await app.register(iconsRoutes, { prefix: '/api' });
 await app.register(schedulerRoutes, { prefix: '/api' });
 await app.register(zoteroRoutes, { prefix: '/api' });
 await app.register(collectionsRoutes, { prefix: '/api' });
+await app.register(statsRoutes, { prefix: '/api' });
 await app.register(tagsRoutes, { prefix: '/api' });
+await app.register(mobileRoutes, { prefix: '/api' });
 
 // ============================================
 // MCP (Model Context Protocol) Endpoint
@@ -146,15 +161,34 @@ app.listen({ port: config.apiPort, host: config.apiHost }, (err, address) => {
   console.log(`🚀 Server listening at ${address}`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
+async function shutdown(signal: 'SIGTERM' | 'SIGINT') {
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
+  console.log(`${signal} received, shutting down gracefully`);
   scheduler.stop();
+
+  try {
+    await app.close();
+  } catch (error) {
+    console.error('Error while closing Fastify:', error);
+  }
+
+  try {
+    closeDatabase();
+  } catch (error) {
+    console.error('Error while closing database:', error);
+  }
+
   process.exit(0);
+}
+
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  scheduler.stop();
-  process.exit(0);
+  void shutdown('SIGINT');
 });

@@ -4,10 +4,14 @@
   "description": "Node.js backend for Aurora RSS Reader",
   "type": "module",
   "main": "dist/main.js",
+  "engines": {
+    "node": ">=22.0.0 <23"
+  },
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "mcp": "tsx src/mcp-server.ts",
     "build": "tsc",
+    "test": "node --import tsx --test test/**/*.test.ts",
     "start": "node dist/main.js"
   },
   "dependencies": {

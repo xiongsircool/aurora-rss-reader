@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, defineAsyncComponent, ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Entry, ViewType } from '../../types'
 import type { ViewMode } from '../../composables/useViewMode'
 import { getTimeRangeText } from '../../utils/date'
-import TimelineHeader from './TimelineHeader.vue'
-import TimelineFilters from './TimelineFilters.vue'
-import EntryCard from './EntryCard.vue'
-import PictureCard from './PictureCard.vue'
-import VideoCard from './VideoCard.vue'
-import AudioCard from './AudioCard.vue'
-import LoadingSpinner from '../LoadingSpinner.vue'
-import TagComboFilter from '../tags/TagComboFilter.vue'
+
+const TimelineHeader = defineAsyncComponent(() => import('./TimelineHeader.vue'))
+const TimelineFilters = defineAsyncComponent(() => import('./TimelineFilters.vue'))
+const EntryCard = defineAsyncComponent(() => import('./EntryCard.vue'))
+const PictureCard = defineAsyncComponent(() => import('./PictureCard.vue'))
+const VideoCard = defineAsyncComponent(() => import('./VideoCard.vue'))
+const AudioCard = defineAsyncComponent(() => import('./AudioCard.vue'))
+const LoadingSpinner = defineAsyncComponent(() => import('../LoadingSpinner.vue'))
+const TagComboFilter = defineAsyncComponent(() => import('../tags/TagComboFilter.vue'))
 
 const props = defineProps<{
   // Header props
@@ -19,6 +20,8 @@ const props = defineProps<{
   subtitle: string
   showFavoritesOnly: boolean
   viewMode: ViewMode
+  scopeSummaryTarget?: { scope_type: 'feed' | 'group'; scope_id: string; label: string } | null
+  scopeSummaryActive?: boolean
   activeTagId: string | null
   activeTagName?: string
   activeTagView: 'tag' | 'pending' | 'untagged' | 'digest' | null
@@ -41,6 +44,7 @@ const props = defineProps<{
   dateRangeFilter: string
   filterLoading: boolean
   enableDateFilter: boolean
+  filterDensity?: 'compact' | 'standard'
   
   // List props
   entries: Entry[]
@@ -87,6 +91,7 @@ const emit = defineEmits<{
   (e: 'ai-search', query: string): void
   (e: 'apply-tag-combo', tagIds: string[], mode: 'and' | 'or'): void
   (e: 'clear-tag-combo'): void
+  (e: 'toggle-scope-summary', mode: 'articles' | 'summary'): void
 }>()
 
 const { t } = useI18n()
@@ -124,6 +129,7 @@ const hasDateFilter = computed(() => props.enableDateFilter && props.dateRangeFi
 const hasAnyFilters = computed(() =>
   hasSearchFilter.value || hasStateFilter.value || hasDateFilter.value || !!props.comboFilterActive
 )
+const showTopHeader = computed(() => props.filterDensity !== 'compact')
 const filterModeLabel = computed(() => {
   if (props.filterMode === 'unread') return t('navigation.unread')
   if (props.filterMode === 'starred') return t('navigation.favorites')
@@ -162,6 +168,9 @@ const emptyMessage = computed(() => {
   if (props.viewMode === 'tag' && props.activeTagView === 'digest') return t('tags.digestEmpty')
   return t('feeds.noArticlesAdd')
 })
+const showScopeSummaryToggle = computed(() =>
+  props.viewMode === 'feeds' && !props.showFavoritesOnly && !!props.scopeSummaryTarget
+)
 
 // Responsive grid columns
 const containerRef = ref<HTMLElement | null>(null)
@@ -252,6 +261,7 @@ function handleVisibleUpdate(
 <template>
   <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden lt-md:w-full! lt-md:border-r-0 lt-md:border-b lt-md:min-w-auto lt-md:h-auto lt-md:max-h-none lt-md:overflow-visible">
     <TimelineHeader
+      v-if="showTopHeader"
       :title="title"
       :subtitle="subtitle"
       :show-favorites-only="showFavoritesOnly"
@@ -261,13 +271,42 @@ function handleVisibleUpdate(
       @mark-all-read="emit('mark-all-read')"
     />
 
-    <div class="mx-4 mt-3 mb-2 px-3 py-2 rounded-xl border flex items-center justify-between gap-3" :class="modeAccentClass">
+    <div
+      class="mx-4 mb-2 px-3 py-2 rounded-xl border flex items-center justify-between gap-3"
+      :class="[modeAccentClass, showTopHeader ? 'mt-3' : 'mt-2']"
+    >
       <div class="flex items-center gap-2 min-w-0">
         <span class="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0"></span>
         <span class="text-[12px] font-semibold c-[var(--text-primary)] truncate">{{ modeLabel }}</span>
       </div>
       <div class="text-[11px] c-[var(--text-secondary)] whitespace-nowrap">
         {{ entries.length }} {{ t('articles.title') }}
+      </div>
+    </div>
+
+    <div
+      v-if="showScopeSummaryToggle"
+      class="mx-4 mb-2 px-3 py-2 rounded-xl border border-[rgba(255,122,24,0.22)] bg-[linear-gradient(135deg,rgba(255,122,24,0.08),rgba(255,190,48,0.06))] flex items-center justify-between gap-3"
+    >
+      <div class="min-w-0">
+        <div class="text-[12px] font-semibold c-[var(--text-primary)]">{{ t('scopeSummary.panelTitle') }}</div>
+        <div class="mt-0.5 text-[11px] c-[var(--text-secondary)] truncate">{{ scopeSummaryTarget?.label }}</div>
+      </div>
+      <div class="flex items-center gap-1 bg-[var(--bg-base)] rounded-lg p-0.5 border border-[var(--border-color)]">
+        <button
+          class="px-2.5 py-1 text-[11px] font-medium rounded-md transition-all"
+          :class="!scopeSummaryActive ? 'bg-[var(--bg-surface)] c-[var(--text-primary)] shadow-sm' : 'c-[var(--text-tertiary)] hover:c-[var(--text-secondary)]'"
+          @click="emit('toggle-scope-summary', 'articles')"
+        >
+          {{ t('scopeSummary.articlesTab') }}
+        </button>
+        <button
+          class="px-2.5 py-1 text-[11px] font-medium rounded-md transition-all"
+          :class="scopeSummaryActive ? 'bg-[var(--bg-surface)] c-[var(--text-primary)] shadow-sm' : 'c-[var(--text-tertiary)] hover:c-[var(--text-secondary)]'"
+          @click="emit('toggle-scope-summary', 'summary')"
+        >
+          {{ t('scopeSummary.summaryTab') }}
+        </button>
       </div>
     </div>
 
@@ -338,6 +377,7 @@ function handleVisibleUpdate(
       :date-range-filter="dateRangeFilter"
       :filter-loading="filterLoading"
       :enable-date-filter="enableDateFilter"
+      :filter-density="filterDensity"
       :ai-search-enabled="aiSearchEnabled"
       :ai-search-active="aiSearchActive"
       :ai-search-loading="aiSearchLoading"

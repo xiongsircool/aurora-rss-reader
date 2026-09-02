@@ -4,6 +4,7 @@
 
 import { FastifyInstance } from 'fastify';
 import { CollectionRepository, EntryRepository } from '../db/repositories/index.js';
+import { getObjectBody } from '../utils/http.js';
 
 export async function collectionsRoutes(app: FastifyInstance) {
   const collectionRepo = new CollectionRepository();
@@ -20,14 +21,23 @@ export async function collectionsRoutes(app: FastifyInstance) {
 
   // POST /collections - Create a new collection
   app.post('/collections', async (request, reply) => {
-    const body = request.body as { name: string; icon?: string; color?: string };
-    if (!body.name?.trim()) {
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.status(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const icon = typeof body.icon === 'string' ? body.icon : undefined;
+    const color = typeof body.color === 'string' ? body.color : undefined;
+
+    if (!name) {
       return reply.status(400).send({ error: 'Name is required' });
     }
+
     const collection = collectionRepo.create({
-      name: body.name.trim(),
-      icon: body.icon,
-      color: body.color,
+      name,
+      icon,
+      color,
     });
     return collection;
   });
@@ -48,8 +58,18 @@ export async function collectionsRoutes(app: FastifyInstance) {
   // PUT /collections/:id - Update a collection
   app.put('/collections/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as { name?: string; icon?: string; color?: string; sort_order?: number };
-    const updated = collectionRepo.update(id, body);
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.status(400).send({ error: 'Invalid request body: expected an object' });
+    }
+
+    const updates = {
+      name: typeof body.name === 'string' ? body.name : undefined,
+      icon: typeof body.icon === 'string' ? body.icon : undefined,
+      color: typeof body.color === 'string' ? body.color : undefined,
+      sort_order: typeof body.sort_order === 'number' ? body.sort_order : undefined,
+    };
+    const updated = collectionRepo.update(id, updates);
     if (!updated) {
       return reply.status(404).send({ error: 'Collection not found' });
     }
@@ -94,9 +114,15 @@ export async function collectionsRoutes(app: FastifyInstance) {
   // POST /collections/:id/entries - Add entry to collection
   app.post('/collections/:id/entries', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as { entry_id: string; note?: string };
+    const body = getObjectBody(request.body);
+    if (!body) {
+      return reply.status(400).send({ error: 'Invalid request body: expected an object' });
+    }
 
-    if (!body.entry_id) {
+    const entryId = typeof body.entry_id === 'string' ? body.entry_id : '';
+    const note = typeof body.note === 'string' ? body.note : undefined;
+
+    if (!entryId) {
       return reply.status(400).send({ error: 'entry_id is required' });
     }
 
@@ -105,15 +131,15 @@ export async function collectionsRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Collection not found' });
     }
 
-    const entry = entryRepo.findById(body.entry_id);
+    const entry = entryRepo.findById(entryId);
     if (!entry) {
       return reply.status(404).send({ error: 'Entry not found' });
     }
 
     const result = collectionRepo.addEntry({
       collection_id: id,
-      entry_id: body.entry_id,
-      note: body.note,
+      entry_id: entryId,
+      note,
     });
     return result;
   });

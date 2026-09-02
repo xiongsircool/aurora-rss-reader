@@ -25,16 +25,16 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.1.7 Latest Release | 最新版本
+## 🎉 v0.2.0 Latest Release | 最新版本
 
-**Digest Intelligence, Tag Workflow Polish & Update Experience | 信息简报智能化、标签流程优化与更新体验升级**
+**Reading Analytics, Feed Reliability & Mobile API Foundation | 阅读统计、订阅稳定性与移动 API 基础**
 
-- 🧠 **Digest 2.0** - LLM summaries with history, manual regenerate, language aligned with current UI locale
-- 🕒 **Latest + Week Modes** - Digest now supports `Latest` view so tags stay visible even when no items arrive today
-- 🏷️ **Tag Analyze-All Fix** - Analyze-all now loads full pending pages instead of only the currently visible subset
-- 🧾 **Summary Quality Upgrade** - Prompting tuned for conclusion-first, fact-dense output with explicit time context
-- 🔄 **Manual Update Check Entry** - Added update-check button in `Settings > About`
-- 🧩 **Sidebar & Tag UX Polish** - Better left-panel actions and smarter tag/digest interaction flow
+- 📊 **Reading Analytics** - Added totals, read rate, 30-day activity, top feeds, and tag visualizations
+- 🕒 **Read Activity Tracking** - Read timestamps now accumulate locally for meaningful trends without uploading reading data
+- 📰 **More Reliable Feed Parsing** - Rejects HTML/non-RSS responses early and extracts more direct and Media RSS images
+- 🎬 **Video Feed Polish** - Improved video extraction and timeline card presentation
+- 📱 **Mobile API Foundation** - Added cursor-paginated presentation endpoints for future LAN or self-hosted mobile clients
+- 🧩 **v0.2 Roadmap Complete** - Reading analytics ships in-app; the AI-assisted RSSHub browser tool lives in [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator)
 
 ---
 
@@ -42,7 +42,7 @@
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
-**Current Version: v0.1.7**
+**Current Version: v0.2.0**
 
 ## Key Features
 
@@ -68,30 +68,30 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 
 ## Interface Preview
 
-### v0.1.7 Highlights
+### Current UI Highlights
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/智能标签和简约日报功能.png" alt="Smart tags and digest upgrades" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Smart Tags + Digest Upgrades</figcaption>
+    <img src="images/v.0.1.9/MCP功能升级.png" alt="Dedicated MCP settings" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Dedicated MCP Settings</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧键功能增强支持自定义别名修改分组.png" alt="Sidebar action enhancements" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Sidebar Actions & Group Alias Enhancements</figcaption>
+    <img src="images/v.0.1.9/增加支持后台summary.png" alt="Background summary queue" style="width:440px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Background Summary Queue</figcaption>
   </figure>
 </div>
 
 <div align="center">
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧风格切换按钮.png" alt="Sidebar style switch button" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Sidebar Style Switch</figcaption>
+    <img src="images/v.0.1.9/支持单个订阅和分组的日报功能.png" alt="Scope summary and digest" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Scope Summary & Digest</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/左侧切换后风格.png" alt="Sidebar switched style" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Switched Sidebar Style</figcaption>
+    <img src="images/v.0.1.9/增加rsshub预选.png" alt="RSSHub preset selection" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>RSSHub Preset Selection</figcaption>
   </figure>
   <figure style="display:inline-block;margin:0 12px 18px;text-align:center;vertical-align:bottom;">
-    <img src="images/v0.1.7/通过新的字符串可以创建新的分组.png" alt="Create group by string" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
-    <figcaption>Create Group via String Shortcut</figcaption>
+    <img src="images/v.0.1.9/AI摘要支持makedown渲染.png" alt="Markdown summary rendering" style="width:280px;border-radius:12px;box-shadow:0 6px 24px rgba(15,17,21,.18);" />
+    <figcaption>Markdown Summary Rendering</figcaption>
   </figure>
 </div>
 
@@ -142,7 +142,7 @@ Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI tran
 ## Quick Start
 
 ### System Requirements
-- Node.js 18+
+- Node.js 22
 - pnpm 8+
 
 ### Installation and Running
@@ -183,6 +183,11 @@ Recommended (backend-node):
      ```
    - Then open the app again.
 
+**Update Limitation:**
+1. The current macOS build is still distributed as an unsigned app.
+2. Built-in version checking can work, but automatic in-place installation through ShipIt may fail signature validation.
+3. For macOS users, the recommended update path is still to download the latest `.dmg` or `.zip` from GitHub Releases manually.
+
 ### Performance
 **Q: The app is slow to start?**
 A: Check the backend service logs if possible. First launch may take longer to initialize the database.
@@ -215,7 +220,9 @@ git clone https://github.com/xiongsircool/aurora-rss-reader.git
 cd aurora-rss-reader
 docker-compose up -d
 
-# Access: http://localhost:8080
+# Access Web UI: http://localhost:8080
+# Access Backend API: http://localhost:15432/api
+# Access MCP Endpoint: http://localhost:15432/mcp
 ```
 
 For detailed Docker configuration, see [Docker README](docker/README.md).
@@ -231,13 +238,20 @@ chmod +x build-release-app.sh
 ```
 
 Generated files:
-- macOS: `AuroraRSSReader-Mac-0.1.7-{x64,arm64}.dmg`
-- Windows: `AuroraRSSReader-Windows-0.1.7-x64-Setup.exe`
-- Linux: `AuroraRSSReader-Linux-0.1.7-x64.AppImage`
+- macOS: `AuroraRSSReader-Mac-0.2.0.dmg`
+- Windows: `AuroraRSSReader-Windows-0.2.0-x64-Setup.exe`
+- Linux: `AuroraRSSReader-Linux-0.2.0-x64.AppImage`
+
+### Public Packaging Notes
+- Bump `rss-desktop/package.json` to the target release version before any public packaging or tagging.
+- Run the packaging preflight on `main` first with `workflow_dispatch`; this validates the build without creating a GitHub Release.
+- Only create the public tag after macOS, Windows, and Linux builds all pass.
+- Use a fresh tag such as `v0.2.0`; do not reuse an occupied release tag like `v0.1.9`.
+- Auto-update continues to work only after the public GitHub Release is created with installers and `latest*.yml`.
+- For the current unsigned macOS build, in-app version checking is available, but users should still update via GitHub Releases manually.
 
 ## 📋 Documentation | 文档
 
-- **[Update Details](UPDATE_README.md)** - Detailed update content | 详细更新内容
 - **[Chinese Version](README_ZH.md)** - Complete documentation in Chinese | 中文完整文档
 
 ## Tech Stack
@@ -274,11 +288,11 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 ## 🎯 Future Roadmap
 
 ### Short-term Plans (v0.2)
-- [ ] **Mobile Support** - Develop iOS and Android mobile applications
-- [ ] **AI labeling** - for every feed, we can use AI to label the feed by pre set labels.
-- [ ] **AI Daily Briefing** - Smart daily news summaries and personalized recommendations
+- [x] **AI Daily Briefing / Scope Summary** - Tag digest, feed/group scope summaries, automation and rerun flows are already available ✅
 - [x] **Podcast Support** - Support for audio podcast subscription and playback ✅
-- [ ] **Reading Analytics** - Personal reading habits analysis and data visualization
+- [x] **Reading Analytics** - Subscription totals, read rate, 30-day trends, top feeds, and tag visualizations are available ✅
+- [x] **RSSHub Support** - RSSHub URL configuration, mirror switching and RSSHub feed access are already supported ✅
+- [x] **Browser Extension** - AI-assisted RSSHub rule generation is available in the separate [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator) project ✅
 
 ### Mid-term Plans (v0.3)
 - [ ] **Data Synchronization** - Cross-device data sync and cloud backup
@@ -287,3 +301,47 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 ---
 
 Give it a ⭐ if you find it useful!
+## Changelog
+
+### v0.2.0 (Current Version)
+**Reading Analytics + Feed Reliability + Mobile API Foundation**
+
+- Added a localized reading statistics dashboard with totals, read rate, 30-day activity, top feeds, and top tags
+- Added local `read_at` tracking and an idempotent migration for existing databases
+- Improved feed validation, Media RSS image extraction, video URL extraction, and timeline video cards
+- Added cursor-paginated `/api/mobile` endpoints for future LAN or self-hosted mobile clients
+- Completed the v0.2 roadmap; the AI-assisted browser tool is maintained separately as [rsshub-rule-generator](https://github.com/xiongsircool/rsshub-rule-generator)
+
+### v0.1.9 (Previous Version)
+**Background Summary Queue + MCP Modernization + Docker Access**
+
+- Background summary queue can persist generated summaries locally and reuse them after restart
+- Added queue runtime status panel in settings for live inspection of summary jobs
+- MCP moved out of AI provider config into a dedicated settings section
+- MCP tool surface modernized with grouped recommended tools, deprecation hints and cursor-based search pagination
+- MCP time defaults now follow the app's current date range and time field settings
+- Docker deployment now exposes the backend directly on `15432` for local `/api` and `/mcp` access
+
+### v0.1.8 (Previous Version)
+**Published release baseline before the current packaging cycle**
+
+### v0.1.7
+**Digest Intelligence, Tag Workflow Polish & Update Experience**
+
+- Digest 2.0 with history, manual regenerate and locale-aligned language
+- Latest + Week digest modes
+- Analyze-all full pagination fix
+- Summary prompting quality upgrade
+- Manual update-check entry in settings
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=xiongsircool/aurora-rss-reader&type=Date)](https://www.star-history.com/#xiongsircool/aurora-rss-reader&Date)
+
+## Community
+
+If you want to discuss product ideas, report usage feedback, or join the user community, you can scan the QQ code below.
+
+<div align="center">
+  <img src="images/二维码/QQ537546690.jpeg" alt="Aurora RSS Reader QQ community" width="260" />
+</div>

@@ -1,7 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAIStore, type AIServiceKey } from '../stores/aiStore'
-import { getApiBaseUrl } from '../api/base'
 import type { LocalConfig } from './useSettingsModal'
 import type { ConfirmOptions } from './useConfirmDialog'
 
@@ -123,10 +122,6 @@ export function useAIConfigSettings(
     const rebuildingVectors = ref(false)
     const rebuildResult = ref<TestResult | null>(null)
 
-    // MCP testing state
-    const mcpTesting = ref(false)
-    const mcpTestResult = ref<TestResult | null>(null)
-
     async function rebuildVectors() {
         if (!localConfig.value.embedding.api_key) {
             rebuildResult.value = {
@@ -169,39 +164,6 @@ export function useAIConfigSettings(
         }
     }
 
-    async function testMcp() {
-        mcpTesting.value = true
-        mcpTestResult.value = null
-
-        try {
-            const apiBase = getApiBaseUrl()
-            const response = await fetch(`${apiBase}/health`)
-            const data = await response.json()
-            if (data?.status === 'ok' || data?.status === 'degraded') {
-                mcpTestResult.value = {
-                    success: true,
-                    message: 'MCP 服务连接正常'
-                }
-            } else {
-                mcpTestResult.value = {
-                    success: false,
-                    message: 'MCP 服务响应异常'
-                }
-            }
-        } catch (error) {
-            mcpTestResult.value = {
-                success: false,
-                message: 'MCP 服务连接失败'
-            }
-        } finally {
-            mcpTesting.value = false
-        }
-    }
-
-    function resetMcpTestResult() {
-        mcpTestResult.value = null
-    }
-
     return {
         globalTesting,
         globalTestResult,
@@ -212,10 +174,6 @@ export function useAIConfigSettings(
         resetTestResults,
         rebuildingVectors,
         rebuildResult,
-        rebuildVectors,
-        mcpTesting,
-        mcpTestResult,
-        testMcp,
-        resetMcpTestResult
+        rebuildVectors
     }
 }

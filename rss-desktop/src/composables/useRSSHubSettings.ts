@@ -6,10 +6,21 @@ export interface RSSHubTestResult {
     message: string
 }
 
+export interface RSSHubMirror {
+    name: string
+    base_url: string
+    priority: number
+    is_default?: boolean
+    is_current?: boolean
+    description: string
+}
+
 export function useRSSHubSettings() {
     const rsshubUrl = ref('https://rsshub.app')
     const isTestingRSSHub = ref(false)
     const rsshubTestResult = ref<RSSHubTestResult | null>(null)
+    const rsshubMirrors = ref<RSSHubMirror[]>([])
+    const rsshubMirrorsLoading = ref(false)
 
     async function fetchRSSHubUrl() {
         try {
@@ -17,6 +28,19 @@ export function useRSSHubSettings() {
             rsshubUrl.value = data.rsshub_url
         } catch (error) {
             console.error('获取RSSHub URL失败:', error)
+        }
+    }
+
+    async function fetchRSSHubMirrors() {
+        rsshubMirrorsLoading.value = true
+        try {
+            const { data } = await api.get<{ current: string; items: RSSHubMirror[] }>('/settings/rsshub-mirrors')
+            rsshubMirrors.value = (data.items || []).slice().sort((a, b) => a.priority - b.priority)
+        } catch (error) {
+            console.error('获取RSSHub镜像列表失败:', error)
+            rsshubMirrors.value = []
+        } finally {
+            rsshubMirrorsLoading.value = false
         }
     }
 
@@ -89,13 +113,22 @@ export function useRSSHubSettings() {
         rsshubTestResult.value = null
     }
 
+    function selectMirror(url: string) {
+        rsshubUrl.value = url
+        resetTestResult()
+    }
+
     return {
         rsshubUrl,
         isTestingRSSHub,
         rsshubTestResult,
+        rsshubMirrors,
+        rsshubMirrorsLoading,
         fetchRSSHubUrl,
+        fetchRSSHubMirrors,
         saveRSSHubUrl,
         testRSSHubConnection,
-        resetTestResult
+        resetTestResult,
+        selectMirror,
     }
 }

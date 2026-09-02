@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { useFeedStore } from '../stores/feedStore'
 import { useAIStore } from '../stores/aiStore'
@@ -13,28 +13,61 @@ import { useLanguage } from '../composables/useLanguage'
 import { useLayoutManager } from '../composables/useLayoutManager'
 import { useNotification } from '../composables/useNotification'
 import { useTheme } from '../composables/useTheme'
-import { useTitleTranslation } from '../composables/useTitleTranslation'
 import { useFeedFilter } from '../composables/useFeedFilter'
 import { useAppSync } from '../composables/useAppSync'
 import { useFeedActions } from '../composables/useFeedActions'
-import { useArticleTranslation } from '../composables/useArticleTranslation'
 import { useViewMode } from '../composables/useViewMode'
 import { useDetailsPanel } from '../composables/useDetailsPanel'
 import { useTimelineData } from '../composables/useTimelineData'
 import { useFeedManagement } from '../composables/useFeedManagement'
+import { useEntryAI } from '../composables/useEntryAI'
+import type { AutomationTarget } from '../composables/useSettingsModal'
 
-import Toast from '../components/Toast.vue'
-import ConfirmModal from '../components/common/ConfirmModal.vue'
-import SidebarPanel from '../components/sidebar/SidebarPanel.vue'
-import TimelinePanel from '../components/timeline/TimelinePanel.vue'
-import TimelineHeader from '../components/timeline/TimelineHeader.vue'
-import DigestView from '../components/tags/DigestView.vue'
-import DetailsPanel from '../components/details/DetailsPanel.vue'
 import type { Entry } from '../types'
 
-import { defineAsyncComponent } from 'vue'
-const SettingsModal = defineAsyncComponent(() => import('../components/SettingsModal.vue'))
-const AddToBookmarkGroupModal = defineAsyncComponent(() => import('../components/collections/AddToCollectionModal.vue'))
+const loadToast = () => import('../components/Toast.vue')
+const loadConfirmModal = () => import('../components/common/ConfirmModal.vue')
+const loadSidebarPanel = () => import('../components/sidebar/SidebarPanel.vue')
+const loadTimelinePanel = () => import('../components/timeline/TimelinePanel.vue')
+const loadTimelineHeader = () => import('../components/timeline/TimelineHeader.vue')
+const loadSettingsModal = () => import('../components/SettingsModal.vue')
+const loadAddToBookmarkGroupModal = () => import('../components/collections/AddToCollectionModal.vue')
+const loadDigestView = () => import('../components/tags/DigestView.vue')
+const loadScopeSummaryView = () => import('../components/summaries/ScopeSummaryView.vue')
+const loadDetailsPanel = () => import('../components/details/DetailsPanel.vue')
+
+const Toast = defineAsyncComponent(loadToast)
+const ConfirmModal = defineAsyncComponent(loadConfirmModal)
+const SidebarPanel = defineAsyncComponent(loadSidebarPanel)
+const TimelinePanel = defineAsyncComponent(loadTimelinePanel)
+const TimelineHeader = defineAsyncComponent(loadTimelineHeader)
+const SettingsModal = defineAsyncComponent(loadSettingsModal)
+const AddToBookmarkGroupModal = defineAsyncComponent(loadAddToBookmarkGroupModal)
+const DigestView = defineAsyncComponent(loadDigestView)
+const ScopeSummaryView = defineAsyncComponent(loadScopeSummaryView)
+const DetailsPanel = defineAsyncComponent(loadDetailsPanel)
+
+const prefetchedLoaders = new WeakMap<() => Promise<unknown>, Promise<unknown>>()
+
+function prefetchComponent(loader: () => Promise<unknown>) {
+  const existing = prefetchedLoaders.get(loader)
+  if (existing) return existing
+  const pending = loader().catch(() => undefined)
+  prefetchedLoaders.set(loader, pending)
+  return pending
+}
+
+function scheduleIdlePrefetch(loader: () => Promise<unknown>, timeout = 1200) {
+  if (typeof window === 'undefined') return
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number
+  }
+  if (typeof idleWindow.requestIdleCallback === 'function') {
+    idleWindow.requestIdleCallback(() => { void prefetchComponent(loader) }, { timeout })
+    return
+  }
+  window.setTimeout(() => { void prefetchComponent(loader) }, 300)
+}
 
 // === Stores ===
 const store = useFeedStore()
@@ -57,19 +90,6 @@ function readSavedDateRange(key: string): string | null {
 function writeSavedDateRange(key: string, value: string) {
   try { localStorage.setItem(key, value) } catch { /* ignore */ }
 }
-
-// === Title Translation ===
-const {
-  aiFeatures,
-  titleTranslationLanguageLabel,
-  getTranslatedTitle,
-  isTitleTranslationLoading,
-  isTitleTranslationFailed,
-  registerAutoRetryHandler,
-  queueAutoTitleTranslation,
-  requestTitleTranslation,
-  setupAutoTranslationWatcher,
-} = useTitleTranslation()
 
 // === Feed Filter ===
 const {
@@ -95,6 +115,9 @@ setupFilterWatchers()
 const subscriptionDateRange = ref('30d')
 const favoritesDateRange = ref('30d')
 const tagsDateRange = ref('30d')
+const compactTimelineFilterDensity = computed(
+  () => settingsStore.settings.timeline_filter_density === 'compact'
+)
 
 // === View Mode ===
 const selectedFavoriteEntryId = ref<string | null>(null)
@@ -204,14 +227,24 @@ async function handleClearTagCombo() {
 }
 
 // === Entry Selection ===
+// Store for digest/summary entry selection (entries from digest view that may not be in tagEntriesAsEntry)
+const selectedDigestEntry = ref<Entry | null>(null)
+
 const currentSelectedEntry = computed<Entry | null>(() => {
+  // Check digest entry first (e.g., when clicking citations in DigestView or ScopeSummaryView)
+  if (selectedDigestEntry.value) return selectedDigestEntry.value
+
   if (viewMode.value === 'collection') {
     if (!selectedUnifiedEntryId.value) return null
     return collectionEntriesAsEntry.value.find(e => e.id === selectedUnifiedEntryId.value) ?? null
   }
   if (viewMode.value === 'tag') {
     if (!selectedUnifiedEntryId.value) return null
-    return tagEntriesAsEntry.value.find(e => e.id === selectedUnifiedEntryId.value) ?? null
+    // First check tag timeline entries
+    const entry = tagEntriesAsEntry.value.find(e => e.id === selectedUnifiedEntryId.value) ?? null
+    if (entry) return entry
+    // Fallback: check feed store entries (e.g., entries from DigestView citations)
+    return store.selectedEntry?.id === selectedUnifiedEntryId.value ? store.selectedEntry : null
   }
   if (showFavoritesOnly.value) {
     return favoritesStore.starredEntries.find((entry) => entry.id === selectedFavoriteEntryId.value) ?? null
@@ -251,6 +284,11 @@ const {
 
 // Close details when switching view modes
 watch(viewMode, () => { isDetailsOpen.value = false })
+watch([viewMode, showFavoritesOnly], ([mode, favoritesOnly]) => {
+  if (mode !== 'feeds' || favoritesOnly) {
+    feedDetailMode.value = 'articles'
+  }
+})
 
 // === Timeline Data ===
 const {
@@ -316,8 +354,107 @@ const {
 const { showToast, toastMessage, toastType, showNotification } = useNotification()
 const { darkMode, toggleTheme, loadTheme } = useTheme()
 const showSettings = ref(false)
+const settingsInitialCategory = ref<'general' | 'display' | 'sync' | 'intelligence' | 'mcp'>('general')
+const settingsAutomationTarget = ref<AutomationTarget | null>(null)
+const feedDetailMode = ref<'articles' | 'summary'>('articles')
 const showBookmarkGroupModal = ref(false)
 const bookmarkGroupEntryId = ref<string | null>(null)
+
+function openGeneralSettings() {
+  void prefetchComponent(loadSettingsModal)
+  settingsInitialCategory.value = 'general'
+  settingsAutomationTarget.value = null
+  showSettings.value = true
+}
+
+function openTagSettings() {
+  void prefetchComponent(loadSettingsModal)
+  settingsInitialCategory.value = 'intelligence'
+  settingsAutomationTarget.value = null
+  showSettings.value = true
+}
+
+function openScopedAutomationSettings(target: AutomationTarget) {
+  void prefetchComponent(loadSettingsModal)
+  settingsInitialCategory.value = 'intelligence'
+  settingsAutomationTarget.value = target
+  showSettings.value = true
+}
+
+function closeSettingsModal() {
+  showSettings.value = false
+  settingsInitialCategory.value = 'general'
+  settingsAutomationTarget.value = null
+}
+
+function resolveQuickRerunWindow() {
+  const now = Date.now()
+  let range = isDateFilterActive.value ? dateRangeFilter.value : settingsStore.settings.default_date_range
+  if (!range || range === 'all') {
+    range = settingsStore.settings.default_date_range || '30d'
+  }
+
+  const day = 24 * 60 * 60 * 1000
+  const dayMap: Record<string, number> = {
+    '1d': 1,
+    '3d': 3,
+    '7d': 7,
+    '30d': 30,
+    '90d': 90,
+  }
+  const fallbackDays = 30
+  const days = dayMap[range] || fallbackDays
+  const from = new Date(now - days * day).toISOString()
+  const to = new Date(now).toISOString()
+  return { from, to, effectiveRange: range }
+}
+
+async function handleQuickRerunTagging(payload: { scope: 'feed' | 'tag' | 'group'; feedId?: string; tagId?: string; groupName?: string; label: string }) {
+  if (tagsStore.rerunTask.running) {
+    showNotification(t('tags.quickRerunRunning'), 'info')
+    return
+  }
+
+  const { from, to, effectiveRange } = resolveQuickRerunWindow()
+  let feedIds: string[] | undefined
+  if (payload.scope === 'feed' && payload.feedId) {
+    feedIds = [payload.feedId]
+  } else if (payload.scope === 'group' && payload.groupName !== undefined) {
+    feedIds = store.feeds
+      .filter((feed) => (feed.group_name || '') === payload.groupName && feed.ai_tagging_enabled !== 0)
+      .map((feed) => feed.id)
+  }
+
+  if (payload.scope === 'group' && (!feedIds || feedIds.length === 0)) {
+    showNotification(t('tags.quickRerunEmptyScope'), 'info')
+    return
+  }
+
+  showNotification(
+    t('tags.quickRerunStarted', { label: payload.label, range: effectiveRange }),
+    'info',
+  )
+
+  try {
+    const result = await tagsStore.runRangeRerunTask({
+      from,
+      to,
+      mode: 'missing',
+      limit: 100,
+      feedIds,
+    })
+    showNotification(
+      t('tags.quickRerunFinished', {
+        total: result.summary.total,
+        tagged: result.summary.tagged,
+      }),
+      'success',
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    showNotification(t('tags.quickRerunFailed', { error: message }), 'error')
+  }
+}
 
 // === Group collapse ===
 const collapsedGroups = computed<Record<string, boolean>>(() => {
@@ -352,96 +489,31 @@ watch(() => favoritesStore.error, (error) => {
   }
 })
 
-// === Summary & Full-text Translation ===
-const summaryText = ref('')
-const summaryLoading = ref(false)
-const translationLanguage = ref('zh')
-const lastVisibleEntries = ref<Entry[]>([])
-
-const cleanupTitleTranslationAutoRetry = registerAutoRetryHandler((entryId, language) => {
-  if (!aiFeatures.value?.auto_title_translation) return
-  const entry = lastVisibleEntries.value.find((item) => item.id === entryId)
-  if (!entry) return
-  queueAutoTitleTranslation(entry, language)
-})
-
-const currentEntryId = computed(() => currentSelectedEntry.value?.id ?? null)
-const currentEntryContent = computed(() => selectTranslationContent(currentSelectedEntry.value ?? null))
-
 const {
-  progress: fullTextTranslationProgress,
-  blocks: fullTextTranslationBlocks,
-  isTranslating: isFullTextTranslating,
-  showTranslation: showFullTextTranslation,
-  translatableBlocks: fullTextTranslatableBlocks,
-  getTranslation: getFullTextTranslation,
-  isBlockLoading: isFullTextBlockLoading,
-  isBlockFailed: isFullTextBlockFailed,
-  toggleTranslation: toggleFullTextTranslationRaw,
-} = useArticleTranslation(currentEntryId, currentEntryContent, translationLanguage)
-
-const translatedTitle = computed(() => {
-  if (!currentSelectedEntry.value) return null
-  return getTranslatedTitle(currentSelectedEntry.value.id, translationLanguage.value)
+  aiFeatures,
+  titleTranslationLanguageLabel,
+  translatedTitle,
+  translationLanguage,
+  summaryText,
+  summaryLoading,
+  fullTextTranslationProgress,
+  fullTextTranslationBlocks,
+  isFullTextTranslating,
+  showFullTextTranslation,
+  getFullTextTranslation,
+  isFullTextBlockLoading,
+  isFullTextBlockFailed,
+  getTranslatedTitle,
+  isTitleTranslationLoading,
+  isTitleTranslationFailed,
+  handleEntriesVisible,
+  handleFullTextTranslation,
+  handleSummary,
+  cleanup: cleanupEntryAI,
+} = useEntryAI(currentSelectedEntry, {
+  notify: showNotification,
+  t,
 })
-
-function getContentTextLength(html?: string | null): number {
-  if (!html) return 0
-  if (typeof DOMParser === 'undefined') {
-    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().length
-  }
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  return (doc.body?.textContent ?? '').replace(/\s+/g, ' ').trim().length
-}
-
-function selectTranslationContent(entry: Entry | null): string | null {
-  if (!entry) return null
-  const candidates = [
-    { value: entry.readability_content, priority: 3 },
-    { value: entry.content, priority: 2 },
-    { value: entry.summary, priority: 1 },
-  ]
-  let best: { value: string; length: number; priority: number } | null = null
-  for (const candidate of candidates) {
-    if (!candidate.value) continue
-    const length = getContentTextLength(candidate.value)
-    if (!best || length > best.length || (length === best.length && candidate.priority > best.priority)) {
-      best = { value: candidate.value, length, priority: candidate.priority }
-    }
-  }
-  if (best && best.length > 0) return best.value
-  return entry.readability_content ?? entry.content ?? entry.summary ?? null
-}
-
-async function handleFullTextTranslation() {
-  const wasShowing = showFullTextTranslation.value
-  toggleFullTextTranslationRaw()
-  if (!wasShowing && currentSelectedEntry.value) {
-    await nextTick()
-    if (fullTextTranslatableBlocks.value.length === 0) {
-      showNotification(t('toast.translationNoText'), 'info')
-    }
-    try {
-      await requestTitleTranslation(currentSelectedEntry.value.id, translationLanguage.value)
-    } catch (error) {
-      console.warn('Title translation failed:', error)
-    }
-  }
-}
-
-async function handleSummary() {
-  if (!currentSelectedEntry.value) return
-  summaryLoading.value = true
-  try {
-    const summary = await store.requestSummary(currentSelectedEntry.value.id)
-    summaryText.value = summary.summary
-    showNotification(t('toast.summarySuccess'), 'success')
-  } catch {
-    showNotification(t('toast.summaryFailed'), 'error')
-  } finally {
-    summaryLoading.value = false
-  }
-}
 
 // === Favorites ===
 async function loadFavoritesData(options: { includeEntries?: boolean; feedId?: string | null } = {}) {
@@ -536,6 +608,7 @@ async function selectFavoriteFeed(feedId: string | null) {
 }
 
 function backToAllFeeds() {
+  feedDetailMode.value = 'articles'
   if (viewMode.value === 'collection' || viewMode.value === 'tag') {
     viewMode.value = 'feeds'
     activeCollectionId.value = null
@@ -570,12 +643,15 @@ async function toggleStarFromList(entry: Entry) {
 }
 
 function handleAddToBookmarkGroup(entry: Entry) {
+  void prefetchComponent(loadAddToBookmarkGroupModal)
   bookmarkGroupEntryId.value = entry.id
   showBookmarkGroupModal.value = true
 }
 
 async function handleToggleReadFromList(entry: Entry) {
-  await store.toggleEntryState(entry, { read: !entry.read })
+  const newReadState = !entry.read
+  await store.toggleEntryState(entry, { read: newReadState })
+  tagsStore.updateEntryState(entry.id, { read: newReadState })
 }
 
 function handleCopyLink(entry: Entry) {
@@ -632,66 +708,78 @@ async function handleGroupRowClick(groupName: string) {
   await store.fetchEntries({ groupName })
 }
 
+const currentScopeSummaryTarget = computed<{ scope_type: 'feed' | 'group'; scope_id: string; label: string } | null>(() => {
+  if (viewMode.value !== 'feeds' || showFavoritesOnly.value) return null
+  if (store.activeFeedId) {
+    const feed = store.feeds.find((item) => item.id === store.activeFeedId)
+    if (!feed) return null
+    return {
+      scope_type: 'feed',
+      scope_id: feed.id,
+      label: feed.custom_title || feed.title || feed.url,
+    }
+  }
+  if (store.activeGroupName) {
+    return {
+      scope_type: 'group',
+      scope_id: store.activeGroupName,
+      label: store.activeGroupName,
+    }
+  }
+  return null
+})
+
+watch(currentScopeSummaryTarget, (target) => {
+  if (!target) {
+    feedDetailMode.value = 'articles'
+    return
+  }
+  void prefetchComponent(loadScopeSummaryView)
+})
+
+watch(() => activeTagView.value, (value) => {
+  if (value === 'digest') {
+    void prefetchComponent(loadDigestView)
+  }
+})
+
+watch(() => showSettings.value, (value) => {
+  if (value) {
+    void prefetchComponent(loadSettingsModal)
+  }
+})
+
+watch(() => currentSelectedEntry.value?.id ?? null, (entryId) => {
+  if (entryId) {
+    void prefetchComponent(loadDetailsPanel)
+  }
+})
+
+function handleToggleFeedDetailMode(mode: 'articles' | 'summary') {
+  feedDetailMode.value = mode
+}
+
+async function handleScopeSummaryEntrySelect(entryId: string) {
+  // 直接选择文章并在右侧显示详情，不切换视图模式
+  store.selectEntry(entryId)
+  void prefetchComponent(loadDetailsPanel)
+  openDetails()
+}
+
 // === Entry selection & visible entries ===
 function handleEntrySelect(entryId: string) {
   if (viewMode.value === 'collection' || viewMode.value === 'tag') {
     selectedUnifiedEntryId.value = entryId
+    // Also select in feedStore so currentSelectedEntry can find it as fallback
+    store.selectEntry(entryId)
   } else if (showFavoritesOnly.value) {
     selectedFavoriteEntryId.value = entryId
   } else {
     store.selectEntry(entryId)
   }
+  void prefetchComponent(loadDetailsPanel)
   openDetails()
 }
-
-function handleEntriesVisible(entries: Entry[]) {
-  lastVisibleEntries.value = entries
-  entries.forEach((entry) => queueAutoTitleTranslation(entry))
-}
-
-// === Auto-translation watchers ===
-watch(
-  () => [aiFeatures.value?.auto_title_translation, aiFeatures.value?.translation_language],
-  ([autoEnabled]) => {
-    if (!autoEnabled || !lastVisibleEntries.value.length) return
-    lastVisibleEntries.value.forEach((entry) => queueAutoTitleTranslation(entry))
-  },
-)
-
-// === Entry change watchers ===
-watch(
-  () => currentSelectedEntry.value,
-  async (entry) => {
-    if (!entry) { summaryText.value = ''; return }
-    const cached = store.summaryCache[entry.id]
-    summaryText.value = cached?.summary ?? ''
-    if (aiFeatures.value?.auto_summary && !cached?.summary) {
-      try {
-        summaryLoading.value = true
-        const summary = await store.requestSummary(entry.id)
-        summaryText.value = summary.summary
-      } catch (error) {
-        console.error('Auto summary failed:', error)
-      } finally {
-        summaryLoading.value = false
-      }
-    }
-    if (!entry.read) await store.toggleEntryState(entry, { read: true })
-  },
-  { immediate: true },
-)
-
-watch(
-  () => translationLanguage.value,
-  async (newLang, oldLang) => {
-    if (newLang === oldLang || !currentSelectedEntry.value || !showFullTextTranslation.value) return
-    try {
-      await requestTitleTranslation(currentSelectedEntry.value.id, newLang)
-    } catch (error) {
-      console.warn('Title translation failed:', error)
-    }
-  },
-)
 
 // === App Sync ===
 const { initSync, cleanupSync } = useAppSync(
@@ -699,7 +787,6 @@ const { initSync, cleanupSync } = useAppSync(
   async () => { await loadFavoritesData() },
   dateRangeFilter,
 )
-setupAutoTranslationWatcher()
 
 // === Lifecycle ===
 onMounted(async () => {
@@ -709,7 +796,10 @@ onMounted(async () => {
   store.loadCustomGroups()
   try { await settingsStore.fetchSettings() } catch { /* continue with defaults */ }
   await loadLanguage()
-  await aiStore.fetchConfig()
+  await Promise.all([
+    aiStore.fetchConfig(),
+    aiStore.fetchAutomationRules(),
+  ])
 
   const defaultRange = settingsStore.settings.default_date_range
   subscriptionDateRange.value = readSavedDateRange(SUBSCRIPTION_DATE_RANGE_KEY) || defaultRange
@@ -728,6 +818,9 @@ onMounted(async () => {
   tagsStore.fetchTags()
   tagsStore.fetchStats()
   initSync()
+
+  scheduleIdlePrefetch(loadSettingsModal)
+  scheduleIdlePrefetch(loadDetailsPanel)
 })
 
 onMounted(() => {
@@ -735,7 +828,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  cleanupTitleTranslationAutoRetry()
+  cleanupEntryAI()
   cleanupLayout()
   cleanupSync()
   unlockBodyScroll()
@@ -762,7 +855,10 @@ onUnmounted(() => {
   />
   <SettingsModal
     :show="showSettings"
-    @close="showSettings = false"
+    :initial-category="settingsInitialCategory"
+    :initial-automation-target="settingsAutomationTarget"
+    @notify="showNotification"
+    @close="closeSettingsModal"
   />
   <AddToBookmarkGroupModal
     v-if="bookmarkGroupEntryId"
@@ -793,7 +889,7 @@ onUnmounted(() => {
       :is-date-filter-active="isDateFilterActive"
       :time-filter-label="timeFilterLabel"
       @toggle-theme="toggleTheme"
-      @open-settings="showSettings = true"
+      @open-settings="openGeneralSettings"
       @reset-layout="resetLayout"
       @add-feed="handleAddFeed"
       @export-opml="handleExportOpml"
@@ -805,7 +901,7 @@ onUnmounted(() => {
       @toggle-tags="handleToggleTags"
       @select-tag="handleSelectTag"
       @select-tag-view="handleSelectTagView"
-      @open-tag-settings="showSettings = true"
+      @open-tag-settings="openTagSettings"
       @group-click="handleGroupClick"
       @toggle-collapse="toggleGroupCollapse"
       @group-row-click="handleGroupRowClick"
@@ -823,6 +919,8 @@ onUnmounted(() => {
       @change-view-type="handleChangeViewType"
       @move-to-group="handleMoveToGroup"
       @set-custom-title="handleSetCustomTitle"
+      @quick-rerun-tagging="handleQuickRerunTagging"
+      @open-automation-settings="openScopedAutomationSettings"
     />
 
     <div
@@ -832,10 +930,26 @@ onUnmounted(() => {
       :title="t('layout.leftResizeTitle')"
     ></div>
 
+    <template v-if="currentScopeSummaryTarget && feedDetailMode === 'summary'">
+      <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden">
+        <div class="flex-1 overflow-y-auto" :class="compactTimelineFilterDensity ? 'p-3 pt-2' : 'p-4'">
+          <ScopeSummaryView
+            :scope-type="currentScopeSummaryTarget.scope_type"
+            :scope-id="currentScopeSummaryTarget.scope_id"
+            :scope-label="currentScopeSummaryTarget.label"
+            @back="handleToggleFeedDetailMode('articles')"
+            @select-entry="handleScopeSummaryEntrySelect"
+            @notify="showNotification"
+          />
+        </div>
+      </main>
+    </template>
+
     <!-- Digest view (tag mode: 今日/本周 简报) -->
-    <template v-if="viewMode === 'tag' && activeTagView === 'digest'">
+    <template v-else-if="viewMode === 'tag' && activeTagView === 'digest'">
       <main class="flex flex-col border-r border-[var(--border-color)] bg-[var(--bg-base)] flex-1 min-w-260px w-auto box-border max-h-screen min-h-0 overflow-hidden">
         <TimelineHeader
+          v-if="!compactTimelineFilterDensity"
           :title="timelineTitle"
           :subtitle="timelineSubtitle"
           :show-favorites-only="false"
@@ -843,7 +957,7 @@ onUnmounted(() => {
           @refresh="reloadFeeds"
           @back-to-feeds="backToAllFeeds"
         />
-        <div class="flex-1 overflow-y-auto p-4">
+        <div class="flex-1 overflow-y-auto" :class="compactTimelineFilterDensity ? 'p-3 pt-2' : 'p-4'">
           <DigestView
             @select-entry="handleEntrySelect"
             @select-tag="handleSelectTag"
@@ -858,6 +972,8 @@ onUnmounted(() => {
       :subtitle="timelineSubtitle"
       :show-favorites-only="showFavoritesOnly"
       :view-mode="viewMode"
+      :scope-summary-target="currentScopeSummaryTarget"
+      :scope-summary-active="feedDetailMode === 'summary'"
       :active-tag-id="activeTagId"
       :active-tag-name="tagsStore.selectedTag?.name || undefined"
       :active-tag-view="activeTagView"
@@ -876,6 +992,7 @@ onUnmounted(() => {
       :date-range-filter="dateRangeFilter"
       :filter-loading="filterLoading"
       :enable-date-filter="settingsStore.settings.enable_date_filter"
+      :filter-density="settingsStore.settings.timeline_filter_density"
       :entries="unifiedEntries"
       :loading="unifiedLoading"
       :has-more="timelineHasMore"
@@ -909,6 +1026,7 @@ onUnmounted(() => {
       @ai-search="handleAISearch"
       @apply-tag-combo="handleApplyTagCombo"
       @clear-tag-combo="handleClearTagCombo"
+      @toggle-scope-summary="handleToggleFeedDetailMode"
     />
 
     <div

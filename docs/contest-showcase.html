@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aurora RSS Reader | 比赛展示PPT页</title>
+    <style>
+      :root {
+        --bg: #f3ede6;
+        --paper: rgba(255, 252, 248, 0.96);
+        --paper-strong: #fffdfa;
+        --ink: #1f1413;
+        --muted: #6a5953;
+        --wine: #9c1f36;
+        --wine-deep: #6f1324;
+        --gold: #c9964a;
+        --gold-soft: rgba(201, 150, 74, 0.18);
+        --line: rgba(126, 38, 56, 0.12);
+        --line-strong: rgba(126, 38, 56, 0.18);
+        --shadow: 0 28px 72px rgba(102, 30, 43, 0.13);
+        --shadow-soft: 0 16px 34px rgba(102, 30, 43, 0.08);
+        --slide-width: min(1280px, calc(100vw - 52px), calc((100vh - 28px) * 16 / 9));
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at left top, rgba(201, 150, 74, 0.14), transparent 26%),
+          radial-gradient(circle at right top, rgba(156, 31, 54, 0.1), transparent 22%),
+          linear-gradient(180deg, #f4efe8 0%, #f8f3ee 100%);
+        font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(156, 31, 54, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(156, 31, 54, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 88%);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      .nav {
+        position: fixed;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: grid;
+        gap: 10px;
+        z-index: 30;
+        padding: 10px 8px;
+        border-radius: 999px;
+        background: rgba(255, 251, 248, 0.72);
+        border: 1px solid rgba(156, 31, 54, 0.1);
+        backdrop-filter: blur(14px);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .nav a {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(156, 31, 54, 0.2);
+        border: 1px solid rgba(156, 31, 54, 0.12);
+        transition: transform 180ms ease, background 180ms ease;
+      }
+
+      .nav a:hover {
+        transform: scale(1.14);
+        background: rgba(156, 31, 54, 0.56);
+      }
+
+      .deck {
+        width: var(--slide-width);
+        margin: 14px auto 28px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .slide {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        height: calc(var(--slide-width) * 9 / 16);
+        min-height: 0;
+        overflow: hidden;
+        border-radius: 32px;
+        background:
+          radial-gradient(circle at 14% 12%, rgba(255, 222, 204, 0.54), transparent 22%),
+          radial-gradient(circle at 86% 12%, rgba(255, 226, 238, 0.42), transparent 18%),
+          linear-gradient(180deg, rgba(255, 251, 248, 0.99), rgba(255, 247, 242, 0.985));
+        border: 1px solid rgba(156, 31, 54, 0.11);
+        box-shadow: var(--shadow);
+        padding: 24px 26px 22px;
+      }
+
+      .slide::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.46), transparent 24%),
+          radial-gradient(circle at 85% 0%, rgba(201, 150, 74, 0.08), transparent 20%);
+        pointer-events: none;
+      }
+
+      .slide::after {
+        content: "";
+        position: absolute;
+        inset: 14px;
+        border-radius: 24px;
+        border: 1px solid rgba(156, 31, 54, 0.08);
+        pointer-events: none;
+      }
+
+      .slide-top {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 0;
+      }
+
+      .brand img {
+        width: 58px;
+        height: 58px;
+        object-fit: contain;
+        border-radius: 16px;
+        background: white;
+        padding: 4px;
+        box-shadow: 0 10px 28px rgba(156, 31, 54, 0.12);
+      }
+
+      .brand .meta strong,
+      .title,
+      .cover-title,
+      .big-number,
+      .quote {
+        font-family: "Iowan Old Style", "Palatino Linotype", "Songti SC", serif;
+      }
+
+      .brand .meta strong {
+        display: block;
+        font-size: 0.98rem;
+        letter-spacing: 0.02em;
+      }
+
+      .brand .meta span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
+
+      .page {
+        color: var(--wine);
+        letter-spacing: 0.08em;
+        font-size: 0.9rem;
+        min-height: 36px;
+        padding: 0 14px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        background: rgba(156, 31, 54, 0.06);
+        border: 1px solid rgba(156, 31, 54, 0.1);
+      }
+
+      .kicker,
+      .label {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 34px;
+        padding: 0 14px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, rgba(156, 31, 54, 0.08), rgba(201, 150, 74, 0.08));
+        color: var(--wine);
+        font-size: 0.82rem;
+        border: 1px solid rgba(156, 31, 54, 0.08);
+      }
+
+      .kicker::before,
+      .label::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--wine), var(--gold));
+      }
+
+      .title-block {
+        position: relative;
+        z-index: 1;
+        margin-bottom: 16px;
+      }
+
+      .title {
+        margin: 10px 0 8px;
+        font-size: clamp(1.72rem, 3.2vw, 2.8rem);
+        line-height: 1.04;
+        letter-spacing: -0.04em;
+        max-width: 15ch;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.62;
+        max-width: 66ch;
+      }
+
+      .cover-layout,
+      .split-layout,
+      .grid-2,
+      .grid-3,
+      .grid-4,
+      .outline-grid,
+      .intro-grid,
+      .intro-points,
+      .problem-bottom {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        gap: 20px;
+      }
+
+      .cover-layout {
+        grid-template-columns: 0.8fr 1.2fr;
+        height: calc(100% - 96px);
+        align-items: stretch;
+      }
+
+      .split-layout {
+        grid-template-columns: 1.04fr 0.96fr;
+        height: calc(100% - 108px);
+        align-items: stretch;
+      }
+
+      .grid-2 {
+        grid-template-columns: 1.08fr 0.92fr;
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .outline-grid {
+        grid-template-columns: 0.96fr 1.04fr;
+        height: calc(100% - 108px);
+        align-items: stretch;
+      }
+
+      .intro-grid {
+        grid-template-columns: 0.9fr 1.1fr;
+        height: calc(100% - 96px);
+        align-items: stretch;
+      }
+
+      .intro-points {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        align-content: start;
+      }
+
+      .problem-bottom {
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 14px;
+      }
+
+      .card,
+      .shot,
+      .stat,
+      .quote-panel,
+      .outline-panel,
+      .timeline-item {
+        border-radius: 26px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow-soft);
+        position: relative;
+      }
+
+      .card::before,
+      .shot::before,
+      .stat::before,
+      .outline-panel::before,
+      .timeline-item::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        height: 4px;
+        border-radius: 26px 26px 0 0;
+        background: linear-gradient(90deg, rgba(156, 31, 54, 0.9), rgba(201, 150, 74, 0.72));
+        opacity: 0.8;
+      }
+
+      .card,
+      .outline-panel {
+        padding: 20px;
+      }
+
+      .card h3,
+      .shot h3,
+      .stat h3,
+      .outline-panel h3,
+      .timeline-item h3 {
+        margin: 10px 0 6px;
+        font-size: 1rem;
+        line-height: 1.28;
+      }
+
+      .card p,
+      .shot p,
+      .stat p,
+      .outline-panel p,
+      .timeline-item p,
+      li {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.52;
+        font-size: 0.84rem;
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      .stat {
+        padding: 16px 16px 18px;
+        min-height: 126px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .big-number {
+        font-size: 2.3rem;
+        line-height: 0.96;
+        color: var(--wine-deep);
+        letter-spacing: -0.05em;
+      }
+
+      .cover-title {
+        margin: 12px 0 12px;
+        font-size: clamp(2.6rem, 4.7vw, 4.8rem);
+        line-height: 0.95;
+        letter-spacing: -0.06em;
+        max-width: 8.5ch;
+      }
+
+      .shot {
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .image-box {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 20px;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(252, 248, 244, 0.98), rgba(248, 241, 236, 0.98));
+        border: 1px solid rgba(156, 31, 54, 0.08);
+        padding: 4px;
+      }
+
+      .image-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        object-position: center;
+      }
+
+      .stack {
+        display: grid;
+        gap: 20px;
+        min-height: 0;
+      }
+
+      .bullet-list {
+        margin: 12px 0 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .quote-panel {
+        padding: 24px;
+        background: linear-gradient(135deg, rgba(111, 19, 36, 0.98), rgba(156, 31, 54, 0.93) 58%, rgba(201, 150, 74, 0.8));
+        color: #fff8f2;
+        box-shadow: 0 24px 48px rgba(111, 19, 36, 0.18);
+      }
+
+      .quote-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 26%);
+        pointer-events: none;
+      }
+
+      .quote {
+        margin: 0 0 12px;
+        font-size: clamp(1.58rem, 2.55vw, 2.35rem);
+        line-height: 1.1;
+        letter-spacing: -0.04em;
+      }
+
+      .quote-panel p,
+      .quote-panel li {
+        color: rgba(255, 248, 242, 0.94);
+      }
+
+      .outline-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .timeline-item {
+        padding: 20px 20px 20px 18px;
+        display: grid;
+        grid-template-columns: 48px 1fr;
+        gap: 14px;
+        align-items: start;
+      }
+
+      .timeline-item .index {
+        width: 48px;
+        height: 48px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(180deg, rgba(156, 31, 54, 0.12), rgba(201, 150, 74, 0.1));
+        color: var(--wine);
+        font-weight: 700;
+        box-shadow: inset 0 0 0 1px rgba(156, 31, 54, 0.08);
+      }
+
+      .footer-layout {
+        display: grid;
+        grid-template-columns: 1.06fr 0.94fr;
+        gap: 20px;
+        height: calc(100% - 138px);
+      }
+
+      .repo {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 999px;
+        background: rgba(156, 31, 54, 0.08);
+        color: var(--wine);
+        width: fit-content;
+        margin-top: 18px;
+        border: 1px solid rgba(156, 31, 54, 0.1);
+      }
+
+      .note {
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      @media (max-width: 1100px) {
+        :root {
+          --slide-width: calc(100vw - 18px);
+        }
+
+        .slide {
+          aspect-ratio: auto;
+          height: auto;
+          min-height: auto;
+        }
+
+        .cover-layout,
+        .split-layout,
+        .outline-grid,
+        .intro-grid,
+        .intro-points,
+        .problem-bottom,
+        .footer-layout,
+        .grid-2,
+        .grid-3,
+        .grid-4,
+        .stat-grid {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+
+        .nav {
+          display: none;
+        }
+      }
+
+      @media print {
+        @page {
+          size: 16in 9in;
+          margin: 0;
+        }
+
+        body {
+          background: white;
+        }
+
+        body::before,
+        .nav {
+          display: none;
+        }
+
+        .deck {
+          width: 100%;
+          margin: 0;
+          gap: 0;
+        }
+
+        .slide {
+          width: 100%;
+          height: 100vh;
+          min-height: 0;
+          border-radius: 0;
+          box-shadow: none;
+          page-break-after: always;
+          break-after: page;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="nav" aria-label="Slide navigation">
+      <a href="#s1"></a>
+      <a href="#s2"></a>
+      <a href="#s3"></a>
+      <a href="#s4"></a>
+      <a href="#s5"></a>
+      <a href="#s6"></a>
+      <a href="#s7"></a>
+    </nav>
+
+    <main class="deck">
+      <section class="slide" id="s1">
+        <div class="slide-top">
+          <div class="brand">
+            <img src="../images/学校log.webp" alt="华东师范大学校徽" />
+            <div class="meta">
+              <strong>华东师范大学第三届全民数字素养与人工智能创新应用大赛</strong>
+              <span>Aurora RSS Reader · AI 驱动的个人信息管理与智能阅读平台</span>
+            </div>
+          </div>
+          <div class="page">01 / 封面</div>
+        </div>
+
+        <div class="cover-layout">
+          <div>
+            <span class="kicker">数字素养 × 人工智能创新应用</span>
+            <h1 class="cover-title">Aurora RSS Reader</h1>
+            <p class="subtitle">
+              面向学习、科研、技术追踪与知识管理场景，提供信息聚合、AI 理解与智能体协同的一体化桌面工作台。
+            </p>
+            <div class="stat-grid" style="margin-top: 14px;">
+              <article class="stat">
+                <span class="label">开源基础</span>
+                <div class="big-number">82</div>
+                <p>GitHub Star，持续迭代中。</p>
+              </article>
+              <article class="stat">
+                <span class="label">产品定位</span>
+                <div class="big-number">AI RSS</div>
+                <p>从阅读器升级为信息平台。</p>
+              </article>
+              <article class="stat">
+                <span class="label">平台支持</span>
+                <div class="big-number">3 端</div>
+                <p>覆盖 Windows、macOS、Linux。</p>
+              </article>
+              <article class="stat">
+                <span class="label">核心创新</span>
+                <div class="big-number">MCP</div>
+                <p>支持与智能体协同工作。</p>
+              </article>
+            </div>
+          </div>
+
+          <article class="shot">
+            <div class="image-box">
+              <img src="../images/整体UI进行美化.png" alt="Aurora RSS Reader 总览界面" />
+            </div>
+            <h3>产品整体界面</h3>
+            <p>在桌面端完成聚合、阅读、摘要、翻译与自动化配置的闭环。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="slide" id="s2">
+        <div class="slide-top">
+          <div class="brand">
+            <img src="../images/学校log.webp" alt="华东师范大学校徽" />
+            <div class="meta">
+              <strong>项目整体介绍</strong>
+              <span>Aurora RSS Reader · AI 驱动的个人信息管理与智能阅读平台</span>
+            </div>
+          </div>
+          <div class="page">02 / 项目介绍</div>
+        </div>
+
+        <div class="intro-grid">
+          <article class="outline-panel">
+            <span class="kicker">项目概述</span>
+            <h2 class="title">Aurora RSS Reader 的整体能力</h2>
+            <p class="subtitle">Aurora RSS Reader 面向高频信息获取场景，围绕聚合、理解、整理与自动化构建完整能力体系。</p>
+          </article>
+
+          <div class="intro-points">
+            <div class="timeline-item">
+              <div class="index">1</div>
+              <div>
+                <h3>信息聚合</h3>
+                <p>统一接入博客、资讯站点与媒体内容。</p>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="index">2</div>
+              <div>
+                <h3>内容理解</h3>
+                <p>通过 AI 摘要与 AI 翻译降低阅读成本。</p>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="index">3</div>
+              <div>
+                <h3>知识整理</h3>
+                <p>通过搜索、收藏、分组和日报沉淀内容。</p>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="index">4</div>
+              <div>
+                <h3>持续处理</h3>
+                <p>后台摘要队列与日报机制提升效率。</p>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="index">5</div>
+              <div>
+                <h3>智能体协同</h3>
+                <p>通过 MCP 工具集合支持外部智能体联动。</p>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="index">6</div>
+              <div>
+                <h3>技术实现</h3>
+                <p>基于 Electron、Vue 3、Fastify 与 SQLite 构建。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" id="s3">
+        <div class="slide-top">
+          <div class="brand">
+            <img src="../images/学校log.webp" alt="华东师范大学校徽" />
+            <div class="meta">
+              <strong>项目背景与痛点</strong>
+              <span>为什么需要这样一款产品</span>
+            </div>
+          </div>
+          <div class="page">03 / 问题定义</div>
+        </div>
+
+        <div class="title-block">
+          <span class="kicker">项目出发点</span>
+          <h2 class="title">信息分散、内容过载与处理成本高，是数字阅读中的核心问题</h2>
+          <p class="subtitle">Aurora RSS Reader 重点解决多源内容统一获取、快速理解与持续整理的问题。</p>
+        </div>
+
+        <div class="grid-3">
+          <article class="card">
+            <span class="label">痛点一</span>
+            <h3>信息来源分散</h3>
+            <p>博客、资讯站点与媒体内容分散在多个入口，切换成本高。</p>
+          </article>
+          <article class="card">
+            <span class="label">痛点二</span>
+            <h3>内容过载难消化</h3>
+            <p>更新快、篇幅长、语言多样，用户难以快速判断阅读重点。</p>
+          </article>
+          <article class="card">
+            <span class="label">痛点三</span>
+            <h3>缺少自动化支撑</h3>
+            <p>传统工具偏重展示，难以完成摘要、筛选和整理等后续处理。</p>
+          </article>
+        </div>
+
+        <div class="problem-bottom" style="margin-top: 16px;">
+          <article class="card">
+            <span class="label">目标用户</span>
+            <h3>适用人群</h3>
+            <p>适用于学生、研究者、开发者及长期进行信息跟踪与知识整理的个人用户。</p>
+          </article>
+          <article class="quote-panel">
+            <p class="quote">项目目标是让用户更高效地获取信息、理解信息并管理信息。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="slide" id="s4">
+        <div class="slide-top">
+          <div class="brand">
+            <img src="../images/学校log.webp" alt="华东师范大学校徽" />
+            <div class="meta">
+              <strong>解决方案与核心功能</strong>
+              <span>从阅读器升级为智能信息平台</span>
+            </div>
+          </div>
+          <div class="page">04 / 解决方案</div>
+        </div>
+
+        <div class="split-layout">
+          <article class="shot">
+            <div class="image-box">
+              <img src="../images/appimages/自动翻译和自动摘要示意图.png" alt="自动翻译和自动摘要示意图" />
+            </div>
+            <h3>AI 辅助阅读主界面</h3>
+            <p>将内容聚合、阅读、翻译和摘要提炼直接整合在同一工作台中，让用户更快理解文章重点。</p>
+          </article>
+
+          <div class="stack">
+            <div class="grid-4">
+              <article class="card">
+                <span class="label">信息组织</span>
+                <h3>订阅分组与收藏</h3>
+                <p>支持订阅分组、收藏管理和结构化组织，让多源内容更易梳理。</p>
+              </article>
+              <article class="card">
+                <span class="label">快速定位</span>
+                <h3>全文搜索与时间过滤</h3>
+                <p>帮助用户在大量内容中快速定位真正有价值的信息。</p>
+              </article>
+              <article class="card">
+                <span class="label">AI 理解</span>
+                <h3>文章摘要与全文翻译</h3>
+                <p>降低长文与多语种内容门槛，让信息处理更高效。</p>
+              </article>
+              <article class="card">
+                <span class="label">持续积累</span>
+                <h3>日报与本地数据沉淀</h3>
+                <p>让高频内容形成可回顾、可积累、可复用的知识资产。</p>
+              </article>
+            </div>
+            <article class="card">
+              <span class="label">产品定位</span>
+              <h3>不是简单的 RSS 阅读器，而是个人信息处理工作台</h3>
+              <p>项目围绕聚合阅读、内容理解、信息整理与自动化管理构建完整闭环。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" id="s5">
+        <div class="slide-top">
+          <div class="brand">
+            <img src="../images/学校log.webp" alt="华东师范大学校徽" />
+            <div class="meta">
+              <strong>AI 能力与产品特性</strong>
+              <span>Aurora RSS Reader · 摘要、翻译、后台处理与日报能力</span>
+            </div>
+          </div>
+          <div class="page">05 / AI能力</div>
+        </div>
+
+        <div class="grid-2" style="height: calc(100% - 132px); align-items: stretch;">
+          <div class="stack">
+            <article class="shot" style="min-height: 0;">
+              <div class="image-box">
+                <img src="../images/v.0.1.9/增加支持后台summary.png" alt="后台摘要队列界面" />
+              </div>
+              <h3>后台摘要队列</h3>
+              <p>支持未读文章进入本地摘要队列，后台持续处理并保留结果。</p>
+            </article>
+            <article class="shot" style="min-height: 0;">
+              <div class="image-box">
+                <img src="../images/v.0.1.9/支持单个订阅和分组的日报功能.png" alt="单订阅与分组日报功能" />
+              </div>
+              <h3>订阅与分组日报</h3>
+              <p>将高频更新内容压缩为结构化日报，便于快速浏览与回顾。</p>
+            </article>
+          </div>
+
+          <div class="stack">
+            <article class="quote-panel">
+              <p class="quote">AI 能力被直接嵌入阅读流程，用于提炼重点、降低理解门槛并提升持续使用效率。</p>
+            </article>
+            <article class="card">
+              <span class="label">AI 价值</span>
+              <h3>把用户从“耗时阅读”中解放出来</h3>
+              <ul class="bullet-list">
+                <li>自动摘要：先看重点，再决定是否深读</li>
+                <li>全文翻译：降低多语种内容阅读门槛</li>
+                <li>后台队列：让 AI 处理从即时交互变成持续服务</li>
+                <li>日报生成：把零散更新转化为结构化输出</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" id="s6">
+        <div class="slide-top">
+          <div class="brand">
+            <img src="../images/学校log.webp" alt="华东师范大学校徽" />
+            <div class="meta">
+              <strong>MCP 协同与技术实现</strong>
+              <span>Aurora RSS Reader · 可扩展的信息处理基础设施</span>
+            </div>
+          </div>
+          <div class="page">06 / MCP协同</div>
+        </div>
+
+        <div class="split-layout">
+          <div class="stack">
+            <article class="quote-panel">
+              <p class="quote">Aurora RSS Reader 同时面向用户使用与智能体调用，兼具产品属性与平台属性。</p>
+              <p>通过 MCP 工具集合，项目可将订阅管理、检索、摘要与标签分析能力提供给智能体调用。</p>
+            </article>
+            <article class="card">
+              <span class="label">技术底座</span>
+              <h3>Electron + Vue 3 + Fastify + SQLite</h3>
+              <p>桌面端体验、跨平台分发与本地数据积累能力兼顾。</p>
+              <ul class="bullet-list">
+                <li>本地数据存储确保内容可持续积累</li>
+                <li>前后端解耦，便于扩展 AI 与 MCP 功能</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="stack">
+            <article class="shot" style="min-height: 0;">
+              <div class="image-box">
+                <img src="../images/v.0.1.9/MCP功能升级.png" alt="MCP 独立配置页面" />
+              </div>
+              <h3>MCP 独立配置页</h3>
+              <p>将工具能力显式化和结构化，便于用户理解，也便于智能体接入与调用。</p>
+            </article>
+            <article class="shot" style="min-height: 0;">
+              <div class="image-box">
+                <img src="../images/v.0.1.9/更强的mcp功能.png" alt="更强的 MCP 工具能力" />
+              </div>
+              <h3>更完整的工具集合</h3>
+              <p>与 Claude Code、OpenClaw 等智能体协同时，可支持信息检索、摘要、分析与自动整理。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" id="s7">
+        <div class="slide-top">
+          <div class="brand">
+            <img src="../images/学校log.webp" alt="华东师范大学校徽" />
+            <div class="meta">
+              <strong>应用价值</strong>
+              <span>Aurora RSS Reader · 面向学习、科研与知识管理场景</span>
+            </div>
+          </div>
+          <div class="page">07 / 应用价值</div>
+        </div>
+
+        <div class="footer-layout">
+          <article class="card">
+            <span class="kicker">参赛价值</span>
+            <h2 class="title">一个兼具实用性、创新性与扩展性的 AI 应用项目</h2>
+            <p>Aurora RSS Reader 回应了数字时代信息处理效率低的问题，也展示了 AI 与 MCP 在桌面工具中的真实应用价值。</p>
+            <div class="repo">GitHub：xiongsircool / aurora-rss-reader</div>
+            <p class="note" style="margin-top: 14px;">适用场景：课程学习、科研追踪、技术资讯订阅、行业监测、个人知识管理。</p>
+          </article>
+
+          <div class="stack">
+            <article class="card">
+              <span class="label">数字素养价值</span>
+              <h3>帮助用户更高效获取、甄别、理解与整理信息</h3>
+              <p>提升数字环境中的信息获取能力、处理能力和应用能力。</p>
+            </article>
+            <article class="card">
+              <span class="label">创新应用价值</span>
+              <h3>探索“阅读器 + AI + 智能体协同”的融合模式</h3>
+              <p>从单纯的工具使用走向人与智能体协同的信息处理方式。</p>
+            </article>
+            <article class="quote-panel">
+              <p class="quote">谢谢观看</p>
+              <p>华东师范大学第三届全民数字素养与人工智能创新应用大赛 · Aurora RSS Reader 项目展示</p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

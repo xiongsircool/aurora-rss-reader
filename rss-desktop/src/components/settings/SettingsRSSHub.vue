@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import type { RSSHubTestResult } from '../../composables/useRSSHubSettings'
+import type { RSSHubMirror, RSSHubTestResult } from '../../composables/useRSSHubSettings'
 
 defineProps<{
   rsshubUrl: string
   isTestingRSSHub: boolean
   rsshubTestResult: RSSHubTestResult | null
+  rsshubMirrors: RSSHubMirror[]
+  rsshubMirrorsLoading: boolean
 }>()
 
 const emit = defineEmits<{
   'update:rsshubUrl': [value: string]
   testConnection: []
+  selectMirror: [value: string]
 }>()
 
 const { t } = useI18n()
@@ -35,6 +38,50 @@ const { t } = useI18n()
         {{ t('settings.rssHubDeployGuide') }}:
         <a href="https://docs.rsshub.app/zh/deploy/" target="_blank" class="text-[var(--accent)] no-underline hover:underline">RSSHub部署指南</a>
       </p>
+    </div>
+
+    <div class="mb-4">
+      <div class="mb-2 flex items-center justify-between gap-3">
+        <label class="text-3.5 text-[var(--text-primary)] font-500">{{ t('settings.rssHubMirrorPresets') }}</label>
+        <span v-if="rsshubMirrorsLoading" class="text-3 text-[var(--text-secondary)]">
+          {{ t('settings.rssHubMirrorLoading') }}
+        </span>
+      </div>
+      <div class="grid gap-2">
+        <button
+          v-for="mirror in rsshubMirrors"
+          :key="mirror.base_url"
+          type="button"
+          class="w-full text-left p-3 rounded-xl border transition-all duration-200 bg-[var(--bg-input)] hover:border-orange-500/40 hover:bg-[var(--bg-elevated)]"
+          :class="rsshubUrl === mirror.base_url
+            ? 'border-orange-500/60 shadow-[0_0_0_2px_rgba(255,122,24,0.08)]'
+            : 'border-[var(--border-color)]'"
+          @click="emit('selectMirror', mirror.base_url)"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-3.5 text-[var(--text-primary)] font-600">{{ mirror.name }}</span>
+                <span
+                  v-if="mirror.is_default"
+                  class="px-1.5 py-0.5 rounded-full text-2.75 bg-[rgba(255,122,24,0.12)] text-orange-600"
+                >
+                  Default
+                </span>
+                <span
+                  v-if="rsshubUrl === mirror.base_url"
+                  class="px-1.5 py-0.5 rounded-full text-2.75 bg-[rgba(52,199,89,0.12)] text-[#0f7a39]"
+                >
+                  {{ t('settings.rssHubMirrorCurrent') }}
+                </span>
+              </div>
+              <div class="mt-1 text-3 text-[var(--text-secondary)] break-all">{{ mirror.base_url }}</div>
+              <div class="mt-1 text-3 text-[var(--text-secondary)]">{{ mirror.description }}</div>
+            </div>
+            <span class="text-3 text-[var(--accent)] shrink-0">{{ t('settings.rssHubMirrorUse') }}</span>
+          </div>
+        </button>
+      </div>
     </div>
 
     <div class="mb-4">

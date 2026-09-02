@@ -8,6 +8,7 @@ const defaultDateRange = defineModel<string>('defaultDateRange', { required: tru
 const timeField = defineModel<string>('timeField', { required: true })
 const markAsReadRange = defineModel<string>('markAsReadRange', { required: true })
 const detailsPanelMode = defineModel<'docked' | 'click'>('detailsPanelMode', { required: true })
+const timelineFilterDensity = defineModel<'compact' | 'standard'>('timelineFilterDensity', { required: true })
 
 const { t } = useI18n()
 </script>
@@ -43,6 +44,16 @@ const { t } = useI18n()
         <option value="click">{{ t('settings.detailsPanelModeClick') }}</option>
       </select>
       <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.detailsPanelModeDescription') }}</p>
+    </div>
+
+    <!-- Timeline Filter Density -->
+    <div class="mb-4">
+      <label class="block mb-2 text-sm font-medium text-[var(--text-primary)]">{{ t('settings.timelineFilterDensity') }}</label>
+      <select v-model="timelineFilterDensity" class="w-full p-[11px_14px] border border-[var(--border-color)] rounded-lg text-sm bg-[var(--bg-input)] text-[var(--text-primary)] transition-all focus:outline-none focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(255,122,24,0.15)]">
+        <option value="compact">{{ t('settings.timelineFilterDensityCompact') }}</option>
+        <option value="standard">{{ t('settings.timelineFilterDensityStandard') }}</option>
+      </select>
+      <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('settings.timelineFilterDensityDescription') }}</p>
     </div>
 
     <!-- Enable Date Filter -->

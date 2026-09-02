@@ -2,11 +2,15 @@ export { FeedRepository } from './feed.js';
 export { EntryRepository } from './entry.js';
 export { TranslationRepository } from './translation.js';
 export { SummaryRepository } from './summary.js';
+export { SummaryGenerationJobRepository } from './summaryGenerationJob.js';
 export { FetchLogRepository } from './fetchLog.js';
+export { ArticleExtractionJobRepository } from './articleExtractionJob.js';
 export { CollectionRepository } from './collections.js';
 export { TagRepository } from './tag.js';
 export { EntryTagRepository } from './entryTag.js';
 export { AnalysisStatusRepository } from './analysisStatus.js';
+export { AIAutomationRuleRepository } from './aiAutomationRule.js';
+export { AggregateDigestRepository } from './aggregateDigest.js';
 
 export type {
   FeedCreateInput,
@@ -29,9 +33,17 @@ export type {
 } from './summary.js';
 
 export type {
+  SummaryGenerationJobCreateInput,
+} from './summaryGenerationJob.js';
+
+export type {
   FetchLogCreateInput,
   FetchLogUpdateInput,
 } from './fetchLog.js';
+
+export type {
+  ArticleExtractionJobCreateInput,
+} from './articleExtractionJob.js';
 
 export type {
   CollectionCreateInput,
@@ -47,3 +59,12 @@ export type {
 export type {
   AnalysisStats,
 } from './analysisStatus.js';
+
+export type {
+  AIAutomationRuleCreateInput,
+  AIAutomationRuleUpdateInput,
+} from './aiAutomationRule.js';
+
+export type {
+  AggregateDigestCreateInput,
+} from './aggregateDigest.js';

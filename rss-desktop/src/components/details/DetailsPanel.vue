@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Entry } from '../../types'
 import type { ContentBlock } from '../../composables/useArticleParser'
@@ -57,10 +57,18 @@ const containerClasses = computed(() => [
   props.inOverlay ? 'h-full max-h-none' : 'max-h-screen',
   props.inOverlay ? '' : 'lt-md:w-full! lt-md:max-w-none lt-md:h-auto lt-md:max-h-none lt-md:overflow-visible',
 ])
+
+// Reset scroll position when entry changes
+const detailsRef = ref<HTMLElement | null>(null)
+watch(() => props.entry?.id, () => {
+  if (detailsRef.value) {
+    detailsRef.value.scrollTop = 0
+  }
+})
 </script>
 
 <template>
-  <section :class="containerClasses">
+  <section ref="detailsRef" :class="containerClasses">
     <div v-if="entry" class="flex flex-col min-h-0">
       <DetailsHeader
         :entry="entry"
