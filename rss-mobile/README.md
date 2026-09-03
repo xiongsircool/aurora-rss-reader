@@ -10,7 +10,13 @@ M0 technical validation is in progress. The repository currently contains:
 - Four-tab mobile shell: Inbox, Saved, Sources, Settings
 - Framework-independent Feed and Entry domain models
 - Native `dart:io` HTTP adapter that preserves response bytes
-- Tests for navigation, read state, redirects, HTTP errors, and response size limits
+- Explicit gzip/deflate decoding with compressed and decompressed size limits
+- RSS 2.0, Atom, Media RSS and podcast parsing
+- UTF-8/UTF-16, GBK, Big5 and Shift-JIS decoding (full four-byte GB18030 remains an M0 gap)
+- Drift/sqlite3 Native Assets schema for feeds, entries, AI caches, tags and collections
+- Feed + guid deduplication, cursor pagination, FTS5 search and cascade cleanup
+- Tests for navigation, parsing, encodings, HTTP behavior and database contracts
+- Reproducible 50,000-entry SQLite benchmark
 
 The previous Vue/Capacitor client is preserved on branch `archive/mobile-plan-d-v1` and is not part of this implementation.
 

@@ -17,7 +17,11 @@ final class FeedHttpException implements Exception {
 }
 
 final class IoFeedHttpClient implements FeedHttpClient {
-  IoFeedHttpClient({HttpClient? client}) : _client = client ?? HttpClient();
+  IoFeedHttpClient({HttpClient? client}) : _client = client ?? HttpClient() {
+    // Decompress explicitly so gzip and deflate behave consistently on every
+    // platform, and so the decompressed size can be limited as well.
+    _client.autoUncompress = false;
+  }
 
   static const _userAgent = 'AuroraRSSMobile/0.1';
   final HttpClient _client;
@@ -44,7 +48,8 @@ final class IoFeedHttpClient implements FeedHttpClient {
         ..headers.set(
           HttpHeaders.acceptHeader,
           'application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.5',
-        );
+        )
+        ..headers.set(HttpHeaders.acceptEncodingHeader, 'gzip, deflate');
 
       final response = await request.close().timeout(timeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -83,12 +88,24 @@ final class IoFeedHttpClient implements FeedHttpClient {
           ? uri
           : response.redirects.last.location;
 
+      final encodedBody = body.takeBytes();
+      final decodedBody = _decodeContentEncoding(
+        encodedBody,
+        response.headers.value(HttpHeaders.contentEncodingHeader),
+      );
+      if (decodedBody.length > maxBytes) {
+        throw FeedHttpException(
+          'Decompressed feed response exceeds $maxBytes bytes',
+          statusCode: response.statusCode,
+        );
+      }
+
       return FeedHttpResponse(
         requestedUri: uri,
         finalUri: finalUri,
         statusCode: response.statusCode,
         headers: Map.unmodifiable(headers),
-        body: Uint8List.fromList(body.takeBytes()),
+        body: Uint8List.fromList(decodedBody),
       );
     } on TimeoutException catch (error) {
       throw FeedHttpException('Feed request timed out: $error');
@@ -100,5 +117,26 @@ final class IoFeedHttpClient implements FeedHttpClient {
   @override
   void close() {
     _client.close(force: true);
+  }
+}
+
+List<int> _decodeContentEncoding(List<int> bytes, String? rawEncoding) {
+  final encoding = rawEncoding?.split(',').last.trim().toLowerCase();
+  try {
+    switch (encoding) {
+      case null:
+      case '':
+      case 'identity':
+        return bytes;
+      case 'gzip':
+      case 'x-gzip':
+        return gzip.decode(bytes);
+      case 'deflate':
+        return zlib.decode(bytes);
+      default:
+        throw FeedHttpException('Unsupported Content-Encoding: $encoding');
+    }
+  } on FormatException catch (error) {
+    throw FeedHttpException('Invalid $encoding response: ${error.message}');
   }
 }

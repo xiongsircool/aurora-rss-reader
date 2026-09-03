@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:aurora_mobile/platform/http/io_feed_http_client.dart';
@@ -22,6 +23,18 @@ void main() {
           request.response.redirect(baseUri.resolve('/feed'));
         case '/large':
           request.response.add(List<int>.filled(64, 0x61));
+        case '/gzip':
+          request.response.headers.set(
+            HttpHeaders.contentEncodingHeader,
+            'gzip',
+          );
+          request.response.add(gzip.encode(utf8.encode('<rss>gzip</rss>')));
+        case '/deflate':
+          request.response.headers.set(
+            HttpHeaders.contentEncodingHeader,
+            'deflate',
+          );
+          request.response.add(zlib.encode(utf8.encode('<rss>deflate</rss>')));
         default:
           request.response.statusCode = HttpStatus.internalServerError;
       }
@@ -52,6 +65,17 @@ void main() {
 
     expect(response.statusCode, HttpStatus.ok);
     expect(response.finalUri.path, '/feed');
+  });
+
+  test('automatically decompresses gzip and deflate responses', () async {
+    final client = IoFeedHttpClient();
+    addTearDown(client.close);
+
+    final gzipResponse = await client.get(baseUri.resolve('/gzip'));
+    final deflateResponse = await client.get(baseUri.resolve('/deflate'));
+
+    expect(utf8.decode(gzipResponse.body), '<rss>gzip</rss>');
+    expect(utf8.decode(deflateResponse.body), '<rss>deflate</rss>');
   });
 
   test('rejects non-success responses', () async {

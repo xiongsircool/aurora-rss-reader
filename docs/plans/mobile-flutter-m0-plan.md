@@ -43,12 +43,14 @@ flutter build ios --debug --no-codesign
 验证项:
 
 - [x] 原始字节响应,不提前假设 UTF-8
-- [ ] gzip/deflate
+- [x] gzip/deflate 显式解压,并限制压缩前后响应体大小
 - [x] 301/302/307/308 重定向(已完成通用重定向单测,真实状态码语料待补)
 - [x] 超时和响应体大小限制;主动取消待补
 - [x] User-Agent与常用请求头
-- [ ] UTF-8、GBK/GB18030、Big5、Shift-JIS 编码
-- [ ] TLS、HTTP 错误和响应体大小限制
+- [x] UTF-8、GBK、Big5、Shift-JIS 编码
+- [ ] 完整 GB18030 四字节扩展(当前纯 Dart GBK codec 仅覆盖双字节子集)
+- [x] HTTP 错误和响应体大小限制
+- [ ] 真实 TLS 异常语料验证
 
 验收:至少 20 个真实 Feed 形成固定清单;失败必须返回结构化错误且不覆盖本地旧内容。
 
@@ -56,14 +58,14 @@ flutter build ios --debug --no-codesign
 
 覆盖:
 
-- [ ] RSS 2.0
-- [ ] Atom
-- [ ] Media RSS
-- [ ] Podcast enclosure
-- [ ] HTML description/content
-- [ ] 缺 guid、缺日期、重复 guid
-- [ ] 时区和 Unix timestamp
-- [ ] 图片、视频、DOI、PMID
+- [x] RSS 2.0
+- [x] Atom
+- [x] Media RSS
+- [x] Podcast enclosure与时长
+- [x] HTML description/content
+- [x] 缺 guid、缺日期、重复 guid
+- [x] 时区和 Unix timestamp
+- [x] 图片、视频、DOI、PMID
 
 旧 Node `feedNormalizer.test.ts` 的输入输出将转成跨端测试语料。解析层必须是纯 Dart,不得依赖 Widget。
 
@@ -86,13 +88,13 @@ schema_migrations
 
 验证:
 
-- [ ] 首次建库和版本迁移
-- [ ] Feed + guid 唯一去重
-- [ ] 50,000 篇文章批量灌入
-- [ ] 收件箱游标分页
-- [ ] 已读、收藏、标签事务
-- [ ] 标题/正文关键字搜索
-- [ ] 删除 Feed 后关联数据清理
+- [x] 首次建库;版本迁移测试待 schema v2
+- [x] Feed + guid 唯一去重
+- [x] 50,000 篇文章批量灌入(主机基准完成,真机待复测)
+- [x] 收件箱游标分页
+- [x] 已读、收藏、标签事务
+- [x] 标题/正文 FTS5 关键字搜索
+- [x] 删除 Feed 后关联数据清理
 
 初始性能门槛(在选定的中低端 Android 真机上复测):
 
@@ -100,6 +102,8 @@ schema_migrations
 - 50,000 条数据的游标分页查询:< 100ms
 - 单次写入 200 条归一化文章:< 500ms
 - 滚动期间不执行大型同步 SQL
+
+主机基准报告:`docs/reports/mobile-m0-sqlite-benchmark-2026-09-03.md`;真机结果仍是 M0 退出条件。
 
 ## 5. 全文与 AI
 
