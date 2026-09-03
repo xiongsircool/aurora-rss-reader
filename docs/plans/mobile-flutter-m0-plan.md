@@ -54,6 +54,9 @@ flutter build ios --debug --no-codesign
 
 验收:至少 20 个真实 Feed 形成固定清单;失败必须返回结构化错误且不覆盖本地旧内容。
 
+- [x] 本地 HTTP 测试确认网络/解析失败不写入或覆盖已有快照
+- [ ] 20 个真实 Feed 清单与 TLS 异常报告
+
 ## 3. Feed 解析与归一化
 
 覆盖:
