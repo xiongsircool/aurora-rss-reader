@@ -15,7 +15,7 @@ final class ParsedFeed {
   /// Primary site link (HTML), not the feed URL itself.
   final Uri? link;
 
-  /// Detected source format: `rss2` or `atom`.
+  /// Detected source format: RSS 1.0 (RDF), RSS 2.0 or Atom.
   final FeedFormat format;
 
   final String? description;
@@ -25,7 +25,7 @@ final class ParsedFeed {
   final List<ParsedEntry> entries;
 }
 
-enum FeedFormat { rss2, atom }
+enum FeedFormat { rss1, rss2, atom }
 
 /// A normalized feed item, independent of source format.
 final class ParsedEntry {

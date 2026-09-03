@@ -55,12 +55,14 @@ flutter build ios --debug --no-codesign
 验收:至少 20 个真实 Feed 形成固定清单;失败必须返回结构化错误且不覆盖本地旧内容。
 
 - [x] 本地 HTTP 测试确认网络/解析失败不写入或覆盖已有快照
-- [ ] 20 个真实 Feed 清单与 TLS 异常报告
+- [x] 20 个真实 Feed 清单与报告(实际 26/26 通过)
+- [ ] TLS 证书异常语料报告
 
 ## 3. Feed 解析与归一化
 
 覆盖:
 
+- [x] RSS 1.0 RDF(真实 Nature feed 验证)
 - [x] RSS 2.0
 - [x] Atom
 - [x] Media RSS
@@ -135,7 +137,7 @@ schema_migrations
 以下全部满足才进入 M1:
 
 - [ ] Android 与 iOS 真机至少各跑通一次抓取闭环
-- [ ] 20 个 Feed 测试清单有结果报告
+- [x] 20 个 Feed 测试清单有结果报告(26/26)
 - [ ] 50,000 条 SQLite 基准有可复现报告
 - [ ] 数据库迁移和解析测试全绿
 - [ ] 已记录平台差异与不可行项

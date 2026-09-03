@@ -17,10 +17,14 @@ final class FeedHttpException implements Exception {
 }
 
 final class IoFeedHttpClient implements FeedHttpClient {
-  IoFeedHttpClient({HttpClient? client}) : _client = client ?? HttpClient() {
+  IoFeedHttpClient({HttpClient? client, bool useEnvironmentProxy = true})
+    : _client = client ?? HttpClient() {
     // Decompress explicitly so gzip and deflate behave consistently on every
     // platform, and so the decompressed size can be limited as well.
     _client.autoUncompress = false;
+    if (useEnvironmentProxy) {
+      _client.findProxy = HttpClient.findProxyFromEnvironment;
+    }
   }
 
   static const _userAgent = 'AuroraRSSMobile/0.1';

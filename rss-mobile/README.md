@@ -19,6 +19,7 @@ M0 technical validation is in progress. The repository currently contains:
 - Failed HTTP/XML refreshes preserve the previous local snapshot
 - Tests for navigation, parsing, encodings, HTTP behavior and database contracts
 - Reproducible 50,000-entry SQLite benchmark
+- Reproducible real-network compatibility probe (26 RSS/Atom/podcast feeds)
 
 The previous Vue/Capacitor client is preserved on branch `archive/mobile-plan-d-v1` and is not part of this implementation.
 
@@ -46,6 +47,15 @@ flutter build ios --debug --no-codesign
 ```
 
 The iOS command remains blocked until full Xcode is installed.
+
+Run the external Feed compatibility suite separately from deterministic tests:
+
+```bash
+cd rss-mobile
+dart run tool/feed_compatibility.dart > ../docs/reports/mobile-m0-feed-compatibility.md
+```
+
+This network probe intentionally does not run as part of `flutter test`.
 
 ## Architecture
 

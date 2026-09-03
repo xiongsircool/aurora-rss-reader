@@ -27,8 +27,9 @@ ParsedFeed parseFeedBytes(Uint8List bytes, {Uri? feedUrl}) {
 
   switch (root.name.local.toLowerCase()) {
     case 'rss':
+      return _parseRss(root, feedUrl, format: FeedFormat.rss2);
     case 'rdf':
-      return _parseRss(root, feedUrl);
+      return _parseRss(root, feedUrl, format: FeedFormat.rss1);
     case 'feed':
       return _parseAtom(root, feedUrl);
     default:
@@ -50,10 +51,16 @@ XmlDocument _parseXml(String text) {
 // RSS 2.0 / RDF
 // ---------------------------------------------------------------------------
 
-ParsedFeed _parseRss(XmlElement root, Uri? feedUrl) {
-  // RSS 2.0 nests under <channel>; RSS 1.0 (RDF) puts items at the root.
+ParsedFeed _parseRss(
+  XmlElement root,
+  Uri? feedUrl, {
+  required FeedFormat format,
+}) {
+  // RSS 2.0 nests items under <channel>; RSS 1.0 (RDF) puts items next
+  // to <channel> at the root level.
   final channel = root.getElement('channel');
   final channelLike = channel ?? root;
+  final itemParent = format == FeedFormat.rss1 ? root : channelLike;
 
   final title =
       _textOf(channelLike, 'title') ?? _fallbackTitle(feedUrl, channelLike);
@@ -61,14 +68,14 @@ ParsedFeed _parseRss(XmlElement root, Uri? feedUrl) {
   return ParsedFeed(
     title: title,
     link: _uriOf(_textOf(channelLike, 'link')),
-    format: FeedFormat.rss2,
+    format: format,
     description: _textOf(channelLike, 'description'),
     updatedAt: parseFeedDate(
       _textOf(channelLike, 'lastBuildDate') ??
           _textOf(channelLike, 'pubDate') ??
           _namespaced(channelLike, 'date'),
     ),
-    entries: channelLike
+    entries: itemParent
         .findElements('item')
         .map((item) => _parseRssItem(item, feedUrl))
         .toList(),

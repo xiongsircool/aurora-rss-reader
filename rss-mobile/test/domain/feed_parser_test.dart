@@ -94,6 +94,34 @@ void main() {
     });
   });
 
+  group('parseFeedBytes RSS 1.0', () {
+    test('parses RDF items placed next to the channel', () {
+      const xml = '''
+<rdf:RDF
+ xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+ xmlns="http://purl.org/rss/1.0/"
+ xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel rdf:about="https://example.com/feed">
+    <title>Academic Journal</title>
+    <link>https://example.com</link>
+    <description>Journal updates</description>
+  </channel>
+  <item rdf:about="https://example.com/paper/1">
+    <title>Research paper</title>
+    <link>https://example.com/paper/1</link>
+    <dc:date>2026-09-04T08:00:00Z</dc:date>
+  </item>
+</rdf:RDF>
+''';
+      final feed = parseFeedBytes(utf8.encode(xml));
+
+      expect(feed.format, FeedFormat.rss1);
+      expect(feed.title, 'Academic Journal');
+      expect(feed.entries.single.title, 'Research paper');
+      expect(feed.entries.single.publishedAt, DateTime.utc(2026, 9, 4, 8));
+    });
+  });
+
   group('parseFeedBytes RSS 2.0', () {
     test('parses a complete feed with namespaces', () {
       const xml = '''
