@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.xiongsircool.aurora.mobile"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -69,6 +69,46 @@ final class LocalContentRepository {
     return rows.map(_feedFromRow).toList();
   }
 
+  Future<({String baseUrl, String model})> loadAiConfig() async {
+    final settings = await database
+        .select(database.userSettings)
+        .getSingleOrNull();
+    if (settings == null) return (baseUrl: '', model: '');
+    return (baseUrl: settings.aiBaseUrl, model: settings.aiModel);
+  }
+
+  Future<void> saveAiConfig({
+    required String baseUrl,
+    required String model,
+  }) async {
+    final now = DateTime.now().toUtc();
+    final existing = await database
+        .select(database.userSettings)
+        .getSingleOrNull();
+    if (existing == null) {
+      await database
+          .into(database.userSettings)
+          .insert(
+            UserSettingsCompanion.insert(
+              aiBaseUrl: Value(baseUrl),
+              aiModel: Value(model),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      return;
+    }
+    await (database.update(
+      database.userSettings,
+    )..where((row) => row.id.equals(existing.id))).write(
+      UserSettingsCompanion(
+        aiBaseUrl: Value(baseUrl),
+        aiModel: Value(model),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
   Future<String?> loadProxyUrl() async {
     final settings = await database
         .select(database.userSettings)

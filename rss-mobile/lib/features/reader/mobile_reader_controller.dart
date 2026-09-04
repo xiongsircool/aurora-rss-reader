@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../application/use_cases/extract_article.dart';
 import '../../application/use_cases/refresh_feed.dart';
+import '../../data/platform/ai_client.dart';
+import '../../data/platform/secure_key_store.dart';
 import '../../data/repositories/local_content_repository.dart';
 import '../../domain/entities/entry.dart';
 import '../../domain/entities/feed.dart';
@@ -12,12 +16,16 @@ final class MobileReaderController extends ChangeNotifier {
     required this.repository,
     required this.refreshFeed,
     this.extractArticle,
+    this.aiClient,
+    this.secureKeyStore,
     String? initialProxyUrl,
   }) : _proxyUrl = initialProxyUrl;
 
   final LocalContentRepository repository;
   final RefreshFeed refreshFeed;
   final ExtractArticle? extractArticle;
+  final AiClient? aiClient;
+  final SecureKeyStore? secureKeyStore;
 
   List<Feed> _feeds = const [];
   List<Entry> _entries = const [];
@@ -37,10 +45,15 @@ final class MobileReaderController extends ChangeNotifier {
   String? _error;
   String? _notice;
   String? _proxyUrl;
+  String? _aiSummary;
+  bool _generatingSummary = false;
 
   List<Feed> get feeds => _feeds;
   List<GroupSummary> get groups => _groups;
   Set<String> get mutedGroups => _mutedGroups;
+  String? get aiSummary => _aiSummary;
+  bool get generatingSummary => _generatingSummary;
+  String? get aiConfigError => _error;
   List<Entry> get entries => _entries;
   List<Entry> get starredEntries => _starredEntries;
   List<Entry> get searchResults => _searchResults;
@@ -412,6 +425,101 @@ final class MobileReaderController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  Future<({String baseUrl, String model, String? apiKey})?>
+  loadAiSettings() async {
+    final config = await repository.loadAiConfig();
+    final key = await secureKeyStore?.loadSummaryKey();
+    return (baseUrl: config.baseUrl, model: config.model, apiKey: key);
+  }
+
+  Future<void> saveAiSettings({
+    required String baseUrl,
+    required String model,
+    required String apiKey,
+  }) async {
+    await repository.saveAiConfig(baseUrl: baseUrl, model: model);
+    if (apiKey.isNotEmpty && secureKeyStore != null) {
+      await secureKeyStore!.saveSummaryKey(apiKey);
+    }
+  }
+
+  Stream<String> generateSummary({
+    required String entryId,
+    required String contentHtml,
+  }) async* {
+    final aiClient = this.aiClient;
+    if (aiClient == null || _generatingSummary) return;
+
+    final settings = await repository.loadAiConfig();
+    final key = await secureKeyStore?.loadSummaryKey();
+    if (settings.baseUrl.isEmpty ||
+        settings.model.isEmpty ||
+        (key == null || key.isEmpty)) {
+      _error = '请先在设置中配置 AI 服务端点和 Key';
+      notifyListeners();
+      return;
+    }
+
+    final plainText = contentHtml.length > 8000
+        ? contentHtml.substring(0, 8000)
+        : contentHtml;
+    if (plainText.trim().length < 30) {
+      _error = '文章内容太短';
+      notifyListeners();
+      return;
+    }
+
+    _generatingSummary = true;
+    _aiSummary = null;
+    _error = null;
+    notifyListeners();
+
+    final buffer = StringBuffer();
+    try {
+      await for (final event in aiClient.summarize(
+        config: AiConfig(
+          baseUrl: settings.baseUrl,
+          apiKey: key,
+          model: settings.model,
+          language: 'zh',
+        ),
+        systemPrompt:
+            'Summarize the following article concisely in Chinese. '
+            'Return 2-4 sentences without preamble.',
+        userContent: plainText,
+      )) {
+        switch (event) {
+          case AiDelta(:final text):
+            buffer.write(text);
+            yield buffer.toString();
+            notifyListeners();
+          case AiError(:final message):
+            _error = 'AI 摘要失败：$message';
+            notifyListeners();
+            return;
+          case AiDone():
+            break;
+        }
+      }
+      final result = buffer.toString().trim();
+      if (result.isNotEmpty) {
+        await repository.saveSummary(
+          entryId: entryId,
+          language: 'zh',
+          summary: result,
+        );
+        _aiSummary = result;
+      }
+    } finally {
+      _generatingSummary = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> loadSummaryKey() async {
+    return await secureKeyStore?.loadSummaryKey();
   }
 
   String feedTitle(String feedId) {
