@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'dart:async';
+
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:url_launcher/url_launcher.dart';
@@ -32,6 +35,10 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
   late Entry _entry;
   bool _extracting = false;
   bool _showOriginal = false;
+  String _summaryText = '';
+  bool _summaryGenerating = false;
+  String? _summaryError;
+  StreamSubscription<String>? _summarySub;
 
   @override
   void initState() {
@@ -40,6 +47,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     if (!_entry.isRead) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _markRead());
     }
+    _loadCachedSummary();
   }
 
   Future<void> _markRead() async {
@@ -84,6 +92,54 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('无法打开链接')));
     }
+  }
+
+  @override
+  void dispose() {
+    _summarySub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadCachedSummary() async {
+    final cached = await widget.controller.repository.loadSummary(
+      entryId: _entry.id,
+      language: 'zh',
+    );
+    if (cached != null && cached.isNotEmpty && mounted) {
+      setState(() => _summaryText = cached);
+    }
+  }
+
+  void _startSummary() {
+    if (_summaryGenerating) return;
+    final content =
+        _entry.readabilityContent ?? _entry.content ?? _entry.summary;
+    if (content == null || content.trim().length < 30) return;
+
+    setState(() {
+      _summaryGenerating = true;
+      _summaryText = '';
+      _summaryError = null;
+    });
+
+    _summarySub = widget.controller
+        .generateSummary(entryId: _entry.id, contentHtml: content)
+        .listen(
+          (text) {
+            if (mounted) setState(() => _summaryText = text);
+          },
+          onError: (error) {
+            if (mounted) {
+              setState(() {
+                _summaryGenerating = false;
+                _summaryError = error.toString();
+              });
+            }
+          },
+          onDone: () {
+            if (mounted) setState(() => _summaryGenerating = false);
+          },
+        );
   }
 
   @override
@@ -159,6 +215,97 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               ),
             ],
             const SizedBox(height: 18),
+            // AI 摘要面板
+            if (_summaryText.isNotEmpty ||
+                _summaryGenerating ||
+                _summaryError != null)
+              Container(
+                key: const ValueKey('ai-summary-panel'),
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondaryContainer
+                      .withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.secondary
+                        .withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'AI 摘要',
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.secondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const Spacer(),
+                        if (_summaryGenerating)
+                          const SizedBox.square(
+                            dimension: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else if (_summaryText.isNotEmpty)
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            tooltip: '重新生成',
+                            onPressed: _startSummary,
+                            icon: const Icon(Icons.refresh, size: 16),
+                          ),
+                      ],
+                    ),
+                    if (_summaryText.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _summaryText,
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(height: 1.6),
+                      ),
+                    ],
+                    if (_summaryError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _summaryError!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              )
+            else
+            // AI 摘要按钮
+            if (!_summaryGenerating)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: OutlinedButton.icon(
+                  key: const ValueKey('generate-ai-summary'),
+                  onPressed: _startSummary,
+                  icon: const Icon(Icons.auto_awesome, size: 18),
+                  label: const Text('AI 摘要'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.secondary,
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.secondary
+                          .withValues(alpha: 0.3),
+                    ),
+                  ),
+                ),
+              ),
             if (hasExtracted && hasOriginal)
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
