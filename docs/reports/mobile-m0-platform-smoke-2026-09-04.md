@@ -53,6 +53,22 @@ A generic physical-device Xcode compilation reached the provisioning stage, then
 - Mozilla Readability HTML extraction, CJK page decoding, failure fallback and schema-v3 cache validated
 - Deterministic Flutter tests: 57 passing
 
+## Physical Device (Android)
+
+- Device: Xiaomi 14 Pro (23116PN5BC), HyperOS 3 / Android 16, arm64-v8a
+- Debug APK installed and launched via adb
+- Discovered and fixed: Flutter Impeller never rendered a frame on this device (0 frames); disabled Impeller via `io.flutter.embedding.android.EnableImpeller=false`, rendering restored with Skia
+- Discovered and fixed: reader_mode default JSDOM parser failed on real-world sspai.com markup; switched primary parser to the pure-Dart html package
+- End-to-end on-device validation via UI automation:
+  - Added https://sspai.com/feed through the subscription form
+  - Feed fetched, parsed, 10 articles persisted and rendered in the inbox
+  - Article reader rendered feed content and auto-marked read
+  - Web full-text extraction succeeded: page fetched, parsed, cached, and rendered with headings/lists/links
+  - Extraction failure fallback was observed and correct before the parser fix
+- No Flutter fatal errors in device logs
+
+> Note: `flutter` CLI marks this device unsupported because HyperOS reports non-standard `ro.build.version.release/sdk` values; adb install and Flutter-rendered builds work normally.
+
 ## Remaining Platform Gates
 
 - Android physical device refresh/performance run

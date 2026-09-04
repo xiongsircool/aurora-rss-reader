@@ -58,8 +58,17 @@ final class ExtractArticle {
     }
 
     final html = decodeHtmlBytes(response.body, contentType: contentType);
-    final article = readability.parse(
+    // The jsdom port trips on malformed real-world markup; the pure-Dart
+    // html package handles it and is the reliable primary here.
+    var article = readability.parse(
       html,
+      parser: readability.ParserType.html,
+      baseUri: response.finalUri.toString(),
+      charThreshold: 120,
+    );
+    article ??= readability.parse(
+      html,
+      parser: readability.ParserType.jsdom,
       baseUri: response.finalUri.toString(),
       charThreshold: 120,
     );
