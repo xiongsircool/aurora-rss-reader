@@ -30,6 +30,7 @@ final class ArticleReaderPage extends StatefulWidget {
 class _ArticleReaderPageState extends State<ArticleReaderPage> {
   late Entry _entry;
   bool _extracting = false;
+  bool _showOriginal = false;
 
   @override
   void initState() {
@@ -86,7 +87,11 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final html = _entry.readabilityContent ?? _entry.content ?? _entry.summary;
+    final hasExtracted = _entry.readabilityContent != null;
+    final hasOriginal = _entry.content != null || _entry.summary != null;
+    final html = _showOriginal
+        ? (_entry.content ?? _entry.summary)
+        : (_entry.readabilityContent ?? _entry.content ?? _entry.summary);
     final referer = widget.referer;
     return Scaffold(
       appBar: AppBar(
@@ -146,7 +151,29 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               ),
             ],
             const SizedBox(height: 18),
-            if (_entry.url != null && _entry.readabilityContent == null) ...[
+            if (hasExtracted && hasOriginal)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(
+                      value: false,
+                      label: Text('网页全文'),
+                      icon: Icon(Icons.article_outlined, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      label: Text('订阅原文'),
+                      icon: Icon(Icons.rss_feed, size: 16),
+                    ),
+                  ],
+                  selected: {_showOriginal},
+                  onSelectionChanged: (selection) {
+                    setState(() => _showOriginal = selection.single);
+                  },
+                ),
+              ),
+            if (!hasExtracted && _entry.url != null) ...[
               FilledButton.tonalIcon(
                 key: const ValueKey('extract-full-text'),
                 onPressed: _extracting ? null : _extractFullText,
@@ -170,7 +197,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 ),
               ],
               const SizedBox(height: 16),
-            ] else if (_entry.readabilityContent != null) ...[
+            ] else if (hasExtracted) ...[
               Row(
                 children: [
                   Icon(
@@ -180,7 +207,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '网页全文已缓存',
+                    _showOriginal ? '显示订阅原文' : '网页全文已缓存',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: Theme.of(context).colorScheme.secondary,
                     ),
