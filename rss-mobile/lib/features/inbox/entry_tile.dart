@@ -8,6 +8,7 @@ final class EntryTile extends StatelessWidget {
     required this.feedTitle,
     required this.onReadChanged,
     required this.onStarredChanged,
+    this.onTap,
     super.key,
   });
 
@@ -15,6 +16,7 @@ final class EntryTile extends StatelessWidget {
   final String feedTitle;
   final ValueChanged<bool> onReadChanged;
   final ValueChanged<bool> onStarredChanged;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -30,121 +32,124 @@ final class EntryTile extends StatelessWidget {
       color: entry.isRead
           ? colorScheme.surface
           : colorScheme.primary.withValues(alpha: 0.035),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 10, 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (entry.imageUrl != null) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  entry.imageUrl.toString(),
-                  width: 88,
-                  height: 76,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 10, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (entry.imageUrl != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    entry.imageUrl.toString(),
                     width: 88,
                     height: 76,
-                    color: colorScheme.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.broken_image_outlined),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      if (!entry.isRead) ...[
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                      ],
-                      Expanded(
-                        child: Text(
-                          feedTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDate(date),
-                        style: Theme.of(context).textTheme.labelSmall
-                            ?.copyWith(color: colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    entry.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: entry.isRead
-                          ? FontWeight.w500
-                          : FontWeight.w700,
-                      height: 1.35,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      width: 88,
+                      height: 76,
+                      color: colorScheme.surfaceContainerHighest,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.broken_image_outlined),
                     ),
                   ),
-                  if (showSummary) ...[
-                    const SizedBox(height: 5),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (!entry.isRead) ...[
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                        ],
+                        Expanded(
+                          child: Text(
+                            feedTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatDate(date),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Text(
-                      summary.trim(),
+                      entry.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: entry.isRead
+                            ? FontWeight.w500
+                            : FontWeight.w700,
                         height: 1.35,
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        tooltip: entry.isStarred ? '取消收藏' : '收藏',
-                        onPressed: () => onStarredChanged(!entry.isStarred),
-                        icon: Icon(
-                          entry.isStarred ? Icons.star : Icons.star_border,
-                          color: entry.isStarred
-                              ? const Color(0xFFF4A000)
-                              : null,
-                          size: 20,
-                        ),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        tooltip: entry.isRead ? '标为未读' : '标为已读',
-                        onPressed: () => onReadChanged(!entry.isRead),
-                        icon: Icon(
-                          entry.isRead
-                              ? Icons.mark_email_unread_outlined
-                              : Icons.check_circle_outline,
-                          size: 20,
+                    if (showSummary) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        summary.trim(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.35,
                         ),
                       ),
                     ],
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: entry.isStarred ? '取消收藏' : '收藏',
+                          onPressed: () => onStarredChanged(!entry.isStarred),
+                          icon: Icon(
+                            entry.isStarred ? Icons.star : Icons.star_border,
+                            color: entry.isStarred
+                                ? const Color(0xFFF4A000)
+                                : null,
+                            size: 20,
+                          ),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: entry.isRead ? '标为未读' : '标为已读',
+                          onPressed: () => onReadChanged(!entry.isRead),
+                          icon: Icon(
+                            entry.isRead
+                                ? Icons.mark_email_unread_outlined
+                                : Icons.check_circle_outline,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

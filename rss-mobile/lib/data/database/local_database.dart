@@ -111,6 +111,7 @@ class UserSettings extends Table {
       integer().withDefault(const Constant(720))();
   TextColumn get aiBaseUrl => text().withDefault(const Constant(''))();
   TextColumn get aiModel => text().withDefault(const Constant(''))();
+  TextColumn get proxyUrl => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
@@ -196,12 +197,17 @@ final class LocalDatabase extends _$LocalDatabase {
   factory LocalDatabase.onDevice() => LocalDatabase(_openOnDevice());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (migrator) async {
       await migrator.createAll();
+    },
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.addColumn(userSettings, userSettings.proxyUrl);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

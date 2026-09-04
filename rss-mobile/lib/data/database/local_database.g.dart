@@ -2926,6 +2926,17 @@ class $UserSettingsTable extends UserSettings
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _proxyUrlMeta = const VerificationMeta(
+    'proxyUrl',
+  );
+  @override
+  late final GeneratedColumn<String> proxyUrl = GeneratedColumn<String>(
+    'proxy_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -2956,6 +2967,7 @@ class $UserSettingsTable extends UserSettings
     refreshIntervalMinutes,
     aiBaseUrl,
     aiModel,
+    proxyUrl,
     createdAt,
     updatedAt,
   ];
@@ -3010,6 +3022,12 @@ class $UserSettingsTable extends UserSettings
         aiModel.isAcceptableOrUnknown(data['ai_model']!, _aiModelMeta),
       );
     }
+    if (data.containsKey('proxy_url')) {
+      context.handle(
+        _proxyUrlMeta,
+        proxyUrl.isAcceptableOrUnknown(data['proxy_url']!, _proxyUrlMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -3059,6 +3077,10 @@ class $UserSettingsTable extends UserSettings
         DriftSqlType.string,
         data['${effectivePrefix}ai_model'],
       )!,
+      proxyUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}proxy_url'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -3083,6 +3105,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
   final int refreshIntervalMinutes;
   final String aiBaseUrl;
   final String aiModel;
+  final String? proxyUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
   const UserSettingsRow({
@@ -3092,6 +3115,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
     required this.refreshIntervalMinutes,
     required this.aiBaseUrl,
     required this.aiModel,
+    this.proxyUrl,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -3104,6 +3128,9 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
     map['refresh_interval_minutes'] = Variable<int>(refreshIntervalMinutes);
     map['ai_base_url'] = Variable<String>(aiBaseUrl);
     map['ai_model'] = Variable<String>(aiModel);
+    if (!nullToAbsent || proxyUrl != null) {
+      map['proxy_url'] = Variable<String>(proxyUrl);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -3117,6 +3144,9 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
       refreshIntervalMinutes: Value(refreshIntervalMinutes),
       aiBaseUrl: Value(aiBaseUrl),
       aiModel: Value(aiModel),
+      proxyUrl: proxyUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(proxyUrl),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -3136,6 +3166,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
       ),
       aiBaseUrl: serializer.fromJson<String>(json['aiBaseUrl']),
       aiModel: serializer.fromJson<String>(json['aiModel']),
+      proxyUrl: serializer.fromJson<String?>(json['proxyUrl']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -3150,6 +3181,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
       'refreshIntervalMinutes': serializer.toJson<int>(refreshIntervalMinutes),
       'aiBaseUrl': serializer.toJson<String>(aiBaseUrl),
       'aiModel': serializer.toJson<String>(aiModel),
+      'proxyUrl': serializer.toJson<String?>(proxyUrl),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -3162,6 +3194,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
     int? refreshIntervalMinutes,
     String? aiBaseUrl,
     String? aiModel,
+    Value<String?> proxyUrl = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => UserSettingsRow(
@@ -3172,6 +3205,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
         refreshIntervalMinutes ?? this.refreshIntervalMinutes,
     aiBaseUrl: aiBaseUrl ?? this.aiBaseUrl,
     aiModel: aiModel ?? this.aiModel,
+    proxyUrl: proxyUrl.present ? proxyUrl.value : this.proxyUrl,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -3187,6 +3221,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
           : this.refreshIntervalMinutes,
       aiBaseUrl: data.aiBaseUrl.present ? data.aiBaseUrl.value : this.aiBaseUrl,
       aiModel: data.aiModel.present ? data.aiModel.value : this.aiModel,
+      proxyUrl: data.proxyUrl.present ? data.proxyUrl.value : this.proxyUrl,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -3201,6 +3236,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
           ..write('refreshIntervalMinutes: $refreshIntervalMinutes, ')
           ..write('aiBaseUrl: $aiBaseUrl, ')
           ..write('aiModel: $aiModel, ')
+          ..write('proxyUrl: $proxyUrl, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -3215,6 +3251,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
     refreshIntervalMinutes,
     aiBaseUrl,
     aiModel,
+    proxyUrl,
     createdAt,
     updatedAt,
   );
@@ -3228,6 +3265,7 @@ class UserSettingsRow extends DataClass implements Insertable<UserSettingsRow> {
           other.refreshIntervalMinutes == this.refreshIntervalMinutes &&
           other.aiBaseUrl == this.aiBaseUrl &&
           other.aiModel == this.aiModel &&
+          other.proxyUrl == this.proxyUrl &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -3239,6 +3277,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSettingsRow> {
   final Value<int> refreshIntervalMinutes;
   final Value<String> aiBaseUrl;
   final Value<String> aiModel;
+  final Value<String?> proxyUrl;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const UserSettingsCompanion({
@@ -3248,6 +3287,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSettingsRow> {
     this.refreshIntervalMinutes = const Value.absent(),
     this.aiBaseUrl = const Value.absent(),
     this.aiModel = const Value.absent(),
+    this.proxyUrl = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -3258,6 +3298,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSettingsRow> {
     this.refreshIntervalMinutes = const Value.absent(),
     this.aiBaseUrl = const Value.absent(),
     this.aiModel = const Value.absent(),
+    this.proxyUrl = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : createdAt = Value(createdAt),
@@ -3269,6 +3310,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSettingsRow> {
     Expression<int>? refreshIntervalMinutes,
     Expression<String>? aiBaseUrl,
     Expression<String>? aiModel,
+    Expression<String>? proxyUrl,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -3280,6 +3322,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSettingsRow> {
         'refresh_interval_minutes': refreshIntervalMinutes,
       if (aiBaseUrl != null) 'ai_base_url': aiBaseUrl,
       if (aiModel != null) 'ai_model': aiModel,
+      if (proxyUrl != null) 'proxy_url': proxyUrl,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -3292,6 +3335,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSettingsRow> {
     Value<int>? refreshIntervalMinutes,
     Value<String>? aiBaseUrl,
     Value<String>? aiModel,
+    Value<String?>? proxyUrl,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -3303,6 +3347,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSettingsRow> {
           refreshIntervalMinutes ?? this.refreshIntervalMinutes,
       aiBaseUrl: aiBaseUrl ?? this.aiBaseUrl,
       aiModel: aiModel ?? this.aiModel,
+      proxyUrl: proxyUrl ?? this.proxyUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -3331,6 +3376,9 @@ class UserSettingsCompanion extends UpdateCompanion<UserSettingsRow> {
     if (aiModel.present) {
       map['ai_model'] = Variable<String>(aiModel.value);
     }
+    if (proxyUrl.present) {
+      map['proxy_url'] = Variable<String>(proxyUrl.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -3349,6 +3397,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSettingsRow> {
           ..write('refreshIntervalMinutes: $refreshIntervalMinutes, ')
           ..write('aiBaseUrl: $aiBaseUrl, ')
           ..write('aiModel: $aiModel, ')
+          ..write('proxyUrl: $proxyUrl, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -7043,6 +7092,7 @@ typedef $$UserSettingsTableCreateCompanionBuilder =
       Value<int> refreshIntervalMinutes,
       Value<String> aiBaseUrl,
       Value<String> aiModel,
+      Value<String?> proxyUrl,
       required DateTime createdAt,
       required DateTime updatedAt,
     });
@@ -7054,6 +7104,7 @@ typedef $$UserSettingsTableUpdateCompanionBuilder =
       Value<int> refreshIntervalMinutes,
       Value<String> aiBaseUrl,
       Value<String> aiModel,
+      Value<String?> proxyUrl,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -7094,6 +7145,11 @@ class $$UserSettingsTableFilterComposer
 
   ColumnFilters<String> get aiModel => $composableBuilder(
     column: $table.aiModel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get proxyUrl => $composableBuilder(
+    column: $table.proxyUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7147,6 +7203,11 @@ class $$UserSettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get proxyUrl => $composableBuilder(
+    column: $table.proxyUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -7188,6 +7249,9 @@ class $$UserSettingsTableAnnotationComposer
 
   GeneratedColumn<String> get aiModel =>
       $composableBuilder(column: $table.aiModel, builder: (column) => column);
+
+  GeneratedColumn<String> get proxyUrl =>
+      $composableBuilder(column: $table.proxyUrl, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -7237,6 +7301,7 @@ class $$UserSettingsTableTableManager
                 Value<int> refreshIntervalMinutes = const Value.absent(),
                 Value<String> aiBaseUrl = const Value.absent(),
                 Value<String> aiModel = const Value.absent(),
+                Value<String?> proxyUrl = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => UserSettingsCompanion(
@@ -7246,6 +7311,7 @@ class $$UserSettingsTableTableManager
                 refreshIntervalMinutes: refreshIntervalMinutes,
                 aiBaseUrl: aiBaseUrl,
                 aiModel: aiModel,
+                proxyUrl: proxyUrl,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -7257,6 +7323,7 @@ class $$UserSettingsTableTableManager
                 Value<int> refreshIntervalMinutes = const Value.absent(),
                 Value<String> aiBaseUrl = const Value.absent(),
                 Value<String> aiModel = const Value.absent(),
+                Value<String?> proxyUrl = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
               }) => UserSettingsCompanion.insert(
@@ -7266,6 +7333,7 @@ class $$UserSettingsTableTableManager
                 refreshIntervalMinutes: refreshIntervalMinutes,
                 aiBaseUrl: aiBaseUrl,
                 aiModel: aiModel,
+                proxyUrl: proxyUrl,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),

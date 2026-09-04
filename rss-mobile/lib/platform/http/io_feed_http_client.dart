@@ -22,19 +22,31 @@ final class IoFeedHttpClient implements FeedHttpClient {
     String? proxyUrl,
     bool useEnvironmentProxy = true,
   }) : _client = client ?? HttpClient() {
+    _useEnvironmentProxy = useEnvironmentProxy;
     // Decompress explicitly so gzip and deflate behave consistently on every
     // platform, and so the decompressed size can be limited as well.
     _client.autoUncompress = false;
-    if (proxyUrl != null && proxyUrl.trim().isNotEmpty) {
-      final proxy = _parseProxy(proxyUrl);
-      _client.findProxy = (_) => 'PROXY ${proxy.host}:${proxy.port}';
-    } else if (useEnvironmentProxy) {
-      _client.findProxy = HttpClient.findProxyFromEnvironment;
-    }
+    setProxyUrl(proxyUrl);
   }
 
   static const _userAgent = 'AuroraRSSMobile/0.1';
   final HttpClient _client;
+  late final bool _useEnvironmentProxy;
+  Uri? _proxy;
+
+  @override
+  void setProxyUrl(String? proxyUrl) {
+    _proxy = proxyUrl == null || proxyUrl.trim().isEmpty
+        ? null
+        : _parseProxy(proxyUrl);
+    _client.findProxy = (target) {
+      final proxy = _proxy;
+      if (proxy != null) return 'PROXY ${proxy.host}:${proxy.port}';
+      return _useEnvironmentProxy
+          ? HttpClient.findProxyFromEnvironment(target)
+          : 'DIRECT';
+    };
+  }
 
   @override
   Future<FeedHttpResponse> get(

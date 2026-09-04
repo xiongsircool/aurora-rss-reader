@@ -48,7 +48,7 @@ void main() {
     final version = await database
         .customSelect('PRAGMA user_version')
         .getSingle();
-    expect(version.read<int>('user_version'), 1);
+    expect(version.read<int>('user_version'), 2);
   });
 
   test('refreshing a feed preserves its creation timestamp', () async {
@@ -66,6 +66,17 @@ void main() {
     expect(after.createdAt, before.createdAt);
     expect(after.updatedAt.isBefore(before.updatedAt), isFalse);
     expect(after.title, 'Updated Feed');
+  });
+
+  test('persists the singleton proxy setting', () async {
+    expect(await repository.loadProxyUrl(), isNull);
+    await repository.saveProxyUrl('http://127.0.0.1:7897');
+
+    expect(await repository.loadProxyUrl(), 'http://127.0.0.1:7897');
+    expect(await database.select(database.userSettings).get(), hasLength(1));
+
+    await repository.saveProxyUrl(null);
+    expect(await repository.loadProxyUrl(), isNull);
   });
 
   test('deduplicates entries by feed and guid', () async {

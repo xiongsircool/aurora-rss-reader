@@ -18,6 +18,9 @@ M0 technical validation is in progress. The repository currently contains:
 - End-to-end local refresh pipeline: fetch bytes, decode, parse and persist only after validation
 - Functional subscription form, mixed inbox, all/unread filter and cursor-based load-more
 - Feed refresh/delete plus persistent read and starred actions
+- Local FTS5 search UI and static HTML article reader with safe external links
+- Persistent HTTP proxy settings backed by a tested schema v1-to-v2 migration
+- OPML import through the native file picker and export through the system share sheet
 - Failed HTTP/XML refreshes preserve the previous local snapshot
 - Tests for navigation, parsing, encodings, HTTP behavior and database contracts
 - Reproducible 50,000-entry SQLite benchmark
@@ -64,7 +67,7 @@ flutter run -d <ios-simulator-id> \
   --dart-define=AURORA_PROXY_URL=http://127.0.0.1:7897
 ```
 
-The proxy value is compile-time development configuration for now; persistent user configuration belongs to the settings milestone.
+The compile-time value is only a development default. Users can override or disable it at runtime from Settings > Network Proxy; that choice persists in the schema-v2 local database.
 
 Run the external Feed compatibility suite separately from deterministic tests:
 

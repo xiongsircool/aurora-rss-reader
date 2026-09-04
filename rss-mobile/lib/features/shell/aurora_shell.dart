@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/entities/entry.dart';
 import '../../domain/entities/feed.dart';
 import '../inbox/entry_tile.dart';
+import '../reader/article_reader_page.dart';
 import '../reader/mobile_reader_controller.dart';
+import '../search/search_page.dart';
+import '../settings/opml_actions_sheet.dart';
+import '../settings/proxy_settings_dialog.dart';
 import '../sources/add_feed_sheet.dart';
 
 final class AuroraShell extends StatefulWidget {
@@ -102,6 +107,15 @@ final class _InboxPage extends StatelessWidget {
         title: const Text('Aurora'),
         actions: [
           IconButton(
+            tooltip: '搜索',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => SearchPage(controller: controller),
+              ),
+            ),
+            icon: const Icon(Icons.search),
+          ),
+          IconButton(
             tooltip: '刷新全部订阅',
             onPressed: controller.refreshing || controller.feeds.isEmpty
                 ? null
@@ -194,6 +208,7 @@ final class _InboxPage extends StatelessWidget {
             key: ValueKey(entry.id),
             entry: entry,
             feedTitle: controller.feedTitle(entry.feedId),
+            onTap: () => _openReader(context, controller, entry),
             onReadChanged: (read) => controller.setRead(entry, read: read),
             onStarredChanged: (starred) =>
                 controller.setStarred(entry, starred: starred),
@@ -232,6 +247,7 @@ final class _SavedPage extends StatelessWidget {
                         key: ValueKey('saved-${entry.id}'),
                         entry: entry,
                         feedTitle: controller.feedTitle(entry.feedId),
+                        onTap: () => _openReader(context, controller, entry),
                         onReadChanged: (read) =>
                             controller.setRead(entry, read: read),
                         onStarredChanged: (starred) =>
@@ -396,6 +412,22 @@ final class _SettingsPage extends StatelessWidget {
             ),
           ),
           const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.lan_outlined),
+            title: const Text('网络代理'),
+            subtitle: Text(controller.proxyUrl ?? '直连'),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => showProxySettingsDialog(context, controller),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.import_export),
+            title: const Text('OPML 导入与导出'),
+            subtitle: Text('${controller.feeds.length} 个订阅'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showOpmlActionsSheet(context, controller),
+          ),
+          const Divider(height: 1, indent: 56),
           const ListTile(
             leading: Icon(Icons.smart_toy_outlined),
             title: Text('AI 服务'),
@@ -501,4 +533,20 @@ final class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+void _openReader(
+  BuildContext context,
+  MobileReaderController controller,
+  Entry entry,
+) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => ArticleReaderPage(
+        entry: entry,
+        feedTitle: controller.feedTitle(entry.feedId),
+        controller: controller,
+      ),
+    ),
+  );
 }

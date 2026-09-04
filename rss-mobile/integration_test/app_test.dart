@@ -110,5 +110,8 @@ final class _FakeFeedHttpClient implements FeedHttpClient {
   }
 
   @override
+  void setProxyUrl(String? proxyUrl) {}
+
+  @override
   void close() {}
 }

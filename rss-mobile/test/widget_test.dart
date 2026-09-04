@@ -47,6 +47,67 @@ void main() {
     expect(find.text('本地模式'), findsOneWidget);
   });
 
+  testWidgets('opens OPML import and export actions from settings', (
+    tester,
+  ) async {
+    await tester.pumpWidget(AuroraApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('OPML 导入与导出'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('导入 OPML'), findsOneWidget);
+    expect(find.text('导出 OPML'), findsOneWidget);
+  });
+
+  testWidgets('persists and applies a proxy from settings', (tester) async {
+    await tester.pumpWidget(AuroraApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('网络代理'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('proxy-url-input')),
+      '127.0.0.1:7897',
+    );
+    await tester.tap(find.byKey(const ValueKey('proxy-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('http://127.0.0.1:7897'), findsOneWidget);
+    expect(httpClient.proxyUrl, 'http://127.0.0.1:7897');
+    expect(
+      (await database.select(database.userSettings).getSingle()).proxyUrl,
+      'http://127.0.0.1:7897',
+    );
+  });
+
+  testWidgets('searches local article content and opens the reader', (
+    tester,
+  ) async {
+    await tester.pumpWidget(AuroraApp(controller: controller));
+    await tester.pumpAndSettle();
+    await controller.addFeed('https://example.com/feed.xml');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('搜索'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('search-input')),
+      'Fixture summary',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fixture article'), findsOneWidget);
+    await tester.tap(find.text('Fixture article'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, '打开原文'), findsOneWidget);
+  });
+
   testWidgets('adds a feed and persists article actions from the UI', (
     tester,
   ) async {
@@ -65,6 +126,13 @@ void main() {
     expect(find.text('Fixture article'), findsOneWidget);
     expect(find.text('Fixture Feed'), findsOneWidget);
 
+    await tester.tap(find.text('Fixture article'));
+    await tester.pumpAndSettle();
+    expect(find.text('Fixture summary', findRichText: true), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '打开原文'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byIcon(Icons.star_border));
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.bookmark_border));
@@ -77,6 +145,7 @@ void main() {
 
 final class _FakeFeedHttpClient implements FeedHttpClient {
   bool closed = false;
+  String? proxyUrl;
 
   @override
   Future<FeedHttpResponse> get(
@@ -106,6 +175,11 @@ final class _FakeFeedHttpClient implements FeedHttpClient {
       },
       body: Uint8List.fromList(utf8.encode(fixture)),
     );
+  }
+
+  @override
+  void setProxyUrl(String? proxyUrl) {
+    this.proxyUrl = proxyUrl;
   }
 
   @override

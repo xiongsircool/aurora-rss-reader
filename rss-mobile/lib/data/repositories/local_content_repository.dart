@@ -57,6 +57,44 @@ final class LocalContentRepository {
     return rows.map(_feedFromRow).toList();
   }
 
+  Future<String?> loadProxyUrl() async {
+    final settings = await database
+        .select(database.userSettings)
+        .getSingleOrNull();
+    if (settings != null) return settings.proxyUrl;
+
+    final now = DateTime.now().toUtc();
+    await database
+        .into(database.userSettings)
+        .insert(UserSettingsCompanion.insert(createdAt: now, updatedAt: now));
+    return null;
+  }
+
+  Future<void> saveProxyUrl(String? proxyUrl) async {
+    final now = DateTime.now().toUtc();
+    final existing = await database
+        .select(database.userSettings)
+        .getSingleOrNull();
+    if (existing == null) {
+      await database
+          .into(database.userSettings)
+          .insert(
+            UserSettingsCompanion.insert(
+              proxyUrl: Value(proxyUrl),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      return;
+    }
+
+    await (database.update(
+      database.userSettings,
+    )..where((row) => row.id.equals(existing.id))).write(
+      UserSettingsCompanion(proxyUrl: Value(proxyUrl), updatedAt: Value(now)),
+    );
+  }
+
   /// Inserts normalized entries and ignores duplicates by feed + guid.
   Future<int> insertParsedEntries(String feedId, Iterable<ParsedEntry> items) {
     return database.transaction(() async {
@@ -250,6 +288,7 @@ domain_entry.Entry _entryFromRow(EntryRow row) {
     url: row.url == null ? null : Uri.tryParse(row.url!),
     author: row.author,
     summary: row.summary,
+    content: row.content,
     imageUrl: row.imageUrl == null ? null : Uri.tryParse(row.imageUrl!),
     publishedAt: row.publishedAt,
     insertedAt: row.insertedAt,

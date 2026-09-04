@@ -19,6 +19,7 @@ void main() {
   final controller = MobileReaderController(
     repository: repository,
     refreshFeed: RefreshFeed(httpClient: httpClient, repository: repository),
+    initialProxyUrl: configuredProxy.isEmpty ? null : configuredProxy,
   );
 
   runApp(AuroraApp(controller: controller));

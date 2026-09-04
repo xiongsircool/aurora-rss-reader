@@ -8,6 +8,7 @@ final class Entry {
     this.url,
     this.author,
     this.summary,
+    this.content,
     this.imageUrl,
     this.publishedAt,
     this.readAt,
@@ -21,6 +22,7 @@ final class Entry {
   final Uri? url;
   final String? author;
   final String? summary;
+  final String? content;
   final Uri? imageUrl;
   final DateTime? publishedAt;
   final DateTime insertedAt;
@@ -46,6 +48,7 @@ final class Entry {
       url: url,
       author: author,
       summary: summary,
+      content: content,
       imageUrl: imageUrl,
       publishedAt: publishedAt,
       insertedAt: insertedAt,

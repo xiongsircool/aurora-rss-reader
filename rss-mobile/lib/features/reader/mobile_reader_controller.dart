@@ -4,9 +4,14 @@ import '../../application/use_cases/refresh_feed.dart';
 import '../../data/repositories/local_content_repository.dart';
 import '../../domain/entities/entry.dart';
 import '../../domain/entities/feed.dart';
+import '../../domain/opml/opml_codec.dart';
 
 final class MobileReaderController extends ChangeNotifier {
-  MobileReaderController({required this.repository, required this.refreshFeed});
+  MobileReaderController({
+    required this.repository,
+    required this.refreshFeed,
+    String? initialProxyUrl,
+  }) : _proxyUrl = initialProxyUrl;
 
   final LocalContentRepository repository;
   final RefreshFeed refreshFeed;
@@ -14,34 +19,43 @@ final class MobileReaderController extends ChangeNotifier {
   List<Feed> _feeds = const [];
   List<Entry> _entries = const [];
   List<Entry> _starredEntries = const [];
+  List<Entry> _searchResults = const [];
   InboxCursor? _nextCursor;
   bool _initialized = false;
   bool _loading = false;
   bool _adding = false;
   bool _refreshing = false;
   bool _loadingMore = false;
+  bool _searching = false;
   bool _unreadOnly = false;
   String? _error;
   String? _notice;
+  String? _proxyUrl;
 
   List<Feed> get feeds => _feeds;
   List<Entry> get entries => _entries;
   List<Entry> get starredEntries => _starredEntries;
+  List<Entry> get searchResults => _searchResults;
   bool get initialized => _initialized;
   bool get loading => _loading;
   bool get adding => _adding;
   bool get refreshing => _refreshing;
   bool get loadingMore => _loadingMore;
+  bool get searching => _searching;
   bool get unreadOnly => _unreadOnly;
   bool get hasMore => _nextCursor != null;
   String? get error => _error;
   String? get notice => _notice;
+  String? get proxyUrl => _proxyUrl;
 
   Future<void> initialize() async {
     if (_initialized || _loading) return;
     _loading = true;
     notifyListeners();
     try {
+      final storedProxy = await repository.loadProxyUrl();
+      if (storedProxy != null) _proxyUrl = storedProxy;
+      refreshFeed.httpClient.setProxyUrl(_proxyUrl);
       await _reload();
       _initialized = true;
     } catch (error) {
@@ -198,6 +212,83 @@ final class MobileReaderController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<int> importOpml(Uint8List bytes) async {
+    try {
+      final imported = parseOpml(bytes);
+      for (final item in imported) {
+        await repository.saveFeed(
+          Feed(
+            id: _feedId(item.url),
+            title: item.title,
+            url: item.url,
+            groupName: item.groupName,
+          ),
+        );
+      }
+      await _reload();
+      _error = null;
+      _notice = '已导入 ${imported.length} 个订阅';
+      notifyListeners();
+      return imported.length;
+    } catch (error) {
+      _error = '导入 OPML 失败：$error';
+      notifyListeners();
+      return 0;
+    }
+  }
+
+  String exportOpml() => buildOpml(_feeds);
+
+  Future<void> search(String query) async {
+    final normalized = query.trim();
+    if (normalized.isEmpty) {
+      clearSearch();
+      return;
+    }
+    _searching = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _searchResults = await repository.search(normalized);
+    } catch (error) {
+      _searchResults = const [];
+      _error = '搜索失败：$error';
+    } finally {
+      _searching = false;
+      notifyListeners();
+    }
+  }
+
+  void clearSearch() {
+    if (_searchResults.isEmpty && !_searching) return;
+    _searchResults = const [];
+    _searching = false;
+    notifyListeners();
+  }
+
+  Future<bool> saveProxyUrl(String rawValue) async {
+    final normalized = _normalizeProxyUrl(rawValue);
+    if (rawValue.trim().isNotEmpty && normalized == null) {
+      _error = '代理地址格式应为 host:port 或 http://host:port';
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      await repository.saveProxyUrl(normalized);
+      refreshFeed.httpClient.setProxyUrl(normalized);
+      _proxyUrl = normalized;
+      _error = null;
+      _notice = normalized == null ? '已关闭自定义代理' : '代理设置已保存';
+      notifyListeners();
+      return true;
+    } catch (error) {
+      _error = '保存代理设置失败：$error';
+      notifyListeners();
+      return false;
+    }
+  }
+
   String feedTitle(String feedId) {
     for (final feed in _feeds) {
       if (feed.id == feedId) return feed.title;
@@ -223,6 +314,24 @@ final class MobileReaderController extends ChangeNotifier {
     _entries = page.entries;
     _nextCursor = page.nextCursor;
   }
+}
+
+String? _normalizeProxyUrl(String input) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) return null;
+  final normalized = trimmed.contains('://') ? trimmed : 'http://$trimmed';
+  final uri = Uri.tryParse(normalized);
+  if (uri == null ||
+      uri.scheme != 'http' ||
+      uri.host.isEmpty ||
+      !uri.hasPort ||
+      uri.userInfo.isNotEmpty ||
+      (uri.path.isNotEmpty && uri.path != '/') ||
+      uri.hasQuery ||
+      uri.hasFragment) {
+    return null;
+  }
+  return 'http://${uri.host}:${uri.port}';
 }
 
 Uri? _parseFeedUri(String input) {
