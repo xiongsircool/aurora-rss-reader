@@ -4,6 +4,7 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../domain/entities/entry.dart';
+import '../../shared/image_viewer_page.dart';
 import '../reader/mobile_reader_controller.dart';
 
 final class ArticleReaderPage extends StatefulWidget {
@@ -138,15 +139,22 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             ),
             if (_entry.imageUrl != null) ...[
               const SizedBox(height: 20),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  _entry.imageUrl.toString(),
-                  headers: referer == null
-                      ? null
-                      : {'Referer': referer.toString()},
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              GestureDetector(
+                onTap: () => ImageViewerPage.show(
+                  context,
+                  url: _entry.imageUrl!,
+                  referer: referer,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    _entry.imageUrl.toString(),
+                    headers: referer == null
+                        ? null
+                        : {'Referer': referer.toString()},
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
                 ),
               ),
             ],
@@ -231,8 +239,19 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             else
               HtmlWidget(
                 _sanitizeArticleHtml(html),
-                factoryBuilder: () =>
-                    ArticleWidgetFactory(referer: referer?.toString()),
+                factoryBuilder: () => ArticleWidgetFactory(
+                  referer: referer?.toString(),
+                  onImageTap: (url) async {
+                    final uri = Uri.tryParse(url);
+                    if (uri != null) {
+                      await ImageViewerPage.show(
+                        context,
+                        url: uri,
+                        referer: referer,
+                      );
+                    }
+                  },
+                ),
                 textStyle: Theme.of(context).textTheme.bodyLarge
                     ?.copyWith(height: 1.65),
                 onTapUrl: (url) async {
@@ -258,9 +277,10 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
 /// Renders remote article images with the page URL as Referer; many
 /// site CDNs reject image requests without it.
 final class ArticleWidgetFactory extends WidgetFactory {
-  ArticleWidgetFactory({this.referer});
+  ArticleWidgetFactory({this.referer, this.onImageTap});
 
   final String? referer;
+  final void Function(String url)? onImageTap;
 
   @override
   ImageProvider? imageProviderFromNetwork(String url) {
@@ -268,6 +288,19 @@ final class ArticleWidgetFactory extends WidgetFactory {
     return NetworkImage(
       url,
       headers: referer == null ? null : {'Referer': referer},
+    );
+  }
+
+  @override
+  Widget? buildImageWidget(BuildTree tree, ImageSource src) {
+    final image = super.buildImageWidget(tree, src);
+    if (image == null || onImageTap == null) return image;
+    return GestureDetector(
+      onTap: () {
+        final url = src.url;
+        if (url.isNotEmpty) onImageTap!(url);
+      },
+      child: image,
     );
   }
 }
