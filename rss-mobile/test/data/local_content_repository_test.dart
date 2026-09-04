@@ -68,6 +68,41 @@ void main() {
     expect(after.title, 'Updated Feed');
   });
 
+  test('marks inbox entries as read, optionally per group', () async {
+    await repository.saveFeed(
+      Feed(
+        id: 'feed-2',
+        title: 'Grouped Feed',
+        url: Uri.parse('https://example.com/grouped.xml'),
+        groupName: '技术',
+      ),
+    );
+    await repository.insertParsedEntries('feed-1', [_entry('mr-1', 'A')]);
+    await repository.insertParsedEntries('feed-2', [_entry('mr-2', 'B')]);
+
+    final updated = await repository.markInboxRead(groupName: '技术');
+    expect(updated, 1);
+
+    final statuses = await database
+        .customSelect(
+          'SELECT e.read_at IS NULL AS unread, f.group_name AS group_name '
+          'FROM entries e JOIN feeds f ON f.id = e.feed_id',
+        )
+        .get();
+    expect(
+      statuses
+          .where((row) => row.read<String>('group_name') == '技术')
+          .every((row) => row.read<bool>('unread') == false),
+      isTrue,
+    );
+    expect(
+      statuses
+          .where((row) => row.read<String>('group_name') == 'default')
+          .every((row) => row.read<bool>('unread') == true),
+      isTrue,
+    );
+  });
+
   test('persists the singleton proxy setting', () async {
     expect(await repository.loadProxyUrl(), isNull);
     await repository.saveProxyUrl('http://127.0.0.1:7897');

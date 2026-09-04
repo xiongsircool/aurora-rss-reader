@@ -224,6 +224,14 @@ final class MobileReaderController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<int> markInboxRead() async {
+    final updated = await repository.markInboxRead(groupName: _selectedGroup);
+    await _loadFirstPage();
+    _starredEntries = await repository.listStarred();
+    notifyListeners();
+    return updated;
+  }
+
   Future<void> setUnreadOnly(bool value) async {
     if (_unreadOnly == value) return;
     _unreadOnly = value;

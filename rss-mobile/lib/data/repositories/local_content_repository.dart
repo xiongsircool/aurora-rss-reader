@@ -270,6 +270,24 @@ final class LocalContentRepository {
     );
   }
 
+  /// Marks every unread entry (optionally limited to a group) as read.
+  /// Returns the number of entries updated.
+  Future<int> markInboxRead({String? groupName}) async {
+    final groupFilter = groupName == null
+        ? ''
+        : 'AND feed_id IN (SELECT id FROM feeds WHERE group_name = ?)';
+    final changes = await database.transaction(() async {
+      await database.customStatement(
+        'UPDATE entries SET read_at = ? '
+        'WHERE read_at IS NULL $groupFilter',
+        [DateTime.now().toUtc().toIso8601String(), ?groupName],
+      );
+      return (await database.customSelect('SELECT changes() AS c').getSingle())
+          .read<int>('c');
+    });
+    return changes;
+  }
+
   Future<void> markRead(String entryId, {required bool read}) {
     return database.transaction(() async {
       await (database.update(

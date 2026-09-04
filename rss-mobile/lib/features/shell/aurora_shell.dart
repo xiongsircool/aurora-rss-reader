@@ -130,6 +130,31 @@ final class _InboxPage extends StatelessWidget {
                   )
                 : const Icon(Icons.refresh),
           ),
+          PopupMenuButton<String>(
+            key: const ValueKey('inbox-more'),
+            tooltip: '更多',
+            onSelected: (action) async {
+              if (action == 'mark-all-read') {
+                final count = await controller.markInboxRead();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('已标记 $count 篇为已读')));
+                }
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'mark-all-read',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.done_all_outlined),
+                  title: Text(
+                    controller.selectedGroup == null ? '全部标为已读' : '本分组标为已读',
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: SafeArea(

@@ -21,6 +21,17 @@ final class AuroraApp extends StatelessWidget {
       surface: Color(0xFFF8F9FA),
       onSurface: Color(0xFF202124),
     );
+    const darkScheme = ColorScheme(
+      brightness: Brightness.dark,
+      primary: Color(0xFFFFB68A),
+      onPrimary: Color(0xFF3A1D00),
+      secondary: Color(0xFF6FD6E3),
+      onSecondary: Color(0xFF00363B),
+      error: Color(0xFFFFB4AB),
+      onError: Color(0xFF690005),
+      surface: Color(0xFF14161A),
+      onSurface: Color(0xFFE4E2E6),
+    );
 
     return MaterialApp(
       title: 'Aurora RSS Reader',
@@ -49,6 +60,31 @@ final class AuroraApp extends StatelessWidget {
           ),
         ),
       ),
+      darkTheme: ThemeData(
+        colorScheme: darkScheme,
+        scaffoldBackgroundColor: darkScheme.surface,
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF14161A),
+          foregroundColor: Color(0xFFE4E2E6),
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: TextStyle(
+            color: Color(0xFFE4E2E6),
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        navigationBarTheme: const NavigationBarThemeData(
+          height: 68,
+          indicatorColor: Color(0xFF52432F),
+          backgroundColor: Color(0xFF1B1E23),
+          labelTextStyle: WidgetStatePropertyAll(
+            TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
+      themeMode: ThemeMode.system,
       home: AuroraShell(controller: controller),
     );
   }
