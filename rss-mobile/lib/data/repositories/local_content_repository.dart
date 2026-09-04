@@ -331,6 +331,73 @@ final class LocalContentRepository {
     );
   }
 
+  /// Caches an AI summary for the given entry and language.
+  Future<void> saveSummary({
+    required String entryId,
+    required String language,
+    required String summary,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await database
+        .into(database.summaries)
+        .insertOnConflictUpdate(
+          SummariesCompanion.insert(
+            id: 'summary-$entryId-$language',
+            entryId: entryId,
+            language: language,
+            summary: summary,
+            createdAt: now,
+          ),
+        );
+  }
+
+  Future<String?> loadSummary({
+    required String entryId,
+    required String language,
+  }) async {
+    final row =
+        await (database.select(database.summaries)
+              ..where((s) => s.entryId.equals(entryId))
+              ..where((s) => s.language.equals(language)))
+            .getSingleOrNull();
+    return row?.summary;
+  }
+
+  /// Caches a translation for the given entry and language.
+  Future<void> saveTranslation({
+    required String entryId,
+    required String language,
+    required String title,
+    String? summary,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await database
+        .into(database.translations)
+        .insertOnConflictUpdate(
+          TranslationsCompanion.insert(
+            id: 'translation-$entryId-$language',
+            entryId: entryId,
+            language: language,
+            title: Value(title),
+            summary: Value(summary),
+            createdAt: now,
+          ),
+        );
+  }
+
+  Future<({String title, String? summary})?> loadTranslation({
+    required String entryId,
+    required String language,
+  }) async {
+    final row =
+        await (database.select(database.translations)
+              ..where((t) => t.entryId.equals(entryId))
+              ..where((t) => t.language.equals(language)))
+            .getSingleOrNull();
+    if (row == null) return null;
+    return (title: row.title ?? '', summary: row.summary);
+  }
+
   Future<void> saveExtractionFailure(String entryId, String error) {
     return (database.update(
       database.entries,
