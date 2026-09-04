@@ -25,7 +25,7 @@ final class MobileReaderController extends ChangeNotifier {
   List<Entry> _searchResults = const [];
   final Set<String> _extractingEntryIds = {};
   List<GroupSummary> _groups = const [];
-  String? _selectedGroup;
+  final Set<String> _mutedGroups = {};
   InboxCursor? _nextCursor;
   bool _initialized = false;
   bool _loading = false;
@@ -40,7 +40,7 @@ final class MobileReaderController extends ChangeNotifier {
 
   List<Feed> get feeds => _feeds;
   List<GroupSummary> get groups => _groups;
-  String? get selectedGroup => _selectedGroup;
+  Set<String> get mutedGroups => _mutedGroups;
   List<Entry> get entries => _entries;
   List<Entry> get starredEntries => _starredEntries;
   List<Entry> get searchResults => _searchResults;
@@ -110,15 +110,20 @@ final class MobileReaderController extends ChangeNotifier {
     }
   }
 
-  Future<void> setGroup(String? groupName) async {
-    if (_selectedGroup == groupName) return;
-    _selectedGroup = groupName;
+  /// Toggles a group's visibility in the inbox. Muted groups disappear
+  /// from the inbox entirely (feed subscriptions are untouched).
+  Future<void> toggleGroupMuted(String groupName) async {
+    if (_mutedGroups.contains(groupName)) {
+      _mutedGroups.remove(groupName);
+    } else {
+      _mutedGroups.add(groupName);
+    }
     _loading = true;
     notifyListeners();
     try {
       await _loadFirstPage();
     } catch (error) {
-      _error = '切换分组失败：$error';
+      _error = '加载文章失败：$error';
     } finally {
       _loading = false;
       notifyListeners();
@@ -142,7 +147,7 @@ final class MobileReaderController extends ChangeNotifier {
     if (normalized.isEmpty || normalized == oldName) return;
     try {
       await repository.renameGroup(oldName, normalized);
-      if (_selectedGroup == oldName) _selectedGroup = normalized;
+      _mutedGroups.remove(oldName);
       await _reload();
       _error = null;
       _notice = '分组已重命名为 $normalized';
@@ -155,7 +160,7 @@ final class MobileReaderController extends ChangeNotifier {
   Future<void> deleteGroup(String groupName) async {
     try {
       await repository.deleteGroup(groupName);
-      if (_selectedGroup == groupName) _selectedGroup = null;
+      _mutedGroups.remove(groupName);
       await _reload();
       _error = null;
       _notice = '分组 $groupName 已解散，订阅移入默认分组';
@@ -225,7 +230,7 @@ final class MobileReaderController extends ChangeNotifier {
   }
 
   Future<int> markInboxRead() async {
-    final updated = await repository.markInboxRead(groupName: _selectedGroup);
+    final updated = await repository.markInboxRead();
     await _loadFirstPage();
     _starredEntries = await repository.listStarred();
     notifyListeners();
@@ -256,7 +261,7 @@ final class MobileReaderController extends ChangeNotifier {
       final page = await repository.listInbox(
         cursor: cursor,
         unreadOnly: _unreadOnly,
-        groupName: _selectedGroup,
+        excludeGroups: _mutedGroups,
       );
       _entries = [..._entries, ...page.entries];
       _nextCursor = page.nextCursor;
@@ -433,10 +438,9 @@ final class MobileReaderController extends ChangeNotifier {
   Future<void> _reload() async {
     _feeds = await repository.listFeeds();
     _groups = await repository.listGroups();
-    if (_selectedGroup != null &&
-        !_groups.any((group) => group.name == _selectedGroup)) {
-      _selectedGroup = null;
-    }
+    _mutedGroups.removeWhere(
+      (name) => !_groups.any((group) => group.name == name),
+    );
     await _loadFirstPage();
     _starredEntries = await repository.listStarred();
   }
@@ -444,7 +448,7 @@ final class MobileReaderController extends ChangeNotifier {
   Future<void> _loadFirstPage() async {
     final page = await repository.listInbox(
       unreadOnly: _unreadOnly,
-      groupName: _selectedGroup,
+      excludeGroups: _mutedGroups,
     );
     _entries = page.entries;
     _nextCursor = page.nextCursor;

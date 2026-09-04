@@ -219,18 +219,20 @@ final class LocalContentRepository {
   Future<InboxPage> listInbox({
     InboxCursor? cursor,
     bool unreadOnly = false,
-    String? groupName,
+    Set<String> excludeGroups = const {},
     int limit = 50,
   }) async {
     final where = <String>[];
     final variables = <Variable<Object>>[];
 
     if (unreadOnly) where.add('entries.read_at IS NULL');
-    if (groupName != null) {
+    if (excludeGroups.isNotEmpty) {
+      final placeholders = List.filled(excludeGroups.length, '?').join(', ');
       where.add(
-        'entries.feed_id IN (SELECT id FROM feeds WHERE group_name = ?)',
+        'entries.feed_id NOT IN '
+        '(SELECT id FROM feeds WHERE group_name IN ($placeholders))',
       );
-      variables.add(Variable<String>(groupName));
+      variables.addAll(excludeGroups.map(Variable<String>.new));
     }
     if (cursor != null) {
       where.add(
@@ -273,19 +275,15 @@ final class LocalContentRepository {
   /// Marks every unread entry (optionally limited to a group) as read.
   /// Returns the number of entries updated.
   Future<int> markInboxRead({String? groupName}) async {
-    final groupFilter = groupName == null
-        ? ''
-        : 'AND feed_id IN (SELECT id FROM feeds WHERE group_name = ?)';
-    final changes = await database.transaction(() async {
-      await database.customStatement(
-        'UPDATE entries SET read_at = ? '
-        'WHERE read_at IS NULL $groupFilter',
-        [DateTime.now().toUtc().toIso8601String(), ?groupName],
-      );
-      return (await database.customSelect('SELECT changes() AS c').getSingle())
-          .read<int>('c');
-    });
-    return changes;
+    var query = database.update(database.entries)
+      ..where((entry) => entry.readAt.isNull());
+    if (groupName != null) {
+      final groupFeedIds = database.selectOnly(database.feeds)
+        ..addColumns([database.feeds.id])
+        ..where(database.feeds.groupName.equals(groupName));
+      query = query..where((entry) => entry.feedId.isInQuery(groupFeedIds));
+    }
+    return query.write(EntriesCompanion(readAt: Value(DateTime.now().toUtc())));
   }
 
   Future<void> markRead(String entryId, {required bool read}) {

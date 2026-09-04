@@ -68,6 +68,23 @@ void main() {
     expect(after.title, 'Updated Feed');
   });
 
+  test('listInbox excludes muted groups via excludeGroups', () async {
+    await repository.saveFeed(
+      Feed(
+        id: 'feed-2',
+        title: 'Grouped Feed',
+        url: Uri.parse('https://example.com/grouped.xml'),
+        groupName: '技术',
+      ),
+    );
+    await repository.insertParsedEntries('feed-1', [_entry('ex-1', 'A')]);
+    await repository.insertParsedEntries('feed-2', [_entry('ex-2', 'B')]);
+
+    final visible = await repository.listInbox(excludeGroups: const {'技术'});
+    expect(visible.entries, hasLength(1));
+    expect(visible.entries.single.feedId, 'feed-1');
+  });
+
   test('marks inbox entries as read, optionally per group', () async {
     await repository.saveFeed(
       Feed(
@@ -90,16 +107,20 @@ void main() {
         )
         .get();
     expect(
-      statuses
-          .where((row) => row.read<String>('group_name') == '技术')
-          .every((row) => row.read<bool>('unread') == false),
+      statuses.where((row) => row.read<String>('group_name') == '技术').length,
+      1,
+    );
+
+    // Re-reading through drift must succeed (catches storage-format drift).
+    final reread = await repository.listInbox();
+    expect(reread.entries, hasLength(2));
+    expect(
+      reread.entries.singleWhere((entry) => entry.guid == 'mr-2').isRead,
       isTrue,
     );
     expect(
-      statuses
-          .where((row) => row.read<String>('group_name') == 'default')
-          .every((row) => row.read<bool>('unread') == true),
-      isTrue,
+      reread.entries.singleWhere((entry) => entry.guid == 'mr-1').isRead,
+      isFalse,
     );
   });
 
@@ -213,8 +234,11 @@ void main() {
       expect(groups.any((group) => group.name == '技术'), isFalse);
       expect(groups.singleWhere((group) => group.name == '阅读').feedCount, 2);
 
-      // Inbox can be filtered by group (feed-1 moved in, so 1+2 entries).
-      final techInbox = await repository.listInbox(groupName: '阅读');
+      // Inbox can be filtered by excluding other groups (feed-1 moved in,
+      // so 1+2 entries).
+      final techInbox = await repository.listInbox(
+        excludeGroups: const {'default'},
+      );
       expect(techInbox.entries, hasLength(3));
 
       // Deleting a group moves feeds back to default.

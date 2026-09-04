@@ -5,6 +5,7 @@ import '../../data/repositories/local_content_repository.dart'
 import '../../domain/entities/entry.dart';
 import '../../domain/entities/feed.dart';
 import '../inbox/entry_tile.dart';
+import '../inbox/inbox_filter_sheet.dart';
 import '../reader/article_reader_page.dart';
 import '../reader/mobile_reader_controller.dart';
 import '../search/search_page.dart';
@@ -110,6 +111,29 @@ final class _InboxPage extends StatelessWidget {
         title: const Text('Aurora'),
         actions: [
           IconButton(
+            tooltip: '筛选',
+            onPressed: () => showInboxFilterSheet(context, controller),
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.filter_list),
+                if (controller.mutedGroups.isNotEmpty)
+                  Positioned(
+                    right: -4,
+                    top: -2,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          IconButton(
             tooltip: '搜索',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -148,9 +172,7 @@ final class _InboxPage extends StatelessWidget {
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.done_all_outlined),
-                  title: Text(
-                    controller.selectedGroup == null ? '全部标为已读' : '本分组标为已读',
-                  ),
+                  title: const Text('全部标为已读'),
                 ),
               ),
             ],
@@ -176,37 +198,6 @@ final class _InboxPage extends StatelessWidget {
                 },
               ),
             ),
-            if (controller.groups.isNotEmpty)
-              SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: const Text('全部分组'),
-                        selected: controller.selectedGroup == null,
-                        onSelected: (_) => controller.setGroup(null),
-                      ),
-                    ),
-                    for (final group in controller.groups)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(
-                            '${groupDisplayName(group.name)}'
-                            '${group.unreadEntries > 0 ? ' ${group.unreadEntries}' : ''}',
-                          ),
-                          selected: controller.selectedGroup == group.name,
-                          onSelected: (_) => controller.setGroup(group.name),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 4),
             Expanded(child: _inboxContent(context)),
           ],
         ),
