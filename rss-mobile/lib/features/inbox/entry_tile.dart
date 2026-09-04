@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:html/parser.dart' as html_parser;
 
 import '../../domain/entities/entry.dart';
 
@@ -27,11 +28,10 @@ final class EntryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final date = entry.publishedAt ?? entry.insertedAt;
-    final summary = entry.summary;
-    final showSummary =
-        summary != null &&
-        summary.trim().isNotEmpty &&
-        !summary.contains(RegExp(r'<[^>]+>'));
+    final summary = entry.summary == null
+        ? null
+        : html_parser.parseFragment(entry.summary!).text?.trim();
+    final showSummary = summary != null && summary.isNotEmpty;
 
     return Material(
       color: entry.isRead
