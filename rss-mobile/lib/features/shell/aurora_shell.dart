@@ -616,13 +616,41 @@ final class _FeedTile extends StatelessWidget {
   }
 }
 
-final class _SettingsPage extends StatelessWidget {
+final class _SettingsPage extends StatefulWidget {
   const _SettingsPage({required this.controller});
 
   final MobileReaderController controller;
 
   @override
+  State<_SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<_SettingsPage> {
+  int _settingsRevision = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (mounted) {
+      setState(() => _settingsRevision++);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
+    // Key forces the FutureBuilder to re-fetch when settings change.
+    final settingsKey = ValueKey('settings-ai-$_settingsRevision');
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
@@ -662,7 +690,19 @@ final class _SettingsPage extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.smart_toy_outlined),
             title: const Text('AI 服务'),
-            subtitle: Text(controller.aiSummary != null ? '已配置' : '未配置'),
+            subtitle: FutureBuilder<({String baseUrl, String model})>(
+              key: settingsKey,
+              future: controller.loadAiConfig(),
+              builder: (context, snapshot) {
+                final configured =
+                    snapshot.hasData &&
+                    snapshot.data!.baseUrl.isNotEmpty &&
+                    snapshot.data!.model.isNotEmpty;
+                return Text(
+                  configured ? '已配置 · ${snapshot.data!.model}' : '未配置',
+                );
+              },
+            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => showAiSettingsSheet(context, controller),
           ),

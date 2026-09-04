@@ -427,6 +427,10 @@ final class MobileReaderController extends ChangeNotifier {
     }
   }
 
+  Future<({String baseUrl, String model})> loadAiConfig() {
+    return repository.loadAiConfig();
+  }
+
   Future<({String baseUrl, String model, String? apiKey})?>
   loadAiSettings() async {
     final config = await repository.loadAiConfig();
