@@ -157,17 +157,24 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 child: SegmentedButton<bool>(
                   segments: const [
                     ButtonSegment(
-                      value: false,
-                      label: Text('网页全文'),
-                      icon: Icon(Icons.article_outlined, size: 16),
-                    ),
-                    ButtonSegment(
                       value: true,
                       label: Text('订阅原文'),
                       icon: Icon(Icons.rss_feed, size: 16),
                     ),
+                    ButtonSegment(
+                      value: false,
+                      label: Text('网页全文'),
+                      icon: Icon(Icons.article_outlined, size: 16),
+                    ),
                   ],
                   selected: {_showOriginal},
+                  showSelectedIcon: false,
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: WidgetStatePropertyAll(
+                      Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ),
                   onSelectionChanged: (selection) {
                     setState(() => _showOriginal = selection.single);
                   },
