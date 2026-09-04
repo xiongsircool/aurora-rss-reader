@@ -9,12 +9,13 @@
 - [x] 旧 Capacitor 客户端归档到 `archive/mobile-plan-d-v1`
 - [x] 创建开发分支 `feature/mobile-flutter-v1`
 - [x] 安装 Flutter stable SDK(3.47.2 / Dart 3.13.2)
-- [ ] 安装完整 Xcode并完成首次启动/许可证
+- [x] 安装完整 Xcode 26.6并完成首次启动/许可证
+- [x] 安装 iOS 26.5 Simulator Runtime
 - [x] 安装 CocoaPods 1.17.0
 - [x] 安装 Android command-line SDK 36、Build Tools 36、Platform Tools与 JDK 17
 - [x] 安装 Android Emulator与 API 36 ARM64 系统镜像
 - [ ] 安装 Android Studio(命令行构建和模拟器不依赖此项)
-- [ ] `flutter doctor -v` 的 Android/iOS 项全部通过(Android 已通过,iOS 待 Xcode)
+- [x] `flutter doctor -v` 的 Android/iOS 工具链通过(仅网络资源检查偶发超时)
 
 环境限制不阻塞纯 Dart 单测和项目分层,但 M0 不能在真机检查完成前宣布结束。
 
@@ -26,7 +27,9 @@
 - [x] 配置静态检查和单元/Widget 测试
 - [x] Android debug APK 构建通过
 - [x] Android 36 ARM64 模拟器安装、冷启动、四标签导航与无崩溃冒烟通过
-- [ ] 配置真机集成测试
+- [x] iOS 26.5 / iPhone 17 Pro 模拟器构建、安装、启动与截图检查通过
+- [x] Android/iOS 模拟器运行同一套导航 + sqlite3 Native Assets 集成测试
+- [ ] Android/iOS 物理真机集成测试(真机 iOS 还需 Development Team/签名)
 - [ ] 增加开发/测试环境配置,禁止真实凭据进入仓库
 
 验收:
@@ -35,8 +38,10 @@
 flutter analyze
 flutter test
 flutter build apk --debug
-flutter build ios --debug --no-codesign
+flutter build ios --simulator --debug
 ```
+
+物理 iOS 设备构建还需在 Xcode 中选择 Development Team并完成签名配置。
 
 ## 2. HTTP 与编码
 

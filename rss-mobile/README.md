@@ -39,14 +39,15 @@ flutter doctor -v
 
 ```bash
 cd rss-mobile
-dart format --output=none --set-exit-if-changed lib test
+dart format --output=none --set-exit-if-changed lib test integration_test tool
 flutter analyze
 flutter test
 flutter build apk --debug
-flutter build ios --debug --no-codesign
+flutter build ios --simulator --debug
+flutter test integration_test/app_test.dart -d <device-id>
 ```
 
-The iOS command remains blocked until full Xcode is installed.
+Physical iOS deployment requires selecting an Apple Development Team and provisioning profile in `ios/Runner.xcworkspace`.
 
 Run the external Feed compatibility suite separately from deterministic tests:
 
