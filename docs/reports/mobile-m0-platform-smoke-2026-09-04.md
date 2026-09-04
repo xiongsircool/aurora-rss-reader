@@ -27,8 +27,9 @@ PASS - build/ios/iphonesimulator/Runner.app
 - Inbox header, segmented filter, empty state, primary action and four bottom tabs fit within the viewport
 - No Runner fatal/crash messages found in the simulator log
 - Device-level integration tests: 2/2 passed
-  - Four-tab navigation
+  - Four-tab navigation plus subscription form and parsed article display
   - `path_provider` + sqlite3 Native Assets file database write/query/delete
+- Real-network HTTPS RSS fetch, device-side parse and SQLite persistence passed through the explicit development proxy
 
 A generic physical-device Xcode compilation reached the provisioning stage, then correctly stopped because no Apple Development Team/Profile is configured. Physical deployment remains an explicit M0 gate.
 
@@ -36,9 +37,11 @@ A generic physical-device Xcode compilation reached the provisioning stage, then
 
 - Device: Android 36 ARM64 emulator
 - Debug APK assembled and installed
+- Release APK built successfully (57 MB) and verified to contain `android.permission.INTERNET`
 - Device-level integration tests: 2/2 passed
-  - Four-tab navigation
+  - Four-tab navigation plus subscription form and parsed article display
   - `path_provider` + sqlite3 Native Assets file database write/query/delete
+- Real-network HTTPS RSS fetch, device-side parse and SQLite persistence passed through the explicit development proxy
 
 ## Remaining Platform Gates
 

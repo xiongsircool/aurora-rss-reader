@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../features/reader/mobile_reader_controller.dart';
 import '../features/shell/aurora_shell.dart';
 
 final class AuroraApp extends StatelessWidget {
-  const AuroraApp({super.key});
+  const AuroraApp({required this.controller, super.key});
+
+  final MobileReaderController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +49,7 @@ final class AuroraApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuroraShell(),
+      home: AuroraShell(controller: controller),
     );
   }
 }

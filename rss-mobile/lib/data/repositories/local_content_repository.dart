@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 
-import '../../domain/entities/feed.dart' as domain;
+import '../../domain/entities/entry.dart' as domain_entry;
+import '../../domain/entities/feed.dart' as domain_feed;
+import '../../domain/value_objects/feed_view_type.dart' as domain_type;
 import '../../domain/feed_parsing/parsed_feed.dart';
 import '../database/local_database.dart';
 
@@ -14,7 +16,7 @@ final class InboxCursor {
 final class InboxPage {
   const InboxPage({required this.entries, required this.nextCursor});
 
-  final List<EntryRow> entries;
+  final List<domain_entry.Entry> entries;
   final InboxCursor? nextCursor;
 }
 
@@ -23,8 +25,11 @@ final class LocalContentRepository {
 
   final LocalDatabase database;
 
-  Future<void> saveFeed(domain.Feed feed) async {
+  Future<void> saveFeed(domain_feed.Feed feed) async {
     final now = DateTime.now().toUtc();
+    final existing = await (database.select(
+      database.feeds,
+    )..where((row) => row.id.equals(feed.id))).getSingleOrNull();
     await database
         .into(database.feeds)
         .insertOnConflictUpdate(
@@ -35,18 +40,21 @@ final class LocalContentRepository {
             groupName: Value(feed.groupName),
             viewType: Value(feed.viewType.name),
             updateIntervalMinutes: Value(feed.updateInterval.inMinutes),
-            createdAt: now,
+            lastCheckedAt: Value(now),
+            createdAt: existing?.createdAt ?? now,
             updatedAt: now,
           ),
         );
   }
 
-  Future<List<FeedRow>> listFeeds() {
-    return (database.select(database.feeds)..orderBy([
-          (feed) => OrderingTerm.asc(feed.groupName),
-          (feed) => OrderingTerm.asc(feed.title),
-        ]))
-        .get();
+  Future<List<domain_feed.Feed>> listFeeds() async {
+    final rows =
+        await (database.select(database.feeds)..orderBy([
+              (feed) => OrderingTerm.asc(feed.groupName),
+              (feed) => OrderingTerm.asc(feed.title),
+            ]))
+            .get();
+    return rows.map(_feedFromRow).toList();
   }
 
   /// Inserts normalized entries and ignores duplicates by feed + guid.
@@ -132,7 +140,9 @@ final class LocalContentRepository {
         )
         .get();
 
-    final entries = rows.map((row) => database.entries.map(row.data)).toList();
+    final entries = rows
+        .map((row) => _entryFromRow(database.entries.map(row.data)))
+        .toList();
     final last = entries.lastOrNull;
     return InboxPage(
       entries: entries,
@@ -178,7 +188,23 @@ final class LocalContentRepository {
     });
   }
 
-  Future<List<EntryRow>> search(String query, {int limit = 50}) async {
+  Future<List<domain_entry.Entry>> listStarred({int limit = 100}) async {
+    final rows =
+        await (database.select(database.entries)
+              ..where((entry) => entry.starred.equals(true))
+              ..orderBy([
+                (entry) => OrderingTerm.desc(entry.publishedAt),
+                (entry) => OrderingTerm.desc(entry.insertedAt),
+              ])
+              ..limit(limit))
+            .get();
+    return rows.map(_entryFromRow).toList();
+  }
+
+  Future<List<domain_entry.Entry>> search(
+    String query, {
+    int limit = 50,
+  }) async {
     final normalized = query.trim();
     if (normalized.isEmpty) return const [];
     final ftsQuery = '"${normalized.replaceAll('"', '""')}"';
@@ -192,7 +218,9 @@ final class LocalContentRepository {
           readsFrom: {database.entries},
         )
         .get();
-    return rows.map((row) => database.entries.map(row.data)).toList();
+    return rows
+        .map((row) => _entryFromRow(database.entries.map(row.data)))
+        .toList();
   }
 
   Future<void> deleteFeed(String feedId) async {
@@ -200,6 +228,42 @@ final class LocalContentRepository {
       database.feeds,
     )..where((feed) => feed.id.equals(feedId))).go();
   }
+}
+
+domain_feed.Feed _feedFromRow(FeedRow row) {
+  return domain_feed.Feed(
+    id: row.id,
+    title: row.title,
+    url: Uri.parse(row.url),
+    groupName: row.groupName,
+    viewType: _feedViewType(row.viewType),
+    updateInterval: Duration(minutes: row.updateIntervalMinutes),
+  );
+}
+
+domain_entry.Entry _entryFromRow(EntryRow row) {
+  return domain_entry.Entry(
+    id: row.id,
+    feedId: row.feedId,
+    guid: row.guid,
+    title: row.title ?? '(untitled)',
+    url: row.url == null ? null : Uri.tryParse(row.url!),
+    author: row.author,
+    summary: row.summary,
+    imageUrl: row.imageUrl == null ? null : Uri.tryParse(row.imageUrl!),
+    publishedAt: row.publishedAt,
+    insertedAt: row.insertedAt,
+    readAt: row.readAt,
+    isStarred: row.starred,
+  );
+}
+
+// Keep unknown future values readable instead of failing an old client.
+domain_type.FeedViewType _feedViewType(String value) {
+  return domain_type.FeedViewType.values.firstWhere(
+    (type) => type.name == value,
+    orElse: () => domain_type.FeedViewType.articles,
+  );
 }
 
 String _entryId(String feedId, String guid) {

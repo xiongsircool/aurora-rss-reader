@@ -16,4 +16,20 @@ final class Feed {
   final String groupName;
   final FeedViewType viewType;
   final Duration updateInterval;
+
+  Feed copyWith({
+    String? title,
+    String? groupName,
+    FeedViewType? viewType,
+    Duration? updateInterval,
+  }) {
+    return Feed(
+      id: id,
+      title: title ?? this.title,
+      url: url,
+      groupName: groupName ?? this.groupName,
+      viewType: viewType ?? this.viewType,
+      updateInterval: updateInterval ?? this.updateInterval,
+    );
+  }
 }

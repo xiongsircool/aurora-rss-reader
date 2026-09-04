@@ -17,12 +17,18 @@ final class FeedHttpException implements Exception {
 }
 
 final class IoFeedHttpClient implements FeedHttpClient {
-  IoFeedHttpClient({HttpClient? client, bool useEnvironmentProxy = true})
-    : _client = client ?? HttpClient() {
+  IoFeedHttpClient({
+    HttpClient? client,
+    String? proxyUrl,
+    bool useEnvironmentProxy = true,
+  }) : _client = client ?? HttpClient() {
     // Decompress explicitly so gzip and deflate behave consistently on every
     // platform, and so the decompressed size can be limited as well.
     _client.autoUncompress = false;
-    if (useEnvironmentProxy) {
+    if (proxyUrl != null && proxyUrl.trim().isNotEmpty) {
+      final proxy = _parseProxy(proxyUrl);
+      _client.findProxy = (_) => 'PROXY ${proxy.host}:${proxy.port}';
+    } else if (useEnvironmentProxy) {
       _client.findProxy = HttpClient.findProxyFromEnvironment;
     }
   }
@@ -122,6 +128,15 @@ final class IoFeedHttpClient implements FeedHttpClient {
   void close() {
     _client.close(force: true);
   }
+}
+
+Uri _parseProxy(String raw) {
+  final normalized = raw.contains('://') ? raw : 'http://$raw';
+  final uri = Uri.tryParse(normalized);
+  if (uri == null || uri.host.isEmpty || !uri.hasPort) {
+    throw ArgumentError.value(raw, 'proxyUrl', 'Expected host:port or URL');
+  }
+  return uri;
 }
 
 List<int> _decodeContentEncoding(List<int> bytes, String? rawEncoding) {

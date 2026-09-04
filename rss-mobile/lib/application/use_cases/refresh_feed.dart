@@ -6,12 +6,14 @@ import '../ports/feed_http_client.dart';
 final class RefreshFeedResult {
   const RefreshFeedResult({
     required this.feedId,
+    required this.feedTitle,
     required this.fetchedEntries,
     required this.insertedEntries,
     required this.finalUri,
   });
 
   final String feedId;
+  final String feedTitle;
   final int fetchedEntries;
   final int insertedEntries;
   final Uri finalUri;
@@ -33,7 +35,8 @@ final class RefreshFeed {
     final parsed = parseFeedBytes(response.body, feedUrl: response.finalUri);
 
     // The parsed document is complete at this point; only now mutate storage.
-    await repository.saveFeed(feed);
+    final storedFeed = feed.copyWith(title: parsed.title);
+    await repository.saveFeed(storedFeed);
     final inserted = await repository.insertParsedEntries(
       feed.id,
       parsed.entries,
@@ -41,6 +44,7 @@ final class RefreshFeed {
 
     return RefreshFeedResult(
       feedId: feed.id,
+      feedTitle: parsed.title,
       fetchedEntries: parsed.entries.length,
       insertedEntries: inserted,
       finalUri: response.finalUri,

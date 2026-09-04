@@ -6,7 +6,9 @@ final class Entry {
     required this.title,
     required this.insertedAt,
     this.url,
+    this.author,
     this.summary,
+    this.imageUrl,
     this.publishedAt,
     this.readAt,
     this.isStarred = false,
@@ -17,7 +19,9 @@ final class Entry {
   final String guid;
   final String title;
   final Uri? url;
+  final String? author;
   final String? summary;
+  final Uri? imageUrl;
   final DateTime? publishedAt;
   final DateTime insertedAt;
   final DateTime? readAt;
@@ -40,7 +44,9 @@ final class Entry {
       guid: guid,
       title: title,
       url: url,
+      author: author,
       summary: summary,
+      imageUrl: imageUrl,
       publishedAt: publishedAt,
       insertedAt: insertedAt,
       readAt: clearReadAt ? null : (readAt ?? this.readAt),

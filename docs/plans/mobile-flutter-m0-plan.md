@@ -28,7 +28,8 @@
 - [x] Android debug APK 构建通过
 - [x] Android 36 ARM64 模拟器安装、冷启动、四标签导航与无崩溃冒烟通过
 - [x] iOS 26.5 / iPhone 17 Pro 模拟器构建、安装、启动与截图检查通过
-- [x] Android/iOS 模拟器运行同一套导航 + sqlite3 Native Assets 集成测试
+- [x] Android/iOS 模拟器运行同一套表单添加、四标签导航 + sqlite3 Native Assets 集成测试
+- [x] Android/iOS 模拟器端上真实 RSS 抓取、解析和落库(开发网络通过显式代理)
 - [ ] Android/iOS 物理真机集成测试(真机 iOS 还需 Development Team/签名)
 - [ ] 增加开发/测试环境配置,禁止真实凭据进入仓库
 
@@ -150,4 +151,4 @@ schema_migrations
 
 ## 8. M1 预告
 
-M1 只实现本地阅读闭环:订阅 CRUD、OPML、刷新、混合收件箱、阅读、已读、收藏、分页和搜索。AI、自托管连接和完整视觉打磨不进入 M1。
+M1 本地阅读闭环已经开始实现:订阅地址输入、端上抓取解析、SQLite 落库、混合收件箱、全部/未读筛选、已读、收藏、分页、单源/全量刷新和删除订阅已接入 UI。OPML、文章阅读页和搜索 UI 仍未完成;AI、自托管连接和完整视觉打磨不进入 M1。

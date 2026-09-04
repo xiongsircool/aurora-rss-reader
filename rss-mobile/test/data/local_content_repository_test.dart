@@ -51,6 +51,23 @@ void main() {
     expect(version.read<int>('user_version'), 1);
   });
 
+  test('refreshing a feed preserves its creation timestamp', () async {
+    final before = await database.select(database.feeds).getSingle();
+    await Future<void>.delayed(const Duration(milliseconds: 2));
+    await repository.saveFeed(
+      Feed(
+        id: 'feed-1',
+        title: 'Updated Feed',
+        url: Uri.parse('https://example.com/feed.xml'),
+      ),
+    );
+    final after = await database.select(database.feeds).getSingle();
+
+    expect(after.createdAt, before.createdAt);
+    expect(after.updatedAt.isBefore(before.updatedAt), isFalse);
+    expect(after.title, 'Updated Feed');
+  });
+
   test('deduplicates entries by feed and guid', () async {
     final item = _entry('guid-1', 'First');
 

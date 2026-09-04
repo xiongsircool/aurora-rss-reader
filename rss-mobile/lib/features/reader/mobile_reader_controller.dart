@@ -1,0 +1,248 @@
+import 'package:flutter/foundation.dart';
+
+import '../../application/use_cases/refresh_feed.dart';
+import '../../data/repositories/local_content_repository.dart';
+import '../../domain/entities/entry.dart';
+import '../../domain/entities/feed.dart';
+
+final class MobileReaderController extends ChangeNotifier {
+  MobileReaderController({required this.repository, required this.refreshFeed});
+
+  final LocalContentRepository repository;
+  final RefreshFeed refreshFeed;
+
+  List<Feed> _feeds = const [];
+  List<Entry> _entries = const [];
+  List<Entry> _starredEntries = const [];
+  InboxCursor? _nextCursor;
+  bool _initialized = false;
+  bool _loading = false;
+  bool _adding = false;
+  bool _refreshing = false;
+  bool _loadingMore = false;
+  bool _unreadOnly = false;
+  String? _error;
+  String? _notice;
+
+  List<Feed> get feeds => _feeds;
+  List<Entry> get entries => _entries;
+  List<Entry> get starredEntries => _starredEntries;
+  bool get initialized => _initialized;
+  bool get loading => _loading;
+  bool get adding => _adding;
+  bool get refreshing => _refreshing;
+  bool get loadingMore => _loadingMore;
+  bool get unreadOnly => _unreadOnly;
+  bool get hasMore => _nextCursor != null;
+  String? get error => _error;
+  String? get notice => _notice;
+
+  Future<void> initialize() async {
+    if (_initialized || _loading) return;
+    _loading = true;
+    notifyListeners();
+    try {
+      await _reload();
+      _initialized = true;
+    } catch (error) {
+      _error = '无法打开本地数据库：$error';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> addFeed(String rawUrl) async {
+    if (_adding) return false;
+    final uri = _parseFeedUri(rawUrl);
+    if (uri == null) {
+      _error = '请输入有效的 HTTP 或 HTTPS 订阅地址';
+      notifyListeners();
+      return false;
+    }
+
+    _adding = true;
+    _error = null;
+    _notice = null;
+    notifyListeners();
+    try {
+      final feed = Feed(id: _feedId(uri), title: uri.host, url: uri);
+      final result = await refreshFeed(feed);
+      await _reload();
+      _notice = result.insertedEntries > 0
+          ? '已添加 ${result.feedTitle}，获取 ${result.insertedEntries} 篇文章'
+          : '${result.feedTitle} 已是最新状态';
+      return true;
+    } catch (error) {
+      _error = '添加订阅失败：$error';
+      return false;
+    } finally {
+      _adding = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshAll() async {
+    if (_refreshing || _feeds.isEmpty) return;
+    _refreshing = true;
+    _error = null;
+    _notice = null;
+    notifyListeners();
+
+    try {
+      var inserted = 0;
+      var failed = 0;
+      for (final feed in List<Feed>.from(_feeds)) {
+        try {
+          final result = await refreshFeed(feed);
+          inserted += result.insertedEntries;
+        } catch (_) {
+          failed++;
+        }
+      }
+      await _reload();
+      _notice = failed == 0
+          ? '刷新完成，新增 $inserted 篇文章'
+          : '刷新完成，新增 $inserted 篇，$failed 个订阅失败';
+    } catch (error) {
+      _error = '刷新订阅失败：$error';
+    } finally {
+      _refreshing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshOne(Feed feed) async {
+    if (_refreshing) return;
+    _refreshing = true;
+    _error = null;
+    _notice = null;
+    notifyListeners();
+    try {
+      final result = await refreshFeed(feed);
+      await _reload();
+      _notice = '${result.feedTitle}：新增 ${result.insertedEntries} 篇';
+    } catch (error) {
+      _error = '刷新 ${feed.title} 失败：$error';
+    } finally {
+      _refreshing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteFeed(Feed feed) async {
+    try {
+      await repository.deleteFeed(feed.id);
+      await _reload();
+      _notice = '已删除 ${feed.title}';
+    } catch (error) {
+      _error = '删除订阅失败：$error';
+    }
+    notifyListeners();
+  }
+
+  Future<void> setUnreadOnly(bool value) async {
+    if (_unreadOnly == value) return;
+    _unreadOnly = value;
+    _loading = true;
+    notifyListeners();
+    try {
+      await _loadFirstPage();
+    } catch (error) {
+      _error = '加载文章失败：$error';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadMore() async {
+    final cursor = _nextCursor;
+    if (cursor == null || _loadingMore) return;
+    _loadingMore = true;
+    notifyListeners();
+    try {
+      final page = await repository.listInbox(
+        cursor: cursor,
+        unreadOnly: _unreadOnly,
+      );
+      _entries = [..._entries, ...page.entries];
+      _nextCursor = page.nextCursor;
+    } catch (error) {
+      _error = '加载更多失败：$error';
+    } finally {
+      _loadingMore = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setRead(Entry entry, {required bool read}) async {
+    try {
+      await repository.markRead(entry.id, read: read);
+      await _loadFirstPage();
+      _starredEntries = await repository.listStarred();
+    } catch (error) {
+      _error = '更新阅读状态失败：$error';
+    }
+    notifyListeners();
+  }
+
+  Future<void> setStarred(Entry entry, {required bool starred}) async {
+    try {
+      await repository.setStarred(entry.id, starred: starred);
+      await _loadFirstPage();
+      _starredEntries = await repository.listStarred();
+    } catch (error) {
+      _error = '更新收藏状态失败：$error';
+    }
+    notifyListeners();
+  }
+
+  String feedTitle(String feedId) {
+    for (final feed in _feeds) {
+      if (feed.id == feedId) return feed.title;
+    }
+    return '未知订阅';
+  }
+
+  void clearMessages() {
+    if (_error == null && _notice == null) return;
+    _error = null;
+    _notice = null;
+    notifyListeners();
+  }
+
+  Future<void> _reload() async {
+    _feeds = await repository.listFeeds();
+    await _loadFirstPage();
+    _starredEntries = await repository.listStarred();
+  }
+
+  Future<void> _loadFirstPage() async {
+    final page = await repository.listInbox(unreadOnly: _unreadOnly);
+    _entries = page.entries;
+    _nextCursor = page.nextCursor;
+  }
+}
+
+Uri? _parseFeedUri(String input) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) return null;
+  final withScheme = trimmed.contains('://') ? trimmed : 'https://$trimmed';
+  final uri = Uri.tryParse(withScheme);
+  if (uri == null ||
+      (uri.scheme != 'http' && uri.scheme != 'https') ||
+      uri.host.isEmpty) {
+    return null;
+  }
+  return uri;
+}
+
+String _feedId(Uri uri) {
+  var hash = 0x811c9dc5;
+  for (final unit in uri.toString().codeUnits) {
+    hash ^= unit;
+    hash = (hash * 0x01000193) & 0xFFFFFFFF;
+  }
+  return 'feed-${hash.toRadixString(16).padLeft(8, '0')}';
+}

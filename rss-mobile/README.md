@@ -16,10 +16,13 @@ M0 technical validation is in progress. The repository currently contains:
 - Drift/sqlite3 Native Assets schema for feeds, entries, AI caches, tags and collections
 - Feed + guid deduplication, cursor pagination, FTS5 search and cascade cleanup
 - End-to-end local refresh pipeline: fetch bytes, decode, parse and persist only after validation
+- Functional subscription form, mixed inbox, all/unread filter and cursor-based load-more
+- Feed refresh/delete plus persistent read and starred actions
 - Failed HTTP/XML refreshes preserve the previous local snapshot
 - Tests for navigation, parsing, encodings, HTTP behavior and database contracts
 - Reproducible 50,000-entry SQLite benchmark
 - Reproducible real-network compatibility probe (26 RSS/Atom/podcast feeds)
+- Android and iOS simulator integration tests for UI actions, file SQLite and real RSS fetching
 
 The previous Vue/Capacitor client is preserved on branch `archive/mobile-plan-d-v1` and is not part of this implementation.
 
@@ -48,6 +51,20 @@ flutter test integration_test/app_test.dart -d <device-id>
 ```
 
 Physical iOS deployment requires selecting an Apple Development Team and provisioning profile in `ios/Runner.xcworkspace`.
+
+For development networks that require an explicit HTTP proxy:
+
+```bash
+# Android emulator reaches the macOS host through 10.0.2.2
+flutter run -d emulator-5554 \
+  --dart-define=AURORA_PROXY_URL=http://10.0.2.2:7897
+
+# iOS Simulator shares the macOS loopback interface
+flutter run -d <ios-simulator-id> \
+  --dart-define=AURORA_PROXY_URL=http://127.0.0.1:7897
+```
+
+The proxy value is compile-time development configuration for now; persistent user configuration belongs to the settings milestone.
 
 Run the external Feed compatibility suite separately from deterministic tests:
 
