@@ -663,6 +663,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.6.0"
+  reader_mode:
+    dependency: "direct main"
+    description:
+      name: reader_mode
+      sha256: c45f9624c555f689bf6444b82e2f9b44557e5465b6655ddb2ed22e2e56d59a52
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.3"
   recase:
     dependency: transitive
     description:

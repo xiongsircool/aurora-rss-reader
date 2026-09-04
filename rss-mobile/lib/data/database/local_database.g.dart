@@ -970,6 +970,62 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _readabilityContentMeta =
+      const VerificationMeta('readabilityContent');
+  @override
+  late final GeneratedColumn<String> readabilityContent =
+      GeneratedColumn<String>(
+        'readability_content',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _contentSourceUrlMeta = const VerificationMeta(
+    'contentSourceUrl',
+  );
+  @override
+  late final GeneratedColumn<String> contentSourceUrl = GeneratedColumn<String>(
+    'content_source_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contentExtractedAtMeta =
+      const VerificationMeta('contentExtractedAt');
+  @override
+  late final GeneratedColumn<DateTime> contentExtractedAt =
+      GeneratedColumn<DateTime>(
+        'content_extracted_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _contentExtractionStatusMeta =
+      const VerificationMeta('contentExtractionStatus');
+  @override
+  late final GeneratedColumn<String> contentExtractionStatus =
+      GeneratedColumn<String>(
+        'content_extraction_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('idle'),
+      );
+  static const VerificationMeta _contentExtractionErrorMeta =
+      const VerificationMeta('contentExtractionError');
+  @override
+  late final GeneratedColumn<String> contentExtractionError =
+      GeneratedColumn<String>(
+        'content_extraction_error',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _categoriesJsonMeta = const VerificationMeta(
     'categoriesJson',
   );
@@ -1110,6 +1166,11 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
     author,
     summary,
     content,
+    readabilityContent,
+    contentSourceUrl,
+    contentExtractedAt,
+    contentExtractionStatus,
+    contentExtractionError,
     categoriesJson,
     publishedAt,
     insertedAt,
@@ -1184,6 +1245,51 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
       context.handle(
         _contentMeta,
         content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    }
+    if (data.containsKey('readability_content')) {
+      context.handle(
+        _readabilityContentMeta,
+        readabilityContent.isAcceptableOrUnknown(
+          data['readability_content']!,
+          _readabilityContentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('content_source_url')) {
+      context.handle(
+        _contentSourceUrlMeta,
+        contentSourceUrl.isAcceptableOrUnknown(
+          data['content_source_url']!,
+          _contentSourceUrlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('content_extracted_at')) {
+      context.handle(
+        _contentExtractedAtMeta,
+        contentExtractedAt.isAcceptableOrUnknown(
+          data['content_extracted_at']!,
+          _contentExtractedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('content_extraction_status')) {
+      context.handle(
+        _contentExtractionStatusMeta,
+        contentExtractionStatus.isAcceptableOrUnknown(
+          data['content_extraction_status']!,
+          _contentExtractionStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('content_extraction_error')) {
+      context.handle(
+        _contentExtractionErrorMeta,
+        contentExtractionError.isAcceptableOrUnknown(
+          data['content_extraction_error']!,
+          _contentExtractionErrorMeta,
+        ),
       );
     }
     if (data.containsKey('categories_json')) {
@@ -1323,6 +1429,26 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
         DriftSqlType.string,
         data['${effectivePrefix}content'],
       ),
+      readabilityContent: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}readability_content'],
+      ),
+      contentSourceUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_source_url'],
+      ),
+      contentExtractedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}content_extracted_at'],
+      ),
+      contentExtractionStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_extraction_status'],
+      )!,
+      contentExtractionError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_extraction_error'],
+      ),
       categoriesJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}categories_json'],
@@ -1389,6 +1515,11 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
   final String? author;
   final String? summary;
   final String? content;
+  final String? readabilityContent;
+  final String? contentSourceUrl;
+  final DateTime? contentExtractedAt;
+  final String contentExtractionStatus;
+  final String? contentExtractionError;
   final String? categoriesJson;
   final DateTime? publishedAt;
   final DateTime insertedAt;
@@ -1410,6 +1541,11 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     this.author,
     this.summary,
     this.content,
+    this.readabilityContent,
+    this.contentSourceUrl,
+    this.contentExtractedAt,
+    required this.contentExtractionStatus,
+    this.contentExtractionError,
     this.categoriesJson,
     this.publishedAt,
     required this.insertedAt,
@@ -1443,6 +1579,23 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     }
     if (!nullToAbsent || content != null) {
       map['content'] = Variable<String>(content);
+    }
+    if (!nullToAbsent || readabilityContent != null) {
+      map['readability_content'] = Variable<String>(readabilityContent);
+    }
+    if (!nullToAbsent || contentSourceUrl != null) {
+      map['content_source_url'] = Variable<String>(contentSourceUrl);
+    }
+    if (!nullToAbsent || contentExtractedAt != null) {
+      map['content_extracted_at'] = Variable<DateTime>(contentExtractedAt);
+    }
+    map['content_extraction_status'] = Variable<String>(
+      contentExtractionStatus,
+    );
+    if (!nullToAbsent || contentExtractionError != null) {
+      map['content_extraction_error'] = Variable<String>(
+        contentExtractionError,
+      );
     }
     if (!nullToAbsent || categoriesJson != null) {
       map['categories_json'] = Variable<String>(categoriesJson);
@@ -1497,6 +1650,19 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       content: content == null && nullToAbsent
           ? const Value.absent()
           : Value(content),
+      readabilityContent: readabilityContent == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readabilityContent),
+      contentSourceUrl: contentSourceUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contentSourceUrl),
+      contentExtractedAt: contentExtractedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contentExtractedAt),
+      contentExtractionStatus: Value(contentExtractionStatus),
+      contentExtractionError: contentExtractionError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contentExtractionError),
       categoriesJson: categoriesJson == null && nullToAbsent
           ? const Value.absent()
           : Value(categoriesJson),
@@ -1542,6 +1708,19 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       author: serializer.fromJson<String?>(json['author']),
       summary: serializer.fromJson<String?>(json['summary']),
       content: serializer.fromJson<String?>(json['content']),
+      readabilityContent: serializer.fromJson<String?>(
+        json['readabilityContent'],
+      ),
+      contentSourceUrl: serializer.fromJson<String?>(json['contentSourceUrl']),
+      contentExtractedAt: serializer.fromJson<DateTime?>(
+        json['contentExtractedAt'],
+      ),
+      contentExtractionStatus: serializer.fromJson<String>(
+        json['contentExtractionStatus'],
+      ),
+      contentExtractionError: serializer.fromJson<String?>(
+        json['contentExtractionError'],
+      ),
       categoriesJson: serializer.fromJson<String?>(json['categoriesJson']),
       publishedAt: serializer.fromJson<DateTime?>(json['publishedAt']),
       insertedAt: serializer.fromJson<DateTime>(json['insertedAt']),
@@ -1568,6 +1747,15 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       'author': serializer.toJson<String?>(author),
       'summary': serializer.toJson<String?>(summary),
       'content': serializer.toJson<String?>(content),
+      'readabilityContent': serializer.toJson<String?>(readabilityContent),
+      'contentSourceUrl': serializer.toJson<String?>(contentSourceUrl),
+      'contentExtractedAt': serializer.toJson<DateTime?>(contentExtractedAt),
+      'contentExtractionStatus': serializer.toJson<String>(
+        contentExtractionStatus,
+      ),
+      'contentExtractionError': serializer.toJson<String?>(
+        contentExtractionError,
+      ),
       'categoriesJson': serializer.toJson<String?>(categoriesJson),
       'publishedAt': serializer.toJson<DateTime?>(publishedAt),
       'insertedAt': serializer.toJson<DateTime>(insertedAt),
@@ -1592,6 +1780,11 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     Value<String?> author = const Value.absent(),
     Value<String?> summary = const Value.absent(),
     Value<String?> content = const Value.absent(),
+    Value<String?> readabilityContent = const Value.absent(),
+    Value<String?> contentSourceUrl = const Value.absent(),
+    Value<DateTime?> contentExtractedAt = const Value.absent(),
+    String? contentExtractionStatus,
+    Value<String?> contentExtractionError = const Value.absent(),
     Value<String?> categoriesJson = const Value.absent(),
     Value<DateTime?> publishedAt = const Value.absent(),
     DateTime? insertedAt,
@@ -1613,6 +1806,20 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     author: author.present ? author.value : this.author,
     summary: summary.present ? summary.value : this.summary,
     content: content.present ? content.value : this.content,
+    readabilityContent: readabilityContent.present
+        ? readabilityContent.value
+        : this.readabilityContent,
+    contentSourceUrl: contentSourceUrl.present
+        ? contentSourceUrl.value
+        : this.contentSourceUrl,
+    contentExtractedAt: contentExtractedAt.present
+        ? contentExtractedAt.value
+        : this.contentExtractedAt,
+    contentExtractionStatus:
+        contentExtractionStatus ?? this.contentExtractionStatus,
+    contentExtractionError: contentExtractionError.present
+        ? contentExtractionError.value
+        : this.contentExtractionError,
     categoriesJson: categoriesJson.present
         ? categoriesJson.value
         : this.categoriesJson,
@@ -1644,6 +1851,21 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       author: data.author.present ? data.author.value : this.author,
       summary: data.summary.present ? data.summary.value : this.summary,
       content: data.content.present ? data.content.value : this.content,
+      readabilityContent: data.readabilityContent.present
+          ? data.readabilityContent.value
+          : this.readabilityContent,
+      contentSourceUrl: data.contentSourceUrl.present
+          ? data.contentSourceUrl.value
+          : this.contentSourceUrl,
+      contentExtractedAt: data.contentExtractedAt.present
+          ? data.contentExtractedAt.value
+          : this.contentExtractedAt,
+      contentExtractionStatus: data.contentExtractionStatus.present
+          ? data.contentExtractionStatus.value
+          : this.contentExtractionStatus,
+      contentExtractionError: data.contentExtractionError.present
+          ? data.contentExtractionError.value
+          : this.contentExtractionError,
       categoriesJson: data.categoriesJson.present
           ? data.categoriesJson.value
           : this.categoriesJson,
@@ -1684,6 +1906,11 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
           ..write('author: $author, ')
           ..write('summary: $summary, ')
           ..write('content: $content, ')
+          ..write('readabilityContent: $readabilityContent, ')
+          ..write('contentSourceUrl: $contentSourceUrl, ')
+          ..write('contentExtractedAt: $contentExtractedAt, ')
+          ..write('contentExtractionStatus: $contentExtractionStatus, ')
+          ..write('contentExtractionError: $contentExtractionError, ')
           ..write('categoriesJson: $categoriesJson, ')
           ..write('publishedAt: $publishedAt, ')
           ..write('insertedAt: $insertedAt, ')
@@ -1701,7 +1928,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     feedId,
     guid,
@@ -1710,6 +1937,11 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     author,
     summary,
     content,
+    readabilityContent,
+    contentSourceUrl,
+    contentExtractedAt,
+    contentExtractionStatus,
+    contentExtractionError,
     categoriesJson,
     publishedAt,
     insertedAt,
@@ -1722,7 +1954,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     imageUrl,
     doi,
     pmid,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1735,6 +1967,11 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
           other.author == this.author &&
           other.summary == this.summary &&
           other.content == this.content &&
+          other.readabilityContent == this.readabilityContent &&
+          other.contentSourceUrl == this.contentSourceUrl &&
+          other.contentExtractedAt == this.contentExtractedAt &&
+          other.contentExtractionStatus == this.contentExtractionStatus &&
+          other.contentExtractionError == this.contentExtractionError &&
           other.categoriesJson == this.categoriesJson &&
           other.publishedAt == this.publishedAt &&
           other.insertedAt == this.insertedAt &&
@@ -1758,6 +1995,11 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
   final Value<String?> author;
   final Value<String?> summary;
   final Value<String?> content;
+  final Value<String?> readabilityContent;
+  final Value<String?> contentSourceUrl;
+  final Value<DateTime?> contentExtractedAt;
+  final Value<String> contentExtractionStatus;
+  final Value<String?> contentExtractionError;
   final Value<String?> categoriesJson;
   final Value<DateTime?> publishedAt;
   final Value<DateTime> insertedAt;
@@ -1780,6 +2022,11 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     this.author = const Value.absent(),
     this.summary = const Value.absent(),
     this.content = const Value.absent(),
+    this.readabilityContent = const Value.absent(),
+    this.contentSourceUrl = const Value.absent(),
+    this.contentExtractedAt = const Value.absent(),
+    this.contentExtractionStatus = const Value.absent(),
+    this.contentExtractionError = const Value.absent(),
     this.categoriesJson = const Value.absent(),
     this.publishedAt = const Value.absent(),
     this.insertedAt = const Value.absent(),
@@ -1803,6 +2050,11 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     this.author = const Value.absent(),
     this.summary = const Value.absent(),
     this.content = const Value.absent(),
+    this.readabilityContent = const Value.absent(),
+    this.contentSourceUrl = const Value.absent(),
+    this.contentExtractedAt = const Value.absent(),
+    this.contentExtractionStatus = const Value.absent(),
+    this.contentExtractionError = const Value.absent(),
     this.categoriesJson = const Value.absent(),
     this.publishedAt = const Value.absent(),
     required DateTime insertedAt,
@@ -1829,6 +2081,11 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     Expression<String>? author,
     Expression<String>? summary,
     Expression<String>? content,
+    Expression<String>? readabilityContent,
+    Expression<String>? contentSourceUrl,
+    Expression<DateTime>? contentExtractedAt,
+    Expression<String>? contentExtractionStatus,
+    Expression<String>? contentExtractionError,
     Expression<String>? categoriesJson,
     Expression<DateTime>? publishedAt,
     Expression<DateTime>? insertedAt,
@@ -1852,6 +2109,14 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
       if (author != null) 'author': author,
       if (summary != null) 'summary': summary,
       if (content != null) 'content': content,
+      if (readabilityContent != null) 'readability_content': readabilityContent,
+      if (contentSourceUrl != null) 'content_source_url': contentSourceUrl,
+      if (contentExtractedAt != null)
+        'content_extracted_at': contentExtractedAt,
+      if (contentExtractionStatus != null)
+        'content_extraction_status': contentExtractionStatus,
+      if (contentExtractionError != null)
+        'content_extraction_error': contentExtractionError,
       if (categoriesJson != null) 'categories_json': categoriesJson,
       if (publishedAt != null) 'published_at': publishedAt,
       if (insertedAt != null) 'inserted_at': insertedAt,
@@ -1877,6 +2142,11 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     Value<String?>? author,
     Value<String?>? summary,
     Value<String?>? content,
+    Value<String?>? readabilityContent,
+    Value<String?>? contentSourceUrl,
+    Value<DateTime?>? contentExtractedAt,
+    Value<String>? contentExtractionStatus,
+    Value<String?>? contentExtractionError,
     Value<String?>? categoriesJson,
     Value<DateTime?>? publishedAt,
     Value<DateTime>? insertedAt,
@@ -1900,6 +2170,13 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
       author: author ?? this.author,
       summary: summary ?? this.summary,
       content: content ?? this.content,
+      readabilityContent: readabilityContent ?? this.readabilityContent,
+      contentSourceUrl: contentSourceUrl ?? this.contentSourceUrl,
+      contentExtractedAt: contentExtractedAt ?? this.contentExtractedAt,
+      contentExtractionStatus:
+          contentExtractionStatus ?? this.contentExtractionStatus,
+      contentExtractionError:
+          contentExtractionError ?? this.contentExtractionError,
       categoriesJson: categoriesJson ?? this.categoriesJson,
       publishedAt: publishedAt ?? this.publishedAt,
       insertedAt: insertedAt ?? this.insertedAt,
@@ -1942,6 +2219,27 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     }
     if (content.present) {
       map['content'] = Variable<String>(content.value);
+    }
+    if (readabilityContent.present) {
+      map['readability_content'] = Variable<String>(readabilityContent.value);
+    }
+    if (contentSourceUrl.present) {
+      map['content_source_url'] = Variable<String>(contentSourceUrl.value);
+    }
+    if (contentExtractedAt.present) {
+      map['content_extracted_at'] = Variable<DateTime>(
+        contentExtractedAt.value,
+      );
+    }
+    if (contentExtractionStatus.present) {
+      map['content_extraction_status'] = Variable<String>(
+        contentExtractionStatus.value,
+      );
+    }
+    if (contentExtractionError.present) {
+      map['content_extraction_error'] = Variable<String>(
+        contentExtractionError.value,
+      );
     }
     if (categoriesJson.present) {
       map['categories_json'] = Variable<String>(categoriesJson.value);
@@ -1996,6 +2294,11 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
           ..write('author: $author, ')
           ..write('summary: $summary, ')
           ..write('content: $content, ')
+          ..write('readabilityContent: $readabilityContent, ')
+          ..write('contentSourceUrl: $contentSourceUrl, ')
+          ..write('contentExtractedAt: $contentExtractedAt, ')
+          ..write('contentExtractionStatus: $contentExtractionStatus, ')
+          ..write('contentExtractionError: $contentExtractionError, ')
           ..write('categoriesJson: $categoriesJson, ')
           ..write('publishedAt: $publishedAt, ')
           ..write('insertedAt: $insertedAt, ')
@@ -5429,6 +5732,11 @@ typedef $$EntriesTableCreateCompanionBuilder = EntriesCompanion Function({
   Value<String?> author,
   Value<String?> summary,
   Value<String?> content,
+  Value<String?> readabilityContent,
+  Value<String?> contentSourceUrl,
+  Value<DateTime?> contentExtractedAt,
+  Value<String> contentExtractionStatus,
+  Value<String?> contentExtractionError,
   Value<String?> categoriesJson,
   Value<DateTime?> publishedAt,
   required DateTime insertedAt,
@@ -5452,6 +5760,11 @@ typedef $$EntriesTableUpdateCompanionBuilder = EntriesCompanion Function({
   Value<String?> author,
   Value<String?> summary,
   Value<String?> content,
+  Value<String?> readabilityContent,
+  Value<String?> contentSourceUrl,
+  Value<DateTime?> contentExtractedAt,
+  Value<String> contentExtractionStatus,
+  Value<String?> contentExtractionError,
   Value<String?> categoriesJson,
   Value<DateTime?> publishedAt,
   Value<DateTime> insertedAt,
@@ -5605,6 +5918,31 @@ class $$EntriesTableFilterComposer
 
   ColumnFilters<String> get content => $composableBuilder(
     column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get readabilityContent => $composableBuilder(
+    column: $table.readabilityContent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentSourceUrl => $composableBuilder(
+    column: $table.contentSourceUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get contentExtractedAt => $composableBuilder(
+    column: $table.contentExtractedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentExtractionStatus => $composableBuilder(
+    column: $table.contentExtractionStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentExtractionError => $composableBuilder(
+    column: $table.contentExtractionError,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5836,6 +6174,31 @@ class $$EntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get readabilityContent => $composableBuilder(
+    column: $table.readabilityContent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentSourceUrl => $composableBuilder(
+    column: $table.contentSourceUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get contentExtractedAt => $composableBuilder(
+    column: $table.contentExtractedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentExtractionStatus => $composableBuilder(
+    column: $table.contentExtractionStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentExtractionError => $composableBuilder(
+    column: $table.contentExtractionError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get categoriesJson => $composableBuilder(
     column: $table.categoriesJson,
     builder: (column) => ColumnOrderings(column),
@@ -5949,6 +6312,31 @@ class $$EntriesTableAnnotationComposer
 
   GeneratedColumn<String> get content =>
       $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get readabilityContent => $composableBuilder(
+    column: $table.readabilityContent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get contentSourceUrl => $composableBuilder(
+    column: $table.contentSourceUrl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get contentExtractedAt => $composableBuilder(
+    column: $table.contentExtractedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get contentExtractionStatus => $composableBuilder(
+    column: $table.contentExtractionStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get contentExtractionError => $composableBuilder(
+    column: $table.contentExtractionError,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get categoriesJson => $composableBuilder(
     column: $table.categoriesJson,
@@ -6167,6 +6555,11 @@ class $$EntriesTableTableManager
                 Value<String?> author = const Value.absent(),
                 Value<String?> summary = const Value.absent(),
                 Value<String?> content = const Value.absent(),
+                Value<String?> readabilityContent = const Value.absent(),
+                Value<String?> contentSourceUrl = const Value.absent(),
+                Value<DateTime?> contentExtractedAt = const Value.absent(),
+                Value<String> contentExtractionStatus = const Value.absent(),
+                Value<String?> contentExtractionError = const Value.absent(),
                 Value<String?> categoriesJson = const Value.absent(),
                 Value<DateTime?> publishedAt = const Value.absent(),
                 Value<DateTime> insertedAt = const Value.absent(),
@@ -6189,6 +6582,11 @@ class $$EntriesTableTableManager
                 author: author,
                 summary: summary,
                 content: content,
+                readabilityContent: readabilityContent,
+                contentSourceUrl: contentSourceUrl,
+                contentExtractedAt: contentExtractedAt,
+                contentExtractionStatus: contentExtractionStatus,
+                contentExtractionError: contentExtractionError,
                 categoriesJson: categoriesJson,
                 publishedAt: publishedAt,
                 insertedAt: insertedAt,
@@ -6213,6 +6611,11 @@ class $$EntriesTableTableManager
                 Value<String?> author = const Value.absent(),
                 Value<String?> summary = const Value.absent(),
                 Value<String?> content = const Value.absent(),
+                Value<String?> readabilityContent = const Value.absent(),
+                Value<String?> contentSourceUrl = const Value.absent(),
+                Value<DateTime?> contentExtractedAt = const Value.absent(),
+                Value<String> contentExtractionStatus = const Value.absent(),
+                Value<String?> contentExtractionError = const Value.absent(),
                 Value<String?> categoriesJson = const Value.absent(),
                 Value<DateTime?> publishedAt = const Value.absent(),
                 required DateTime insertedAt,
@@ -6235,6 +6638,11 @@ class $$EntriesTableTableManager
                 author: author,
                 summary: summary,
                 content: content,
+                readabilityContent: readabilityContent,
+                contentSourceUrl: contentSourceUrl,
+                contentExtractedAt: contentExtractedAt,
+                contentExtractionStatus: contentExtractionStatus,
+                contentExtractionError: contentExtractionError,
                 categoriesJson: categoriesJson,
                 publishedAt: publishedAt,
                 insertedAt: insertedAt,

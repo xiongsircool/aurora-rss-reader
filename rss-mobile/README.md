@@ -21,6 +21,8 @@ M0 technical validation is in progress. The repository currently contains:
 - Local FTS5 search UI and static HTML article reader with safe external links
 - Persistent HTTP proxy settings backed by a tested schema v1-to-v2 migration
 - OPML import through the native file picker and export through the system share sheet
+- On-device Mozilla Readability extraction with HTML charset detection, fallback and SQLite cache
+- Extracted full text participates in local FTS5 search
 - Failed HTTP/XML refreshes preserve the previous local snapshot
 - Tests for navigation, parsing, encodings, HTTP behavior and database contracts
 - Reproducible 50,000-entry SQLite benchmark

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../application/use_cases/extract_article.dart';
 import '../../application/use_cases/refresh_feed.dart';
 import '../../data/repositories/local_content_repository.dart';
 import '../../domain/entities/entry.dart';
@@ -10,16 +11,19 @@ final class MobileReaderController extends ChangeNotifier {
   MobileReaderController({
     required this.repository,
     required this.refreshFeed,
+    this.extractArticle,
     String? initialProxyUrl,
   }) : _proxyUrl = initialProxyUrl;
 
   final LocalContentRepository repository;
   final RefreshFeed refreshFeed;
+  final ExtractArticle? extractArticle;
 
   List<Feed> _feeds = const [];
   List<Entry> _entries = const [];
   List<Entry> _starredEntries = const [];
   List<Entry> _searchResults = const [];
+  final Set<String> _extractingEntryIds = {};
   InboxCursor? _nextCursor;
   bool _initialized = false;
   bool _loading = false;
@@ -44,6 +48,7 @@ final class MobileReaderController extends ChangeNotifier {
   bool get searching => _searching;
   bool get unreadOnly => _unreadOnly;
   bool get hasMore => _nextCursor != null;
+  bool isExtracting(String entryId) => _extractingEntryIds.contains(entryId);
   String? get error => _error;
   String? get notice => _notice;
   String? get proxyUrl => _proxyUrl;
@@ -210,6 +215,48 @@ final class MobileReaderController extends ChangeNotifier {
       _error = '更新收藏状态失败：$error';
     }
     notifyListeners();
+  }
+
+  Future<Entry?> extractFullText(Entry entry) async {
+    final extractor = extractArticle;
+    final url = entry.url;
+    if (extractor == null ||
+        url == null ||
+        _extractingEntryIds.contains(entry.id)) {
+      return null;
+    }
+
+    _extractingEntryIds.add(entry.id);
+    _error = null;
+    notifyListeners();
+    await repository.markExtractionRunning(entry.id);
+    try {
+      final extracted = await extractor(url);
+      await repository.saveExtractedContent(
+        entryId: entry.id,
+        contentHtml: extracted.contentHtml,
+        sourceUrl: extracted.sourceUrl,
+      );
+      await _loadFirstPage();
+      _starredEntries = await repository.listStarred();
+      return entry.copyWith(
+        readabilityContent: extracted.contentHtml,
+        contentSourceUrl: extracted.sourceUrl,
+        contentExtractedAt: DateTime.now().toUtc(),
+        contentExtractionStatus: ContentExtractionStatus.succeeded,
+        clearContentExtractionError: true,
+      );
+    } catch (error) {
+      await repository.saveExtractionFailure(entry.id, error.toString());
+      _error = '全文提取失败，继续显示订阅正文：$error';
+      return entry.copyWith(
+        contentExtractionStatus: ContentExtractionStatus.failed,
+        contentExtractionError: error.toString(),
+      );
+    } finally {
+      _extractingEntryIds.remove(entry.id);
+      notifyListeners();
+    }
   }
 
   Future<int> importOpml(Uint8List bytes) async {

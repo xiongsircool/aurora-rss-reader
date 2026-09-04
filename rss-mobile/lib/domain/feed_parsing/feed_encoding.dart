@@ -59,6 +59,26 @@ FeedEncoding detectFeedEncoding(Uint8List bytes) {
 /// Decodes raw feed bytes into a String using detected encoding.
 String decodeFeedBytes(Uint8List bytes) {
   final detected = detectFeedEncoding(bytes);
+  return _decodeBytes(bytes, detected);
+}
+
+/// Decodes an HTML response using BOM, HTTP Content-Type, then meta charset.
+String decodeHtmlBytes(Uint8List bytes, {String? contentType}) {
+  final bom = detectFeedEncoding(bytes);
+  if (bom.hasBom) return _decodeBytes(bytes, bom);
+
+  final declared =
+      _charsetFromContentType(contentType) ?? _charsetFromHtml(bytes);
+  return _decodeBytes(
+    bytes,
+    FeedEncoding(
+      encoding: declared == null ? 'utf-8' : _normalizeEncoding(declared),
+      hasBom: false,
+    ),
+  );
+}
+
+String _decodeBytes(Uint8List bytes, FeedEncoding detected) {
   try {
     if (detected.encoding == 'utf-16le') {
       return const charset.Utf16Decoder().decodeUtf16Le(bytes);
@@ -127,6 +147,27 @@ Uint8List _stripBom(Uint8List bytes, String encoding) {
     default:
       return bytes;
   }
+}
+
+String? _charsetFromContentType(String? contentType) {
+  if (contentType == null) return null;
+  return RegExp(
+    r'''charset\s*=\s*["']?([^;"'\s]+)''',
+    caseSensitive: false,
+  ).firstMatch(contentType)?.group(1);
+}
+
+String? _charsetFromHtml(Uint8List bytes) {
+  final scanLimit = bytes.length < 4096 ? bytes.length : 4096;
+  final window = latin1.decode(Uint8List.sublistView(bytes, 0, scanLimit));
+  return RegExp(
+        r'''<meta[^>]+charset\s*=\s*["']?([^"'\s/>;]+)''',
+        caseSensitive: false,
+      ).firstMatch(window)?.group(1) ??
+      RegExp(
+        r'''<meta[^>]+content\s*=\s*["'][^"']*charset=([^;"'\s]+)''',
+        caseSensitive: false,
+      ).firstMatch(window)?.group(1);
 }
 
 /// Scans the first bytes for an XML declaration and extracts encoding="...".

@@ -209,6 +209,46 @@ final class LocalContentRepository {
         .write(EntriesCompanion(starred: Value(starred)));
   }
 
+  Future<void> markExtractionRunning(String entryId) {
+    return (database.update(
+      database.entries,
+    )..where((entry) => entry.id.equals(entryId))).write(
+      const EntriesCompanion(
+        contentExtractionStatus: Value('running'),
+        contentExtractionError: Value(null),
+      ),
+    );
+  }
+
+  Future<void> saveExtractedContent({
+    required String entryId,
+    required String contentHtml,
+    required Uri sourceUrl,
+  }) {
+    return (database.update(
+      database.entries,
+    )..where((entry) => entry.id.equals(entryId))).write(
+      EntriesCompanion(
+        readabilityContent: Value(contentHtml),
+        contentSourceUrl: Value(sourceUrl.toString()),
+        contentExtractedAt: Value(DateTime.now().toUtc()),
+        contentExtractionStatus: const Value('succeeded'),
+        contentExtractionError: const Value(null),
+      ),
+    );
+  }
+
+  Future<void> saveExtractionFailure(String entryId, String error) {
+    return (database.update(
+      database.entries,
+    )..where((entry) => entry.id.equals(entryId))).write(
+      EntriesCompanion(
+        contentExtractionStatus: const Value('failed'),
+        contentExtractionError: Value(error),
+      ),
+    );
+  }
+
   Future<void> assignTag({required String entryId, required String tagId}) {
     return database.transaction(() async {
       final now = DateTime.now().toUtc();
@@ -289,11 +329,25 @@ domain_entry.Entry _entryFromRow(EntryRow row) {
     author: row.author,
     summary: row.summary,
     content: row.content,
+    readabilityContent: row.readabilityContent,
+    contentSourceUrl: row.contentSourceUrl == null
+        ? null
+        : Uri.tryParse(row.contentSourceUrl!),
+    contentExtractedAt: row.contentExtractedAt,
+    contentExtractionStatus: _extractionStatus(row.contentExtractionStatus),
+    contentExtractionError: row.contentExtractionError,
     imageUrl: row.imageUrl == null ? null : Uri.tryParse(row.imageUrl!),
     publishedAt: row.publishedAt,
     insertedAt: row.insertedAt,
     readAt: row.readAt,
     isStarred: row.starred,
+  );
+}
+
+domain_entry.ContentExtractionStatus _extractionStatus(String value) {
+  return domain_entry.ContentExtractionStatus.values.firstWhere(
+    (status) => status.name == value,
+    orElse: () => domain_entry.ContentExtractionStatus.idle,
   );
 }
 

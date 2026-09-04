@@ -24,6 +24,7 @@ final class ArticleReaderPage extends StatefulWidget {
 
 class _ArticleReaderPageState extends State<ArticleReaderPage> {
   late Entry _entry;
+  bool _extracting = false;
 
   @override
   void initState() {
@@ -58,6 +59,17 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     if (mounted) setState(() => _entry = _entry.copyWith(isStarred: starred));
   }
 
+  Future<void> _extractFullText() async {
+    if (_extracting) return;
+    setState(() => _extracting = true);
+    final updated = await widget.controller.extractFullText(_entry);
+    if (!mounted) return;
+    setState(() {
+      _extracting = false;
+      if (updated != null) _entry = updated;
+    });
+  }
+
   Future<void> _openUrl(Uri? uri) async {
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -69,7 +81,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final html = _entry.content ?? _entry.summary;
+    final html = _entry.readabilityContent ?? _entry.content ?? _entry.summary;
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -125,6 +137,49 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               ),
             ],
             const SizedBox(height: 18),
+            if (_entry.url != null && _entry.readabilityContent == null) ...[
+              FilledButton.tonalIcon(
+                key: const ValueKey('extract-full-text'),
+                onPressed: _extracting ? null : _extractFullText,
+                icon: _extracting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.article_outlined),
+                label: Text(_extracting ? '正在提取' : '提取网页全文'),
+              ),
+              if (_entry.contentExtractionStatus ==
+                  ContentExtractionStatus.failed) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '提取失败，已保留订阅正文。',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+            ] else if (_entry.readabilityContent != null) ...[
+              Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '网页全文已缓存',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
             if (html == null || html.trim().isEmpty)
               Text(
                 '该订阅没有提供正文，请打开原文阅读。',

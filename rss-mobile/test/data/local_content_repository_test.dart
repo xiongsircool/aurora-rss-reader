@@ -48,7 +48,7 @@ void main() {
     final version = await database
         .customSelect('PRAGMA user_version')
         .getSingle();
-    expect(version.read<int>('user_version'), 2);
+    expect(version.read<int>('user_version'), 3);
   });
 
   test('refreshing a feed preserves its creation timestamp', () async {
@@ -140,6 +140,30 @@ void main() {
       database.entries,
     )..where((row) => row.id.equals(entry.id))).getSingle();
     expect(unread.readAt, isNull);
+  });
+
+  test('caches extracted content and adds it to FTS5', () async {
+    await repository.insertParsedEntries('feed-1', [
+      _entry('extract-1', 'Original title', content: 'feed excerpt'),
+    ]);
+    final entry = await database.select(database.entries).getSingle();
+
+    await repository.markExtractionRunning(entry.id);
+    await repository.saveExtractedContent(
+      entryId: entry.id,
+      contentHtml: '<p>UniqueReadabilityNeedle full article</p>',
+      sourceUrl: Uri.parse('https://example.com/full'),
+    );
+
+    final updated = await database.select(database.entries).getSingle();
+    expect(updated.contentExtractionStatus, 'succeeded');
+    expect(updated.readabilityContent, contains('UniqueReadabilityNeedle'));
+    expect(updated.contentSourceUrl, 'https://example.com/full');
+    expect(updated.contentExtractedAt, isNotNull);
+    expect(
+      (await repository.search('UniqueReadabilityNeedle')).single.id,
+      entry.id,
+    );
   });
 
   test('searches title and content through FTS5', () async {

@@ -1,3 +1,5 @@
+enum ContentExtractionStatus { idle, running, succeeded, failed }
+
 final class Entry {
   const Entry({
     required this.id,
@@ -9,6 +11,11 @@ final class Entry {
     this.author,
     this.summary,
     this.content,
+    this.readabilityContent,
+    this.contentSourceUrl,
+    this.contentExtractedAt,
+    this.contentExtractionStatus = ContentExtractionStatus.idle,
+    this.contentExtractionError,
     this.imageUrl,
     this.publishedAt,
     this.readAt,
@@ -23,6 +30,11 @@ final class Entry {
   final String? author;
   final String? summary;
   final String? content;
+  final String? readabilityContent;
+  final Uri? contentSourceUrl;
+  final DateTime? contentExtractedAt;
+  final ContentExtractionStatus contentExtractionStatus;
+  final String? contentExtractionError;
   final Uri? imageUrl;
   final DateTime? publishedAt;
   final DateTime insertedAt;
@@ -39,6 +51,12 @@ final class Entry {
     DateTime? readAt,
     bool clearReadAt = false,
     bool? isStarred,
+    String? readabilityContent,
+    Uri? contentSourceUrl,
+    DateTime? contentExtractedAt,
+    ContentExtractionStatus? contentExtractionStatus,
+    String? contentExtractionError,
+    bool clearContentExtractionError = false,
   }) {
     return Entry(
       id: id,
@@ -49,6 +67,14 @@ final class Entry {
       author: author,
       summary: summary,
       content: content,
+      readabilityContent: readabilityContent ?? this.readabilityContent,
+      contentSourceUrl: contentSourceUrl ?? this.contentSourceUrl,
+      contentExtractedAt: contentExtractedAt ?? this.contentExtractedAt,
+      contentExtractionStatus:
+          contentExtractionStatus ?? this.contentExtractionStatus,
+      contentExtractionError: clearContentExtractionError
+          ? null
+          : (contentExtractionError ?? this.contentExtractionError),
       imageUrl: imageUrl,
       publishedAt: publishedAt,
       insertedAt: insertedAt,

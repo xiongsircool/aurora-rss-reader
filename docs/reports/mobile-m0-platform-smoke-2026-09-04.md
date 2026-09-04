@@ -37,7 +37,7 @@ A generic physical-device Xcode compilation reached the provisioning stage, then
 
 - Device: Android 36 ARM64 emulator
 - Debug APK assembled and installed
-- Release APK built successfully (65.1 MB) and verified to contain `android.permission.INTERNET`
+- Release APK built successfully (65.7 MB) and verified to contain `android.permission.INTERNET`
 - Device-level integration tests: 2/2 passed
   - Four-tab navigation plus subscription form and parsed article display
   - `path_provider` + sqlite3 Native Assets file database write/query/delete
@@ -45,11 +45,13 @@ A generic physical-device Xcode compilation reached the provisioning stage, then
 
 ## Shared Data and Plugin Checks
 
-- Drift schema v1 to v2 migration validated from an exported real v1 snapshot
+- Drift schema v1/v2 to v3 migrations validated from exported real snapshots
+- Schema v3 caches Readability HTML and rebuilds FTS5 to index extracted full text
 - Persistent proxy setting survives database reads and applies without restart
 - `url_launcher`, `file_picker` and `share_plus` native plugins compile on Android and iOS
 - OPML UTI declared for the iOS document picker
-- Deterministic Flutter tests: 51 passing
+- Mozilla Readability HTML extraction, CJK page decoding, failure fallback and schema-v3 cache validated
+- Deterministic Flutter tests: 57 passing
 
 ## Remaining Platform Gates
 

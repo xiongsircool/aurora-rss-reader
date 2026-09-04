@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app/aurora_app.dart';
+import 'application/use_cases/extract_article.dart';
 import 'application/use_cases/refresh_feed.dart';
 import 'data/database/local_database.dart';
 import 'data/repositories/local_content_repository.dart';
@@ -19,6 +20,7 @@ void main() {
   final controller = MobileReaderController(
     repository: repository,
     refreshFeed: RefreshFeed(httpClient: httpClient, repository: repository),
+    extractArticle: ExtractArticle(httpClient: httpClient),
     initialProxyUrl: configuredProxy.isEmpty ? null : configuredProxy,
   );
 

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:aurora_mobile/app/aurora_app.dart';
 import 'package:aurora_mobile/application/ports/feed_http_client.dart';
+import 'package:aurora_mobile/application/use_cases/extract_article.dart';
 import 'package:aurora_mobile/application/use_cases/refresh_feed.dart';
 import 'package:aurora_mobile/data/database/local_database.dart';
 import 'package:aurora_mobile/data/repositories/local_content_repository.dart';
@@ -22,6 +23,7 @@ void main() {
     controller = MobileReaderController(
       repository: repository,
       refreshFeed: RefreshFeed(httpClient: httpClient, repository: repository),
+      extractArticle: ExtractArticle(httpClient: httpClient),
     );
   });
 
@@ -130,6 +132,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Fixture summary', findRichText: true), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '打开原文'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('extract-full-text')));
+    await tester.pumpAndSettle();
+    expect(find.text('网页全文已缓存'), findsOneWidget);
+    expect(
+      find.textContaining('Extracted full article', findRichText: true),
+      findsWidgets,
+    );
+
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -152,7 +163,29 @@ final class _FakeFeedHttpClient implements FeedHttpClient {
     Uri uri, {
     Duration timeout = const Duration(seconds: 20),
     int maxBytes = 10 * 1024 * 1024,
+    String? accept,
   }) async {
+    if (uri.path == '/article') {
+      final paragraphs = List.generate(
+        8,
+        (index) =>
+            '<p>Extracted full article paragraph $index contains enough '
+            'meaningful content for the readability algorithm.</p>',
+      ).join();
+      final html =
+          '<html><head><title>Extracted</title></head><body>'
+          '<article><h1>Extracted</h1>$paragraphs</article></body></html>';
+      return FeedHttpResponse(
+        requestedUri: uri,
+        finalUri: uri,
+        statusCode: 200,
+        headers: const {
+          'content-type': ['text/html; charset=utf-8'],
+        },
+        body: Uint8List.fromList(utf8.encode(html)),
+      );
+    }
+
     const fixture = '''
 <rss version="2.0"><channel>
   <title>Fixture Feed</title>

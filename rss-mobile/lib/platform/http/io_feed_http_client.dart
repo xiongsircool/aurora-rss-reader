@@ -53,6 +53,7 @@ final class IoFeedHttpClient implements FeedHttpClient {
     Uri uri, {
     Duration timeout = const Duration(seconds: 20),
     int maxBytes = 10 * 1024 * 1024,
+    String? accept,
   }) async {
     if (uri.scheme != 'http' && uri.scheme != 'https') {
       throw FeedHttpException('Unsupported URL scheme: ${uri.scheme}');
@@ -69,7 +70,7 @@ final class IoFeedHttpClient implements FeedHttpClient {
         ..headers.set(HttpHeaders.userAgentHeader, _userAgent)
         ..headers.set(
           HttpHeaders.acceptHeader,
-          'application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.5',
+          accept ?? 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.5',
         )
         ..headers.set(HttpHeaders.acceptEncodingHeader, 'gzip, deflate');
 

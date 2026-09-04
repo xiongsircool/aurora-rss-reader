@@ -42,6 +42,12 @@ class Entries extends Table {
   TextColumn get author => text().nullable()();
   TextColumn get summary => text().nullable()();
   TextColumn get content => text().nullable()();
+  TextColumn get readabilityContent => text().nullable()();
+  TextColumn get contentSourceUrl => text().nullable()();
+  DateTimeColumn get contentExtractedAt => dateTime().nullable()();
+  TextColumn get contentExtractionStatus =>
+      text().withDefault(const Constant('idle'))();
+  TextColumn get contentExtractionError => text().nullable()();
   TextColumn get categoriesJson => text().nullable()();
   DateTimeColumn get publishedAt => dateTime().nullable()();
   DateTimeColumn get insertedAt => dateTime()();
@@ -197,7 +203,7 @@ final class LocalDatabase extends _$LocalDatabase {
   factory LocalDatabase.onDevice() => LocalDatabase(_openOnDevice());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -207,6 +213,17 @@ final class LocalDatabase extends _$LocalDatabase {
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
         await migrator.addColumn(userSettings, userSettings.proxyUrl);
+      }
+      if (from < 3) {
+        await migrator.addColumn(entries, entries.readabilityContent);
+        await migrator.addColumn(entries, entries.contentSourceUrl);
+        await migrator.addColumn(entries, entries.contentExtractedAt);
+        await migrator.addColumn(entries, entries.contentExtractionStatus);
+        await migrator.addColumn(entries, entries.contentExtractionError);
+        await customStatement('DROP TRIGGER IF EXISTS entries_fts_ai');
+        await customStatement('DROP TRIGGER IF EXISTS entries_fts_ad');
+        await customStatement('DROP TRIGGER IF EXISTS entries_fts_au');
+        await customStatement('DROP TABLE IF EXISTS entries_fts');
       }
     },
     beforeOpen: (details) async {
@@ -229,30 +246,36 @@ final class LocalDatabase extends _$LocalDatabase {
           title,
           summary,
           content,
+          readability_content,
           content='entries',
           content_rowid='rowid'
         )
       ''');
       await customStatement('''
         CREATE TRIGGER IF NOT EXISTS entries_fts_ai AFTER INSERT ON entries BEGIN
-          INSERT INTO entries_fts(rowid, title, summary, content)
-          VALUES (new.rowid, new.title, new.summary, new.content);
+          INSERT INTO entries_fts(rowid, title, summary, content, readability_content)
+          VALUES (new.rowid, new.title, new.summary, new.content, new.readability_content);
         END
       ''');
       await customStatement('''
         CREATE TRIGGER IF NOT EXISTS entries_fts_ad AFTER DELETE ON entries BEGIN
-          INSERT INTO entries_fts(entries_fts, rowid, title, summary, content)
-          VALUES ('delete', old.rowid, old.title, old.summary, old.content);
+          INSERT INTO entries_fts(entries_fts, rowid, title, summary, content, readability_content)
+          VALUES ('delete', old.rowid, old.title, old.summary, old.content, old.readability_content);
         END
       ''');
       await customStatement('''
         CREATE TRIGGER IF NOT EXISTS entries_fts_au AFTER UPDATE ON entries BEGIN
-          INSERT INTO entries_fts(entries_fts, rowid, title, summary, content)
-          VALUES ('delete', old.rowid, old.title, old.summary, old.content);
-          INSERT INTO entries_fts(rowid, title, summary, content)
-          VALUES (new.rowid, new.title, new.summary, new.content);
+          INSERT INTO entries_fts(entries_fts, rowid, title, summary, content, readability_content)
+          VALUES ('delete', old.rowid, old.title, old.summary, old.content, old.readability_content);
+          INSERT INTO entries_fts(rowid, title, summary, content, readability_content)
+          VALUES (new.rowid, new.title, new.summary, new.content, new.readability_content);
         END
       ''');
+      if (details.wasCreated || details.hadUpgrade) {
+        await customStatement(
+          "INSERT INTO entries_fts(entries_fts) VALUES ('rebuild')",
+        );
+      }
     },
   );
 }
