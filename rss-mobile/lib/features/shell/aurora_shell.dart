@@ -208,6 +208,7 @@ final class _InboxPage extends StatelessWidget {
             key: ValueKey(entry.id),
             entry: entry,
             feedTitle: controller.feedTitle(entry.feedId),
+            referer: controller.feedUrl(entry.feedId),
             onTap: () => _openReader(context, controller, entry),
             onReadChanged: (read) => controller.setRead(entry, read: read),
             onStarredChanged: (starred) =>
@@ -247,6 +248,7 @@ final class _SavedPage extends StatelessWidget {
                         key: ValueKey('saved-${entry.id}'),
                         entry: entry,
                         feedTitle: controller.feedTitle(entry.feedId),
+                        referer: controller.feedUrl(entry.feedId),
                         onTap: () => _openReader(context, controller, entry),
                         onReadChanged: (read) =>
                             controller.setRead(entry, read: read),
@@ -546,6 +548,7 @@ void _openReader(
         entry: entry,
         feedTitle: controller.feedTitle(entry.feedId),
         controller: controller,
+        referer: entry.contentSourceUrl ?? entry.url,
       ),
     ),
   );

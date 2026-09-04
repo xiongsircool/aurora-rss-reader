@@ -9,6 +9,7 @@ final class EntryTile extends StatelessWidget {
     required this.onReadChanged,
     required this.onStarredChanged,
     this.onTap,
+    this.referer,
     super.key,
   });
 
@@ -17,6 +18,10 @@ final class EntryTile extends StatelessWidget {
   final ValueChanged<bool> onReadChanged;
   final ValueChanged<bool> onStarredChanged;
   final VoidCallback? onTap;
+
+  /// Feed page URL sent as Referer for cover images; some site CDNs
+  /// reject image requests without it.
+  final Uri? referer;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +49,9 @@ final class EntryTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                   child: Image.network(
                     entry.imageUrl.toString(),
+                    headers: referer == null
+                        ? null
+                        : {'Referer': referer.toString()},
                     width: 88,
                     height: 76,
                     fit: BoxFit.cover,

@@ -11,12 +11,17 @@ final class ArticleReaderPage extends StatefulWidget {
     required this.entry,
     required this.feedTitle,
     required this.controller,
+    this.referer,
     super.key,
   });
 
   final Entry entry;
   final String feedTitle;
   final MobileReaderController controller;
+
+  /// Page URL used as the Referer for embedded images; many site CDNs
+  /// reject image requests without it.
+  final Uri? referer;
 
   @override
   State<ArticleReaderPage> createState() => _ArticleReaderPageState();
@@ -82,6 +87,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
   @override
   Widget build(BuildContext context) {
     final html = _entry.readabilityContent ?? _entry.content ?? _entry.summary;
+    final referer = widget.referer;
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -131,6 +137,9 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 borderRadius: BorderRadius.circular(6),
                 child: Image.network(
                   _entry.imageUrl.toString(),
+                  headers: referer == null
+                      ? null
+                      : {'Referer': referer.toString()},
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => const SizedBox.shrink(),
                 ),
@@ -188,6 +197,8 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             else
               HtmlWidget(
                 _sanitizeArticleHtml(html),
+                factoryBuilder: () =>
+                    ArticleWidgetFactory(referer: referer?.toString()),
                 textStyle: Theme.of(context).textTheme.bodyLarge
                     ?.copyWith(height: 1.65),
                 onTapUrl: (url) async {
@@ -210,6 +221,24 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
   }
 }
 
+/// Renders remote article images with the page URL as Referer; many
+/// site CDNs reject image requests without it.
+final class ArticleWidgetFactory extends WidgetFactory {
+  ArticleWidgetFactory({this.referer});
+
+  final String? referer;
+
+  @override
+  ImageProvider? imageProviderFromNetwork(String url) {
+    final referer = this.referer;
+    return NetworkImage(
+      url,
+      headers: referer == null ? null : {'Referer': referer},
+    );
+  }
+}
+
+/// Removes active/embedded content that has no place in a reader view.
 String _sanitizeArticleHtml(String raw) {
   final fragment = html_parser.parseFragment(raw);
   for (final selector in const [

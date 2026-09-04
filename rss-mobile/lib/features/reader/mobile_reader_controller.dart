@@ -343,6 +343,13 @@ final class MobileReaderController extends ChangeNotifier {
     return '未知订阅';
   }
 
+  Uri? feedUrl(String feedId) {
+    for (final feed in _feeds) {
+      if (feed.id == feedId) return feed.url;
+    }
+    return null;
+  }
+
   void clearMessages() {
     if (_error == null && _notice == null) return;
     _error = null;
