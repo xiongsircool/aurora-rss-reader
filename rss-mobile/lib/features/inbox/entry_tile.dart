@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import '../../domain/entities/entry.dart';
+import '../../shared/image_viewer_page.dart';
 
 final class EntryTile extends StatelessWidget {
   const EntryTile({
@@ -45,22 +46,29 @@ final class EntryTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (entry.imageUrl != null) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Image.network(
-                    entry.imageUrl.toString(),
-                    headers: referer == null
-                        ? null
-                        : {'Referer': referer.toString()},
-                    width: 88,
-                    height: 76,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
+                GestureDetector(
+                  onTap: () => ImageViewerPage.show(
+                    context,
+                    url: entry.imageUrl!,
+                    referer: referer,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.network(
+                      entry.imageUrl.toString(),
+                      headers: referer == null
+                          ? null
+                          : {'Referer': referer.toString()},
                       width: 88,
                       height: 76,
-                      color: colorScheme.surfaceContainerHighest,
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.broken_image_outlined),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        width: 88,
+                        height: 76,
+                        color: colorScheme.surfaceContainerHighest,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.broken_image_outlined),
+                      ),
                     ),
                   ),
                 ),
