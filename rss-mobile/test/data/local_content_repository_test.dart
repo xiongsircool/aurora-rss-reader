@@ -142,6 +142,57 @@ void main() {
     expect(unread.readAt, isNull);
   });
 
+  test(
+    'groups aggregate statistics and support move, rename, delete',
+    () async {
+      await repository.saveFeed(
+        Feed(
+          id: 'feed-2',
+          title: 'Grouped Feed',
+          url: Uri.parse('https://example.com/grouped.xml'),
+          groupName: '技术',
+        ),
+      );
+      await repository.insertParsedEntries('feed-1', [_entry('g-1', 'A')]);
+      await repository.insertParsedEntries('feed-2', [
+        _entry('g-2', 'B', content: 'grouped'),
+        _entry('g-3', 'C'),
+      ]);
+
+      var groups = await repository.listGroups();
+      expect(groups.map((group) => group.name), containsAll(['default', '技术']));
+      final tech = groups.singleWhere((group) => group.name == '技术');
+      expect(tech.feedCount, 1);
+      expect(tech.unreadEntries, 2);
+
+      // Move a feed into the group; the now-empty default group disappears
+      // because groups are implicit from feeds.
+      await repository.setFeedGroup('feed-1', '技术');
+      groups = await repository.listGroups();
+      expect(groups.singleWhere((group) => group.name == '技术').feedCount, 2);
+      expect(groups.any((group) => group.name == 'default'), isFalse);
+
+      // Rename keeps all feeds.
+      await repository.renameGroup('技术', '阅读');
+      groups = await repository.listGroups();
+      expect(groups.any((group) => group.name == '技术'), isFalse);
+      expect(groups.singleWhere((group) => group.name == '阅读').feedCount, 2);
+
+      // Inbox can be filtered by group (feed-1 moved in, so 1+2 entries).
+      final techInbox = await repository.listInbox(groupName: '阅读');
+      expect(techInbox.entries, hasLength(3));
+
+      // Deleting a group moves feeds back to default.
+      await repository.deleteGroup('阅读');
+      groups = await repository.listGroups();
+      expect(groups.any((group) => group.name == '阅读'), isFalse);
+      expect(
+        groups.singleWhere((group) => group.name == 'default').feedCount,
+        2,
+      );
+    },
+  );
+
   test('caches extracted content and adds it to FTS5', () async {
     await repository.insertParsedEntries('feed-1', [
       _entry('extract-1', 'Original title', content: 'feed excerpt'),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../reader/mobile_reader_controller.dart';
+import 'group_picker.dart' as picker;
 
 Future<void> showAddFeedSheet(
   BuildContext context,
@@ -27,6 +28,7 @@ final class _AddFeedSheet extends StatefulWidget {
 class _AddFeedSheetState extends State<_AddFeedSheet> {
   final _urlController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  String? _group;
 
   @override
   void dispose() {
@@ -34,10 +36,24 @@ class _AddFeedSheetState extends State<_AddFeedSheet> {
     super.dispose();
   }
 
+  Future<void> _pickGroup() async {
+    final selected = await picker.showGroupPicker(
+      context,
+      existingGroups: {
+        for (final feed in widget.controller.feeds) feed.groupName,
+      },
+      current: _group ?? picker.defaultGroupName,
+    );
+    if (selected != null && mounted) setState(() => _group = selected);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    final added = await widget.controller.addFeed(_urlController.text);
+    final added = await widget.controller.addFeed(
+      _urlController.text,
+      groupName: _group,
+    );
     if (added && mounted) Navigator.of(context).pop();
   }
 
@@ -89,6 +105,33 @@ class _AddFeedSheetState extends State<_AddFeedSheet> {
                   validator: (value) =>
                       value == null || value.trim().isEmpty ? '请输入订阅地址' : null,
                   onFieldSubmitted: (_) => _submit(),
+                ),
+                const SizedBox(height: 14),
+                InkWell(
+                  key: const ValueKey('feed-group-picker'),
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: _pickGroup,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: '分组',
+                      prefixIcon: Icon(Icons.folder_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _group == null
+                                ? picker.groupDisplayName(
+                                    picker.defaultGroupName,
+                                  )
+                                : picker.groupDisplayName(_group!),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down),
+                      ],
+                    ),
+                  ),
                 ),
                 if (widget.controller.error != null) ...[
                   const SizedBox(height: 12),

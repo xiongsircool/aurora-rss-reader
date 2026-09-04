@@ -24,6 +24,8 @@ final class MobileReaderController extends ChangeNotifier {
   List<Entry> _starredEntries = const [];
   List<Entry> _searchResults = const [];
   final Set<String> _extractingEntryIds = {};
+  List<GroupSummary> _groups = const [];
+  String? _selectedGroup;
   InboxCursor? _nextCursor;
   bool _initialized = false;
   bool _loading = false;
@@ -37,6 +39,8 @@ final class MobileReaderController extends ChangeNotifier {
   String? _proxyUrl;
 
   List<Feed> get feeds => _feeds;
+  List<GroupSummary> get groups => _groups;
+  String? get selectedGroup => _selectedGroup;
   List<Entry> get entries => _entries;
   List<Entry> get starredEntries => _starredEntries;
   List<Entry> get searchResults => _searchResults;
@@ -71,7 +75,7 @@ final class MobileReaderController extends ChangeNotifier {
     }
   }
 
-  Future<bool> addFeed(String rawUrl) async {
+  Future<bool> addFeed(String rawUrl, {String? groupName}) async {
     if (_adding) return false;
     final uri = _parseFeedUri(rawUrl);
     if (uri == null) {
@@ -85,7 +89,12 @@ final class MobileReaderController extends ChangeNotifier {
     _notice = null;
     notifyListeners();
     try {
-      final feed = Feed(id: _feedId(uri), title: uri.host, url: uri);
+      final feed = Feed(
+        id: _feedId(uri),
+        title: uri.host,
+        url: uri,
+        groupName: groupName ?? 'default',
+      );
       final result = await refreshFeed(feed);
       await _reload();
       _notice = result.insertedEntries > 0
@@ -99,6 +108,61 @@ final class MobileReaderController extends ChangeNotifier {
       _adding = false;
       notifyListeners();
     }
+  }
+
+  Future<void> setGroup(String? groupName) async {
+    if (_selectedGroup == groupName) return;
+    _selectedGroup = groupName;
+    _loading = true;
+    notifyListeners();
+    try {
+      await _loadFirstPage();
+    } catch (error) {
+      _error = '切换分组失败：$error';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setFeedGroup(Feed feed, String groupName) async {
+    try {
+      await repository.setFeedGroup(feed.id, groupName);
+      await _reload();
+      _error = null;
+      _notice = '「${feed.title}」已移动到 $groupName';
+    } catch (error) {
+      _error = '移动分组失败：$error';
+    }
+    notifyListeners();
+  }
+
+  Future<void> renameGroup(String oldName, String newName) async {
+    final normalized = newName.trim();
+    if (normalized.isEmpty || normalized == oldName) return;
+    try {
+      await repository.renameGroup(oldName, normalized);
+      if (_selectedGroup == oldName) _selectedGroup = normalized;
+      await _reload();
+      _error = null;
+      _notice = '分组已重命名为 $normalized';
+    } catch (error) {
+      _error = '重命名分组失败：$error';
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteGroup(String groupName) async {
+    try {
+      await repository.deleteGroup(groupName);
+      if (_selectedGroup == groupName) _selectedGroup = null;
+      await _reload();
+      _error = null;
+      _notice = '分组 $groupName 已解散，订阅移入默认分组';
+    } catch (error) {
+      _error = '删除分组失败：$error';
+    }
+    notifyListeners();
   }
 
   Future<void> refreshAll() async {
@@ -184,6 +248,7 @@ final class MobileReaderController extends ChangeNotifier {
       final page = await repository.listInbox(
         cursor: cursor,
         unreadOnly: _unreadOnly,
+        groupName: _selectedGroup,
       );
       _entries = [..._entries, ...page.entries];
       _nextCursor = page.nextCursor;
@@ -359,12 +424,20 @@ final class MobileReaderController extends ChangeNotifier {
 
   Future<void> _reload() async {
     _feeds = await repository.listFeeds();
+    _groups = await repository.listGroups();
+    if (_selectedGroup != null &&
+        !_groups.any((group) => group.name == _selectedGroup)) {
+      _selectedGroup = null;
+    }
     await _loadFirstPage();
     _starredEntries = await repository.listStarred();
   }
 
   Future<void> _loadFirstPage() async {
-    final page = await repository.listInbox(unreadOnly: _unreadOnly);
+    final page = await repository.listInbox(
+      unreadOnly: _unreadOnly,
+      groupName: _selectedGroup,
+    );
     _entries = page.entries;
     _nextCursor = page.nextCursor;
   }

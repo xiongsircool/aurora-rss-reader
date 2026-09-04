@@ -20,6 +20,18 @@ final class InboxPage {
   final InboxCursor? nextCursor;
 }
 
+final class GroupSummary {
+  const GroupSummary({
+    required this.name,
+    required this.feedCount,
+    required this.unreadEntries,
+  });
+
+  final String name;
+  final int feedCount;
+  final int unreadEntries;
+}
+
 final class LocalContentRepository {
   const LocalContentRepository(this.database);
 
@@ -95,6 +107,64 @@ final class LocalContentRepository {
     );
   }
 
+  /// Aggregated feed-group statistics, sorted by name with the default
+  /// group last so it reads as "everything else".
+  Future<List<GroupSummary>> listGroups() async {
+    final rows = await database
+        .customSelect(
+          'SELECT f.group_name AS name, '
+          'COUNT(DISTINCT f.id) AS feed_count, '
+          'SUM(CASE WHEN e.read_at IS NULL THEN 1 ELSE 0 END) AS unread '
+          'FROM feeds f '
+          'LEFT JOIN entries e ON e.feed_id = f.id '
+          'GROUP BY f.group_name '
+          'ORDER BY CASE WHEN f.group_name = \'default\' THEN 1 ELSE 0 END, name',
+          readsFrom: {database.feeds, database.entries},
+        )
+        .get();
+    return rows
+        .map(
+          (row) => GroupSummary(
+            name: row.read<String>('name'),
+            feedCount: row.read<int>('feed_count'),
+            unreadEntries: row.read<int?>('unread') ?? 0,
+          ),
+        )
+        .toList();
+  }
+
+  Future<void> setFeedGroup(String feedId, String groupName) async {
+    await (database.update(
+      database.feeds,
+    )..where((feed) => feed.id.equals(feedId))).write(
+      FeedsCompanion(
+        groupName: Value(groupName),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
+  /// Renames a group; returns the number of feeds moved.
+  Future<int> renameGroup(String oldName, String newName) async {
+    if (oldName == newName) return 0;
+    final result =
+        await (database.update(
+          database.feeds,
+        )..where((feed) => feed.groupName.equals(oldName))).write(
+          FeedsCompanion(
+            groupName: Value(newName),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ),
+        );
+    return result;
+  }
+
+  /// Dissolves a group by moving its feeds to the default group.
+  Future<int> deleteGroup(String groupName) async {
+    if (groupName == 'default') return 0;
+    return renameGroup(groupName, 'default');
+  }
+
   /// Inserts normalized entries and ignores duplicates by feed + guid.
   Future<int> insertParsedEntries(String feedId, Iterable<ParsedEntry> items) {
     return database.transaction(() async {
@@ -149,12 +219,19 @@ final class LocalContentRepository {
   Future<InboxPage> listInbox({
     InboxCursor? cursor,
     bool unreadOnly = false,
+    String? groupName,
     int limit = 50,
   }) async {
     final where = <String>[];
     final variables = <Variable<Object>>[];
 
-    if (unreadOnly) where.add('read_at IS NULL');
+    if (unreadOnly) where.add('entries.read_at IS NULL');
+    if (groupName != null) {
+      where.add(
+        'entries.feed_id IN (SELECT id FROM feeds WHERE group_name = ?)',
+      );
+      variables.add(Variable<String>(groupName));
+    }
     if (cursor != null) {
       where.add(
         '(COALESCE(published_at, inserted_at) < ? OR '
@@ -169,7 +246,7 @@ final class LocalContentRepository {
 
     final rows = await database
         .customSelect(
-          'SELECT * FROM entries '
+          'SELECT entries.* FROM entries '
           '${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')} '} '
           'ORDER BY COALESCE(published_at, inserted_at) DESC, id DESC '
           'LIMIT ?',

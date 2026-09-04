@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../data/repositories/local_content_repository.dart'
+    show GroupSummary;
 import '../../domain/entities/entry.dart';
 import '../../domain/entities/feed.dart';
 import '../inbox/entry_tile.dart';
@@ -9,6 +11,7 @@ import '../search/search_page.dart';
 import '../settings/opml_actions_sheet.dart';
 import '../settings/proxy_settings_dialog.dart';
 import '../sources/add_feed_sheet.dart';
+import '../sources/group_picker.dart';
 
 final class AuroraShell extends StatefulWidget {
   const AuroraShell({required this.controller, super.key});
@@ -136,7 +139,7 @@ final class _InboxPage extends StatelessWidget {
           children: [
             _StatusBanner(controller: controller),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
               child: SegmentedButton<int>(
                 segments: const [
                   ButtonSegment(value: 0, label: Text('全部')),
@@ -148,6 +151,37 @@ final class _InboxPage extends StatelessWidget {
                 },
               ),
             ),
+            if (controller.groups.isNotEmpty)
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: const Text('全部分组'),
+                        selected: controller.selectedGroup == null,
+                        onSelected: (_) => controller.setGroup(null),
+                      ),
+                    ),
+                    for (final group in controller.groups)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(
+                            '${groupDisplayName(group.name)}'
+                            '${group.unreadEntries > 0 ? ' ${group.unreadEntries}' : ''}',
+                          ),
+                          selected: controller.selectedGroup == group.name,
+                          onSelected: (_) => controller.setGroup(group.name),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 4),
             Expanded(child: _inboxContent(context)),
           ],
         ),
@@ -264,21 +298,29 @@ final class _SavedPage extends StatelessWidget {
   }
 }
 
-final class _SourcesPage extends StatelessWidget {
+final class _SourcesPage extends StatefulWidget {
   const _SourcesPage({required this.controller, required this.onAddSource});
 
   final MobileReaderController controller;
   final VoidCallback onAddSource;
 
   @override
+  State<_SourcesPage> createState() => _SourcesPageState();
+}
+
+class _SourcesPageState extends State<_SourcesPage> {
+  final Set<String> _collapsedGroups = {};
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     return Scaffold(
       appBar: AppBar(
         title: const Text('订阅'),
         actions: [
           IconButton(
             tooltip: '添加订阅',
-            onPressed: onAddSource,
+            onPressed: widget.onAddSource,
             icon: const Icon(Icons.add),
           ),
         ],
@@ -292,24 +334,175 @@ final class _SourcesPage extends StatelessWidget {
                     icon: Icons.rss_feed,
                     title: '还没有订阅源',
                     actionLabel: '添加订阅',
-                    onAction: onAddSource,
+                    onAction: widget.onAddSource,
                   )
                 : RefreshIndicator(
                     onRefresh: controller.refreshAll,
-                    child: ListView.separated(
+                    child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: controller.feeds.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (context, index) => _FeedTile(
-                        feed: controller.feeds[index],
-                        controller: controller,
-                      ),
+                      children: [
+                        for (final group in controller.groups)
+                          _GroupSection(
+                            key: ValueKey('group-${group.name}'),
+                            controller: controller,
+                            group: group,
+                            collapsed: _collapsedGroups.contains(group.name),
+                            onToggle: () => setState(() {
+                              if (!_collapsedGroups.remove(group.name)) {
+                                _collapsedGroups.add(group.name);
+                              }
+                            }),
+                          ),
+                      ],
                     ),
                   ),
           ),
         ],
       ),
     );
+  }
+}
+
+final class _GroupSection extends StatelessWidget {
+  const _GroupSection({
+    required this.controller,
+    required this.group,
+    required this.collapsed,
+    required this.onToggle,
+    super.key,
+  });
+
+  final MobileReaderController controller;
+  final GroupSummary group;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final feedsInGroup = controller.feeds
+        .where((feed) => feed.groupName == group.name)
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: onToggle,
+          onLongPress: () => _groupActions(context),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              children: [
+                AnimatedRotation(
+                  turns: collapsed ? -0.25 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: const Icon(Icons.expand_more, size: 20),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    groupDisplayName(group.name),
+                    style: Theme.of(context).textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                if (group.unreadEntries > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${group.unreadEntries} 未读',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                Text(
+                  '${group.feedCount} 源',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (!collapsed)
+          for (final feed in feedsInGroup)
+            _FeedTile(feed: feed, controller: controller),
+        const Divider(height: 1),
+      ],
+    );
+  }
+
+  Future<void> _groupActions(BuildContext context) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('重命名分组'),
+              onTap: () => Navigator.of(context).pop('rename'),
+            ),
+            if (group.name != defaultGroupName)
+              ListTile(
+                leading: const Icon(Icons.folder_off_outlined),
+                title: const Text('解散分组（订阅移入未分组）'),
+                onTap: () => Navigator.of(context).pop('delete'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted || action == null) return;
+
+    if (action == 'rename') {
+      final nameController = TextEditingController(text: group.name);
+      final newName = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('重命名分组'),
+          content: TextField(
+            key: const ValueKey('rename-group-input'),
+            controller: nameController,
+            autofocus: true,
+            onSubmitted: (value) =>
+                Navigator.of(dialogContext).pop(value.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(nameController.text.trim()),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+      nameController.dispose();
+      if (newName != null && newName.isNotEmpty && newName != group.name) {
+        await controller.renameGroup(group.name, newName);
+      }
+      return;
+    }
+
+    if (action == 'delete') {
+      await controller.deleteGroup(group.name);
+    }
   }
 }
 
@@ -348,8 +541,17 @@ final class _FeedTile extends StatelessWidget {
             tooltip: '更多操作',
             onSelected: (action) {
               if (action == 'delete') _confirmDelete(context);
+              if (action == 'move') _moveToGroup(context);
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'move',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.drive_file_move_outlined),
+                  title: Text('移动到分组'),
+                ),
+              ),
               PopupMenuItem(
                 value: 'delete',
                 child: ListTile(
@@ -363,6 +565,16 @@ final class _FeedTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _moveToGroup(BuildContext context) async {
+    final selected = await showGroupPicker(
+      context,
+      existingGroups: {for (final feed in controller.feeds) feed.groupName},
+      current: feed.groupName,
+    );
+    if (selected == null || selected == feed.groupName) return;
+    await controller.setFeedGroup(feed, selected);
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
