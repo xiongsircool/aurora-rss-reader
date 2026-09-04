@@ -25,26 +25,23 @@ final class _AiSettingsSheet extends StatefulWidget {
 }
 
 class _AiSettingsSheetState extends State<_AiSettingsSheet> {
-  late final TextEditingController _baseUrlController;
-  late final TextEditingController _modelController;
-  late final TextEditingController _keyController;
+  final _baseUrlController = TextEditingController();
+  final _modelController = TextEditingController();
+  final _keyController = TextEditingController();
   bool _saving = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    final config = widget.controller.repository;
-    config.loadAiConfig().then((value) {
+    widget.controller.repository.loadAiConfig().then((value) {
       if (!mounted) return;
-      setState(() {
-        _baseUrlController.text = value.baseUrl;
-        _modelController.text = value.model;
-      });
+      _baseUrlController.text = value.baseUrl;
+      _modelController.text = value.model;
     });
     widget.controller.loadSummaryKey().then((key) {
       if (mounted && key != null && key.isNotEmpty) {
-        setState(() => _keyController.text = key);
+        _keyController.text = key;
       }
     });
   }

@@ -9,6 +9,7 @@ import '../inbox/inbox_filter_sheet.dart';
 import '../reader/article_reader_page.dart';
 import '../reader/mobile_reader_controller.dart';
 import '../search/search_page.dart';
+import '../settings/ai_settings_sheet.dart';
 import '../settings/opml_actions_sheet.dart';
 import '../settings/proxy_settings_dialog.dart';
 import '../sources/add_feed_sheet.dart';
@@ -657,12 +658,13 @@ final class _SettingsPage extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => showOpmlActionsSheet(context, controller),
           ),
-          const Divider(height: 1, indent: 56),
-          const ListTile(
-            leading: Icon(Icons.smart_toy_outlined),
-            title: Text('AI 服务'),
-            subtitle: Text('未配置'),
-            trailing: Icon(Icons.chevron_right),
+          Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.smart_toy_outlined),
+            title: const Text('AI 服务'),
+            subtitle: Text(controller.aiSummary != null ? '已配置' : '未配置'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showAiSettingsSheet(context, controller),
           ),
           const Divider(height: 1, indent: 56),
           const ListTile(
