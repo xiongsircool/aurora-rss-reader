@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Aurora 需要本地网络权限以支持调试服务和局域网功能</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_dartobservatory._tcp</string>
+	</array>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>保存文章图片到相册</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
