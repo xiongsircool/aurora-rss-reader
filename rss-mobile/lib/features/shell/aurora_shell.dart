@@ -16,6 +16,7 @@ import '../reader/article_reader_page.dart';
 import '../reader/mobile_reader_controller.dart';
 import '../search/search_page.dart';
 import '../settings/ai_settings_sheet.dart';
+import '../settings/about_page.dart';
 import '../settings/opml_actions_sheet.dart';
 import '../settings/proxy_settings_dialog.dart';
 import '../sources/add_feed_sheet.dart';
@@ -819,10 +820,14 @@ class _SettingsPageState extends State<_SettingsPage> {
             onTap: () => showAiSettingsSheet(context, controller),
           ),
           const Divider(height: 1, indent: 56),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('关于 Aurora'),
-            subtitle: Text('0.1.0'),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('关于 Aurora'),
+            subtitle: const Text('0.1.0 · 本地优先 · GPL-3.0'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(builder: (_) => const AboutPage())),
           ),
         ],
       ),
