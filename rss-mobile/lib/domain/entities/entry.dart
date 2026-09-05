@@ -24,6 +24,7 @@ final class Entry {
     this.readAt,
     this.isStarred = false,
     this.translatedTitle,
+    this.sourceLang,
   });
 
   final String id;
@@ -52,6 +53,9 @@ final class Entry {
 
   /// Cached AI-translated title (from translations table).
   final String? translatedTitle;
+
+  /// Detected source language (zh/en/ja/ko/ru/unknown).
+  final String? sourceLang;
 
   bool get isRead => readAt != null;
 

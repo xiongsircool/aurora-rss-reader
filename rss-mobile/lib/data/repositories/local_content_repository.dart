@@ -4,6 +4,7 @@ import '../../domain/entities/entry.dart' as domain_entry;
 import '../../domain/entities/feed.dart' as domain_feed;
 import '../../domain/value_objects/feed_view_type.dart' as domain_type;
 import '../../domain/feed_parsing/parsed_feed.dart';
+import '../../domain/translation/lang_detect.dart';
 import '../database/local_database.dart';
 
 final class InboxCursor {
@@ -247,6 +248,7 @@ final class LocalContentRepository {
                 ),
                 doi: Value(item.doi),
                 pmid: Value(item.pmid),
+                sourceLang: Value(detectSourceLang(item.title)),
               ),
               mode: InsertMode.insertOrIgnore,
             );
@@ -546,6 +548,7 @@ domain_entry.Entry _entryFromRow(EntryRow row) {
     contentExtractionStatus: _extractionStatus(row.contentExtractionStatus),
     contentExtractionError: row.contentExtractionError,
     imageUrl: row.imageUrl == null ? null : Uri.tryParse(row.imageUrl!),
+    sourceLang: row.sourceLang,
     enclosureUrl: row.enclosureUrl == null
         ? null
         : Uri.tryParse(row.enclosureUrl!),

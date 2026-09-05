@@ -218,6 +218,8 @@ abstract class _AiSettingsPageState<T extends _AiSettingsPage>
     try {
       final stored = await _loadPrefs();
       await _savePrefs({...stored, ...prefs});
+      // Reload AI preferences in the controller immediately.
+      await widget.controller.reloadAiPreferences();
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {

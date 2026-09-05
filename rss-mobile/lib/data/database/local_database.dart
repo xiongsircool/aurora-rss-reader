@@ -60,6 +60,7 @@ class Entries extends Table {
   TextColumn get imageUrl => text().nullable()();
   TextColumn get doi => text().nullable()();
   TextColumn get pmid => text().nullable()();
+  TextColumn get sourceLang => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -203,7 +204,7 @@ final class LocalDatabase extends _$LocalDatabase {
   factory LocalDatabase.onDevice() => LocalDatabase(_openOnDevice());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -224,6 +225,9 @@ final class LocalDatabase extends _$LocalDatabase {
         await customStatement('DROP TRIGGER IF EXISTS entries_fts_ad');
         await customStatement('DROP TRIGGER IF EXISTS entries_fts_au');
         await customStatement('DROP TABLE IF EXISTS entries_fts');
+      }
+      if (from < 4) {
+        await migrator.addColumn(entries, entries.sourceLang);
       }
     },
     beforeOpen: (details) async {

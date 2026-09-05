@@ -1156,6 +1156,17 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _sourceLangMeta = const VerificationMeta(
+    'sourceLang',
+  );
+  @override
+  late final GeneratedColumn<String> sourceLang = GeneratedColumn<String>(
+    'source_lang',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1183,6 +1194,7 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
     imageUrl,
     doi,
     pmid,
+    sourceLang,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1384,6 +1396,12 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
         pmid.isAcceptableOrUnknown(data['pmid']!, _pmidMeta),
       );
     }
+    if (data.containsKey('source_lang')) {
+      context.handle(
+        _sourceLangMeta,
+        sourceLang.isAcceptableOrUnknown(data['source_lang']!, _sourceLangMeta),
+      );
+    }
     return context;
   }
 
@@ -1497,6 +1515,10 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
         DriftSqlType.string,
         data['${effectivePrefix}pmid'],
       ),
+      sourceLang: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_lang'],
+      ),
     );
   }
 
@@ -1532,6 +1554,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
   final String? imageUrl;
   final String? doi;
   final String? pmid;
+  final String? sourceLang;
   const EntryRow({
     required this.id,
     required this.feedId,
@@ -1558,6 +1581,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     this.imageUrl,
     this.doi,
     this.pmid,
+    this.sourceLang,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1629,6 +1653,9 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     if (!nullToAbsent || pmid != null) {
       map['pmid'] = Variable<String>(pmid);
     }
+    if (!nullToAbsent || sourceLang != null) {
+      map['source_lang'] = Variable<String>(sourceLang);
+    }
     return map;
   }
 
@@ -1691,6 +1718,9 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
           : Value(imageUrl),
       doi: doi == null && nullToAbsent ? const Value.absent() : Value(doi),
       pmid: pmid == null && nullToAbsent ? const Value.absent() : Value(pmid),
+      sourceLang: sourceLang == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceLang),
     );
   }
 
@@ -1733,6 +1763,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
       doi: serializer.fromJson<String?>(json['doi']),
       pmid: serializer.fromJson<String?>(json['pmid']),
+      sourceLang: serializer.fromJson<String?>(json['sourceLang']),
     );
   }
   @override
@@ -1768,6 +1799,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       'imageUrl': serializer.toJson<String?>(imageUrl),
       'doi': serializer.toJson<String?>(doi),
       'pmid': serializer.toJson<String?>(pmid),
+      'sourceLang': serializer.toJson<String?>(sourceLang),
     };
   }
 
@@ -1797,6 +1829,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     Value<String?> imageUrl = const Value.absent(),
     Value<String?> doi = const Value.absent(),
     Value<String?> pmid = const Value.absent(),
+    Value<String?> sourceLang = const Value.absent(),
   }) => EntryRow(
     id: id ?? this.id,
     feedId: feedId ?? this.feedId,
@@ -1840,6 +1873,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
     doi: doi.present ? doi.value : this.doi,
     pmid: pmid.present ? pmid.value : this.pmid,
+    sourceLang: sourceLang.present ? sourceLang.value : this.sourceLang,
   );
   EntryRow copyWithCompanion(EntriesCompanion data) {
     return EntryRow(
@@ -1892,6 +1926,9 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
       doi: data.doi.present ? data.doi.value : this.doi,
       pmid: data.pmid.present ? data.pmid.value : this.pmid,
+      sourceLang: data.sourceLang.present
+          ? data.sourceLang.value
+          : this.sourceLang,
     );
   }
 
@@ -1922,7 +1959,8 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
           ..write('durationSeconds: $durationSeconds, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('doi: $doi, ')
-          ..write('pmid: $pmid')
+          ..write('pmid: $pmid, ')
+          ..write('sourceLang: $sourceLang')
           ..write(')'))
         .toString();
   }
@@ -1954,6 +1992,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     imageUrl,
     doi,
     pmid,
+    sourceLang,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1983,7 +2022,8 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
           other.durationSeconds == this.durationSeconds &&
           other.imageUrl == this.imageUrl &&
           other.doi == this.doi &&
-          other.pmid == this.pmid);
+          other.pmid == this.pmid &&
+          other.sourceLang == this.sourceLang);
 }
 
 class EntriesCompanion extends UpdateCompanion<EntryRow> {
@@ -2012,6 +2052,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
   final Value<String?> imageUrl;
   final Value<String?> doi;
   final Value<String?> pmid;
+  final Value<String?> sourceLang;
   final Value<int> rowid;
   const EntriesCompanion({
     this.id = const Value.absent(),
@@ -2039,6 +2080,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     this.imageUrl = const Value.absent(),
     this.doi = const Value.absent(),
     this.pmid = const Value.absent(),
+    this.sourceLang = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EntriesCompanion.insert({
@@ -2067,6 +2109,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     this.imageUrl = const Value.absent(),
     this.doi = const Value.absent(),
     this.pmid = const Value.absent(),
+    this.sourceLang = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        feedId = Value(feedId),
@@ -2098,6 +2141,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     Expression<String>? imageUrl,
     Expression<String>? doi,
     Expression<String>? pmid,
+    Expression<String>? sourceLang,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2129,6 +2173,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
       if (imageUrl != null) 'image_url': imageUrl,
       if (doi != null) 'doi': doi,
       if (pmid != null) 'pmid': pmid,
+      if (sourceLang != null) 'source_lang': sourceLang,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2159,6 +2204,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     Value<String?>? imageUrl,
     Value<String?>? doi,
     Value<String?>? pmid,
+    Value<String?>? sourceLang,
     Value<int>? rowid,
   }) {
     return EntriesCompanion(
@@ -2189,6 +2235,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
       imageUrl: imageUrl ?? this.imageUrl,
       doi: doi ?? this.doi,
       pmid: pmid ?? this.pmid,
+      sourceLang: sourceLang ?? this.sourceLang,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2277,6 +2324,9 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     if (pmid.present) {
       map['pmid'] = Variable<String>(pmid.value);
     }
+    if (sourceLang.present) {
+      map['source_lang'] = Variable<String>(sourceLang.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2311,6 +2361,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
           ..write('imageUrl: $imageUrl, ')
           ..write('doi: $doi, ')
           ..write('pmid: $pmid, ')
+          ..write('sourceLang: $sourceLang, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5749,6 +5800,7 @@ typedef $$EntriesTableCreateCompanionBuilder = EntriesCompanion Function({
   Value<String?> imageUrl,
   Value<String?> doi,
   Value<String?> pmid,
+  Value<String?> sourceLang,
   Value<int> rowid,
 });
 typedef $$EntriesTableUpdateCompanionBuilder = EntriesCompanion Function({
@@ -5777,6 +5829,7 @@ typedef $$EntriesTableUpdateCompanionBuilder = EntriesCompanion Function({
   Value<String?> imageUrl,
   Value<String?> doi,
   Value<String?> pmid,
+  Value<String?> sourceLang,
   Value<int> rowid,
 });
 
@@ -6003,6 +6056,11 @@ class $$EntriesTableFilterComposer
 
   ColumnFilters<String> get pmid => $composableBuilder(
     column: $table.pmid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceLang => $composableBuilder(
+    column: $table.sourceLang,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6259,6 +6317,11 @@ class $$EntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sourceLang => $composableBuilder(
+    column: $table.sourceLang,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$FeedsTableOrderingComposer get feedId {
     final $$FeedsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6387,6 +6450,11 @@ class $$EntriesTableAnnotationComposer
 
   GeneratedColumn<String> get pmid =>
       $composableBuilder(column: $table.pmid, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceLang => $composableBuilder(
+    column: $table.sourceLang,
+    builder: (column) => column,
+  );
 
   $$FeedsTableAnnotationComposer get feedId {
     final $$FeedsTableAnnotationComposer composer = $composerBuilder(
@@ -6572,6 +6640,7 @@ class $$EntriesTableTableManager
                 Value<String?> imageUrl = const Value.absent(),
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pmid = const Value.absent(),
+                Value<String?> sourceLang = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntriesCompanion(
                 id: id,
@@ -6599,6 +6668,7 @@ class $$EntriesTableTableManager
                 imageUrl: imageUrl,
                 doi: doi,
                 pmid: pmid,
+                sourceLang: sourceLang,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6628,6 +6698,7 @@ class $$EntriesTableTableManager
                 Value<String?> imageUrl = const Value.absent(),
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pmid = const Value.absent(),
+                Value<String?> sourceLang = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntriesCompanion.insert(
                 id: id,
@@ -6655,6 +6726,7 @@ class $$EntriesTableTableManager
                 imageUrl: imageUrl,
                 doi: doi,
                 pmid: pmid,
+                sourceLang: sourceLang,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

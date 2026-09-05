@@ -11,6 +11,7 @@ import '../../data/repositories/local_content_repository.dart';
 import '../../platform/notifications/notification_service.dart';
 import '../../domain/translation/bilingual_builder.dart';
 import '../../domain/translation/block_extractor.dart';
+import '../../domain/translation/lang_detect.dart';
 import '../../domain/entities/entry.dart';
 import '../../domain/entities/feed.dart';
 import '../../domain/opml/opml_codec.dart';
@@ -105,6 +106,17 @@ final class MobileReaderController extends ChangeNotifier {
     }
   }
 
+  /// Called when AI settings change (from the settings UI) so the
+  /// controller picks up auto-translate preferences immediately.
+  Future<void> reloadAiPreferences() async {
+    _prefs ??= ReaderPrefsRepository(repository.database);
+    await _loadAutoTranslateSettings();
+    if (_autoTranslateTitles) {
+      unawaited(_autoTranslatePendingTitles());
+    }
+    notifyListeners();
+  }
+
   Future<void> _loadAutoTranslateSettings() async {
     final prefs = await _prefs?.loadAiExtendedSettings();
     if (prefs == null) return;
@@ -137,7 +149,7 @@ final class MobileReaderController extends ChangeNotifier {
           (e) =>
               !e.isRead &&
               e.translatedTitle == null &&
-              _isLikelyNonChinese(e.title),
+              shouldTranslate(e.sourceLang ?? detectSourceLang(e.title), 'zh'),
         )
         .take(_maxAutoTranslations)
         .toList();
@@ -164,14 +176,6 @@ final class MobileReaderController extends ChangeNotifier {
       await _loadFirstPage();
       notifyListeners();
     }
-  }
-
-  static bool _isLikelyNonChinese(String text) {
-    if (text.isEmpty) return false;
-    final cjkCount = RegExp(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]')
-        .allMatches(text)
-        .length;
-    return cjkCount < text.length * 0.3;
   }
 
   Future<bool> addFeed(String rawUrl, {String? groupName}) async {
