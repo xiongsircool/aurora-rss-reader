@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:html/parser.dart' as html_parser;
 
@@ -54,15 +55,15 @@ final class EntryTile extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(6),
-                    child: Image.network(
-                      entry.imageUrl.toString(),
-                      headers: referer == null
+                    child: CachedNetworkImage(
+                      imageUrl: entry.imageUrl.toString(),
+                      httpHeaders: referer == null
                           ? null
                           : {'Referer': referer.toString()},
                       width: 88,
                       height: 76,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
+                      errorWidget: (_, _, _) => Container(
                         width: 88,
                         height: 76,
                         color: colorScheme.surfaceContainerHighest,

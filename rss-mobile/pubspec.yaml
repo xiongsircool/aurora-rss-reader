@@ -50,6 +50,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_secure_storage: ^11.0.0
   http: ^1.6.0
+  cached_network_image: ^4.0.0
 
 dev_dependencies:
   flutter_test:

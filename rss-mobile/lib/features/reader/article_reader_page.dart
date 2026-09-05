@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
@@ -238,13 +239,13 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: Image.network(
-                    _entry.imageUrl.toString(),
-                    headers: referer == null
+                  child: CachedNetworkImage(
+                    imageUrl: _entry.imageUrl.toString(),
+                    httpHeaders: referer == null
                         ? null
                         : {'Referer': referer.toString()},
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    errorWidget: (_, _, _) => const SizedBox.shrink(),
                   ),
                 ),
               ),

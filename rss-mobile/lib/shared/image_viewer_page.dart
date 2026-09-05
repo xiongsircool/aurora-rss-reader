@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 /// Full-screen image viewer with pinch-to-zoom and double-tap zoom.
@@ -99,11 +100,13 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
           maxScale: 8,
           minScale: 0.5,
           child: Center(
-            child: Image.network(
-              widget.url.toString(),
-              headers: referer == null ? null : {'Referer': referer.toString()},
+            child: CachedNetworkImage(
+              imageUrl: widget.url.toString(),
+              httpHeaders: referer == null
+                  ? null
+                  : {'Referer': referer.toString()},
               fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const Column(
+              errorWidget: (_, _, _) => const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
