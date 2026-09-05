@@ -9,6 +9,7 @@ import 'data/platform/secure_key_store.dart';
 import 'data/repositories/local_content_repository.dart';
 import 'features/reader/mobile_reader_controller.dart';
 import 'platform/background/background_refresh.dart';
+import 'platform/notifications/notification_service.dart';
 import 'platform/http/io_feed_http_client.dart';
 
 void main() {
@@ -30,6 +31,9 @@ void main() {
   );
 
   runApp(AuroraApp(controller: controller));
+
+  // Initialize notifications.
+  NotificationService.init().catchError((_) {});
 
   // Initialize background refresh after the UI is up.
   initBackgroundRefresh(

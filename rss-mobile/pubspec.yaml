@@ -54,6 +54,7 @@ dependencies:
   shared_preferences: ^2.5.5
   workmanager: ^0.10.9
   just_audio: ^0.10.6
+  flutter_local_notifications: ^22.3.0
 
 dev_dependencies:
   flutter_test:

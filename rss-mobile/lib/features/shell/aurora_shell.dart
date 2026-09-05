@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../platform/background/background_refresh.dart';
+
 import '../../data/repositories/local_content_repository.dart'
     show GroupSummary;
 import '../../domain/entities/entry.dart';
@@ -631,6 +633,21 @@ final class _SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<_SettingsPage> {
   int _settingsRevision = 0;
 
+  Future<int> _getRefreshInterval() async {
+    final sp = await SharedPreferences.getInstance();
+    return sp.getInt('refresh_interval_hours') ?? 3;
+  }
+
+  Future<void> _setRefreshInterval(int hours) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt('refresh_interval_hours', hours);
+    initBackgroundRefresh(
+      interval: Duration(hours: hours),
+      enabled: hours > 0,
+    ).catchError((_) {});
+    setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
@@ -680,6 +697,30 @@ class _SettingsPageState extends State<_SettingsPage> {
             subtitle: Text(controller.proxyUrl ?? '直连'),
             trailing: const Icon(Icons.edit_outlined),
             onTap: () => showProxySettingsDialog(context, controller),
+          ),
+          Divider(height: 1, indent: 56),
+          FutureBuilder<int>(
+            future: _getRefreshInterval(),
+            builder: (context, snapshot) {
+              final hours = snapshot.data ?? 3;
+              return ListTile(
+                leading: const Icon(Icons.sync),
+                title: const Text('后台刷新'),
+                subtitle: Text(hours > 0 ? '每 $hours 小时自动刷新订阅' : '已关闭'),
+                trailing: PopupMenuButton<int>(
+                  icon: const Icon(Icons.schedule),
+                  onSelected: (value) => _setRefreshInterval(value),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 0, child: Text('关闭')),
+                    for (final h in [1, 2, 3, 6, 12, 24])
+                      PopupMenuItem(
+                        value: h,
+                        child: Text('$h 小时${h == hours ? ' ✓' : ''}'),
+                      ),
+                  ],
+                ),
+              );
+            },
           ),
           const Divider(height: 1, indent: 56),
           ListTile(

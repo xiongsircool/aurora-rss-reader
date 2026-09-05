@@ -8,6 +8,7 @@ import '../../data/platform/ai_client.dart';
 import '../../data/platform/secure_key_store.dart';
 import '../../data/repositories/reader_prefs_repository.dart';
 import '../../data/repositories/local_content_repository.dart';
+import '../../platform/notifications/notification_service.dart';
 import '../../domain/translation/bilingual_builder.dart';
 import '../../domain/translation/block_extractor.dart';
 import '../../domain/entities/entry.dart';
@@ -290,6 +291,10 @@ final class MobileReaderController extends ChangeNotifier {
       _notice = failed == 0
           ? '刷新完成，新增 $inserted 篇文章'
           : '刷新完成，新增 $inserted 篇，$failed 个订阅失败';
+      // Show notification for new articles.
+      if (inserted > 0) {
+        NotificationService.showNewArticles(count: inserted).catchError((_) {});
+      }
       // Auto-translate new foreign titles after refresh.
       if (_autoTranslateTitles && inserted > 0) {
         unawaited(_autoTranslatePendingTitles());
