@@ -327,8 +327,13 @@ final class MobileReaderController extends ChangeNotifier {
         try {
           final result = await refreshFeed(feed);
           inserted += result.insertedEntries;
-        } catch (_) {
+          await repository.updateFeedStatus(id: feed.id, lastError: null);
+        } catch (error) {
           failed++;
+          await repository.updateFeedStatus(
+            id: feed.id,
+            lastError: error.toString(),
+          );
         }
       }
       await _reload();

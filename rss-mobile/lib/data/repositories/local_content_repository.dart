@@ -38,6 +38,24 @@ final class LocalContentRepository {
 
   final LocalDatabase database;
 
+  /// Records the outcome of a refresh attempt for diagnostics.
+  /// Pass [lastError] = null after a successful fetch to clear it.
+  Future<void> updateFeedStatus({
+    required String id,
+    required String? lastError,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await (database.update(
+      database.feeds,
+    )..where((row) => row.id.equals(id))).write(
+      FeedsCompanion(
+        lastError: Value(lastError),
+        lastCheckedAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
   Future<void> saveFeed(domain_feed.Feed feed) async {
     final now = DateTime.now().toUtc();
     final existing = await (database.select(
