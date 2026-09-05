@@ -580,6 +580,19 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             else
               HtmlWidget(
                 _sanitizeArticleHtml(_bilingualHtml ?? html),
+                customStylesBuilder: (element) {
+                  if (element.className.contains('aurora-translation')) {
+                    return {
+                      'color': '#8b9bb4',
+                      'font-style': 'italic',
+                      'font-size': '0.92em',
+                      'margin': '0.2em 0 0.6em 0',
+                      'padding-left': '10px',
+                      'border-left': '2px solid rgba(100,149,237,0.25)',
+                    };
+                  }
+                  return null;
+                },
                 factoryBuilder: () => ArticleWidgetFactory(
                   referer: referer?.toString(),
                   onImageTap: (url) async {
