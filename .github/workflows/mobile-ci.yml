@@ -1,0 +1,35 @@
+name: mobile-ci
+
+on:
+  push:
+    branches: [main, 'feature/**']
+    paths: ['rss-mobile/**', '.github/workflows/mobile-ci.yml']
+  pull_request:
+    paths: ['rss-mobile/**', '.github/workflows/mobile-ci.yml']
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rss-mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test

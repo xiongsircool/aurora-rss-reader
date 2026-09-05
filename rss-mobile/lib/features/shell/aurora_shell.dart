@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../platform/background/background_refresh.dart';
@@ -684,6 +685,19 @@ class _SettingsPageState extends State<_SettingsPage> {
     setState(() {});
   }
 
+  Future<void> _openBatteryOptimizationSettings() async {
+    const channel = MethodChannel('aurora.mobile/system');
+    try {
+      await channel.invokeMethod<bool>('openBatteryOptimizationSettings');
+    } on PlatformException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开系统设置：${e.message ?? e.code}')),
+        );
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -757,6 +771,14 @@ class _SettingsPageState extends State<_SettingsPage> {
                 ),
               );
             },
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.battery_saver),
+            title: const Text('电池优化豁免'),
+            subtitle: const Text('防止后台刷新被系统终止'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _openBatteryOptimizationSettings,
           ),
           const Divider(height: 1, indent: 56),
           ListTile(

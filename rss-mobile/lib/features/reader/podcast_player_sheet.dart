@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter/material.dart';
 
+import '../../data/repositories/reader_prefs_repository.dart';
+
 /// Full-featured audio player for podcast entries.
 /// Supports play/pause, seek, speed control, and position memory.
 class PodcastPlayerSheet extends StatefulWidget {
@@ -10,6 +12,7 @@ class PodcastPlayerSheet extends StatefulWidget {
     required this.title,
     required this.feedTitle,
     required this.url,
+    this.prefs,
     super.key,
   });
 
@@ -17,18 +20,27 @@ class PodcastPlayerSheet extends StatefulWidget {
   final String feedTitle;
   final Uri url;
 
+  /// Optional persistence for play position memory. When null the
+  /// player works the same but does not remember progress.
+  final ReaderPrefsRepository? prefs;
+
   static Future<void> show(
     BuildContext context, {
     required String title,
     required String feedTitle,
     required Uri url,
+    ReaderPrefsRepository? prefs,
   }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) =>
-          PodcastPlayerSheet(title: title, feedTitle: feedTitle, url: url),
+      builder: (_) => PodcastPlayerSheet(
+        title: title,
+        feedTitle: feedTitle,
+        url: url,
+        prefs: prefs,
+      ),
     );
   }
 
@@ -44,6 +56,9 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
   double _speed = 1.0;
   String? _error;
   bool _disposed = false;
+  Duration? _lastSavedPosition;
+  bool _resumed = false;
+  ReaderPrefsRepository? get _prefs => widget.prefs;
 
   @override
   void initState() {
@@ -69,9 +84,11 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
       _player.positionStream.listen((position) {
         if (_disposed) return;
         setState(() => _position = position);
+        _maybeSaveProgress(position);
       });
 
       await _player.setUrl(widget.url.toString());
+      await _restoreProgress();
     } catch (e) {
       if (_disposed) return;
       setState(() => _error = '加载音频失败：$e');
@@ -101,6 +118,39 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
     final current = _position ?? Duration.zero;
     final target = current + delta;
     await _seek(target);
+  }
+
+  /// Resumes playback from the last saved position (if meaningful).
+  Future<void> _restoreProgress() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    final seconds = double.tryParse(
+      await prefs.loadPlaybackPosition(widget.url.toString()) ?? '',
+    );
+    if (seconds == null || seconds < 30) return;
+    final saved = Duration(seconds: seconds.round());
+    final duration = _player.duration;
+    if (duration != null && duration - saved < const Duration(seconds: 60)) {
+      return; // essentially finished; start over
+    }
+    await _player.seek(saved);
+    if (_disposed) return;
+    setState(() {
+      _position = saved;
+      _resumed = true;
+    });
+  }
+
+  /// Persists progress at most every 10 seconds of new playback.
+  void _maybeSaveProgress(Duration position) {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    final last = _lastSavedPosition;
+    if (last != null && (position - last).abs() < const Duration(seconds: 10)) {
+      return;
+    }
+    _lastSavedPosition = position;
+    prefs.savePlaybackPosition(widget.url.toString(), position.inSeconds);
   }
 
   void _cycleSpeed() {
@@ -153,6 +203,15 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
                 ?.copyWith(color: colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
+
+          if (_resumed) ...[
+            Text(
+              '已恢复到上次播放位置',
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: colorScheme.secondary),
+            ),
+            const SizedBox(height: 8),
+          ],
 
           if (_error != null) ...[
             Text(_error!, style: TextStyle(color: colorScheme.error)),

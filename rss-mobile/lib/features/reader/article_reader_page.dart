@@ -99,6 +99,63 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     });
   }
 
+  void _showReaderSettingsSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '阅读设置',
+                style: Theme.of(sheetContext).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                '字号 · ${_fontSize.round()}',
+                style: Theme.of(sheetContext).textTheme.labelLarge,
+              ),
+              Slider(
+                value: _fontSize,
+                min: 12,
+                max: 24,
+                divisions: 12,
+                label: '${_fontSize.round()}',
+                onChanged: (v) {
+                  setSheetState(() {});
+                  setState(() => _fontSize = v);
+                },
+                onChangeEnd: _prefs.saveFontSize,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '行距 · ${_lineHeight.toStringAsFixed(2)}',
+                style: Theme.of(sheetContext).textTheme.labelLarge,
+              ),
+              Slider(
+                value: _lineHeight,
+                min: 1.3,
+                max: 2.2,
+                divisions: 18,
+                label: _lineHeight.toStringAsFixed(2),
+                onChanged: (v) {
+                  setSheetState(() {});
+                  setState(() => _lineHeight = v);
+                },
+                onChangeEnd: _prefs.saveLineHeight,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _openUrl(Uri? uri) async {
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -264,29 +321,10 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                   : Icons.check_circle_outline,
             ),
           ),
-          PopupMenuButton<double>(
-            tooltip: '字号',
-            icon: const Icon(Icons.format_size),
-            onSelected: (size) {
-              setState(() => _fontSize = size);
-              _prefs.saveFontSize(size);
-            },
-            itemBuilder: (_) => [
-              for (final s in [14.0, 15.0, 16.0, 17.0, 18.0, 20.0, 22.0])
-                PopupMenuItem(
-                  value: s,
-                  child: Row(
-                    children: [
-                      if (s == _fontSize)
-                        const Icon(Icons.check, size: 18)
-                      else
-                        const SizedBox(width: 18),
-                      const SizedBox(width: 8),
-                      Text(s == _fontSize ? '${s.toInt()} ✓' : '${s.toInt()}'),
-                    ],
-                  ),
-                ),
-            ],
+          IconButton(
+            tooltip: '阅读设置',
+            icon: const Icon(Icons.tune),
+            onPressed: _showReaderSettingsSheet,
           ),
         ],
       ),
@@ -330,7 +368,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             Row(
               children: [
                 Text(
-                  _metadata(_entry, widget.feedTitle),
+                  '${_readingTimeEstimateFromHtml(html)} · ${_metadata(_entry, widget.feedTitle)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -605,6 +643,35 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                       'border-left': '2px solid rgba(100,149,237,0.25)',
                     };
                   }
+                  final tag = element.localName;
+                  if (tag == 'pre') {
+                    return {
+                      'font-family': 'monospace',
+                      'font-size': '0.86em',
+                      'line-height': '1.5',
+                      'background': 'rgba(127,127,127,0.10)',
+                      'padding': '12px',
+                      'border-radius': '8px',
+                      'overflow-x': 'auto',
+                    };
+                  }
+                  if (tag == 'code') {
+                    return {
+                      'font-family': 'monospace',
+                      'font-size': '0.88em',
+                      'background': 'rgba(127,127,127,0.10)',
+                      'padding': '1px 5px',
+                      'border-radius': '4px',
+                    };
+                  }
+                  if (tag == 'blockquote') {
+                    return {
+                      'margin': '0.6em 0',
+                      'padding': '2px 0 2px 12px',
+                      'border-left': '3px solid rgba(127,127,127,0.30)',
+                      'color': 'rgba(127,127,127,0.85)',
+                    };
+                  }
                   return null;
                 },
                 factoryBuilder: () => ArticleWidgetFactory(
@@ -674,6 +741,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                     title: _entry.title,
                     feedTitle: widget.feedTitle,
                     url: _entry.enclosureUrl!,
+                    prefs: _prefs,
                   ),
                   icon: const Icon(Icons.headphones),
                   label: const Text('播放播客'),
@@ -744,6 +812,23 @@ String _sanitizeArticleHtml(String raw) {
     }
   }
   return fragment.outerHtml;
+}
+
+/// Estimates reading minutes from article HTML: CJK chars at ~400/min,
+/// Latin words at ~220/min.
+String _readingTimeEstimateFromHtml(String? html) {
+  if (html == null || html.isEmpty) return '';
+  final text =
+      html_parser.parseFragment(html).text?.replaceAll(RegExp(r'\s+'), '') ??
+      '';
+  if (text.isEmpty) return '';
+  final cjk = RegExp(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]')
+      .allMatches(text)
+      .length;
+  final latinWords = RegExp(r'[a-zA-Z]+').allMatches(text).length;
+  final minutes = (cjk / 400 + latinWords / 220).ceil();
+  if (minutes < 1) return '不到 1 分钟';
+  return '约 $minutes 分钟读完';
 }
 
 String _metadata(Entry entry, String feedTitle) {

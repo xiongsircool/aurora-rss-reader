@@ -86,4 +86,12 @@ class ReaderPrefsRepository {
 
   Future<void> saveLineHeight(double height) =>
       _set('reader_line_height', height.toString());
+
+  /// Podcast playback position memory, keyed by the audio URL.
+  Future<String?> loadPlaybackPosition(String audioUrl) async {
+    return _get('podcast_pos_${audioUrl.hashCode.toRadixString(36)}');
+  }
+
+  Future<void> savePlaybackPosition(String audioUrl, int seconds) =>
+      _set('podcast_pos_${audioUrl.hashCode.toRadixString(36)}', '$seconds');
 }
