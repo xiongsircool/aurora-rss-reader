@@ -1,11 +1,12 @@
-import 'package:flutter/material.dart';
-
 import 'dart:async';
+
+import 'package:flutter/material.dart';
 
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../data/repositories/reader_prefs_repository.dart';
 import '../../domain/entities/entry.dart';
 import '../../shared/image_viewer_page.dart';
 import '../reader/mobile_reader_controller.dart';
@@ -39,11 +40,21 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
   bool _summaryGenerating = false;
   String? _summaryError;
   StreamSubscription<String>? _summarySub;
+  double _fontSize = 16.0;
+  double _lineHeight = 1.65;
+  late final ReaderPrefsRepository _prefs;
 
   @override
   void initState() {
     super.initState();
     _entry = widget.entry;
+    _prefs = ReaderPrefsRepository(widget.controller.repository.database);
+    _prefs.loadFontSize().then((v) {
+      if (mounted) setState(() => _fontSize = v);
+    });
+    _prefs.loadLineHeight().then((v) {
+      if (mounted) setState(() => _lineHeight = v);
+    });
     if (!_entry.isRead) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _markRead());
     }
@@ -174,6 +185,30 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                   ? Icons.mark_email_unread_outlined
                   : Icons.check_circle_outline,
             ),
+          ),
+          PopupMenuButton<double>(
+            tooltip: '字号',
+            icon: const Icon(Icons.format_size),
+            onSelected: (size) {
+              setState(() => _fontSize = size);
+              _prefs.saveFontSize(size);
+            },
+            itemBuilder: (_) => [
+              for (final s in [14.0, 15.0, 16.0, 17.0, 18.0, 20.0, 22.0])
+                PopupMenuItem(
+                  value: s,
+                  child: Row(
+                    children: [
+                      if (s == _fontSize)
+                        const Icon(Icons.check, size: 18)
+                      else
+                        const SizedBox(width: 18),
+                      const SizedBox(width: 8),
+                      Text(s == _fontSize ? '${s.toInt()} ✓' : '${s.toInt()}'),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -400,7 +435,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                   },
                 ),
                 textStyle: Theme.of(context).textTheme.bodyLarge
-                    ?.copyWith(height: 1.65),
+                    ?.copyWith(fontSize: _fontSize, height: _lineHeight),
                 onTapUrl: (url) async {
                   await _openUrl(Uri.tryParse(url));
                   return true;
