@@ -115,8 +115,6 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
 
   void _startArticleTranslation() {
     if (_translatingArticle) return;
-    // Translate what the user is currently viewing, not always the
-    // extracted version.
     final content = _showOriginal
         ? (_entry.content ?? _entry.summary)
         : (_entry.readabilityContent ?? _entry.content ?? _entry.summary);
@@ -124,25 +122,29 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
 
     setState(() {
       _translatingArticle = true;
-      _translatedArticle = '';
+      _bilingualHtml = null;
       _translationProgress = 0.0;
     });
 
     _translateSub = widget.controller
-        .translateArticle(entryId: _entry.id, contentHtml: content)
+        .translateArticleImmersive(
+          entryId: _entry.id,
+          contentHtml: content,
+          onBlockTranslated: (_, _) {},
+        )
         .listen(
-          (update) {
+          (progressUpdate) {
             if (mounted) {
               setState(() {
-                _translationProgress = update.progress;
-                _translatedArticle = update.text;
+                _translationProgress = progressUpdate.progress;
+                if (progressUpdate.bilingualHtml != null) {
+                  _bilingualHtml = progressUpdate.bilingualHtml!;
+                }
               });
             }
           },
           onError: (error) {
-            if (mounted) {
-              setState(() => _translatingArticle = false);
-            }
+            if (mounted) setState(() => _translatingArticle = false);
           },
           onDone: () {
             if (mounted) setState(() => _translatingArticle = false);
@@ -152,10 +154,10 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
 
   String? _translatedTitle;
   bool _translatingTitle = false;
-  String _translatedArticle = '';
+  String? _bilingualHtml;
   bool _translatingArticle = false;
   double _translationProgress = 0.0;
-  StreamSubscription<({double progress, String text})>? _translateSub;
+  StreamSubscription<({double progress, String? bilingualHtml})>? _translateSub;
 
   Future<void> _translateTitle() async {
     if (_translatingTitle) return;
@@ -577,7 +579,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               )
             else
               HtmlWidget(
-                _sanitizeArticleHtml(html),
+                _sanitizeArticleHtml(_bilingualHtml ?? html),
                 factoryBuilder: () => ArticleWidgetFactory(
                   referer: referer?.toString(),
                   onImageTap: (url) async {
@@ -598,37 +600,29 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                   return true;
                 },
               ),
-            // Translated article panel — shown AFTER the original content
-            // as a natural continuation, not a separate card.
-            if (_translatedArticle.isNotEmpty) ...[
-              const SizedBox(height: 24),
+            // Translation progress indicator
+            if (_translatingArticle) ...[
+              const SizedBox(height: 12),
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 3,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(2),
+                  SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      value: _translationProgress > 0
+                          ? _translationProgress
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _translatingArticle
-                        ? '翻译中 · ${(_translationProgress * 100).toInt()}%'
-                        : '全文翻译',
+                    '翻译中 · ${(_translationProgress * 100).toInt()}%',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                _translatedArticle,
-                style: Theme.of(context).textTheme.bodyLarge
-                    ?.copyWith(height: _lineHeight, fontSize: _fontSize),
               ),
             ],
             if (_entry.url != null) ...[

@@ -8,6 +8,8 @@ import '../../data/platform/ai_client.dart';
 import '../../data/platform/secure_key_store.dart';
 import '../../data/repositories/reader_prefs_repository.dart';
 import '../../data/repositories/local_content_repository.dart';
+import '../../domain/translation/bilingual_builder.dart';
+import '../../domain/translation/block_extractor.dart';
 import '../../domain/entities/entry.dart';
 import '../../domain/entities/feed.dart';
 import '../../domain/opml/opml_codec.dart';
@@ -772,6 +774,77 @@ final class MobileReaderController extends ChangeNotifier {
           progress: (i + 1) / segments.length,
           text: translatedBuffer.toString(),
         );
+        notifyListeners();
+      }
+    } finally {
+      _generatingSummary = false;
+      notifyListeners();
+    }
+  }
+
+  /// Immersive bilingual translation: translates each paragraph and
+  /// builds bilingual HTML where translations appear inline below
+  /// their source paragraphs.
+  Stream<({double progress, String? bilingualHtml})> translateArticleImmersive({
+    required String entryId,
+    required String contentHtml,
+    required void Function(String source, String translated) onBlockTranslated,
+  }) async* {
+    if (aiClient == null || _generatingSummary) return;
+
+    final settings = await repository.loadAiConfig();
+    final key = await secureKeyStore?.loadSummaryKey();
+    if (settings.baseUrl.isEmpty ||
+        settings.model.isEmpty ||
+        key == null ||
+        key.isEmpty) {
+      _error = '请先在设置中配置 AI 服务';
+      notifyListeners();
+      return;
+    }
+
+    // Extract paragraph-level blocks.
+    final blocks = extractTranslatableBlocks(contentHtml);
+    if (blocks.isEmpty) {
+      _error = '未检测到需要翻译的外文内容';
+      notifyListeners();
+      return;
+    }
+
+    _generatingSummary = true;
+    _error = null;
+    notifyListeners();
+
+    final translations = <String, String>{};
+    final config = AiConfig(
+      baseUrl: settings.baseUrl,
+      apiKey: key,
+      model: settings.model,
+      language: 'zh',
+    );
+
+    try {
+      for (var i = 0; i < blocks.length; i++) {
+        final block = blocks[i];
+
+        // Translate this block.
+        final translated = await _translateTextBlock(
+          text: block.sourceText,
+          config: config,
+        );
+
+        if (translated.isNotEmpty) {
+          translations[block.sourceText] = translated;
+          onBlockTranslated(block.sourceText, translated);
+        }
+
+        // Build bilingual HTML progressively.
+        final bilingualHtml = buildBilingualHtml(
+          originalHtml: contentHtml,
+          translations: translations,
+        );
+
+        yield (progress: (i + 1) / blocks.length, bilingualHtml: bilingualHtml);
         notifyListeners();
       }
     } finally {
