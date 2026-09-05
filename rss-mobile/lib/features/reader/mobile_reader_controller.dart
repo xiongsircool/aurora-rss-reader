@@ -139,15 +139,18 @@ final class MobileReaderController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Auto-translates titles of unread entries that look non-Chinese
-  /// and don't have a cached translation yet.
+  /// Auto-translates titles of entries currently visible in the inbox.
+  /// Only targets non-Chinese entries that lack a cached translation,
+  /// and works on what the user is actually looking at rather than
+  /// the full list.
   Future<void> _autoTranslatePendingTitles() async {
     if (!_autoTranslateTitles || aiClient == null) return;
 
+    // Only translate entries currently in the inbox list (what the
+    // user is looking at), not the entire database.
     final candidates = _entries
         .where(
           (e) =>
-              !e.isRead &&
               e.translatedTitle == null &&
               shouldTranslate(e.sourceLang ?? detectSourceLang(e.title), 'zh'),
         )
@@ -173,6 +176,7 @@ final class MobileReaderController extends ChangeNotifier {
     }
 
     if (translated > 0) {
+      // Refresh the inbox to show translated titles.
       await _loadFirstPage();
       notifyListeners();
     }
@@ -376,6 +380,10 @@ final class MobileReaderController extends ChangeNotifier {
       );
       _entries = [..._entries, ...page.entries];
       _nextCursor = page.nextCursor;
+      // Auto-translate titles of newly loaded entries.
+      if (_autoTranslateTitles) {
+        unawaited(_autoTranslatePendingTitles());
+      }
     } catch (error) {
       _error = '加载更多失败：$error';
     } finally {
