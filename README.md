@@ -40,6 +40,9 @@
 
 ## Introduction
 
+> 📱 **NEW — Aurora Mobile v0.1.0 is out!** A local-first Flutter RSS reader for Android (iOS coming via TestFlight).
+> 📥 [Download the APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0) · 📖 [Mobile README](rss-mobile/README.md)
+
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
 **Current Version: v0.2.0**

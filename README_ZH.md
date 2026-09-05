@@ -47,6 +47,9 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 
 ## Introduction
 
+> 📱 **新版本 — Aurora Mobile v0.1.0 正式发布！** 本地优先的 Flutter RSS 阅读器，支持 Android（iOS 将通过 TestFlight 提供）。
+> 📥 [下载 APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0) · 📖 [移动端文档](rss-mobile/README.md)
+
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
 **Current Version: v0.2.0**

@@ -1,105 +1,68 @@
-# Aurora RSS Reader Mobile
+# Aurora Mobile
 
-Flutter client for Aurora RSS Reader. Android and iOS are the initial targets; the app is local-first and must remain usable without a desktop backend or hosted account.
+[![mobile-ci](https://github.com/xiongsircool/aurora-rss-reader/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/xiongsircool/aurora-rss-reader/actions/workflows/mobile-ci.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/xiongsircool/aurora-rss-reader/blob/main/LICENSE)
+[![Release](https://img.shields.io/badge/Release-mobile--v0.1.0-orange)](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0)
 
-## Current Status
+**Aurora Mobile** 是 [Aurora RSS Reader](../../README_ZH.md) 的 Flutter 移动端，**本地优先**：无账号、无服务器，你的订阅与阅读数据全部只保存在设备上。支持 Android 与 iOS。
 
-M0 technical validation is in progress. The repository currently contains:
+<p align="center">
+  <img src="docs/screenshots/inbox.png" width="200" alt="收件箱"/>
+  <img src="docs/screenshots/reader.png" width="200" alt="阅读器"/>
+  <img src="docs/screenshots/share.png" width="200" alt="分享"/>
+  <img src="docs/screenshots/dark.png" width="200" alt="深色模式"/>
+</p>
 
-- Android/iOS Flutter scaffold with application ID `com.xiongsircool.aurora.mobile`
-- Four-tab mobile shell: Inbox, Saved, Sources, Settings
-- Framework-independent Feed and Entry domain models
-- Native `dart:io` HTTP adapter that preserves response bytes
-- Explicit gzip/deflate decoding with compressed and decompressed size limits
-- RSS 2.0, Atom, Media RSS and podcast parsing
-- UTF-8/UTF-16, GBK, Big5 and Shift-JIS decoding (full four-byte GB18030 remains an M0 gap)
-- Drift/sqlite3 Native Assets schema for feeds, entries, AI caches, tags and collections
-- Feed + guid deduplication, cursor pagination, FTS5 search and cascade cleanup
-- End-to-end local refresh pipeline: fetch bytes, decode, parse and persist only after validation
-- Functional subscription form, mixed inbox, all/unread filter and cursor-based load-more
-- Feed refresh/delete plus persistent read and starred actions
-- Local FTS5 search UI and static HTML article reader with safe external links
-- Persistent HTTP proxy settings backed by a tested schema v1-to-v2 migration
-- OPML import through the native file picker and export through the system share sheet
-- On-device Mozilla Readability extraction with HTML charset detection, fallback and SQLite cache
-- Extracted full text participates in local FTS5 search
-- Failed HTTP/XML refreshes preserve the previous local snapshot
-- Tests for navigation, parsing, encodings, HTTP behavior and database contracts
-- Reproducible 50,000-entry SQLite benchmark
-- Reproducible real-network compatibility probe (26 RSS/Atom/podcast feeds)
-- Android and iOS simulator integration tests for UI actions, file SQLite and real RSS fetching
+## 📥 下载
 
-The previous Vue/Capacitor client is preserved on branch `archive/mobile-plan-d-v1` and is not part of this implementation.
+前往 [Releases](https://github.com/xiongsircool/aurora-rss-reader/releases) 获取最新 APK：
 
-## Requirements
+| 文件 | 适用 |
+|---|---|
+| `Aurora-*-arm64.apk` | 2019 年后的绝大多数设备（推荐） |
+| `Aurora-*-universal.apk` | 不确定设备架构时 |
 
-- Flutter 3.47.2 / Dart 3.13.2
-- Android SDK 36 + Build Tools 36.0.0 + JDK 17
-- Full Xcode + CocoaPods for iOS builds
+iOS 版已完成真机验证，计划通过 TestFlight 分发。
 
-Check the local toolchain:
+## ✨ 功能
 
-```bash
-flutter doctor -v
+- **全格式解析** — RSS 1.0/2.0、Atom、Media RSS、播客；UTF-8/16、GBK、Big5、Shift-JIS 多编码
+- **AI 能力**（自带 SiliconFlow/DeepSeek API Key）— 摘要生成、全文双语对照翻译、标题实时翻译（视口驱动，同语言自动跳过）
+- **播客播放器** — 倍速（0.75–2.0x）、播放进度记忆、±15/30 秒跳转
+- **视频卡片** — YouTube / Bilibili 链接自动渲染封面卡片
+- **分享四件套 + 卡片** — 链接 / 标题文本 / Markdown 全文 / 屏幕截图 / 品牌分享卡片图
+- **阅读体验** — 字号 / 行距 / 衬线字体调节、阅读时长估算、阅读进度记忆、代码块复制、图片保存相册
+- **本地能力** — FTS5 全文搜索（5 万篇毫秒级）、OPML 导入导出、分组与静默、本地通知、WorkManager 后台刷新
+- **细节** — 深色模式、实时搜索（防抖）、网络代理、提取失败原因提示
+
+## 🏗️ 架构
+
 ```
-
-## Verification
-
-```bash
-cd rss-mobile
-dart format --output=none --set-exit-if-changed lib test integration_test tool
-flutter analyze
-flutter test
-flutter build apk --debug
-flutter build ios --simulator --debug
-flutter test integration_test/app_test.dart -d <device-id>
-```
-
-Physical iOS deployment requires selecting an Apple Development Team and provisioning profile in `ios/Runner.xcworkspace`.
-
-For development networks that require an explicit HTTP proxy:
-
-```bash
-# Android emulator reaches the macOS host through 10.0.2.2
-flutter run -d emulator-5554 \
-  --dart-define=AURORA_PROXY_URL=http://10.0.2.2:7897
-
-# iOS Simulator shares the macOS loopback interface
-flutter run -d <ios-simulator-id> \
-  --dart-define=AURORA_PROXY_URL=http://127.0.0.1:7897
-```
-
-The compile-time value is only a development default. Users can override or disable it at runtime from Settings > Network Proxy; that choice persists in the schema-v2 local database.
-
-Run the external Feed compatibility suite separately from deterministic tests:
-
-```bash
-cd rss-mobile
-dart run tool/feed_compatibility.dart > ../docs/reports/mobile-m0-feed-compatibility.md
-```
-
-This network probe intentionally does not run as part of `flutter test`.
-
-## Architecture
-
-```text
 lib/
-├── app/          # App composition and theme
-├── domain/       # Entities and policies; no Flutter UI or storage imports
-├── application/  # Use cases and repository/platform ports
-├── data/         # SQLite implementations and migrations
-├── platform/     # Android/iOS network, tasks, and secure storage adapters
-├── features/     # User-facing screens grouped by workflow
-└── shared/       # Reusable UI and utilities
+├── app/            # 应用入口与主题
+├── application/    # 用例层（刷新、提取、AI 生成）
+├── data/           # Drift/SQLite 存储、HTTP 适配器、AI 客户端
+├── domain/         # 纯 Dart 领域模型（Feed/Entry/解析/编码/翻译）
+├── features/       # UI（inbox/reader/sources/settings/search）
+├── platform/       # 通知、后台刷新、系统通道
+└── shared/         # 跨功能工具（阅读统计、分享卡片渲染、图片查看）
 ```
 
-See:
+- 存储使用 Drift (SQLite) + FTS5，schema 版本化管理并带迁移测试
+- 网络、解析、持久化分离：刷新失败不会破坏本地快照
+- 68 项单元/组件测试 + CI（analyze + test）+ tag 触发的发布流水线
 
-- `docs/adr/0001-mobile-local-first-flutter.md`
-- `docs/plans/mobile-flutter-m0-plan.md`
+## 🚀 开发
 
-## Product Modes
+```bash
+# 工具链：Flutter 3.47+ / JDK 17 / Android SDK 36
+flutter pub get
+flutter run            # 真机或模拟器
+flutter test           # 68 项测试
+flutter analyze
+flutter build apk --release --split-per-abi
+```
 
-- **Local mode (default):** device fetches and parses feeds, stores SQLite data, and calls user-configured AI endpoints directly.
-- **Self-hosted mode (later):** optional adapter for `/api/mobile`; it must not be required for startup or local reading.
-- **Official cloud:** not planned for the initial mobile release.
+## 📄 许可
+
+GPL-3.0 — 详见 [LICENSE](../LICENSE)。

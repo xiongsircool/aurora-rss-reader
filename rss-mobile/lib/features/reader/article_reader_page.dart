@@ -530,10 +530,14 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  Text(
-                    '${readingTimeEstimate(html)} · ${_metadata(_entry, widget.feedTitle)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  Flexible(
+                    child: Text(
+                      '${readingTimeEstimate(html)} · ${_metadata(_entry, widget.feedTitle)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   const Spacer(),
