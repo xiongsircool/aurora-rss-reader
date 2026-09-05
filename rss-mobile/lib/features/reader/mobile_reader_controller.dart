@@ -143,13 +143,20 @@ final class MobileReaderController extends ChangeNotifier {
 
     if (candidates.isEmpty) return;
 
+    // Translate titles concurrently in batches of 5.
+    const batchSize = 5;
     var translated = 0;
-    for (final entry in candidates) {
-      final result = await translateTitle(
-        entryId: entry.id,
-        title: entry.title,
+
+    for (var i = 0; i < candidates.length; i += batchSize) {
+      final batch = candidates.skip(i).take(batchSize).toList();
+
+      final results = await Future.wait(
+        batch.map(
+          (entry) => translateTitle(entryId: entry.id, title: entry.title),
+        ),
       );
-      if (result != null) translated++;
+
+      translated += results.where((r) => r != null).length;
     }
 
     if (translated > 0) {
@@ -283,6 +290,10 @@ final class MobileReaderController extends ChangeNotifier {
       _notice = failed == 0
           ? '刷新完成，新增 $inserted 篇文章'
           : '刷新完成，新增 $inserted 篇，$failed 个订阅失败';
+      // Auto-translate new foreign titles after refresh.
+      if (_autoTranslateTitles && inserted > 0) {
+        unawaited(_autoTranslatePendingTitles());
+      }
     } catch (error) {
       _error = '刷新订阅失败：$error';
     } finally {
@@ -782,13 +793,12 @@ final class MobileReaderController extends ChangeNotifier {
     }
   }
 
-  /// Immersive bilingual translation: translates each paragraph and
-  /// builds bilingual HTML where translations appear inline below
-  /// their source paragraphs.
+  /// Immersive bilingual translation with concurrent batch processing.
+  /// Translates paragraphs in groups of 3 for speed.
   Stream<({double progress, String? bilingualHtml})> translateArticleImmersive({
     required String entryId,
     required String contentHtml,
-    required void Function(String source, String translated) onBlockTranslated,
+    void Function(String source, String translated)? onBlockTranslated,
   }) async* {
     if (aiClient == null || _generatingSummary) return;
 
@@ -803,7 +813,6 @@ final class MobileReaderController extends ChangeNotifier {
       return;
     }
 
-    // Extract paragraph-level blocks.
     final blocks = extractTranslatableBlocks(contentHtml);
     if (blocks.isEmpty) {
       _error = '未检测到需要翻译的外文内容';
@@ -823,28 +832,46 @@ final class MobileReaderController extends ChangeNotifier {
       language: 'zh',
     );
 
-    try {
-      for (var i = 0; i < blocks.length; i++) {
-        final block = blocks[i];
+    // Concurrent: batch blocks into groups of 3, translate in parallel.
+    const concurrency = 3;
+    var completed = 0;
 
-        // Translate this block.
-        final translated = await _translateTextBlock(
-          text: block.sourceText,
-          config: config,
+    try {
+      for (var i = 0; i < blocks.length; i += concurrency) {
+        final batch = blocks.skip(i).take(concurrency).toList();
+
+        final results = await Future.wait(
+          batch.map((block) async {
+            try {
+              return await _translateTextBlock(
+                text: block.sourceText,
+                config: config,
+              );
+            } catch (_) {
+              return '';
+            }
+          }),
         );
 
-        if (translated.isNotEmpty) {
-          translations[block.sourceText] = translated;
-          onBlockTranslated(block.sourceText, translated);
+        for (var j = 0; j < batch.length; j++) {
+          final block = batch[j];
+          final translated = results[j];
+          if (translated.isNotEmpty) {
+            translations[block.sourceText] = translated;
+            onBlockTranslated?.call(block.sourceText, translated);
+          }
+          completed++;
         }
 
-        // Build bilingual HTML progressively.
         final bilingualHtml = buildBilingualHtml(
           originalHtml: contentHtml,
           translations: translations,
         );
 
-        yield (progress: (i + 1) / blocks.length, bilingualHtml: bilingualHtml);
+        yield (
+          progress: completed / blocks.length,
+          bilingualHtml: bilingualHtml,
+        );
         notifyListeners();
       }
     } finally {
