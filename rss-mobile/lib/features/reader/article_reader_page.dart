@@ -115,8 +115,11 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
 
   void _startArticleTranslation() {
     if (_translatingArticle) return;
-    final content =
-        _entry.readabilityContent ?? _entry.content ?? _entry.summary;
+    // Translate what the user is currently viewing, not always the
+    // extracted version.
+    final content = _showOriginal
+        ? (_entry.content ?? _entry.summary)
+        : (_entry.readabilityContent ?? _entry.content ?? _entry.summary);
     if (content == null || content.trim().length < 30) return;
 
     setState(() {
@@ -495,53 +498,6 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                   ],
                 ),
               ),
-            // Translated article panel
-            if (_translatedArticle.isNotEmpty)
-              Container(
-                key: const ValueKey('translated-article-panel'),
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer
-                      .withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.primary
-                        .withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.translate,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _translatingArticle
-                              ? '翻译中 · ${(_translationProgress * 100).toInt()}%'
-                              : '全文翻译',
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _translatedArticle,
-                      style: Theme.of(context).textTheme.bodyMedium
-                          ?.copyWith(height: 1.6, fontSize: _fontSize),
-                    ),
-                  ],
-                ),
-              ),
             if (hasExtracted && hasOriginal)
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
@@ -642,6 +598,39 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                   return true;
                 },
               ),
+            // Translated article panel — shown AFTER the original content
+            // as a natural continuation, not a separate card.
+            if (_translatedArticle.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Container(
+                    width: 3,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _translatingArticle
+                        ? '翻译中 · ${(_translationProgress * 100).toInt()}%'
+                        : '全文翻译',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _translatedArticle,
+                style: Theme.of(context).textTheme.bodyLarge
+                    ?.copyWith(height: _lineHeight, fontSize: _fontSize),
+              ),
+            ],
             if (_entry.url != null) ...[
               const SizedBox(height: 24),
               OutlinedButton.icon(
