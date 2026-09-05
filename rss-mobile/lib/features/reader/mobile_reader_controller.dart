@@ -48,6 +48,7 @@ final class MobileReaderController extends ChangeNotifier {
   bool _adding = false;
   bool _refreshing = false;
   bool _loadingMore = false;
+  int _unreadCount = 0;
   bool _searching = false;
   bool _unreadOnly = false;
   String? _error;
@@ -82,6 +83,7 @@ final class MobileReaderController extends ChangeNotifier {
   bool get loadingMore => _loadingMore;
   bool get searching => _searching;
   bool get unreadOnly => _unreadOnly;
+  int get unreadCount => _unreadCount;
   bool get hasMore => _nextCursor != null;
   bool isExtracting(String entryId) => _extractingEntryIds.contains(entryId);
   String? get error => _error;
@@ -961,6 +963,7 @@ final class MobileReaderController extends ChangeNotifier {
   }
 
   Future<void> _loadFirstPage() async {
+    _unreadCount = await repository.countUnread(excludeGroups: _mutedGroups);
     final page = await repository.listInbox(
       unreadOnly: _unreadOnly,
       excludeGroups: _mutedGroups,

@@ -258,6 +258,24 @@ final class LocalContentRepository {
     });
   }
 
+  /// Counts unread entries visible in the inbox (muted groups excluded)
+  /// for the header summary.
+  Future<int> countUnread({Set<String> excludeGroups = const {}}) async {
+    final variables = <Variable<Object>>[];
+    var sql =
+        'SELECT COUNT(*) AS c FROM entries '
+        'WHERE read_at IS NULL';
+    if (excludeGroups.isNotEmpty) {
+      final placeholders = List.filled(excludeGroups.length, '?').join(', ');
+      sql +=
+          ' AND feed_id NOT IN (SELECT id FROM feeds '
+          'WHERE group_name IN ($placeholders))';
+      variables.addAll(excludeGroups.map(Variable<String>.new));
+    }
+    final rows = await database.customSelect(sql, variables: variables).get();
+    return rows.isEmpty ? 0 : rows.first.read<int>('c');
+  }
+
   Future<InboxPage> listInbox({
     InboxCursor? cursor,
     bool unreadOnly = false,

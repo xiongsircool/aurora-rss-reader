@@ -114,7 +114,40 @@ final class _InboxPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Aurora'),
+        title: Builder(
+          builder: (context) {
+            final now = DateTime.now();
+            final hour = now.hour;
+            final greeting = hour < 6
+                ? '夜深了'
+                : hour < 12
+                ? '早上好'
+                : hour < 14
+                ? '中午好'
+                : hour < 18
+                ? '下午好'
+                : '晚上好';
+            const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+            final unread = controller.unreadCount;
+            final subtitle =
+                '${now.month}月${now.day}日 '
+                '${weekdays[now.weekday - 1]}'
+                '${unread > 0 ? ' · $unread 篇未读' : ' · 已全部读完'}';
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(greeting),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
         actions: [
           IconButton(
             tooltip: '筛选',

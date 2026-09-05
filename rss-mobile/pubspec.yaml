@@ -64,6 +64,7 @@ dev_dependencies:
 
   drift_dev: ^2.34.6
   build_runner: ^2.16.1
+  flutter_native_splash: ^2.4.6
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -113,3 +114,16 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Native splash screen (run: dart run flutter_native_splash:create)
+flutter_native_splash:
+  color: "#F8F9FA"
+  color_dark: "#10161A"
+  image: assets/splash/logo.png
+  image_dark: assets/splash/logo.png
+  android: true
+  ios: true
+  android_12:
+    color: "#F8F9FA"
+    color_dark: "#10161A"
+    image: assets/splash/logo_android12.png

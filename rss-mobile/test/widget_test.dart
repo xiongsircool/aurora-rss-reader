@@ -38,7 +38,7 @@ void main() {
     await tester.pumpWidget(AuroraApp(controller: controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('Aurora'), findsOneWidget);
+    expect(find.textContaining(RegExp('早上好|中午好|下午好|晚上好|夜深了')), findsOneWidget);
     expect(find.text('收件箱为空'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.rss_feed_outlined));
