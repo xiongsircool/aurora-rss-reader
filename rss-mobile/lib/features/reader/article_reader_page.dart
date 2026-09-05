@@ -11,6 +11,7 @@ import '../../data/repositories/reader_prefs_repository.dart';
 import '../../domain/entities/entry.dart';
 import '../../shared/image_viewer_page.dart';
 import '../reader/podcast_player_sheet.dart';
+import '../reader/video_card.dart';
 import '../reader/mobile_reader_controller.dart';
 
 final class ArticleReaderPage extends StatefulWidget {
@@ -112,6 +113,18 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     _summarySub?.cancel();
     _translateSub?.cancel();
     super.dispose();
+  }
+
+  bool get _isVideoArticle {
+    final url = _entry.url;
+    if (url == null) return false;
+    final host = url.host.replaceFirst('www.', '');
+    return host == 'youtube.com' ||
+        host == 'm.youtube.com' ||
+        host == 'youtu.be' ||
+        host == 'bilibili.com' ||
+        host == 'm.bilibili.com' ||
+        host == 'vimeo.com';
   }
 
   void _startArticleTranslation() {
@@ -637,6 +650,15 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                     ),
                   ),
                 ],
+              ),
+            ],
+            // Video card (when the article is a video link)
+            if (_isVideoArticle) ...[
+              const SizedBox(height: 12),
+              VideoCard(
+                url: _entry.url!,
+                title: _entry.title,
+                referer: referer,
               ),
             ],
             // Podcast player button (when audio enclosure exists)
