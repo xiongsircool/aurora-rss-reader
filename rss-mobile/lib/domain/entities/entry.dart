@@ -17,6 +17,9 @@ final class Entry {
     this.contentExtractionStatus = ContentExtractionStatus.idle,
     this.contentExtractionError,
     this.imageUrl,
+    this.enclosureUrl,
+    this.enclosureType,
+    this.enclosureDuration,
     this.publishedAt,
     this.readAt,
     this.isStarred = false,
@@ -37,6 +40,11 @@ final class Entry {
   final ContentExtractionStatus contentExtractionStatus;
   final String? contentExtractionError;
   final Uri? imageUrl;
+
+  /// Audio/video enclosure URL for podcast entries.
+  final Uri? enclosureUrl;
+  final String? enclosureType;
+  final Duration? enclosureDuration;
   final DateTime? publishedAt;
   final DateTime insertedAt;
   final DateTime? readAt;

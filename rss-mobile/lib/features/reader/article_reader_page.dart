@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../data/repositories/reader_prefs_repository.dart';
 import '../../domain/entities/entry.dart';
 import '../../shared/image_viewer_page.dart';
+import '../reader/podcast_player_sheet.dart';
 import '../reader/mobile_reader_controller.dart';
 
 final class ArticleReaderPage extends StatefulWidget {
@@ -636,6 +637,25 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                     ),
                   ),
                 ],
+              ),
+            ],
+            // Podcast player button (when audio enclosure exists)
+            if (_entry.enclosureUrl != null &&
+                (_entry.enclosureType?.startsWith('audio/') ?? false)) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const ValueKey('play-podcast'),
+                  onPressed: () => PodcastPlayerSheet.show(
+                    context,
+                    title: _entry.title,
+                    feedTitle: widget.feedTitle,
+                    url: _entry.enclosureUrl!,
+                  ),
+                  icon: const Icon(Icons.headphones),
+                  label: const Text('播放播客'),
+                ),
               ),
             ],
             if (_entry.url != null) ...[

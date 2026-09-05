@@ -546,6 +546,13 @@ domain_entry.Entry _entryFromRow(EntryRow row) {
     contentExtractionStatus: _extractionStatus(row.contentExtractionStatus),
     contentExtractionError: row.contentExtractionError,
     imageUrl: row.imageUrl == null ? null : Uri.tryParse(row.imageUrl!),
+    enclosureUrl: row.enclosureUrl == null
+        ? null
+        : Uri.tryParse(row.enclosureUrl!),
+    enclosureType: row.enclosureType,
+    enclosureDuration: row.durationSeconds == null
+        ? null
+        : Duration(seconds: row.durationSeconds!),
     publishedAt: row.publishedAt,
     insertedAt: row.insertedAt,
     readAt: row.readAt,

@@ -53,6 +53,7 @@ dependencies:
   cached_network_image: ^4.0.0
   shared_preferences: ^2.5.5
   workmanager: ^0.10.9
+  just_audio: ^0.10.6
 
 dev_dependencies:
   flutter_test:
