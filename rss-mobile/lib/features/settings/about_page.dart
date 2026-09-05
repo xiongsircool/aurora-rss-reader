@@ -6,6 +6,7 @@ class AppMeta {
   static const version = '0.1.0';
   static const repoUrl = 'https://github.com/xiongsircool/aurora-rss-reader';
   static const issueUrl = '$repoUrl/issues';
+  static const sponsorUrl = 'https://github.com/sponsors/xiongsircool';
 }
 
 /// Branded about page: identity, links, privacy statement, and the
@@ -93,6 +94,14 @@ class AboutPage extends StatelessWidget {
             subtitle: const Text('提交 Issue 帮助改进'),
             trailing: const Icon(Icons.open_in_new, size: 18),
             onTap: () => _open(context, AppMeta.issueUrl),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.favorite_outline),
+            title: const Text('支持开发者'),
+            subtitle: const Text('GitHub Sponsors 赞助'),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: () => _open(context, AppMeta.sponsorUrl),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
