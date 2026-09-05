@@ -102,6 +102,7 @@ class _SearchPageState extends State<SearchPage> {
             ),
           ),
           onReadChanged: (read) => widget.controller.setRead(entry, read: read),
+          onVisible: () => widget.controller.requestTitleTranslation(entry.id),
           onStarredChanged: (starred) =>
               widget.controller.setStarred(entry, starred: starred),
         );

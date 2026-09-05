@@ -5,13 +5,14 @@ import 'package:html/parser.dart' as html_parser;
 import '../../domain/entities/entry.dart';
 import '../../shared/image_viewer_page.dart';
 
-final class EntryTile extends StatelessWidget {
+final class EntryTile extends StatefulWidget {
   const EntryTile({
     required this.entry,
     required this.feedTitle,
     required this.onReadChanged,
     required this.onStarredChanged,
     this.onTap,
+    this.onVisible,
     this.referer,
     super.key,
   });
@@ -22,44 +23,67 @@ final class EntryTile extends StatelessWidget {
   final ValueChanged<bool> onStarredChanged;
   final VoidCallback? onTap;
 
+  /// Called once when the tile is built (≈ about to become visible).
+  /// Used to request auto title translation for what the user sees.
+  final VoidCallback? onVisible;
+
   /// Feed page URL sent as Referer for cover images; some site CDNs
   /// reject image requests without it.
   final Uri? referer;
 
   @override
+  State<EntryTile> createState() => _EntryTileState();
+}
+
+final class _EntryTileState extends State<EntryTile> {
+  @override
+  void initState() {
+    super.initState();
+    // ListView.builder only builds tiles right before they scroll into
+    // view, so "built" ≈ "visible". Fire once per tile instance.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onVisible?.call();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return _build(context, widget);
+  }
+
+  Widget _build(BuildContext context, EntryTile tile) {
     final colorScheme = Theme.of(context).colorScheme;
-    final date = entry.publishedAt ?? entry.insertedAt;
-    final summary = entry.summary == null
+    final date = tile.entry.publishedAt ?? tile.entry.insertedAt;
+    final summary = tile.entry.summary == null
         ? null
-        : html_parser.parseFragment(entry.summary!).text?.trim();
+        : html_parser.parseFragment(tile.entry.summary!).text?.trim();
     final showSummary = summary != null && summary.isNotEmpty;
 
     return Material(
-      color: entry.isRead
+      color: tile.entry.isRead
           ? colorScheme.surface
           : colorScheme.primary.withValues(alpha: 0.035),
       child: InkWell(
-        onTap: onTap,
+        onTap: tile.onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 10, 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (entry.imageUrl != null) ...[
+              if (tile.entry.imageUrl != null) ...[
                 GestureDetector(
                   onTap: () => ImageViewerPage.show(
                     context,
-                    url: entry.imageUrl!,
-                    referer: referer,
+                    url: tile.entry.imageUrl!,
+                    referer: tile.referer,
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: CachedNetworkImage(
-                      imageUrl: entry.imageUrl.toString(),
-                      httpHeaders: referer == null
+                      imageUrl: tile.entry.imageUrl.toString(),
+                      httpHeaders: tile.referer == null
                           ? null
-                          : {'Referer': referer.toString()},
+                          : {'Referer': tile.referer!.toString()},
                       width: 88,
                       height: 76,
                       fit: BoxFit.cover,
@@ -81,7 +105,7 @@ final class EntryTile extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        if (!entry.isRead) ...[
+                        if (!tile.entry.isRead) ...[
                           Container(
                             width: 7,
                             height: 7,
@@ -94,7 +118,7 @@ final class EntryTile extends StatelessWidget {
                         ],
                         Expanded(
                           child: Text(
-                            feedTitle,
+                            tile.feedTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.labelMedium
@@ -111,21 +135,21 @@ final class EntryTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      entry.title,
+                      tile.entry.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: entry.isRead
+                        fontWeight: tile.entry.isRead
                             ? FontWeight.w500
                             : FontWeight.w700,
                         height: 1.35,
                       ),
                     ),
-                    if (entry.translatedTitle != null &&
-                        entry.translatedTitle != entry.title) ...[
+                    if (tile.entry.translatedTitle != null &&
+                        tile.entry.translatedTitle != tile.entry.title) ...[
                       const SizedBox(height: 2),
                       Text(
-                        entry.translatedTitle!,
+                        tile.entry.translatedTitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -151,11 +175,14 @@ final class EntryTile extends StatelessWidget {
                       children: [
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          tooltip: entry.isStarred ? '取消收藏' : '收藏',
-                          onPressed: () => onStarredChanged(!entry.isStarred),
+                          tooltip: tile.entry.isStarred ? '取消收藏' : '收藏',
+                          onPressed: () =>
+                              tile.onStarredChanged(!tile.entry.isStarred),
                           icon: Icon(
-                            entry.isStarred ? Icons.star : Icons.star_border,
-                            color: entry.isStarred
+                            tile.entry.isStarred
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: tile.entry.isStarred
                                 ? const Color(0xFFF4A000)
                                 : null,
                             size: 20,
@@ -163,10 +190,11 @@ final class EntryTile extends StatelessWidget {
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          tooltip: entry.isRead ? '标为未读' : '标为已读',
-                          onPressed: () => onReadChanged(!entry.isRead),
+                          tooltip: tile.entry.isRead ? '标为未读' : '标为已读',
+                          onPressed: () =>
+                              tile.onReadChanged(!tile.entry.isRead),
                           icon: Icon(
-                            entry.isRead
+                            tile.entry.isRead
                                 ? Icons.mark_email_unread_outlined
                                 : Icons.check_circle_outline,
                             size: 20,

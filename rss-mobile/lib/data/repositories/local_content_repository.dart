@@ -263,6 +263,7 @@ final class LocalContentRepository {
     bool unreadOnly = false,
     Set<String> excludeGroups = const {},
     int limit = 50,
+    String translationLang = 'zh',
   }) async {
     final where = <String>[];
     final variables = <Variable<Object>>[];
@@ -293,7 +294,7 @@ final class LocalContentRepository {
           'SELECT entries.*, t.title AS translated_title '
           'FROM entries '
           'LEFT JOIN translations t '
-          "ON t.entry_id = entries.id AND t.language = 'zh' "
+          'ON t.entry_id = entries.id AND t.language = \'${translationLang.replaceAll("'", "''")}\' '
           '${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')} '} '
           'ORDER BY COALESCE(entries.published_at, entries.inserted_at) DESC, entries.id DESC '
           'LIMIT ?',

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../application/use_cases/extract_article.dart';
 import '../../application/use_cases/refresh_feed.dart';
@@ -60,11 +62,15 @@ final class MobileReaderController extends ChangeNotifier {
   String? get aiSummary => _aiSummary;
   bool get generatingSummary => _generatingSummary;
 
-  // Auto title translation settings
+  // ── Auto title translation (V2, viewport-driven) ──────────────
   bool _autoTranslateTitles = false;
-  int _maxAutoTranslations = 10;
+  String _targetLangCode = 'zh';
+  final Set<String> _titleTxFlying = {};
+  final Map<String, DateTime> _titleTxFailed = {};
+  ({String baseUrl, String model, String key})? _titleTxCfg;
+  static const _titleTxRetryBackoff = Duration(minutes: 10);
+  static const _maxConcurrentTitleTx = 3;
   bool get autoTranslateTitles => _autoTranslateTitles;
-  int get maxAutoTranslations => _maxAutoTranslations;
   String? get aiConfigError => _error;
   List<Entry> get entries => _entries;
   List<Entry> get starredEntries => _starredEntries;
@@ -94,10 +100,6 @@ final class MobileReaderController extends ChangeNotifier {
       await _loadAutoTranslateSettings();
       await _reload();
       _initialized = true;
-      // Fire-and-forget: auto translate titles after initial load.
-      if (_autoTranslateTitles) {
-        unawaited(_autoTranslatePendingTitles());
-      }
     } catch (error) {
       _error = '无法打开本地数据库：$error';
     } finally {
@@ -111,76 +113,108 @@ final class MobileReaderController extends ChangeNotifier {
   Future<void> reloadAiPreferences() async {
     _prefs ??= ReaderPrefsRepository(repository.database);
     await _loadAutoTranslateSettings();
-    if (_autoTranslateTitles) {
-      unawaited(_autoTranslatePendingTitles());
-    }
     notifyListeners();
   }
 
+  /// Reads AI settings from SharedPreferences (same key the settings
+  /// sheet writes) — the single source of truth for the auto-translate
+  /// switch and output language.
   Future<void> _loadAutoTranslateSettings() async {
-    final prefs = await _prefs?.loadAiExtendedSettings();
-    if (prefs == null) return;
-    _autoTranslateTitles = prefs['autoTranslateTitles'] as bool? ?? false;
-    _maxAutoTranslations = prefs['maxAutoTranslations'] as int? ?? 10;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final raw = sp.getString('ai_settings');
+      if (raw == null) return;
+      final prefs = jsonDecode(raw);
+      if (prefs is! Map<String, dynamic>) return;
+      _autoTranslateTitles = prefs['autoTranslateTitles'] as bool? ?? false;
+      _targetLangCode = prefs['language'] as String? ?? 'zh';
+      _titleTxCfg = null; // config may have changed; reload lazily
+    } catch (_) {
+      // Missing plugin (tests) or unreadable storage: keep defaults.
+    }
   }
 
-  Future<void> setAutoTranslate({required bool enabled, int? maxCount}) async {
-    _autoTranslateTitles = enabled;
-    if (maxCount != null) _maxAutoTranslations = maxCount;
-    final stored = await _prefs?.loadAiExtendedSettings() ?? {};
-    await _prefs?.saveAiExtendedSettings({
-      ...stored,
-      'autoTranslateTitles': enabled,
-      'maxAutoTranslations': _maxAutoTranslations,
-    });
-    if (enabled) {
-      unawaited(_autoTranslatePendingTitles());
+  /// Viewport-driven auto translation entry point.
+  /// Called by [EntryTile] when a tile is about to become visible;
+  /// silently skips anything that should not be translated.
+  Future<void> requestTitleTranslation(String entryId) async {
+    if (!_autoTranslateTitles) return; // master switch
+    final entry = _entryById(entryId);
+    if (entry == null || entry.translatedTitle != null) return; // done
+    if (_titleTxFlying.contains(entryId)) return; // in flight
+    final failedAt = _titleTxFailed[entryId];
+    if (failedAt != null &&
+        DateTime.now().difference(failedAt) < _titleTxRetryBackoff) {
+      return; // recently failed; retry later
     }
+    if (_titleTxFlying.length >= _maxConcurrentTitleTx) return; // throttled
+    final source = entry.sourceLang ?? detectSourceLang(entry.title);
+    if (!shouldTranslate(source, _targetLangCode)) return; // same language
+
+    _titleTxFlying.add(entryId);
+    try {
+      final result = await _translateTitleWith(
+        entryId: entryId,
+        title: entry.title,
+      );
+      if (result == null) {
+        _titleTxFailed[entryId] = DateTime.now();
+        return;
+      }
+      _updateEntryInPlace(entryId, result);
+    } finally {
+      _titleTxFlying.remove(entryId);
+    }
+  }
+
+  Entry? _entryById(String id) {
+    for (final e in _entries) {
+      if (e.id == id) return e;
+    }
+    for (final e in _starredEntries) {
+      if (e.id == id) return e;
+    }
+    return null;
+  }
+
+  /// Updates a single entry's translated title in memory and notifies
+  /// listeners — no list reload, no scroll jump.
+  void _updateEntryInPlace(String id, String translatedTitle) {
+    void patch(List<Entry> list) {
+      final i = list.indexWhere((e) => e.id == id);
+      if (i >= 0) list[i] = list[i].copyWith(translatedTitle: translatedTitle);
+    }
+
+    patch(_entries);
+    patch(_starredEntries);
     notifyListeners();
   }
 
-  /// Auto-translates titles of entries currently visible in the inbox.
-  /// Only targets non-Chinese entries that lack a cached translation,
-  /// and works on what the user is actually looking at rather than
-  /// the full list.
-  Future<void> _autoTranslatePendingTitles() async {
-    if (!_autoTranslateTitles || aiClient == null) return;
-
-    // Only translate entries currently in the inbox list (what the
-    // user is looking at), not the entire database.
-    final candidates = _entries
-        .where(
-          (e) =>
-              e.translatedTitle == null &&
-              shouldTranslate(e.sourceLang ?? detectSourceLang(e.title), 'zh'),
-        )
-        .take(_maxAutoTranslations)
-        .toList();
-
-    if (candidates.isEmpty) return;
-
-    // Translate titles concurrently in batches of 5.
-    const batchSize = 5;
-    var translated = 0;
-
-    for (var i = 0; i < candidates.length; i += batchSize) {
-      final batch = candidates.skip(i).take(batchSize).toList();
-
-      final results = await Future.wait(
-        batch.map(
-          (entry) => translateTitle(entryId: entry.id, title: entry.title),
-        ),
-      );
-
-      translated += results.where((r) => r != null).length;
+  Future<({String baseUrl, String model, String key})?>
+  _ensureTitleTxCfg() async {
+    final cached = _titleTxCfg;
+    if (cached != null) return cached;
+    final settings = await repository.loadAiConfig();
+    final key = await secureKeyStore?.loadSummaryKey();
+    if (settings.baseUrl.isEmpty ||
+        settings.model.isEmpty ||
+        key == null ||
+        key.isEmpty) {
+      return null;
     }
-
-    if (translated > 0) {
-      // Refresh the inbox to show translated titles.
-      await _loadFirstPage();
-      notifyListeners();
-    }
+    return _titleTxCfg = (
+      baseUrl: settings.baseUrl,
+      model: settings.model,
+      key: key,
+    );
   }
+
+  String _langName(String code) => switch (code) {
+    'en' => 'English',
+    'ja' => 'Japanese',
+    'ko' => 'Korean',
+    _ => 'Chinese',
+  };
 
   Future<bool> addFeed(String rawUrl, {String? groupName}) async {
     if (_adding) return false;
@@ -303,10 +337,6 @@ final class MobileReaderController extends ChangeNotifier {
       if (inserted > 0) {
         NotificationService.showNewArticles(count: inserted).catchError((_) {});
       }
-      // Auto-translate new foreign titles after refresh.
-      if (_autoTranslateTitles && inserted > 0) {
-        unawaited(_autoTranslatePendingTitles());
-      }
     } catch (error) {
       _error = '刷新订阅失败：$error';
     } finally {
@@ -377,13 +407,10 @@ final class MobileReaderController extends ChangeNotifier {
         cursor: cursor,
         unreadOnly: _unreadOnly,
         excludeGroups: _mutedGroups,
+        translationLang: _targetLangCode,
       );
       _entries = [..._entries, ...page.entries];
       _nextCursor = page.nextCursor;
-      // Auto-translate titles of newly loaded entries.
-      if (_autoTranslateTitles) {
-        unawaited(_autoTranslatePendingTitles());
-      }
     } catch (error) {
       _error = '加载更多失败：$error';
     } finally {
@@ -640,41 +667,46 @@ final class MobileReaderController extends ChangeNotifier {
     return await secureKeyStore?.loadSummaryKey();
   }
 
-  /// Translates an article title to the target language and caches it.
-  /// Returns the translated title, or null on failure.
+  /// Manual translation entry point (reader page button).
+  /// Uses the same config cache and target language as auto translation.
   Future<String?> translateTitle({
+    required String entryId,
+    required String title,
+  }) async {
+    final result = await _translateTitleWith(entryId: entryId, title: title);
+    if (result != null) _updateEntryInPlace(entryId, result);
+    return result;
+  }
+
+  /// Shared implementation: cache lookup → AI call → persist.
+  /// Returns null on any failure (caller decides whether to back off).
+  Future<String?> _translateTitleWith({
     required String entryId,
     required String title,
   }) async {
     final aiClient = this.aiClient;
     if (aiClient == null) return null;
+    final lang = _targetLangCode;
 
-    // Check cache first.
     final cached = await repository.loadTranslation(
       entryId: entryId,
-      language: 'zh',
+      language: lang,
     );
     if (cached != null && cached.title.isNotEmpty) return cached.title;
 
-    final settings = await repository.loadAiConfig();
-    final key = await secureKeyStore?.loadSummaryKey();
-    if (settings.baseUrl.isEmpty ||
-        settings.model.isEmpty ||
-        key == null ||
-        key.isEmpty) {
-      return null;
-    }
+    final cfg = await _ensureTitleTxCfg();
+    if (cfg == null) return null;
 
     final buffer = StringBuffer();
     await for (final event in aiClient.summarize(
       config: AiConfig(
-        baseUrl: settings.baseUrl,
-        apiKey: key,
-        model: settings.model,
-        language: 'zh',
+        baseUrl: cfg.baseUrl,
+        apiKey: cfg.key,
+        model: cfg.model,
+        language: lang,
       ),
       systemPrompt:
-          'Translate the following article title to Chinese. '
+          'Translate the following article title to ${_langName(lang)}. '
           'Return ONLY the translated title, nothing else.',
       userContent: title,
     )) {
@@ -693,7 +725,7 @@ final class MobileReaderController extends ChangeNotifier {
 
     await repository.saveTranslation(
       entryId: entryId,
-      language: 'zh',
+      language: lang,
       title: result,
     );
     return result;
@@ -932,6 +964,7 @@ final class MobileReaderController extends ChangeNotifier {
     final page = await repository.listInbox(
       unreadOnly: _unreadOnly,
       excludeGroups: _mutedGroups,
+      translationLang: _targetLangCode,
     );
     _entries = page.entries;
     _nextCursor = page.nextCursor;

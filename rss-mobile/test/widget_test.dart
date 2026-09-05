@@ -10,6 +10,7 @@ import 'package:aurora_mobile/data/repositories/local_content_repository.dart';
 import 'package:aurora_mobile/features/reader/mobile_reader_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   late LocalDatabase database;
@@ -17,6 +18,7 @@ void main() {
   late MobileReaderController controller;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     database = LocalDatabase.memory();
     httpClient = _FakeFeedHttpClient();
     final repository = LocalContentRepository(database);
