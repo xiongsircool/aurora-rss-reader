@@ -276,6 +276,25 @@ final class LocalContentRepository {
     });
   }
 
+  /// Reading statistics for the settings page: total/read/starred counts.
+  Future<({int total, int read, int starred})> entryStats() async {
+    final rows = await database
+        .customSelect(
+          'SELECT COUNT(*) AS total, '
+          'SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) AS read_count, '
+          'SUM(CASE WHEN starred THEN 1 ELSE 0 END) AS starred '
+          'FROM entries',
+        )
+        .get();
+    if (rows.isEmpty) return (total: 0, read: 0, starred: 0);
+    final row = rows.first;
+    return (
+      total: row.read<int>('total'),
+      read: row.read<int>('read_count'),
+      starred: row.read<int>('starred'),
+    );
+  }
+
   /// Counts unread entries visible in the inbox (muted groups excluded)
   /// for the header summary.
   Future<int> countUnread({Set<String> excludeGroups = const {}}) async {

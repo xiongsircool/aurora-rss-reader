@@ -1,5 +1,9 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 
 /// Full-screen image viewer with pinch-to-zoom and double-tap zoom.
 class ImageViewerPage extends StatefulWidget {
@@ -38,6 +42,46 @@ class ImageViewerPage extends StatefulWidget {
 
 class _ImageViewerPageState extends State<ImageViewerPage> {
   final _transformationController = TransformationController();
+  bool _saving = false;
+
+  Future<void> _saveToGallery() async {
+    setState(() => _saving = true);
+    try {
+      final client = HttpClient();
+      client.userAgent = 'AuroraRSSMobile/0.1';
+      final request = await client.getUrl(widget.url);
+      final referer = widget.referer;
+      if (referer != null) {
+        request.headers.set(HttpHeaders.refererHeader, referer.toString());
+      }
+      final response = await request.close();
+      if (response.statusCode != 200) {
+        throw HttpException('HTTP ${response.statusCode}');
+      }
+      final bytes = await response.fold<List<int>>(
+        <int>[],
+        (acc, chunk) => acc..addAll(chunk),
+      );
+      client.close();
+      await Gal.putImageBytes(Uint8List.fromList(bytes));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('已保存到相册')));
+      }
+    } on GalException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('保存失败：${e.type.message}')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('保存失败：$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -82,11 +126,13 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
         actions: [
           IconButton(
             tooltip: '保存到相册',
-            onPressed: () async {
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(const SnackBar(content: Text('长按图片可使用系统分享保存')));
-            },
-            icon: const Icon(Icons.save_alt),
+            onPressed: _saving ? null : _saveToGallery,
+            icon: _saving
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.save_alt),
           ),
         ],
       ),

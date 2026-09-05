@@ -87,6 +87,20 @@ class ReaderPrefsRepository {
   Future<void> saveLineHeight(double height) =>
       _set('reader_line_height', height.toString());
 
+  /// Reader font family preference: 'sans' (default) or 'serif'.
+  Future<String> loadFontFamily() async =>
+      await _get('reader_font_family') ?? 'sans';
+
+  Future<void> saveFontFamily(String family) =>
+      _set('reader_font_family', family);
+
+  /// Article reading scroll position memory, keyed by the entry id.
+  Future<double?> loadScrollOffset(String entryId) async =>
+      double.tryParse(await _get('reader_pos_$entryId') ?? '');
+
+  Future<void> saveScrollOffset(String entryId, double offset) =>
+      _set('reader_pos_$entryId', offset.toStringAsFixed(0));
+
   /// Podcast playback position memory, keyed by the audio URL.
   Future<String?> loadPlaybackPosition(String audioUrl) async {
     return _get('podcast_pos_${audioUrl.hashCode.toRadixString(36)}');

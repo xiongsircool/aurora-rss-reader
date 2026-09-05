@@ -736,8 +736,15 @@ class _SettingsPageState extends State<_SettingsPage> {
           ListTile(
             leading: const Icon(Icons.storage_outlined),
             title: const Text('本地数据'),
-            subtitle: Text(
-              '${controller.feeds.length} 个订阅 · ${controller.entries.length} 篇最近文章',
+            subtitle: FutureBuilder<({int total, int read, int starred})>(
+              future: controller.repository.entryStats(),
+              builder: (context, snapshot) {
+                final stats = snapshot.data;
+                final base =
+                    '${controller.feeds.length} 个订阅 · ${stats?.total ?? controller.entries.length} 篇文章';
+                if (stats == null) return Text(base);
+                return Text('$base · 已读 ${stats.read} · 收藏 ${stats.starred}');
+              },
             ),
           ),
           const Divider(height: 1, indent: 56),

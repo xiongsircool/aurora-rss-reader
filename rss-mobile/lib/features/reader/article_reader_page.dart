@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:html2md/html2md.dart' as html2md;
 import 'package:share_plus/share_plus.dart';
+import 'package:html/dom.dart' as html;
 import 'package:html/parser.dart' as html_parser;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -760,6 +761,10 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               else
                 HtmlWidget(
                   _sanitizeArticleHtml(_bilingualHtml ?? html),
+                  customWidgetBuilder: (element) {
+                    if (element.localName != 'pre') return null;
+                    return _CodeBlockWidget(element: element);
+                  },
                   customStylesBuilder: (element) {
                     if (element.className.contains('aurora-translation')) {
                       return {
@@ -888,6 +893,72 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Renders a code block with horizontal scrolling and a copy button.
+final class _CodeBlockWidget extends StatelessWidget {
+  const _CodeBlockWidget({required this.element});
+
+  final html.Element element;
+
+  @override
+  Widget build(BuildContext context) {
+    final code = element.text.trimRight();
+    final colorScheme = Theme.of(context).colorScheme;
+    return Stack(
+      children: [
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          decoration: BoxDecoration(
+            color: colorScheme.onSurface.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Text(
+              code,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13.5,
+                height: 1.5,
+                color: colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 14,
+          right: 8,
+          child: Material(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(6),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: code));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('代码已复制'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(5),
+                child: Icon(
+                  Icons.copy_rounded,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
