@@ -121,6 +121,18 @@ final class EntryTile extends StatelessWidget {
                         height: 1.35,
                       ),
                     ),
+                    if (entry.translatedTitle != null &&
+                        entry.translatedTitle != entry.title) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        entry.translatedTitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                      ),
+                    ],
                     if (showSummary) ...[
                       const SizedBox(height: 5),
                       Text(

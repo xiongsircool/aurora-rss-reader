@@ -276,8 +276,8 @@ final class LocalContentRepository {
     }
     if (cursor != null) {
       where.add(
-        '(COALESCE(published_at, inserted_at) < ? OR '
-        '(COALESCE(published_at, inserted_at) = ? AND id < ?))',
+        '(COALESCE(entries.published_at, entries.inserted_at) < ? OR '
+        '(COALESCE(entries.published_at, entries.inserted_at) = ? AND entries.id < ?))',
       );
       variables
         ..add(Variable<DateTime>(cursor.timestamp))
@@ -288,18 +288,27 @@ final class LocalContentRepository {
 
     final rows = await database
         .customSelect(
-          'SELECT entries.* FROM entries '
+          'SELECT entries.*, t.title AS translated_title '
+          'FROM entries '
+          'LEFT JOIN translations t '
+          "ON t.entry_id = entries.id AND t.language = 'zh' "
           '${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')} '} '
-          'ORDER BY COALESCE(published_at, inserted_at) DESC, id DESC '
+          'ORDER BY COALESCE(entries.published_at, entries.inserted_at) DESC, entries.id DESC '
           'LIMIT ?',
           variables: variables,
-          readsFrom: {database.entries},
+          readsFrom: {database.entries, database.translations},
         )
         .get();
 
-    final entries = rows
-        .map((row) => _entryFromRow(database.entries.map(row.data)))
-        .toList();
+    final entries = rows.map((row) {
+      final entry = _entryFromRow(database.entries.map(row.data));
+      final translated = row.data.containsKey('translated_title')
+          ? row.data['translated_title'] as String?
+          : null;
+      return translated != null && translated.isNotEmpty
+          ? entry.copyWith(translatedTitle: translated)
+          : entry;
+    }).toList();
     final last = entries.lastOrNull;
     return InboxPage(
       entries: entries,

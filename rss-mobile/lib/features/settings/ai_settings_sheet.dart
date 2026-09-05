@@ -532,6 +532,29 @@ final class _RequestPageState extends _AiSettingsPageState<_RequestPage> {
               ),
           ],
         ),
+        const SizedBox(height: 24),
+        SwitchListTile(
+          dense: true,
+          title: const Text('自动翻译标题'),
+          subtitle: const Text('未读的外文文章标题自动翻译'),
+          value: prefs['autoTranslateTitles'] as bool? ?? false,
+          onChanged: (v) => update('autoTranslateTitles', v),
+        ),
+        if (prefs['autoTranslateTitles'] == true) ...[
+          Text(
+            '每次翻译上限 · ${prefs['maxAutoTranslations'] ?? 10} 篇',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Slider(
+            value: (prefs['maxAutoTranslations'] as num?)?.toDouble() ?? 10,
+            min: 1,
+            max: 50,
+            divisions: 49,
+            onChanged: (v) => update('maxAutoTranslations', v.toInt()),
+          ),
+        ],
       ],
     );
   }

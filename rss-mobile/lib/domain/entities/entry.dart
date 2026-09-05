@@ -20,6 +20,7 @@ final class Entry {
     this.publishedAt,
     this.readAt,
     this.isStarred = false,
+    this.translatedTitle,
   });
 
   final String id;
@@ -41,6 +42,9 @@ final class Entry {
   final DateTime? readAt;
   final bool isStarred;
 
+  /// Cached AI-translated title (from translations table).
+  final String? translatedTitle;
+
   bool get isRead => readAt != null;
 
   Entry markRead(DateTime at) => copyWith(readAt: at);
@@ -51,6 +55,7 @@ final class Entry {
     DateTime? readAt,
     bool clearReadAt = false,
     bool? isStarred,
+    String? translatedTitle,
     String? readabilityContent,
     Uri? contentSourceUrl,
     DateTime? contentExtractedAt,
@@ -80,6 +85,7 @@ final class Entry {
       insertedAt: insertedAt,
       readAt: clearReadAt ? null : (readAt ?? this.readAt),
       isStarred: isStarred ?? this.isStarred,
+      translatedTitle: translatedTitle ?? this.translatedTitle,
     );
   }
 }

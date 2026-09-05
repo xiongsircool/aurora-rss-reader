@@ -55,6 +55,12 @@ final class MobileReaderController extends ChangeNotifier {
   Set<String> get mutedGroups => _mutedGroups;
   String? get aiSummary => _aiSummary;
   bool get generatingSummary => _generatingSummary;
+
+  // Auto title translation settings
+  bool _autoTranslateTitles = false;
+  int _maxAutoTranslations = 10;
+  bool get autoTranslateTitles => _autoTranslateTitles;
+  int get maxAutoTranslations => _maxAutoTranslations;
   String? get aiConfigError => _error;
   List<Entry> get entries => _entries;
   List<Entry> get starredEntries => _starredEntries;
@@ -81,14 +87,81 @@ final class MobileReaderController extends ChangeNotifier {
       final storedProxy = await repository.loadProxyUrl();
       if (storedProxy != null) _proxyUrl = storedProxy;
       refreshFeed.httpClient.setProxyUrl(_proxyUrl);
+      await _loadAutoTranslateSettings();
       await _reload();
       _initialized = true;
+      // Fire-and-forget: auto translate titles after initial load.
+      if (_autoTranslateTitles) {
+        unawaited(_autoTranslatePendingTitles());
+      }
     } catch (error) {
       _error = '无法打开本地数据库：$error';
     } finally {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> _loadAutoTranslateSettings() async {
+    final prefs = await _prefs?.loadAiExtendedSettings();
+    if (prefs == null) return;
+    _autoTranslateTitles = prefs['autoTranslateTitles'] as bool? ?? false;
+    _maxAutoTranslations = prefs['maxAutoTranslations'] as int? ?? 10;
+  }
+
+  Future<void> setAutoTranslate({required bool enabled, int? maxCount}) async {
+    _autoTranslateTitles = enabled;
+    if (maxCount != null) _maxAutoTranslations = maxCount;
+    final stored = await _prefs?.loadAiExtendedSettings() ?? {};
+    await _prefs?.saveAiExtendedSettings({
+      ...stored,
+      'autoTranslateTitles': enabled,
+      'maxAutoTranslations': _maxAutoTranslations,
+    });
+    if (enabled) {
+      unawaited(_autoTranslatePendingTitles());
+    }
+    notifyListeners();
+  }
+
+  /// Auto-translates titles of unread entries that look non-Chinese
+  /// and don't have a cached translation yet.
+  Future<void> _autoTranslatePendingTitles() async {
+    if (!_autoTranslateTitles || aiClient == null) return;
+
+    final candidates = _entries
+        .where(
+          (e) =>
+              !e.isRead &&
+              e.translatedTitle == null &&
+              _isLikelyNonChinese(e.title),
+        )
+        .take(_maxAutoTranslations)
+        .toList();
+
+    if (candidates.isEmpty) return;
+
+    var translated = 0;
+    for (final entry in candidates) {
+      final result = await translateTitle(
+        entryId: entry.id,
+        title: entry.title,
+      );
+      if (result != null) translated++;
+    }
+
+    if (translated > 0) {
+      await _loadFirstPage();
+      notifyListeners();
+    }
+  }
+
+  static bool _isLikelyNonChinese(String text) {
+    if (text.isEmpty) return false;
+    final cjkCount = RegExp(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]')
+        .allMatches(text)
+        .length;
+    return cjkCount < text.length * 0.3;
   }
 
   Future<bool> addFeed(String rawUrl, {String? groupName}) async {
