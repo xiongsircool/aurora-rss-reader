@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../data/repositories/reader_prefs_repository.dart';
 import '../../domain/entities/entry.dart';
 import '../../shared/image_viewer_page.dart';
+import '../../shared/reading_stats.dart';
 import '../reader/podcast_player_sheet.dart';
 import '../reader/video_card.dart';
 import '../reader/mobile_reader_controller.dart';
@@ -368,7 +369,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             Row(
               children: [
                 Text(
-                  '${_readingTimeEstimateFromHtml(html)} · ${_metadata(_entry, widget.feedTitle)}',
+                  '${readingTimeEstimate(html)} · ${_metadata(_entry, widget.feedTitle)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -812,23 +813,6 @@ String _sanitizeArticleHtml(String raw) {
     }
   }
   return fragment.outerHtml;
-}
-
-/// Estimates reading minutes from article HTML: CJK chars at ~400/min,
-/// Latin words at ~220/min.
-String _readingTimeEstimateFromHtml(String? html) {
-  if (html == null || html.isEmpty) return '';
-  final text =
-      html_parser.parseFragment(html).text?.replaceAll(RegExp(r'\s+'), '') ??
-      '';
-  if (text.isEmpty) return '';
-  final cjk = RegExp(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]')
-      .allMatches(text)
-      .length;
-  final latinWords = RegExp(r'[a-zA-Z]+').allMatches(text).length;
-  final minutes = (cjk / 400 + latinWords / 220).ceil();
-  if (minutes < 1) return '不到 1 分钟';
-  return '约 $minutes 分钟读完';
 }
 
 String _metadata(Entry entry, String feedTitle) {
