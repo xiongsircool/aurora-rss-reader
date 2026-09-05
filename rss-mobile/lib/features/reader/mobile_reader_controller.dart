@@ -526,6 +526,66 @@ final class MobileReaderController extends ChangeNotifier {
     return await secureKeyStore?.loadSummaryKey();
   }
 
+  /// Translates an article title to the target language and caches it.
+  /// Returns the translated title, or null on failure.
+  Future<String?> translateTitle({
+    required String entryId,
+    required String title,
+  }) async {
+    final aiClient = this.aiClient;
+    if (aiClient == null) return null;
+
+    // Check cache first.
+    final cached = await repository.loadTranslation(
+      entryId: entryId,
+      language: 'zh',
+    );
+    if (cached != null && cached.title.isNotEmpty) return cached.title;
+
+    final settings = await repository.loadAiConfig();
+    final key = await secureKeyStore?.loadSummaryKey();
+    if (settings.baseUrl.isEmpty ||
+        settings.model.isEmpty ||
+        key == null ||
+        key.isEmpty) {
+      return null;
+    }
+
+    final buffer = StringBuffer();
+    await for (final event in aiClient.summarize(
+      config: AiConfig(
+        baseUrl: settings.baseUrl,
+        apiKey: key,
+        model: settings.model,
+        language: 'zh',
+      ),
+      systemPrompt:
+          'Translate the following article title to Chinese. '
+          'Return ONLY the translated title, nothing else.',
+      userContent: title,
+      maxTokens: 256,
+    )) {
+      switch (event) {
+        case AiDelta(:final text):
+          buffer.write(text);
+        case AiError():
+          return null;
+        case AiDone():
+          break;
+      }
+    }
+
+    final result = buffer.toString().trim();
+    if (result.isEmpty || result == title) return null;
+
+    await repository.saveTranslation(
+      entryId: entryId,
+      language: 'zh',
+      title: result,
+    );
+    return result;
+  }
+
   String feedTitle(String feedId) {
     for (final feed in _feeds) {
       if (feed.id == feedId) return feed.title;

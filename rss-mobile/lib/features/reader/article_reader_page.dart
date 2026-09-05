@@ -112,6 +112,25 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     super.dispose();
   }
 
+  String? _translatedTitle;
+  bool _translatingTitle = false;
+
+  Future<void> _translateTitle() async {
+    if (_translatingTitle) return;
+    setState(() => _translatingTitle = true);
+    try {
+      final result = await widget.controller.translateTitle(
+        entryId: _entry.id,
+        title: _entry.title,
+      );
+      if (mounted && result != null) {
+        setState(() => _translatedTitle = result);
+      }
+    } finally {
+      if (mounted) setState(() => _translatingTitle = false);
+    }
+  }
+
   Future<void> _loadCachedSummary() async {
     final cached = await widget.controller.repository.loadSummary(
       entryId: _entry.id,
@@ -222,12 +241,65 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               style: Theme.of(context).textTheme.headlineSmall
                   ?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
             ),
-            const SizedBox(height: 10),
-            Text(
-              _metadata(_entry, widget.feedTitle),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+            if (_translatedTitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                _translatedTitle!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
+            ] else if (_translatingTitle) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const SizedBox.square(
+                    dimension: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '翻译标题中…',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Text(
+                  _metadata(_entry, widget.feedTitle),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const Spacer(),
+                if (_translatedTitle == null && !_translatingTitle)
+                  GestureDetector(
+                    onTap: _translateTitle,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.translate,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '翻译标题',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             if (_entry.imageUrl != null) ...[
               const SizedBox(height: 20),
