@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/repositories/local_content_repository.dart'
     show GroupSummary;
@@ -690,16 +693,19 @@ class _SettingsPageState extends State<_SettingsPage> {
           ListTile(
             leading: const Icon(Icons.smart_toy_outlined),
             title: const Text('AI 服务'),
-            subtitle: FutureBuilder<({String baseUrl, String model})>(
+            subtitle: FutureBuilder<Map<String, dynamic>>(
               key: settingsKey,
-              future: controller.loadAiConfig(),
+              future: _loadAiStatus(controller),
               builder: (context, snapshot) {
-                final configured =
-                    snapshot.hasData &&
-                    snapshot.data!.baseUrl.isNotEmpty &&
-                    snapshot.data!.model.isNotEmpty;
+                final data = snapshot.data ?? {};
+                final baseUrl = data['baseUrl'] as String? ?? '';
+                final modelId = data['modelId'] as String? ?? '';
+                final configured = baseUrl.isNotEmpty && modelId.isNotEmpty;
+                final modelName = data['modelName'] as String? ?? '';
                 return Text(
-                  configured ? '已配置 · ${snapshot.data!.model}' : '未配置',
+                  configured
+                      ? '已配置 · ${modelName.isNotEmpty ? modelName : modelId}'
+                      : '未配置',
                 );
               },
             ),
@@ -805,6 +811,34 @@ final class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Loads AI settings status, migrating from the database if needed.
+Future<Map<String, dynamic>> _loadAiStatus(
+  MobileReaderController controller,
+) async {
+  final sp = await SharedPreferences.getInstance();
+  final raw = sp.getString('ai_settings');
+  if (raw != null) {
+    try {
+      return (jsonDecode(raw) as Map).cast<String, dynamic>();
+    } catch (_) {}
+  }
+  // Try migrating from the database once.
+  try {
+    final dbConfig = await controller.loadAiConfig();
+    final key = await controller.loadSummaryKey();
+    if (dbConfig.baseUrl.isNotEmpty && dbConfig.model.isNotEmpty) {
+      final prefs = <String, dynamic>{
+        'baseUrl': dbConfig.baseUrl,
+        'modelId': dbConfig.model,
+        'apiKey': key ?? '',
+      };
+      await sp.setString('ai_settings', jsonEncode(prefs));
+      return prefs;
+    }
+  } catch (_) {}
+  return {};
 }
 
 void _openReader(

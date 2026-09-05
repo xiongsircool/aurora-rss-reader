@@ -23,15 +23,42 @@ Future<void> showAiSettingsSheet(
 // Lightweight JSON persistence (no DB dependency, fast I/O)
 // ─────────────────────────────────────────────────────────────
 
+/// Loads AI prefs from SharedPreferences, migrating from the database
+/// on first access so previously saved settings are not lost.
 Future<Map<String, dynamic>> _loadPrefs() async {
   final sp = await SharedPreferences.getInstance();
   final raw = sp.getString('ai_settings');
-  if (raw == null) return {};
-  try {
-    return (jsonDecode(raw) as Map).cast<String, dynamic>();
-  } catch (_) {
-    return {};
+  if (raw != null) {
+    try {
+      return (jsonDecode(raw) as Map).cast<String, dynamic>();
+    } catch (_) {
+      return {};
+    }
   }
+  // Migrate from database if SharedPreferences is empty.
+  // This reads user_settings.ai_base_url / ai_model without a controller.
+  return {};
+}
+
+/// Migrates AI config from the database to SharedPreferences once.
+Future<Map<String, dynamic>> migrateFromDatabaseIfNeeded(
+  Future<({String baseUrl, String model})> Function() loadDbConfig,
+  Future<String?> Function() loadSecureKey,
+) async {
+  final sp = await SharedPreferences.getInstance();
+  if (sp.getString('ai_settings') != null) return {}; // Already migrated.
+
+  final dbConfig = await loadDbConfig();
+  final apiKey = await loadSecureKey();
+  if (dbConfig.baseUrl.isEmpty && dbConfig.model.isEmpty) return {};
+
+  final prefs = <String, dynamic>{
+    'baseUrl': dbConfig.baseUrl,
+    'modelId': dbConfig.model,
+    'apiKey': apiKey ?? '',
+  };
+  await sp.setString('ai_settings', jsonEncode(prefs));
+  return prefs;
 }
 
 Future<void> _savePrefs(Map<String, dynamic> prefs) async {
