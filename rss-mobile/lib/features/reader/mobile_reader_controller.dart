@@ -669,6 +669,117 @@ final class MobileReaderController extends ChangeNotifier {
     return result;
   }
 
+  /// Translates a block of text and returns the result.
+  /// Used for full-text translation, called in segments for long articles.
+  Future<String> _translateTextBlock({
+    required String text,
+    required AiConfig config,
+  }) async {
+    final buffer = StringBuffer();
+    await for (final event in aiClient!.summarize(
+      config: config,
+      systemPrompt:
+          'Translate the following text to '
+          '${config.language == 'zh' ? 'Chinese' : config.language}. '
+          'Return ONLY the translation, preserving paragraph breaks.',
+      userContent: text,
+    )) {
+      switch (event) {
+        case AiDelta(:final text):
+          buffer.write(text);
+        case AiError():
+          throw Exception('Translation failed');
+        case AiDone():
+          break;
+      }
+    }
+    return buffer.toString().trim();
+  }
+
+  /// Translates the full article text in segments.
+  /// Streams progress as a fraction (0.0 to 1.0) followed by the
+  /// accumulated translated text.
+  Stream<({double progress, String text})> translateArticle({
+    required String entryId,
+    required String contentHtml,
+  }) async* {
+    if (aiClient == null || _generatingSummary) return;
+
+    final settings = await repository.loadAiConfig();
+    final key = await secureKeyStore?.loadSummaryKey();
+    if (settings.baseUrl.isEmpty ||
+        settings.model.isEmpty ||
+        key == null ||
+        key.isEmpty) {
+      _error = '请先在设置中配置 AI 服务';
+      notifyListeners();
+      return;
+    }
+
+    // Strip HTML to plain text.
+    final plainText = contentHtml
+        .replaceAll(RegExp(r'<[^>]+>'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (plainText.length < 30) {
+      _error = '文章内容太短';
+      notifyListeners();
+      return;
+    }
+
+    // Split into segments of ~3000 chars, breaking at sentence boundaries.
+    const segmentSize = 3000;
+    final segments = <String>[];
+    var start = 0;
+    while (start < plainText.length) {
+      var end = (start + segmentSize).clamp(0, plainText.length);
+      // Try to break at sentence boundary.
+      if (end < plainText.length) {
+        final lastPeriod = plainText.lastIndexOf('.', end);
+        if (lastPeriod > start + segmentSize * 0.5) {
+          end = lastPeriod + 1;
+        }
+      }
+      segments.add(plainText.substring(start, end));
+      start = end;
+    }
+
+    _generatingSummary = true;
+    _error = null;
+    notifyListeners();
+
+    final config = AiConfig(
+      baseUrl: settings.baseUrl,
+      apiKey: key,
+      model: settings.model,
+      language: 'zh',
+    );
+
+    final translatedBuffer = StringBuffer();
+    try {
+      for (var i = 0; i < segments.length; i++) {
+        final segment = segments[i];
+        final translated = await _translateTextBlock(
+          text: segment,
+          config: config,
+        );
+        if (translated.isNotEmpty) {
+          translatedBuffer.write(translated);
+          if (i < segments.length - 1) translatedBuffer.write('\n\n');
+        }
+        yield (
+          progress: (i + 1) / segments.length,
+          text: translatedBuffer.toString(),
+        );
+        notifyListeners();
+      }
+    } finally {
+      _generatingSummary = false;
+      notifyListeners();
+    }
+  }
+
   String feedTitle(String feedId) {
     for (final feed in _feeds) {
       if (feed.id == feedId) return feed.title;

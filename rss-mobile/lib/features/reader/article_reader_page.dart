@@ -109,11 +109,50 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
   @override
   void dispose() {
     _summarySub?.cancel();
+    _translateSub?.cancel();
     super.dispose();
+  }
+
+  void _startArticleTranslation() {
+    if (_translatingArticle) return;
+    final content =
+        _entry.readabilityContent ?? _entry.content ?? _entry.summary;
+    if (content == null || content.trim().length < 30) return;
+
+    setState(() {
+      _translatingArticle = true;
+      _translatedArticle = '';
+      _translationProgress = 0.0;
+    });
+
+    _translateSub = widget.controller
+        .translateArticle(entryId: _entry.id, contentHtml: content)
+        .listen(
+          (update) {
+            if (mounted) {
+              setState(() {
+                _translationProgress = update.progress;
+                _translatedArticle = update.text;
+              });
+            }
+          },
+          onError: (error) {
+            if (mounted) {
+              setState(() => _translatingArticle = false);
+            }
+          },
+          onDone: () {
+            if (mounted) setState(() => _translatingArticle = false);
+          },
+        );
   }
 
   String? _translatedTitle;
   bool _translatingTitle = false;
+  String _translatedArticle = '';
+  bool _translatingArticle = false;
+  double _translationProgress = 0.0;
+  StreamSubscription<({double progress, String text})>? _translateSub;
 
   Future<void> _translateTitle() async {
     if (_translatingTitle) return;
@@ -399,19 +438,108 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             // AI 摘要按钮
             if (!_summaryGenerating)
               Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: OutlinedButton.icon(
-                  key: const ValueKey('generate-ai-summary'),
-                  onPressed: _startSummary,
-                  icon: const Icon(Icons.auto_awesome, size: 18),
-                  label: const Text('AI 摘要'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.secondary,
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.secondary
-                          .withValues(alpha: 0.3),
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('generate-ai-summary'),
+                        onPressed: _startSummary,
+                        icon: const Icon(Icons.auto_awesome, size: 18),
+                        label: const Text('AI 摘要'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .secondary,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.secondary
+                                .withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
                     ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('translate-article'),
+                        onPressed: _translatingArticle
+                            ? null
+                            : _startArticleTranslation,
+                        icon: _translatingArticle
+                            ? SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  value: _translationProgress > 0
+                                      ? _translationProgress
+                                      : null,
+                                ),
+                              )
+                            : const Icon(Icons.translate, size: 18),
+                        label: Text(
+                          _translatingArticle
+                              ? '${(_translationProgress * 100).toInt()}%'
+                              : '翻译全文',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .primary,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.primary
+                                .withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Translated article panel
+            if (_translatedArticle.isNotEmpty)
+              Container(
+                key: const ValueKey('translated-article-panel'),
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.2),
                   ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.translate,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _translatingArticle
+                              ? '翻译中 · ${(_translationProgress * 100).toInt()}%'
+                              : '全文翻译',
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _translatedArticle,
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(height: 1.6, fontSize: _fontSize),
+                    ),
+                  ],
                 ),
               ),
             if (hasExtracted && hasOriginal)
