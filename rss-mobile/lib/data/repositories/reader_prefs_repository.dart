@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 /// Reading display preferences stored in a dedicated key-value table.
@@ -34,6 +36,41 @@ class ReaderPrefsRepository {
       'updated_at = excluded.updated_at',
       [key, value],
     );
+  }
+
+  Future<Map<String, dynamic>?> loadAiExtendedSettings() async {
+    await _ensureTable();
+    final rows = await _db
+        .customSelect(
+          "SELECT value FROM app_prefs WHERE key = 'ai_extended_settings'",
+        )
+        .get();
+    if (rows.isEmpty) return null;
+    final json = rows.first.read<String>('value');
+    return _decodeJson(json);
+  }
+
+  Future<void> saveAiExtendedSettings(Map<String, dynamic> settings) async {
+    await _ensureTable();
+    await _db.customStatement(
+      "INSERT INTO app_prefs(key, value, updated_at) "
+      "VALUES('ai_extended_settings', ?, datetime('now')) "
+      "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
+      "updated_at = excluded.updated_at",
+      [_encodeJson(settings)],
+    );
+  }
+
+  String _encodeJson(Map<String, dynamic> map) => jsonEncode(map);
+
+  Map<String, dynamic>? _decodeJson(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } on FormatException {
+      // fallthrough
+    }
+    return null;
   }
 
   Future<double> loadFontSize() async {

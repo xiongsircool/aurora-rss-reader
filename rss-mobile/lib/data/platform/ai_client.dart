@@ -3,20 +3,48 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-final class AiConfig {
+/// Full AI service configuration with all tunable parameters.
+class AiConfig {
   const AiConfig({
     required this.baseUrl,
     required this.apiKey,
     required this.model,
     this.language = 'zh',
+    this.maxTokens = 2048,
+    this.temperature = 0.7,
+    this.topP,
+    this.timeoutSeconds = 60,
+    this.maxRetries = 2,
+    this.systemPromptOverride,
   });
 
   final String baseUrl;
   final String apiKey;
   final String model;
   final String language;
+  final int maxTokens;
+  final double temperature;
+  final double? topP;
+  final int timeoutSeconds;
+  final int maxRetries;
+  final String? systemPromptOverride;
 
   bool get isConfigured => baseUrl.isNotEmpty && apiKey.isNotEmpty;
+
+  Map<String, dynamic> toRequestPayload({
+    required String systemPrompt,
+    required String userContent,
+  }) => {
+    'model': model,
+    'stream': true,
+    'max_tokens': maxTokens,
+    'temperature': temperature,
+    if (topP != null) 'top_p': topP,
+    'messages': [
+      {'role': 'system', 'content': systemPromptOverride ?? systemPrompt},
+      {'role': 'user', 'content': userContent},
+    ],
+  };
 }
 
 sealed class AiStreamEvent {
@@ -37,20 +65,17 @@ final class AiError extends AiStreamEvent {
   final String message;
 }
 
-/// Calls an OpenAI-compatible `/chat/completions` endpoint with streaming.
+/// Calls an OpenAI-compatible `/chat/completions` endpoint with streaming,
+/// timeout, and automatic retry on rate-limit/server errors.
 class AiClient {
   AiClient({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
 
-  /// Streams an AI response for the given system prompt and user content.
-  /// Returns a stream of [AiStreamEvent]. The caller is responsible for
-  /// cancelling the subscription to abort early.
   Stream<AiStreamEvent> summarize({
     required AiConfig config,
     required String systemPrompt,
     required String userContent,
-    int maxTokens = 2048,
   }) async* {
     if (!config.isConfigured) {
       yield const AiError('AI 未配置');
@@ -63,62 +88,80 @@ class AiClient {
           : '${config.baseUrl}/chat/completions',
     );
 
-    try {
-      final request = http.Request('POST', uri)
-        ..headers.addAll({
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${config.apiKey}',
-        });
-      request.body = jsonEncode({
-        'model': config.model,
-        'stream': true,
-        'max_tokens': maxTokens,
-        'messages': [
-          {'role': 'system', 'content': systemPrompt},
-          {'role': 'user', 'content': userContent},
-        ],
-      });
+    for (var attempt = 0; attempt <= config.maxRetries; attempt++) {
+      try {
+        final request = http.Request('POST', uri)
+          ..headers.addAll({
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${config.apiKey}',
+          });
+        request.body = jsonEncode(
+          config.toRequestPayload(
+            systemPrompt: systemPrompt,
+            userContent: userContent,
+          ),
+        );
 
-      final response = await _client
-          .send(request)
-          .timeout(const Duration(seconds: 60));
+        final response = await _client
+            .send(request)
+            .timeout(Duration(seconds: config.timeoutSeconds));
 
-      if (response.statusCode != 200) {
-        final body = await response.stream.bytesToString();
-        yield AiError('HTTP ${response.statusCode}: $body');
-        return;
-      }
+        // Retry on rate limit or server errors.
+        if (response.statusCode == 429 || response.statusCode >= 500) {
+          if (attempt < config.maxRetries) {
+            await Future.delayed(Duration(seconds: attempt + 1));
+            continue;
+          }
+        }
 
-      final lineRegex = RegExp(r'^data:\s*(.+)$');
-      await for (final line
-          in response.stream
-              .transform(const Utf8Decoder())
-              .transform(const LineSplitter())) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty || !trimmed.startsWith('data:')) continue;
-        final match = lineRegex.firstMatch(trimmed);
-        if (match == null) continue;
-        final payload = match.group(1)!;
-        if (payload == '[DONE]') {
-          yield const AiDone();
+        if (response.statusCode != 200) {
+          final body = await response.stream.bytesToString();
+          yield AiError('HTTP ${response.statusCode}: $body');
           return;
         }
-        try {
-          final json = jsonDecode(payload) as Map<String, dynamic>;
-          final choices = json['choices'] as List?;
-          if (choices == null || choices.isEmpty) continue;
-          final delta = choices[0]['delta'] as Map<String, dynamic>?;
-          final content = delta?['content'] as String?;
-          if (content != null && content.isNotEmpty) {
-            yield AiDelta(content);
+
+        final lineRegex = RegExp(r'^data:\s*(.+)$');
+        await for (final line
+            in response.stream
+                .transform(const Utf8Decoder())
+                .transform(const LineSplitter())) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty || !trimmed.startsWith('data:')) continue;
+          final match = lineRegex.firstMatch(trimmed);
+          if (match == null) continue;
+          final payload = match.group(1)!;
+          if (payload == '[DONE]') {
+            yield const AiDone();
+            return;
           }
-        } on FormatException {
-          continue;
+          try {
+            final json = jsonDecode(payload) as Map<String, dynamic>;
+            final choices = json['choices'] as List?;
+            if (choices == null || choices.isEmpty) continue;
+            final delta = choices[0]['delta'] as Map<String, dynamic>?;
+            final content = delta?['content'] as String?;
+            if (content != null && content.isNotEmpty) {
+              yield AiDelta(content);
+            }
+          } on FormatException {
+            continue;
+          }
         }
+        yield const AiDone();
+        return;
+      } on http.ClientException catch (e) {
+        if (attempt >= config.maxRetries) {
+          yield AiError('网络错误：${e.message}');
+          return;
+        }
+        await Future.delayed(Duration(seconds: attempt + 1));
+      } on TimeoutException {
+        if (attempt >= config.maxRetries) {
+          yield const AiError('AI 请求超时');
+          return;
+        }
+        await Future.delayed(Duration(seconds: attempt + 1));
       }
-      yield const AiDone();
-    } on http.ClientException catch (e) {
-      yield AiError('网络错误：${e.message}');
     }
   }
 

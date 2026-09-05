@@ -6,6 +6,7 @@ import '../../application/use_cases/extract_article.dart';
 import '../../application/use_cases/refresh_feed.dart';
 import '../../data/platform/ai_client.dart';
 import '../../data/platform/secure_key_store.dart';
+import '../../data/repositories/reader_prefs_repository.dart';
 import '../../data/repositories/local_content_repository.dart';
 import '../../domain/entities/entry.dart';
 import '../../domain/entities/feed.dart';
@@ -26,6 +27,7 @@ final class MobileReaderController extends ChangeNotifier {
   final ExtractArticle? extractArticle;
   final AiClient? aiClient;
   final SecureKeyStore? secureKeyStore;
+  ReaderPrefsRepository? _prefs;
 
   List<Feed> _feeds = const [];
   List<Entry> _entries = const [];
@@ -71,6 +73,7 @@ final class MobileReaderController extends ChangeNotifier {
   String? get proxyUrl => _proxyUrl;
 
   Future<void> initialize() async {
+    _prefs ??= ReaderPrefsRepository(repository.database);
     if (_initialized || _loading) return;
     _loading = true;
     notifyListeners();
@@ -522,6 +525,14 @@ final class MobileReaderController extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> loadAiExtendedSettings() async {
+    return _prefs?.loadAiExtendedSettings();
+  }
+
+  Future<void> saveAiExtendedSettings(Map<String, dynamic> settings) async {
+    await _prefs?.saveAiExtendedSettings(settings);
+  }
+
   Future<String?> loadSummaryKey() async {
     return await secureKeyStore?.loadSummaryKey();
   }
@@ -563,7 +574,6 @@ final class MobileReaderController extends ChangeNotifier {
           'Translate the following article title to Chinese. '
           'Return ONLY the translated title, nothing else.',
       userContent: title,
-      maxTokens: 256,
     )) {
       switch (event) {
         case AiDelta(:final text):

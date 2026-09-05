@@ -58,7 +58,6 @@ class GenerateSummary {
                     'language as the article'}. Return a concise summary in 2-4 '
           'sentences. Do not add any preamble like "Here is the summary".',
       userContent: content,
-      maxTokens: 1024,
     )) {
       switch (event) {
         case AiDelta(:final text):
