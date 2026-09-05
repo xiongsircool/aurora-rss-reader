@@ -51,6 +51,7 @@ dependencies:
   flutter_secure_storage: ^11.0.0
   http: ^1.6.0
   cached_network_image: ^4.0.0
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

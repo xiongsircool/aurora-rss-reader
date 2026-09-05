@@ -1,412 +1,595 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../reader/mobile_reader_controller.dart';
 
+/// AI settings entry point — opens a lightweight menu to sub-pages.
 Future<void> showAiSettingsSheet(
   BuildContext context,
   MobileReaderController controller,
 ) {
   return showModalBottomSheet<void>(
     context: context,
-    isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (_) => _AiSettingsSheet(controller: controller),
+    isScrollControlled: true,
+    builder: (_) => _AiSettingsMenu(controller: controller),
   );
 }
 
-final class _AiSettingsSheet extends StatefulWidget {
-  const _AiSettingsSheet({required this.controller});
+// ─────────────────────────────────────────────────────────────
+// Lightweight JSON persistence (no DB dependency, fast I/O)
+// ─────────────────────────────────────────────────────────────
+
+Future<Map<String, dynamic>> _loadPrefs() async {
+  final sp = await SharedPreferences.getInstance();
+  final raw = sp.getString('ai_settings');
+  if (raw == null) return {};
+  try {
+    return (jsonDecode(raw) as Map).cast<String, dynamic>();
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<void> _savePrefs(Map<String, dynamic> prefs) async {
+  final sp = await SharedPreferences.getInstance();
+  sp.setString('ai_settings', jsonEncode(prefs));
+}
+
+// ─────────────────────────────────────────────────────────────
+// Main menu (3 entries, minimal rendering)
+// ─────────────────────────────────────────────────────────────
+
+final class _AiSettingsMenu extends StatelessWidget {
+  const _AiSettingsMenu({required this.controller});
 
   final MobileReaderController controller;
 
   @override
-  State<_AiSettingsSheet> createState() => _AiSettingsSheetState();
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: Row(
+              children: [
+                Text(
+                  'AI 服务',
+                  style: Theme.of(context).textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _loadPrefs(),
+                  builder: (context, snapshot) {
+                    final configured =
+                        snapshot.data?['baseUrl']?.isNotEmpty == true;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: configured
+                            ? Theme.of(context).colorScheme.primary
+                                  .withValues(alpha: 0.1)
+                            : Theme.of(context).colorScheme.error
+                                  .withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        configured ? '已配置' : '未配置',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: configured
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.dns_outlined),
+            title: const Text('服务连接'),
+            subtitle: const Text('端点 · 模型 · API Key'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.pop(context);
+              _openPage(
+                context,
+                (_) => _ConnectionPage(controller: controller),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.tune),
+            title: const Text('生成参数'),
+            subtitle: const Text('温度 · Tokens · 上下文长度'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.pop(context);
+              _openPage(
+                context,
+                (_) => _GenerationPage(controller: controller),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.shield_outlined),
+            title: const Text('请求策略'),
+            subtitle: const Text('超时 · 重试 · 输出语言'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.pop(context);
+              _openPage(context, (_) => _RequestPage(controller: controller));
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  void _openPage(BuildContext context, WidgetBuilder builder) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: builder));
+  }
 }
 
-class _AiSettingsSheetState extends State<_AiSettingsSheet> {
-  final _baseUrlController = TextEditingController();
-  final _modelIdController = TextEditingController();
-  final _modelNameController = TextEditingController();
-  final _apiKeyController = TextEditingController();
-  final _maxTokensController = TextEditingController();
-  final _contextWindowController = TextEditingController();
-  double _temperature = 0.7;
-  int _timeoutSeconds = 60;
-  int _maxRetries = 2;
-  String _language = 'zh';
-  bool _reasoning = false;
+// ─────────────────────────────────────────────────────────────
+// Shared page scaffold
+// ─────────────────────────────────────────────────────────────
+
+abstract class _AiSettingsPage extends StatefulWidget {
+  const _AiSettingsPage({required this.controller});
+
+  final MobileReaderController controller;
+
+  Future<void> save(Map<String, dynamic> updates);
+
+  Map<String, dynamic> defaults();
+
+  String get title;
+}
+
+abstract class _AiSettingsPageState<T extends _AiSettingsPage>
+    extends State<T> {
+  Map<String, dynamic> prefs = {};
   bool _saving = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    widget.controller.repository.loadAiConfig().then((value) {
+    _loadPrefs().then((stored) {
       if (!mounted) return;
-      _baseUrlController.text = value.baseUrl;
-      _modelIdController.text = value.model;
-    });
-    widget.controller.loadSummaryKey().then((key) {
-      if (mounted && key != null && key.isNotEmpty) {
-        _apiKeyController.text = key;
-      }
-    });
-    // Load extended settings from prefs
-    widget.controller.loadAiExtendedSettings().then((settings) {
-      if (!mounted || settings == null) return;
       setState(() {
-        _temperature = settings['temperature'] as double? ?? 0.7;
-        _timeoutSeconds = settings['timeoutSeconds'] as int? ?? 60;
-        _maxRetries = settings['maxRetries'] as int? ?? 2;
-        _language = settings['language'] as String? ?? 'zh';
-        _reasoning = settings['reasoning'] as bool? ?? false;
-        _maxTokensController.text = (settings['maxTokens'] as int? ?? 16384)
-            .toString();
-        _modelNameController.text = settings['modelName'] as String? ?? '';
+        prefs = {...widget.defaults(), ...stored};
       });
     });
   }
 
-  @override
-  void dispose() {
-    _baseUrlController.dispose();
-    _modelIdController.dispose();
-    _modelNameController.dispose();
-    _apiKeyController.dispose();
-    _maxTokensController.dispose();
-    _contextWindowController.dispose();
-    super.dispose();
+  void update(String key, dynamic value) {
+    setState(() => prefs[key] = value);
   }
 
-  Future<void> _save() async {
+  Future<void> saveAndPop() async {
     if (_saving) return;
-    FocusScope.of(context).unfocus();
     setState(() {
       _saving = true;
       _error = null;
     });
-
-    final baseUrl = _baseUrlController.text.trim();
-    final modelId = _modelIdController.text.trim();
-    final key = _apiKeyController.text.trim();
-    final maxTokens = int.tryParse(_maxTokensController.text.trim()) ?? 16384;
-
-    if (baseUrl.isEmpty && (modelId.isNotEmpty || key.isNotEmpty)) {
-      setState(() {
-        _saving = false;
-        _error = '请填写 API 端点';
-      });
-      return;
-    }
-    if (baseUrl.isNotEmpty && modelId.isEmpty) {
-      setState(() {
-        _saving = false;
-        _error = '请填写模型 ID';
-      });
-      return;
-    }
-    if (maxTokens < 100 || maxTokens > 1000000) {
-      setState(() {
-        _saving = false;
-        _error = 'Max Tokens 应在 100-1000000 之间';
-      });
-      return;
-    }
-
     try {
-      await widget.controller.saveAiSettings(
-        baseUrl: baseUrl,
-        model: modelId,
-        apiKey: key,
-      );
-      await widget.controller.saveAiExtendedSettings({
-        'temperature': _temperature,
-        'maxTokens': maxTokens,
-        'timeoutSeconds': _timeoutSeconds,
-        'maxRetries': _maxRetries,
-        'language': _language,
-        'reasoning': _reasoning,
-        'modelName': _modelNameController.text.trim(),
-      });
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(baseUrl.isEmpty ? 'AI 设置已清空' : 'AI 设置已保存')),
-      );
-    } catch (error) {
-      setState(() {
-        _saving = false;
-        _error = '保存失败：$error';
-      });
+      final stored = await _loadPrefs();
+      await _savePrefs({...stored, ...prefs});
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = '保存失败：$e';
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        4,
-        20,
-        24 + MediaQuery.viewInsetsOf(context).bottom,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : saveAndPop,
+            child: _saving
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('保存'),
+          ),
+        ],
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'AI 服务',
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '配置 OpenAI 兼容接口，支持自定义模型参数。',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 18),
-
-            // ── 基础配置 ──
-            _SectionLabel('基础配置'),
-            TextField(
-              controller: _baseUrlController,
-              enabled: !_saving,
-              keyboardType: TextInputType.url,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'API 端点',
-                hintText: 'https://api.siliconflow.cn/v1',
-                prefixIcon: Icon(Icons.language),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _modelIdController,
-              enabled: !_saving,
-              decoration: const InputDecoration(
-                labelText: '模型 ID',
-                hintText: 'deepseek-ai/DeepSeek-V3',
-                prefixIcon: Icon(Icons.smart_toy_outlined),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _modelNameController,
-              enabled: !_saving,
-              decoration: const InputDecoration(
-                labelText: '显示名称（可选）',
-                hintText: 'DeepSeek V3',
-                prefixIcon: Icon(Icons.label_outline),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _apiKeyController,
-              enabled: !_saving,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'API Key',
-                hintText: 'sk-...',
-                prefixIcon: Icon(Icons.key_outlined),
-                border: OutlineInputBorder(),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── 模型参数 ──
-            _SectionLabel('模型参数'),
-            TextField(
-              controller: _maxTokensController,
-              enabled: !_saving,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: '最大输出 Tokens',
-                hintText: '16384',
-                prefixIcon: Icon(Icons.data_usage),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _SliderTile(
-              label: 'Temperature',
-              value: _temperature,
-              min: 0.0,
-              max: 2.0,
-              divisions: 20,
-              display: _temperature.toStringAsFixed(1),
-              onChanged: (v) => setState(() => _temperature = v),
-            ),
-            SwitchListTile(
-              dense: true,
-              title: const Text('支持推理/思考'),
-              subtitle: const Text('模型支持 extended thinking'),
-              value: _reasoning,
-              onChanged: (v) => setState(() => _reasoning = v),
-            ),
-
-            const SizedBox(height: 8),
-
-            // ── 请求设置 ──
-            _SectionLabel('请求设置'),
-            _SliderTile(
-              label: '超时（秒）',
-              value: _timeoutSeconds.toDouble(),
-              min: 10,
-              max: 300,
-              divisions: 29,
-              display: '${_timeoutSeconds}s',
-              onChanged: (v) => setState(() => _timeoutSeconds = v.toInt()),
-            ),
-            _SliderTile(
-              label: '重试次数',
-              value: _maxRetries.toDouble(),
-              min: 0,
-              max: 5,
-              divisions: 5,
-              display: '$_maxRetries',
-              onChanged: (v) => setState(() => _maxRetries = v.toInt()),
-            ),
-
-            const SizedBox(height: 8),
-
-            // ── 语言 ──
-            _SectionLabel('输出语言'),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final lang in [
-                  ('zh', '中文'),
-                  ('en', 'English'),
-                  ('ja', '日本語'),
-                  ('ko', '한국어'),
-                ])
-                  ChoiceChip(
-                    label: Text(lang.$2),
-                    selected: _language == lang.$1,
-                    onSelected: (_) => setState(() => _language = lang.$1),
-                  ),
-              ],
-            ),
-
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(
+      body: prefs.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : buildBody(context),
+      bottomNavigationBar: _error != null
+          ? Container(
+              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+              padding: const EdgeInsets.all(12),
+              child: Text(
                 _error!,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.error,
                   fontSize: 13,
                 ),
               ),
-            ],
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              child: SizedBox(
-                height: 48,
-                child: Center(
-                  child: _saving
-                      ? const SizedBox.square(
-                          dimension: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('保存'),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+            )
+          : null,
+    );
+  }
+
+  Widget buildBody(BuildContext context);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Page 1: Connection
+// ─────────────────────────────────────────────────────────────
+
+final class _ConnectionPage extends _AiSettingsPage {
+  const _ConnectionPage({required super.controller});
+
+  @override
+  State<_ConnectionPage> createState() => _ConnectionPageState();
+
+  @override
+  String get title => '服务连接';
+
+  @override
+  Map<String, dynamic> defaults() => {
+    'baseUrl': '',
+    'modelId': '',
+    'modelName': '',
+    'apiKey': '',
+  };
+
+  @override
+  Future<void> save(Map<String, dynamic> updates) async {
+    await controller.saveAiSettings(
+      baseUrl: updates['baseUrl'] ?? '',
+      model: updates['modelId'] ?? '',
+      apiKey: updates['apiKey'] ?? '',
     );
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
+final class _ConnectionPageState extends _AiSettingsPageState<_ConnectionPage> {
+  @override
+  Widget buildBody(BuildContext context) {
+    // Load API key from secure storage separately.
+    return FutureBuilder<String?>(
+      future: widget.controller.loadSummaryKey(),
+      builder: (context, keySnap) {
+        if (keySnap.hasData && prefs['apiKey']?.isEmpty != false) {
+          prefs['apiKey'] = keySnap.data;
+        }
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _Field(
+              label: 'API 端点',
+              hint: 'https://api.siliconflow.cn/v1',
+              icon: Icons.language,
+              value: prefs['baseUrl'] ?? '',
+              onChanged: (v) => update('baseUrl', v),
+            ),
+            const SizedBox(height: 12),
+            _Field(
+              label: '模型 ID',
+              hint: 'deepseek-ai/DeepSeek-V3',
+              icon: Icons.smart_toy_outlined,
+              value: prefs['modelId'] ?? '',
+              onChanged: (v) => update('modelId', v),
+            ),
+            const SizedBox(height: 12),
+            _Field(
+              label: '显示名称（可选）',
+              hint: 'DeepSeek V3',
+              icon: Icons.label_outline,
+              value: prefs['modelName'] ?? '',
+              onChanged: (v) => update('modelName', v),
+            ),
+            const SizedBox(height: 12),
+            _Field(
+              label: 'API Key',
+              hint: 'sk-...',
+              icon: Icons.key_outlined,
+              obscure: true,
+              value: prefs['apiKey'] ?? '',
+              onChanged: (v) => update('apiKey', v),
+            ),
+            const SizedBox(height: 24),
+            // Test connection button
+            OutlinedButton.icon(
+              icon: const Icon(Icons.wifi_tethering),
+              label: const Text('测试连接'),
+              onPressed: () async {
+                final url = prefs['baseUrl'] as String? ?? '';
+                if (url.isEmpty) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(const SnackBar(content: Text('请先填写端点')));
+                  }
+                  return;
+                }
+                if (mounted) {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(const SnackBar(content: Text('连接测试已发送…')));
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Future<void> saveAndPop() async {
+    await super.saveAndPop();
+    // Also save to database + secure storage.
+    await widget.save(prefs);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Page 2: Generation parameters
+// ─────────────────────────────────────────────────────────────
+
+final class _GenerationPage extends _AiSettingsPage {
+  const _GenerationPage({required super.controller});
+
+  @override
+  State<_GenerationPage> createState() => _GenerationPageState();
+
+  @override
+  String get title => '生成参数';
+
+  @override
+  Map<String, dynamic> defaults() => {
+    'temperature': 0.7,
+    'maxTokens': 16384,
+    'contextWindow': 128000,
+    'reasoning': false,
+  };
+
+  @override
+  Future<void> save(Map<String, dynamic> updates) async {}
+}
+
+final class _GenerationPageState extends _AiSettingsPageState<_GenerationPage> {
+  @override
+  Widget buildBody(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Max Tokens
+        _NumberField(
+          label: '最大输出 Tokens',
+          icon: Icons.data_usage,
+          value: (prefs['maxTokens'] as num?)?.toInt() ?? 16384,
+          min: 100,
+          max: 1000000,
+          onChanged: (v) => update('maxTokens', v),
+        ),
+        const SizedBox(height: 12),
+        // Context Window
+        _NumberField(
+          label: '上下文长度（tokens）',
+          icon: Icons.storage,
+          value: (prefs['contextWindow'] as num?)?.toInt() ?? 128000,
+          min: 4096,
+          max: 2000000,
+          onChanged: (v) => update('contextWindow', v),
+        ),
+        const SizedBox(height: 20),
+        // Temperature
+        Text(
+          'Temperature · ${(prefs['temperature'] as num?)?.toStringAsFixed(1) ?? '0.7'}',
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        Slider(
+          value: (prefs['temperature'] as num?)?.toDouble() ?? 0.7,
+          min: 0,
+          max: 2,
+          divisions: 20,
+          onChanged: (v) => update('temperature', v),
+        ),
+        SwitchListTile(
+          dense: true,
+          title: const Text('支持推理/思考'),
+          subtitle: const Text('模型支持 extended thinking'),
+          value: prefs['reasoning'] as bool? ?? false,
+          onChanged: (v) => update('reasoning', v),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Page 3: Request strategy
+// ─────────────────────────────────────────────────────────────
+
+final class _RequestPage extends _AiSettingsPage {
+  const _RequestPage({required super.controller});
+
+  @override
+  State<_RequestPage> createState() => _RequestPageState();
+
+  @override
+  String get title => '请求策略';
+
+  @override
+  Map<String, dynamic> defaults() => {
+    'timeoutSeconds': 60,
+    'maxRetries': 2,
+    'language': 'zh',
+  };
+
+  @override
+  Future<void> save(Map<String, dynamic> updates) async {}
+}
+
+final class _RequestPageState extends _AiSettingsPageState<_RequestPage> {
+  @override
+  Widget buildBody(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          '超时 · ${(prefs['timeoutSeconds'] as num?)?.toInt() ?? 60} 秒',
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        Slider(
+          value: (prefs['timeoutSeconds'] as num?)?.toDouble() ?? 60,
+          min: 10,
+          max: 300,
+          divisions: 29,
+          onChanged: (v) => update('timeoutSeconds', v.toInt()),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '重试次数 · ${prefs['maxRetries']}',
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        Slider(
+          value: (prefs['maxRetries'] as num?)?.toDouble() ?? 2,
+          min: 0,
+          max: 5,
+          divisions: 5,
+          onChanged: (v) => update('maxRetries', v.toInt()),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          '输出语言',
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final (code, label) in [
+              ('zh', '中文'),
+              ('en', 'English'),
+              ('ja', '日本語'),
+              ('ko', '한국어'),
+            ])
+              ChoiceChip(
+                label: Text(label),
+                selected: prefs['language'] == code,
+                onSelected: (_) => update('language', code),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Shared widgets
+// ─────────────────────────────────────────────────────────────
+
+class _Field extends StatelessWidget {
+  const _Field({
+    required this.label,
+    required this.hint,
+    required this.icon,
+    required this.value,
+    required this.onChanged,
+    this.obscure = false,
+  });
+
+  final String label;
+  final String hint;
+  final IconData icon;
+  final String value;
+  final ValueChanged<String> onChanged;
+  final bool obscure;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w600,
-        ),
+    return TextField(
+      controller: TextEditingController(text: value),
+      obscureText: obscure,
+      keyboardType: label.contains('端点')
+          ? TextInputType.url
+          : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
       ),
+      onChanged: onChanged,
     );
   }
 }
 
-class _SliderTile extends StatelessWidget {
-  const _SliderTile({
+class _NumberField extends StatelessWidget {
+  const _NumberField({
     required this.label,
+    required this.icon,
     required this.value,
     required this.min,
     required this.max,
-    required this.divisions,
-    required this.display,
     required this.onChanged,
   });
 
   final String label;
-  final double value;
-  final double min;
-  final double max;
-  final int divisions;
-  final String display;
-  final ValueChanged<double> onChanged;
+  final IconData icon;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              Text(
-                display,
-                style: Theme.of(context).textTheme.bodySmall
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
-        SliderTheme(
-          data: SliderThemeData(
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-            trackHeight: 3,
-          ),
-          child: Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: divisions,
-            onChanged: onChanged,
-          ),
-        ),
-      ],
+    return TextField(
+      controller: TextEditingController(text: value.toString()),
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
+        helperText: '范围 $min - ${_format(max)}',
+      ),
+      onChanged: (text) {
+        final parsed = int.tryParse(text);
+        if (parsed != null && parsed >= min && parsed <= max) {
+          onChanged(parsed);
+        }
+      },
     );
+  }
+
+  String _format(int n) {
+    if (n >= 1000000) return '${n ~/ 1000000}M';
+    if (n >= 1000) return '${n ~/ 1000}K';
+    return n.toString();
   }
 }
