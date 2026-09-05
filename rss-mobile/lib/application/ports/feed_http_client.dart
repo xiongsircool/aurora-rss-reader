@@ -27,6 +27,7 @@ abstract interface class FeedHttpClient {
     Duration timeout = const Duration(seconds: 20),
     int maxBytes = 10 * 1024 * 1024,
     String? accept,
+    String? userAgent,
   });
 
   void setProxyUrl(String? proxyUrl);

@@ -49,12 +49,28 @@ final class ExtractArticle {
       timeout: const Duration(seconds: 25),
       maxBytes: 8 * 1024 * 1024,
       accept: 'text/html, application/xhtml+xml;q=0.9, */*;q=0.5',
+      // Many sites reject unknown user agents outright with 403/challenge
+      // pages, so article extraction presents itself as a mobile browser.
+      userAgent:
+          'Mozilla/5.0 (Linux; Android 16; Pixel 9) AppleWebKit/537.36 '
+          '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
     );
     final contentType = response.header('content-type');
     if (contentType != null &&
         !contentType.toLowerCase().contains('html') &&
         !contentType.toLowerCase().startsWith('text/')) {
       throw ArticleExtractionException('页面不是 HTML：$contentType');
+    }
+    // Anti-bot layers (e.g. Ars Technica) answer non-JS clients with an
+    // empty 202 body. Surface that as a clear, actionable error instead
+    // of a confusing "no content extracted" failure.
+    if (response.statusCode != 200) {
+      throw ArticleExtractionException(
+        '该网站启用了反爬保护（HTTP ${response.statusCode}），无法提取正文',
+      );
+    }
+    if (response.body.length < 64) {
+      throw const ArticleExtractionException('页面没有返回任何内容');
     }
 
     final html = decodeHtmlBytes(response.body, contentType: contentType);

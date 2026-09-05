@@ -166,6 +166,7 @@ final class _FakeFeedHttpClient implements FeedHttpClient {
     Duration timeout = const Duration(seconds: 20),
     int maxBytes = 10 * 1024 * 1024,
     String? accept,
+    String? userAgent,
   }) async {
     if (uri.path == '/article') {
       final paragraphs = List.generate(

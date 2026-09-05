@@ -12,6 +12,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:html2md/html2md.dart' as html2md;
 import 'package:share_plus/share_plus.dart';
+
+import '../../shared/share_card_renderer.dart';
+
 import 'package:html/dom.dart' as html;
 import 'package:html/parser.dart' as html_parser;
 import 'package:url_launcher/url_launcher.dart';
@@ -124,6 +127,12 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               for (final (icon, title, subtitle, onTap) in [
+                (
+                  Icons.image_outlined,
+                  '分享卡片',
+                  '生成精美卡片图片，微信好友可见',
+                  _shareCardImage,
+                ),
                 (Icons.link, '复制链接', '仅复制文章地址', _copyLink),
                 (Icons.subject, '分享文本', '标题 + 链接，适合聊天发送', _shareText),
                 (
@@ -149,6 +158,35 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _shareCardImage() async {
+    final html = _entry.readabilityContent ?? _entry.content ?? _entry.summary;
+    var excerpt = html == null
+        ? ''
+        : html_parser.parseFragment(html).text ?? '';
+    excerpt = excerpt.trim().replaceAll('\n', ' ');
+    if (excerpt.length > 160) excerpt = '${excerpt.substring(0, 160)}…';
+    final card = ShareCardRenderer(
+      title: _entry.title,
+      feed: widget.feedTitle,
+      url: _shareTargetUrl,
+      excerpt: excerpt,
+    );
+    final file = await card.render();
+    if (!mounted) return;
+    if (file == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('卡片生成失败，请改用文本分享')));
+      return;
+    }
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        text: _entry.title,
+        subject: _entry.title,
       ),
     );
   }
@@ -726,7 +764,9 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                     ContentExtractionStatus.failed) ...[
                   const SizedBox(height: 8),
                   Text(
-                    '提取失败，已保留订阅正文。',
+                    '提取失败：'
+                    '${_friendlyExtractionError(_entry.contentExtractionError)}'
+                    '已保留订阅正文。',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                       fontSize: 13,
@@ -895,6 +935,26 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
       ),
     );
   }
+}
+
+/// Translates raw extraction exceptions into short, human-readable
+/// Chinese reasons shown in the reader.
+String _friendlyExtractionError(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return '';
+  final e = raw.toLowerCase();
+  if (e.contains('timed out') || e.contains('timeout')) {
+    return '站点响应超时，';
+  }
+  if (e.contains('反爬保护')) {
+    return '该网站启用了反爬保护，';
+  }
+  if (e.contains('403') || e.contains('forbidden')) {
+    return '站点拒绝访问（403），';
+  }
+  if (e.contains('socket') || e.contains('connection')) {
+    return '网络连接失败，';
+  }
+  return '';
 }
 
 /// Renders a code block with horizontal scrolling and a copy button.

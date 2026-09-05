@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../inbox/entry_tile.dart';
@@ -15,17 +17,35 @@ final class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final _queryController = TextEditingController();
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
+    _queryController.addListener(_onQueryChanged);
     widget.controller.clearSearch();
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _queryController.removeListener(_onQueryChanged);
     _queryController.dispose();
     super.dispose();
+  }
+
+  /// Live search with a 350 ms debounce so results appear as the user
+  /// types instead of only after submitting.
+  void _onQueryChanged() {
+    _debounce?.cancel();
+    final query = _queryController.text;
+    if (query.trim().isEmpty) {
+      widget.controller.clearSearch();
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      widget.controller.search(query);
+    });
   }
 
   @override
@@ -56,6 +76,7 @@ class _SearchPageState extends State<SearchPage> {
               IconButton(
                 tooltip: '清空',
                 onPressed: () {
+                  _debounce?.cancel();
                   _queryController.clear();
                   widget.controller.clearSearch();
                   setState(() {});

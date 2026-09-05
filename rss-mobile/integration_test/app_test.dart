@@ -94,6 +94,7 @@ final class _FakeFeedHttpClient implements FeedHttpClient {
     Duration timeout = const Duration(seconds: 20),
     int maxBytes = 10 * 1024 * 1024,
     String? accept,
+    String? userAgent,
   }) async {
     const xml = '''
 <rss version="2.0"><channel>
