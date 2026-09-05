@@ -8,6 +8,7 @@ import 'data/platform/ai_client.dart';
 import 'data/platform/secure_key_store.dart';
 import 'data/repositories/local_content_repository.dart';
 import 'features/reader/mobile_reader_controller.dart';
+import 'platform/background/background_refresh.dart';
 import 'platform/http/io_feed_http_client.dart';
 
 void main() {
@@ -29,4 +30,12 @@ void main() {
   );
 
   runApp(AuroraApp(controller: controller));
+
+  // Initialize background refresh after the UI is up.
+  initBackgroundRefresh(
+    interval: const Duration(hours: 3),
+    enabled: true,
+  ).catchError((_) {
+    // Background refresh is a bonus; ignore init failures.
+  });
 }
