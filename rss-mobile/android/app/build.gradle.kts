@@ -30,11 +30,23 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("githubPreview") {
+            val keyPath = System.getenv("AURORA_PREVIEW_KEYSTORE")
+            check(System.getenv("CI") != "true" || !keyPath.isNullOrBlank()) {
+                "CI release requires AURORA_PREVIEW_KEYSTORE"
+            }
+            storeFile = file(keyPath ?: "${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Fixed GitHub preview identity; not a store-production certificate.
+            signingConfig = signingConfigs.getByName("githubPreview")
         }
     }
 }

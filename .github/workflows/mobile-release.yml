@@ -33,9 +33,9 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.MOBILE_PREVIEW_KEYSTORE_BASE64 }}
         run: |
           test -n "$KEYSTORE_BASE64"
-          install -d -m 700 "$HOME/.android"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
-          chmod 600 "$HOME/.android/debug.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/aurora-preview.keystore"
+          chmod 600 "$RUNNER_TEMP/aurora-preview.keystore"
+          printf 'AURORA_PREVIEW_KEYSTORE=%s\n' "$RUNNER_TEMP/aurora-preview.keystore" >> "$GITHUB_ENV"
 
       - name: Pub get
         run: flutter pub get
@@ -51,6 +51,14 @@ jobs:
 
       - name: Build universal APK
         run: flutter build apk --release
+
+      - name: Verify signing identity
+        run: |
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          test -n "$signer"
+          for apk in build/app/outputs/flutter-apk/*release.apk; do
+            "$signer" verify --print-certs "$apk" | grep -Fq 'certificate SHA-256 digest: 393cd89de498e46841c0d5981244ab7c52a3d959288ccc13b408a28c418e3693'
+          done
 
       - name: Rename artifacts
         run: |
