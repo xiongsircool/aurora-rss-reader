@@ -58,53 +58,59 @@ final class _EntryTileState extends State<EntryTile> {
         ? null
         : html_parser.parseFragment(tile.entry.summary!).text?.trim();
     final showSummary = summary != null && summary.isNotEmpty;
+    final avatarColor = _sourceColor(tile.feedTitle);
 
     return Material(
       color: tile.entry.isRead
           ? colorScheme.surface
-          : colorScheme.primary.withValues(alpha: 0.035),
+          : colorScheme.primary.withValues(alpha: 0.045),
       child: InkWell(
         onTap: tile.onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 10, 12),
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (tile.entry.imageUrl != null) ...[
-                GestureDetector(
-                  onTap: () => ImageViewerPage.show(
-                    context,
-                    url: tile.entry.imageUrl!,
-                    referer: tile.referer,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: CachedNetworkImage(
-                      imageUrl: tile.entry.imageUrl.toString(),
-                      httpHeaders: tile.referer == null
-                          ? null
-                          : {'Referer': tile.referer!.toString()},
-                      width: 88,
-                      height: 76,
-                      fit: BoxFit.cover,
-                      errorWidget: (_, _, _) => Container(
-                        width: 88,
-                        height: 76,
-                        color: colorScheme.surfaceContainerHighest,
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.broken_image_outlined),
-                      ),
-                    ),
+              // Feed avatar: soft-tinted circle with the source initial.
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: avatarColor.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _sourceInitial(tile.feedTitle),
+                  style: TextStyle(
+                    color: avatarColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
                   ),
                 ),
-                const SizedBox(width: 12),
-              ],
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Meta row: source + relative time.
                     Row(
                       children: [
+                        Expanded(
+                          child: Text(
+                            tile.feedTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: avatarColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         if (!tile.entry.isRead) ...[
                           Container(
                             width: 7,
@@ -114,26 +120,16 @@ final class _EntryTileState extends State<EntryTile> {
                               shape: BoxShape.circle,
                             ),
                           ),
-                          const SizedBox(width: 7),
+                          const SizedBox(width: 5),
                         ],
-                        Expanded(
-                          child: Text(
-                            tile.feedTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(color: colorScheme.onSurfaceVariant),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                         Text(
-                          _formatDate(date),
+                          _relativeDate(date),
                           style: Theme.of(context).textTheme.labelSmall
                               ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     Text(
                       tile.entry.title,
                       maxLines: 2,
@@ -160,7 +156,7 @@ final class _EntryTileState extends State<EntryTile> {
                     if (showSummary) ...[
                       const SizedBox(height: 5),
                       Text(
-                        summary.trim(),
+                        summary,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -169,7 +165,7 @@ final class _EntryTileState extends State<EntryTile> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -205,6 +201,35 @@ final class _EntryTileState extends State<EntryTile> {
                   ],
                 ),
               ),
+              if (tile.entry.imageUrl != null) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => ImageViewerPage.show(
+                    context,
+                    url: tile.entry.imageUrl!,
+                    referer: tile.referer,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: tile.entry.imageUrl.toString(),
+                      httpHeaders: tile.referer == null
+                          ? null
+                          : {'Referer': tile.referer!.toString()},
+                      width: 84,
+                      height: 72,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, _, _) => Container(
+                        width: 84,
+                        height: 72,
+                        color: colorScheme.surfaceContainerHighest,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.broken_image_outlined),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -213,13 +238,50 @@ final class _EntryTileState extends State<EntryTile> {
   }
 }
 
-String _formatDate(DateTime date) {
-  final local = date.toLocal();
-  final now = DateTime.now();
-  if (local.year == now.year &&
-      local.month == now.month &&
-      local.day == now.day) {
-    return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+/// Stable per-source color: a fixed pleasant palette indexed by a
+/// deterministic hash (String.hashCode is seeded per run, so roll our own).
+Color _sourceColor(String seed) {
+  const palette = [
+    0xFF087E8B, // teal
+    0xFFE85D24, // orange
+    0xFF1565C0, // blue
+    0xFF6A1B9A, // purple
+    0xFF2E7D32, // green
+    0xFFAD1457, // pink
+    0xFF00838F, // cyan
+    0xFF558B2F, // olive
+    0xFF827717, // lime dark
+    0xFF4E5D6C, // slate
+  ];
+  var hash = 0;
+  for (final code in seed.codeUnits) {
+    hash = (hash * 31 + code) & 0x7fffffff;
   }
-  return '${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  return Color(palette[hash % palette.length]);
+}
+
+/// First meaningful character of the feed title, uppercased for latin.
+String _sourceInitial(String title) {
+  final trimmed = title.trim();
+  if (trimmed.isEmpty) return '·';
+  final first = trimmed.substring(0, 1);
+  final lower = first.toLowerCase();
+  if (lower != first && first != first.toUpperCase()) return first;
+  return first.toUpperCase();
+}
+
+/// Compact relative time for the inbox meta row.
+String _relativeDate(DateTime date) {
+  final local = date.toLocal();
+  final diff = DateTime.now().difference(local);
+  if (diff.isNegative) return '刚刚';
+  if (diff.inMinutes < 1) return '刚刚';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
+  if (diff.inHours < 24) return '${diff.inHours}小时前';
+  if (diff.inDays == 1) return '昨天';
+  if (diff.inDays < 7) return '${diff.inDays}天前';
+  if (local.year == DateTime.now().year) {
+    return '${local.month}月${local.day}日';
+  }
+  return '${local.year}年${local.month}月${local.day}日';
 }
