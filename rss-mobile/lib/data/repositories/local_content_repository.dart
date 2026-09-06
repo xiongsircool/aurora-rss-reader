@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:sqlite3/sqlite3.dart' as sql;
 
 import '../../domain/entities/entry.dart' as domain_entry;
 import '../../domain/entities/feed.dart' as domain_feed;
@@ -40,14 +44,98 @@ final class LocalContentRepository {
 
   /// Stores a resolved site icon URL for a feed (favicon discovery).
   Future<void> updateFeedIconUrl(String id, Uri iconUrl) async {
-    await (database.update(database.feeds)
-          ..where((row) => row.id.equals(id)))
-        .write(
+    await (database.update(
+      database.feeds,
+    )..where((row) => row.id.equals(id))).write(
       FeedsCompanion(
         iconUrl: Value(iconUrl.toString()),
         updatedAt: Value(DateTime.now().toUtc()),
       ),
     );
+  }
+
+  /// Exports the whole local database (already checkpointed) as bytes.
+  /// Uses SQLite VACUUM INTO, producing a compact, consistent snapshot
+  /// that includes feeds, entries, FTS indexes and reading state.
+  Future<Uint8List> exportDatabaseBytes() async {
+    final temp = await getTemporaryDirectory();
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final target = '${temp.path}/aurora-backup-$stamp.db';
+    final file = File(target);
+    if (await file.exists()) await file.delete();
+    await database.customStatement('VACUUM INTO ?', [target]);
+    final bytes = await file.readAsBytes();
+    await file.delete();
+    return bytes;
+  }
+
+  /// Replaces the entire database with [bytes] (a VACUUM INTO snapshot).
+  /// Rejects unknown or schema-newer files before touching live data.
+  /// Validates a full-backup database snapshot without touching live data.
+  /// Returns the backup's schema user_version.
+  Future<int> validateBackupDatabase(Uint8List bytes) async {
+    if (bytes.length < 16) {
+      throw ArgumentError('备份文件损坏或不完整');
+    }
+    final header = String.fromCharCodes(bytes.sublist(0, 15));
+    if (!header.startsWith('SQLite format 3')) {
+      throw ArgumentError('不是有效的 Aurora 完整备份（缺少数据库头）');
+    }
+    final temp = await getTemporaryDirectory();
+    final probeFile = File(
+      '${temp.path}/aurora-probe-${DateTime.now().millisecondsSinceEpoch}.db',
+    );
+    await probeFile.writeAsBytes(bytes);
+    final probe = sql.sqlite3.open(probeFile.path, mode: sql.OpenMode.readOnly);
+    try {
+      final tables =
+          probe
+                  .select(
+                    "SELECT count(*) AS c FROM sqlite_master WHERE type = 'table' "
+                    "AND name IN ('feeds', 'entries', 'user_settings')",
+                  )
+                  .first['c']
+              as int;
+      if (tables < 3) {
+        throw ArgumentError('备份数据库缺少必要的数据表');
+      }
+      final userVersion =
+          probe.select('PRAGMA user_version').first.values[0] as int;
+      return userVersion;
+    } finally {
+      probe.close();
+      if (await probeFile.exists()) await probeFile.delete();
+    }
+  }
+
+  /// Writes a validated backup database next to the app support files.
+  /// It is applied on the next cold start (before drift opens the DB).
+  Future<File> stageRestoreDatabase(Uint8List bytes) async {
+    final userVersion = await validateBackupDatabase(bytes);
+    if (userVersion > database.schemaVersion) {
+      throw ArgumentError(
+        '备份来自更新版本的 App（数据结构 $userVersion > '
+        '${database.schemaVersion}），请先升级应用',
+      );
+    }
+    final support = await getApplicationSupportDirectory();
+    final staged = File('${support.path}/aurora-restore-pending.db');
+    await staged.writeAsBytes(bytes);
+    return staged;
+  }
+
+  /// Full-backup restore path for the controller: validate, then stage.
+  Future<void> importFullBackup(Uint8List bytes) async {
+    final userVersion = await validateBackupDatabase(bytes);
+    if (userVersion > database.schemaVersion) {
+      throw ArgumentError(
+        '备份来自更新版本的 App（数据结构 $userVersion > '
+        '${database.schemaVersion}），请先升级应用',
+      );
+    }
+    final support = await getApplicationSupportDirectory();
+    final staged = File('${support.path}/aurora-restore-pending.db');
+    await staged.writeAsBytes(bytes);
   }
 
   /// Records the outcome of a refresh attempt for diagnostics.

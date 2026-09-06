@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -686,6 +688,78 @@ class _SettingsPageState extends State<_SettingsPage> {
     setState(() {});
   }
 
+  Future<void> _exportFullBackup(BuildContext context) async {
+    if (widget.controller.refreshing) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('刷新中无法备份，请稍后再试')));
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    final renderBox = context.findRenderObject() as RenderBox?;
+    try {
+      final bytes = await widget.controller.exportFullBackup();
+      final box = renderBox;
+      final now = DateTime.now();
+      final name =
+          'aurora-backup-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}.aurora-backup';
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              bytes,
+              mimeType: 'application/octet-stream',
+              name: name,
+            ),
+          ],
+          fileNameOverrides: [name],
+          subject: 'Aurora 数据备份',
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text('备份失败：$error')));
+    }
+  }
+
+  Future<void> _importFullBackup(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final files = await FilePicker.pickFiles(type: FileType.any);
+    if (files.isEmpty) return;
+    final bytes = await files.single.readAsBytes();
+    try {
+      await widget.controller.importFullBackup(bytes);
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            error is ArgumentError ? error.message ?? '备份无效' : '恢复失败：$error',
+          ),
+        ),
+      );
+      return;
+    }
+    if (context.mounted) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('备份已验证'),
+          content: const Text(
+            '恢复将覆盖当前所有数据，并在重启应用后生效。\n\n'
+            '请从最近任务中关闭 Aurora，然后重新打开以完成恢复。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('知道了'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   Future<void> _openBatteryOptimizationSettings() async {
     const channel = MethodChannel('aurora.mobile/system');
     try {
@@ -747,6 +821,22 @@ class _SettingsPageState extends State<_SettingsPage> {
                 return Text('$base · 已读 ${stats.read} · 收藏 ${stats.starred}');
               },
             ),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.backup_outlined),
+            title: const Text('备份全部数据'),
+            subtitle: const Text('订阅、文章、收藏、已读打包为单个备份文件'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _exportFullBackup(context),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.restore),
+            title: const Text('恢复备份'),
+            subtitle: const Text('选择备份文件，重启应用后完成恢复'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _importFullBackup(context),
           ),
           const Divider(height: 1, indent: 56),
           ListTile(
@@ -848,27 +938,66 @@ final class _StatusBanner extends StatelessWidget {
     final color = isError
         ? Theme.of(context).colorScheme.error
         : Theme.of(context).colorScheme.secondary;
+    final failures = controller.refreshFailures;
 
     return Container(
       color: color.withValues(alpha: 0.08),
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            isError ? Icons.error_outline : Icons.check_circle_outline,
-            color: color,
-            size: 18,
+          Row(
+            children: [
+              Icon(
+                isError ? Icons.error_outline : Icons.check_circle_outline,
+                color: color,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(color: color, fontSize: 13),
+                ),
+              ),
+              IconButton(
+                tooltip: '关闭',
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  controller.clearMessages();
+                  controller.clearRefreshFailures();
+                },
+                icon: const Icon(Icons.close, size: 18),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(message, style: TextStyle(color: color, fontSize: 13)),
-          ),
-          IconButton(
-            tooltip: '关闭',
-            visualDensity: VisualDensity.compact,
-            onPressed: controller.clearMessages,
-            icon: const Icon(Icons.close, size: 18),
-          ),
+          if (failures.isNotEmpty) ...[
+            for (final failure in failures)
+              Padding(
+                padding: const EdgeInsets.only(left: 26, bottom: 2),
+                child: Text(
+                  '• ${failure.title}：${failure.error}',
+                  style: TextStyle(
+                    color: color.withValues(alpha: 0.85),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(left: 26, top: 4, bottom: 2),
+              child: ActionChip(
+                label: controller.refreshing
+                    ? const SizedBox.square(
+                        dimension: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('重试失败的订阅', style: TextStyle(fontSize: 12)),
+                onPressed: controller.refreshing
+                    ? null
+                    : controller.retryFailedRefreshes,
+              ),
+            ),
+          ],
         ],
       ),
     );

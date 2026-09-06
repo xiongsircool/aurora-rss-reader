@@ -10,6 +10,7 @@ import '../../data/platform/ai_client.dart';
 import '../../data/platform/secure_key_store.dart';
 import '../../data/repositories/reader_prefs_repository.dart';
 import '../../data/repositories/local_content_repository.dart';
+import '../settings/about_page.dart' show AppMeta;
 import '../../data/services/favicon_resolver.dart';
 import '../../data/services/feed_icon_cache.dart';
 import '../../platform/notifications/notification_service.dart';
@@ -60,6 +61,8 @@ final class MobileReaderController extends ChangeNotifier {
   bool _unreadOnly = false;
   String? _error;
   String? _notice;
+  List<({String feedId, String title, String error})> _refreshFailures =
+      const [];
   String? _proxyUrl;
   String? _aiSummary;
   bool _generatingSummary = false;
@@ -95,6 +98,8 @@ final class MobileReaderController extends ChangeNotifier {
   bool isExtracting(String entryId) => _extractingEntryIds.contains(entryId);
   String? get error => _error;
   String? get notice => _notice;
+  List<({String feedId, String title, String error})> get refreshFailures =>
+      _refreshFailures;
   String? get proxyUrl => _proxyUrl;
 
   Future<void> initialize() async {
@@ -325,11 +330,12 @@ final class MobileReaderController extends ChangeNotifier {
     _refreshing = true;
     _error = null;
     _notice = null;
+    _refreshFailures = const [];
     notifyListeners();
 
     try {
       var inserted = 0;
-      var failed = 0;
+      final failures = <({String feedId, String title, String error})>[];
       for (final feed in List<Feed>.from(_feeds)) {
         try {
           final result = await refreshFeed(feed);
@@ -337,7 +343,11 @@ final class MobileReaderController extends ChangeNotifier {
           await repository.updateFeedStatus(id: feed.id, lastError: null);
           unawaited(_resolveFeedIcon(feed));
         } catch (error) {
-          failed++;
+          failures.add((
+            feedId: feed.id,
+            title: feed.title,
+            error: _friendlyRefreshError(error),
+          ));
           await repository.updateFeedStatus(
             id: feed.id,
             lastError: error.toString(),
@@ -345,9 +355,11 @@ final class MobileReaderController extends ChangeNotifier {
         }
       }
       await _reload();
-      _notice = failed == 0
+      _refreshFailures = failures;
+      _notice = failures.isEmpty
           ? '刷新完成，新增 $inserted 篇文章'
-          : '刷新完成，新增 $inserted 篇，$failed 个订阅失败';
+          : '刷新完成，新增 $inserted 篇，'
+                '${failures.length} 个订阅失败';
       // Show notification for new articles.
       if (inserted > 0) {
         NotificationService.showNewArticles(count: inserted).catchError((_) {});
@@ -358,6 +370,81 @@ final class MobileReaderController extends ChangeNotifier {
       _refreshing = false;
       notifyListeners();
     }
+  }
+
+  /// Retries only the feeds that failed during the last refreshAll.
+  /// Succeeding entries are removed from the failure list; the notice
+  /// reflects the retry round only.
+  Future<void> retryFailedRefreshes() async {
+    final pending = List.of(_refreshFailures);
+    if (_refreshing || pending.isEmpty) return;
+    _refreshing = true;
+    _error = null;
+    _notice = null;
+    notifyListeners();
+    try {
+      var inserted = 0;
+      final stillFailing = <({String feedId, String title, String error})>[];
+      for (final failure in pending) {
+        final feed = _feeds.where((f) => f.id == failure.feedId).firstOrNull;
+        if (feed == null) continue;
+        try {
+          final result = await refreshFeed(feed);
+          inserted += result.insertedEntries;
+          await repository.updateFeedStatus(id: feed.id, lastError: null);
+          unawaited(_resolveFeedIcon(feed));
+        } catch (error) {
+          stillFailing.add((
+            feedId: failure.feedId,
+            title: failure.title,
+            error: _friendlyRefreshError(error),
+          ));
+          await repository.updateFeedStatus(
+            id: feed.id,
+            lastError: error.toString(),
+          );
+        }
+      }
+      await _reload();
+      _refreshFailures = stillFailing;
+      _notice = stillFailing.isEmpty
+          ? '重试成功，新增 $inserted 篇文章'
+          : '重试后仍有 ${stillFailing.length} 个订阅失败';
+      if (inserted > 0) {
+        NotificationService.showNewArticles(count: inserted).catchError((_) {});
+      }
+    } catch (error) {
+      _error = '重试失败：$error';
+    } finally {
+      _refreshing = false;
+      notifyListeners();
+    }
+  }
+
+  /// Translates raw refresh exceptions into short human-readable reasons.
+  static String _friendlyRefreshError(Object error) {
+    final raw = error.toString().toLowerCase();
+    if (raw.contains('timed out') || raw.contains('timeout')) {
+      return '响应超时';
+    }
+    if (raw.contains('handshake') || raw.contains('connection terminated')) {
+      return '安全连接被中断（网络或代理不稳定）';
+    }
+    if (raw.contains('socket') || raw.contains('network')) {
+      return '网络连接失败';
+    }
+    if (raw.contains('invalid') && raw.contains('xml') ||
+        raw.contains('parse')) {
+      return '返回的不是有效的订阅格式';
+    }
+    final match = RegExp(r'FeedHttpException\((\d+)\)').firstMatch(raw);
+    if (match != null) return 'HTTP ${match.group(1)} 错误';
+    return '未知错误';
+  }
+
+  Future<void> clearRefreshFailures() async {
+    _refreshFailures = const [];
+    notifyListeners();
   }
 
   /// Resolves and stores a feed icon in the background. Never throws.
@@ -543,6 +630,66 @@ final class MobileReaderController extends ChangeNotifier {
   }
 
   String exportOpml() => buildOpml(_feeds);
+
+  /// Full local backup: the entire SQLite database plus a manifest with
+  /// the app version, so restores can validate before overwriting.
+  /// API keys are intentionally excluded; they stay in secure storage.
+  Future<Uint8List> exportFullBackup() async {
+    final manifest = jsonEncode({
+      'app': 'aurora-mobile',
+      'schema': repository.database.schemaVersion,
+      'version': AppMeta.version,
+      'created': DateTime.now().toUtc().toIso8601String(),
+      'feeds': _feeds.length,
+    });
+    // WAL checkpoint through drift: closing a second connection is not
+    // available here, so serialize with VACUUM INTO via a raw statement.
+    final dbBytes = await repository.exportDatabaseBytes();
+    final archive = <int>[];
+    // Simple container: [4-byte magic][4-byte manifest len][manifest][db bytes]
+    final magic = utf8.encode('AUR1');
+    final manifestBytes = utf8.encode(manifest);
+    final length = ByteData(4)..setUint32(0, manifestBytes.length, Endian.big);
+    archive
+      ..addAll(magic)
+      ..addAll(length.buffer.asUint8List())
+      ..addAll(manifestBytes)
+      ..addAll(dbBytes);
+    return Uint8List.fromList(archive);
+  }
+
+  /// Restores a full backup created by [exportFullBackup].
+  /// Validates the container, closes nothing (drift reconnects), and
+  /// replaces the entire database content atomically via VACUUM FROM.
+  /// Full-backup import: validates the container, stages the snapshot and
+  /// asks the user to restart. The swap happens on next cold start.
+  Future<void> importFullBackup(Uint8List bytes) async {
+    try {
+      // Container check: AUR1 magic + manifest JSON.
+      if (bytes.length < 12 ||
+          utf8.decode(bytes.sublist(0, 4), allowMalformed: true) != 'AUR1') {
+        throw ArgumentError('不是有效的 Aurora 备份文件');
+      }
+      final manifestLength = ByteData.sublistView(
+        bytes,
+        4,
+        8,
+      ).getUint32(0, Endian.big);
+      if (8 + manifestLength >= bytes.length) {
+        throw ArgumentError('备份文件损坏：清单长度异常');
+      }
+      final manifest = jsonDecode(
+        utf8.decode(bytes.sublist(8, 8 + manifestLength)),
+      ) as Map<String, dynamic>;
+      if (manifest['app'] != 'aurora-mobile') {
+        throw ArgumentError('备份文件来源不符');
+      }
+      await repository.importFullBackup(bytes.sublist(8 + manifestLength));
+      _notice = '备份校验通过，重启应用后完成恢复（恢复将覆盖当前数据）';
+    } finally {
+      notifyListeners();
+    }
+  }
 
   Future<void> search(String query) async {
     final normalized = query.trim();

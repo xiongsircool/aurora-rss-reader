@@ -59,6 +59,12 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('OPML 导入与导出'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('OPML 导入与导出'));
     await tester.pumpAndSettle();
 

@@ -202,6 +202,24 @@ final class LocalDatabase extends _$LocalDatabase {
     ),
   );
 
+  static const _pendingRestoreName = 'aurora-restore-pending.db';
+
+  /// Applies a staged full-backup restore before the app opens the
+  /// database. Safe to call on every startup (no-op without a pending
+  /// restore file).
+  static Future<void> restorePendingIfExists() async {
+    final supportDir = await getApplicationSupportDirectory();
+    final pending = File(p.join(supportDir.path, _pendingRestoreName));
+    if (!await pending.exists()) return;
+    final databaseFile = File(p.join(supportDir.path, 'aurora-mobile.sqlite'));
+    for (final suffix in ['', '-wal', '-shm']) {
+      final sidecar = File('${databaseFile.path}$suffix');
+      if (await sidecar.exists()) await sidecar.delete();
+    }
+    await pending.copy(databaseFile.path);
+    await pending.delete();
+  }
+
   factory LocalDatabase.onDevice() => LocalDatabase(_openOnDevice());
 
   @override

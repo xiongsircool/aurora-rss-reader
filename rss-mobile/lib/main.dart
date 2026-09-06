@@ -21,6 +21,8 @@ import 'platform/http/io_feed_http_client.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Apply a staged full-backup restore before drift opens the database.
+  await LocalDatabase.restorePendingIfExists();
   final database = LocalDatabase.onDevice();
   final repository = LocalContentRepository(database);
   const configuredProxy = String.fromEnvironment('AURORA_PROXY_URL');
