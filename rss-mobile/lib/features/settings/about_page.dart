@@ -3,7 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 /// App-wide constants (kept in one place; update on release).
 class AppMeta {
-  static const version = '0.1.0';
+  static const version = '0.1.1';
   static const repoUrl = 'https://github.com/xiongsircool/aurora-rss-reader';
   static const issueUrl = '$repoUrl/issues';
   static const sponsorUrl = 'https://github.com/sponsors/xiongsircool';

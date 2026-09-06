@@ -24,6 +24,18 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.47.2'
+
+      # Preserve the GitHub preview signing identity across ephemeral runners.
+      # Missing secrets must fail, never silently create a new debug key.
+      - name: Restore stable preview signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MOBILE_PREVIEW_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          install -d -m 700 "$HOME/.android"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
 
       - name: Pub get
         run: flutter pub get
@@ -47,11 +59,14 @@ jobs:
              dist/Aurora-${GITHUB_REF_NAME}-arm64.apk
           cp build/app/outputs/flutter-apk/app-release.apk \
              dist/Aurora-${GITHUB_REF_NAME}-universal.apk
-          sha256sum dist/* > dist/SHA256SUMS.txt
+          (cd dist && sha256sum Aurora-*.apk > SHA256SUMS.txt)
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            rss-mobile/dist/Aurora-*
+            rss-mobile/dist/Aurora-*.apk
+            rss-mobile/dist/SHA256SUMS.txt
+          draft: true
+          fail_on_unmatched_files: true
           generate_release_notes: true

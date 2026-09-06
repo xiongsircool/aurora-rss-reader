@@ -823,7 +823,7 @@ class _SettingsPageState extends State<_SettingsPage> {
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('关于 Aurora'),
-            subtitle: const Text('0.1.0 · 本地优先 · GPL-3.0'),
+            subtitle: const Text('${AppMeta.version} · 本地优先 · GPL-3.0'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(
               context,

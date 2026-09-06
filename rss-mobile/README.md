@@ -2,7 +2,7 @@
 
 [![mobile-ci](https://github.com/xiongsircool/aurora-rss-reader/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/xiongsircool/aurora-rss-reader/actions/workflows/mobile-ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/xiongsircool/aurora-rss-reader/blob/main/LICENSE)
-[![Release](https://img.shields.io/badge/Release-mobile--v0.1.0-orange)](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0)
+[![Release](https://img.shields.io/badge/Release-mobile--v0.1.1-orange)](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.1)
 
 **Aurora Mobile** 是 [Aurora RSS Reader](../../README_ZH.md) 的 Flutter 移动端，**本地优先**：无账号、无服务器，你的订阅与阅读数据全部只保存在设备上。支持 Android 与 iOS。
 
@@ -22,7 +22,9 @@
 | `Aurora-*-arm64.apk` | 2019 年后的绝大多数设备（推荐） |
 | `Aurora-*-universal.apk` | 不确定设备架构时 |
 
-iOS 版已完成真机验证，计划通过 TestFlight 分发。
+iOS 公开分发暂缓。
+
+**升级注意**：GitHub v0.1.0 APK 使用了当时 CI 临时生成的签名，与 v0.1.1 不同，不能直接覆盖安装。请勿直接卸载旧版丢失数据；OPML 只能迁移订阅，不能备份文章、收藏与已读记录。v0.1.1 起固定 GitHub 预览版签名，仍不属于应用商店生产签名。
 
 ## ✨ 功能
 
