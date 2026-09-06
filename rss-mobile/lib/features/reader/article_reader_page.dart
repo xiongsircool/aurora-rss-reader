@@ -3,7 +3,8 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, PlatformException;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -174,6 +175,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     final origin = _shareOrigin;
     setState(() => _sharingCard = true);
     ui.Image? image;
+    var openingShareSheet = false;
     try {
       final contentHtml = _showOriginal
           ? (_entry.content ?? _entry.summary)
@@ -200,6 +202,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
         articleImage: image,
       ).render();
       if (!mounted) return;
+      openingShareSheet = true;
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'image/png')],
@@ -209,9 +212,18 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
       );
     } catch (error) {
       if (mounted) {
-        final message = error is FormatException
-            ? error.message
-            : '卡片分享失败，请重试或使用文本分享';
+        final String message;
+        if (error is FormatException) {
+          message = error.message;
+        } else if (openingShareSheet) {
+          message = error is PlatformException
+              ? '无法打开系统分享面板（${error.code}），请重试'
+              : '无法打开系统分享面板，请重试';
+        } else if (error is FileSystemException) {
+          message = '分享图片保存失败，请检查设备可用存储空间后重试';
+        } else {
+          message = '分享图片生成失败，请重试或使用文本分享';
+        }
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(message)));
       }

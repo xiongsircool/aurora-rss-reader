@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:aurora_mobile/shared/share_card_renderer.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -25,6 +25,35 @@ void main() {
       buffer.dispose();
     }
   }
+
+  test('render saves readable PNGs in unique child directories', () async {
+    final temp = await Directory.systemTemp.createTemp('aurora-share-test-');
+    const channel = MethodChannel('plugins.flutter.io/path_provider');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'getTemporaryDirectory');
+      return temp.path;
+    });
+    addTearDown(() async {
+      messenger.setMockMethodCallHandler(channel, null);
+      await temp.delete(recursive: true);
+    });
+    const renderer = ShareCardRenderer(
+      title: 'Saved card',
+      feed: 'Source',
+      url: 'https://example.com/article',
+    );
+    final files = await Future.wait([renderer.render(), renderer.render()]);
+    expect(files[0].path, isNot(files[1].path));
+    for (final file in files) {
+      expect(file.parent.parent.path, temp.path);
+      expect(await file.exists(), isTrue);
+      final image = await decode(await file.readAsBytes());
+      expect(image.width, 1080);
+      image.dispose();
+    }
+  });
 
   for (final url in [
     'https://example.com/posts/article?from=aurora&lang=zh',

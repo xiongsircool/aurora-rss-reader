@@ -37,8 +37,7 @@ class ShareCardRenderer {
     final bytes = await renderPng();
     final directory = await getTemporaryDirectory();
     // Separate directories avoid filename collisions across concurrent shares.
-    final folder = await Directory('${directory.path}/aurora-card-')
-        .createTemp();
+    final folder = await directory.createTemp('aurora-card-');
     return File('${folder.path}/Aurora.png').writeAsBytes(bytes);
   }
 
