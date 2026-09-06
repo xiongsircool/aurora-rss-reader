@@ -28,6 +28,7 @@ abstract interface class FeedHttpClient {
     int maxBytes = 10 * 1024 * 1024,
     String? accept,
     String? userAgent,
+    Uri? referer,
   });
 
   void setProxyUrl(String? proxyUrl);

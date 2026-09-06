@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' show ImageByteFormat;
+import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
@@ -14,6 +14,8 @@ import 'package:html2md/html2md.dart' as html2md;
 import 'package:share_plus/share_plus.dart';
 
 import '../../shared/share_card_renderer.dart';
+import '../../shared/share_card_content.dart';
+import '../../shared/share_card_image_loader.dart';
 
 import 'package:html/dom.dart' as html;
 import 'package:html/parser.dart' as html_parser;
@@ -59,6 +61,8 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
   double _fontSize = 16.0;
   double _lineHeight = 1.65;
   final GlobalKey _articleCaptureKey = GlobalKey();
+  final GlobalKey _shareButtonKey = GlobalKey();
+  bool _sharingCard = false;
   late final ReaderPrefsRepository _prefs;
 
   @override
@@ -127,12 +131,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               for (final (icon, title, subtitle, onTap) in [
-                (
-                  Icons.image_outlined,
-                  '分享卡片',
-                  '生成精美卡片图片，微信好友可见',
-                  _shareCardImage,
-                ),
+                (Icons.image_outlined, '分享卡片', '图文摘要', _shareCardImage),
                 (Icons.link, '复制链接', '仅复制文章地址', _copyLink),
                 (Icons.subject, '分享文本', '标题 + 链接，适合聊天发送', _shareText),
                 (
@@ -141,7 +140,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                   '保留标题、列表、链接等格式',
                   _shareMarkdown,
                 ),
-                (Icons.photo_camera, '分享截图', '当前阅读画面生成长图', _shareScreenshot),
+                (Icons.photo_camera, '分享截图', '当前阅读画面', _shareScreenshot),
               ])
                 ListTile(
                   leading: Icon(icon, color: colorScheme.secondary),
@@ -162,33 +161,64 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     );
   }
 
-  Future<void> _shareCardImage() async {
-    final html = _entry.readabilityContent ?? _entry.content ?? _entry.summary;
-    var excerpt = html == null
-        ? ''
-        : html_parser.parseFragment(html).text ?? '';
-    excerpt = excerpt.trim().replaceAll('\n', ' ');
-    if (excerpt.length > 160) excerpt = '${excerpt.substring(0, 160)}…';
-    final card = ShareCardRenderer(
-      title: _entry.title,
-      feed: widget.feedTitle,
-      url: _shareTargetUrl,
-      excerpt: excerpt,
-    );
-    final file = await card.render();
-    if (!mounted) return;
-    if (file == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('卡片生成失败，请改用文本分享')));
-      return;
+  Rect get _shareOrigin {
+    final box = _shareButtonKey.currentContext?.findRenderObject();
+    if (box is RenderBox && box.hasSize) {
+      return box.localToGlobal(Offset.zero) & box.size;
     }
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(file.path)],
-        text: _entry.title,
-        subject: _entry.title,
-      ),
-    );
+    return const Rect.fromLTWH(1, 1, 1, 1);
+  }
+
+  Future<void> _shareCardImage() async {
+    if (_sharingCard) return;
+    final origin = _shareOrigin;
+    setState(() => _sharingCard = true);
+    ui.Image? image;
+    try {
+      final contentHtml = _showOriginal
+          ? (_entry.content ?? _entry.summary)
+          : (_entry.readabilityContent ?? _entry.content ?? _entry.summary);
+      final baseUrl = !_showOriginal && _entry.readabilityContent != null
+          ? (_entry.contentSourceUrl ?? _entry.url)
+          : _entry.url;
+      final content = ShareCardContent.fromHtml(
+        html: contentHtml,
+        cover: _entry.imageUrl,
+        baseUrl: baseUrl,
+      );
+      image = await loadShareCardImage(
+        content.images,
+        referer: baseUrl ?? widget.referer,
+        proxyUrl: widget.controller.proxyUrl,
+      );
+      if (!mounted) return;
+      final file = await ShareCardRenderer(
+        title: _entry.title,
+        feed: widget.feedTitle,
+        url: _shareTargetUrl,
+        excerpt: content.excerpt,
+        articleImage: image,
+      ).render();
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'image/png')],
+          subject: _entry.title,
+          sharePositionOrigin: origin,
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        final message = error is FormatException
+            ? error.message
+            : '卡片分享失败，请重试或使用文本分享';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+    } finally {
+      image?.dispose();
+      if (mounted) setState(() => _sharingCard = false);
+    }
   }
 
   Future<void> _copyLink() async {
@@ -205,7 +235,11 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
         ? _entry.title
         : '${_entry.title}\n${_entry.url}';
     await SharePlus.instance.share(
-      ShareParams(text: text, subject: _entry.title),
+      ShareParams(
+        text: text,
+        subject: _entry.title,
+        sharePositionOrigin: _shareOrigin,
+      ),
     );
   }
 
@@ -221,7 +255,11 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
         ? ''
         : '\n\n---\n原文：$_shareTargetUrl';
     await SharePlus.instance.share(
-      ShareParams(text: '$header$md$footer', subject: _entry.title),
+      ShareParams(
+        text: '$header$md$footer',
+        subject: _entry.title,
+        sharePositionOrigin: _shareOrigin,
+      ),
     );
   }
 
@@ -232,7 +270,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               as RenderRepaintBoundary?;
       if (boundary == null) return;
       final image = await boundary.toImage(pixelRatio: 2.0);
-      final bytes = await image.toByteData(format: ImageByteFormat.png);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
       if (bytes == null) return;
       final dir = await getTemporaryDirectory();
@@ -245,6 +283,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
           files: [XFile(file.path)],
           text: '${_entry.title}\n${_entry.url}',
           subject: _entry.title,
+          sharePositionOrigin: _shareOrigin,
         ),
       );
     } catch (e) {
@@ -478,9 +517,15 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
             ),
           ),
           IconButton(
-            tooltip: '分享',
-            icon: const Icon(Icons.ios_share),
-            onPressed: _showShareSheet,
+            key: _shareButtonKey,
+            tooltip: _sharingCard ? '正在生成分享卡片' : '分享',
+            icon: _sharingCard
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.ios_share),
+            onPressed: _sharingCard ? null : _showShareSheet,
           ),
           IconButton(
             tooltip: '阅读设置',

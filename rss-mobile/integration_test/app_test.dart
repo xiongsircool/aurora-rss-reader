@@ -95,6 +95,7 @@ final class _FakeFeedHttpClient implements FeedHttpClient {
     int maxBytes = 10 * 1024 * 1024,
     String? accept,
     String? userAgent,
+    Uri? referer,
   }) async {
     const xml = '''
 <rss version="2.0"><channel>

@@ -55,6 +55,7 @@ final class IoFeedHttpClient implements FeedHttpClient {
     int maxBytes = 10 * 1024 * 1024,
     String? accept,
     String? userAgent,
+    Uri? referer,
   }) async {
     if (uri.scheme != 'http' && uri.scheme != 'https') {
       throw FeedHttpException('Unsupported URL scheme: ${uri.scheme}');
@@ -74,6 +75,9 @@ final class IoFeedHttpClient implements FeedHttpClient {
           accept ?? 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.5',
         )
         ..headers.set(HttpHeaders.acceptEncodingHeader, 'gzip, deflate');
+      if (referer != null && ['http', 'https'].contains(referer.scheme)) {
+        request.headers.set(HttpHeaders.refererHeader, referer.toString());
+      }
 
       final response = await request.close().timeout(timeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {

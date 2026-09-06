@@ -1,200 +1,239 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-/// Renders a branded share-card image (title, excerpt, QR code, brand
-/// footer) so the article can be shared to chat apps as a rich-looking
-/// picture instead of plain text.
+/// Produces a bounded, content-sized PNG. The caller owns [articleImage].
 class ShareCardRenderer {
   const ShareCardRenderer({
     required this.title,
     required this.feed,
     required this.url,
     this.excerpt,
+    this.articleImage,
+    this.fontFamily,
   });
 
   final String title;
   final String feed;
   final String url;
   final String? excerpt;
+  final ui.Image? articleImage;
+  final String? fontFamily;
 
   static const _width = 1080.0;
-  static const _auroraOrange = Color(0xFFE85D24);
-  static const _auroraTeal = Color(0xFF087E8B);
+  static const _padding = 64.0;
+  static const _contentWidth = _width - 2 * _padding;
   static const _ink = Color(0xFF202124);
-  static const _muted = Color(0xFF8A9199);
+  static const _teal = Color(0xFF087E8B);
+  static const _muted = Color(0xFF535A60);
 
-  /// Renders and returns the PNG file, or null if rendering failed.
-  Future<File?> render() async {
+  Future<File> render() async {
+    final bytes = await renderPng();
+    final directory = await getTemporaryDirectory();
+    // Separate directories avoid filename collisions across concurrent shares.
+    final folder = await Directory('${directory.path}/aurora-card-')
+        .createTemp();
+    return File('${folder.path}/Aurora.png').writeAsBytes(bytes);
+  }
+
+  /// All canvas operations, including the QR code, finish before rasterization.
+  Future<Uint8List> renderPng() async {
+    final texts = <TextPainter>[];
+    TextPainter text(
+      String value,
+      double size,
+      int lines,
+      Color color, {
+      double width = _contentWidth,
+      FontWeight weight = FontWeight.w400,
+    }) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: value.trim(),
+          style: TextStyle(
+            fontSize: size,
+            fontFamily: fontFamily,
+            fontWeight: weight,
+            color: color,
+            height: 1.4,
+            letterSpacing: 0,
+          ),
+        ),
+        maxLines: lines,
+        ellipsis: '…',
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: width);
+      texts.add(painter);
+      return painter;
+    }
+
+    ui.Picture? picture;
+    ui.Image? output;
     try {
+      final link = url.trim();
+      QrPainter? qr;
+      var qrSize = 0.0;
+      var quietZone = 0.0;
+      if (link.isNotEmpty) {
+        if (utf8.encode(link).length > 2000) {
+          throw const FormatException('文章链接过长，无法生成二维码，请使用文本分享');
+        }
+        final uri = Uri.tryParse(link);
+        if (uri == null ||
+            !['https', 'http'].contains(uri.scheme) ||
+            uri.host.isEmpty) {
+          throw const FormatException('文章链接无效，无法生成二维码');
+        }
+        final validation = QrValidator.validate(
+          data: link,
+          version: QrVersions.auto,
+          errorCorrectionLevel: QrErrorCorrectLevel.M,
+        );
+        final code = validation.qrCode;
+        if (!validation.isValid || code == null) {
+          throw const FormatException('文章链接过长，无法生成二维码，请使用文本分享');
+        }
+        // Integer module size and four white modules on every edge keep the
+        // QR crisp and scannable. Long URLs receive a larger QR, not blur.
+        final module = math.max(3, (320 / (code.moduleCount + 8)).floor());
+        quietZone = module * 4.0;
+        qrSize = (code.moduleCount + 8) * module.toDouble();
+        qr = QrPainter.withQr(
+          qr: code,
+          gapless: true,
+          eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: _ink),
+          dataModuleStyle: const QrDataModuleStyle(
+            dataModuleShape: QrDataModuleShape.square,
+            color: _ink,
+          ),
+        );
+      }
+
+      final source = text(feed, 30, 2, _teal, weight: FontWeight.w600);
+      final heading = text(title, 58, 6, _ink, weight: FontWeight.w700);
+      final description = (excerpt?.trim().isNotEmpty ?? false)
+          ? text(excerpt!, 36, 6, _muted)
+          : null;
+      final footerWidth = _contentWidth - (qr == null ? 0 : qrSize + 40);
+      final brand = text(
+        'Aurora',
+        42,
+        1,
+        _ink,
+        width: footerWidth,
+        weight: FontWeight.w600,
+      );
+      final caption = text(
+        qr == null ? '文章分享' : '扫码阅读原文',
+        30,
+        1,
+        _muted,
+        width: footerWidth,
+      );
+      final host = qr == null
+          ? null
+          : text(Uri.parse(link).host, 26, 2, _muted, width: footerWidth);
+
+      var y = _padding;
+      final sourceY = y;
+      y += source.height + 24;
+      final headingY = y;
+      y += heading.height;
+      Rect? imageRect;
+      final cover = articleImage;
+      if (cover != null) {
+        y += 32;
+        final scale = math.min(_contentWidth / cover.width, 620 / cover.height);
+        final size = Size(cover.width * scale, cover.height * scale);
+        imageRect = Rect.fromLTWH(
+          (_width - size.width) / 2,
+          y,
+          size.width,
+          size.height,
+        );
+        y += size.height;
+      }
+      double? excerptY;
+      if (description != null) {
+        y += 32;
+        excerptY = y;
+        y += description.height;
+      }
+      y += 40;
+      final dividerY = y;
+      y += 32;
+      final footerY = y;
+      final footerTextHeight =
+          brand.height +
+          12 +
+          caption.height +
+          (host == null ? 0 : 12 + host.height);
+      final footerHeight = math.max(qrSize, footerTextHeight);
+      final height = (footerY + footerHeight + _padding).ceil();
+
       final recorder = ui.PictureRecorder();
-      final canvas = ui.Canvas(recorder);
-
-      _paintCard(canvas);
-
-      final picture = recorder.endRecording();
-      final image = await picture.toImage(_width.round(), 1520);
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-
-      if (bytes == null) return null;
-      final dir = await getTemporaryDirectory();
-      final file = File(
-        '${dir.path}/aurora-card-${DateTime.now().millisecondsSinceEpoch}.png',
+      final canvas = Canvas(recorder);
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, _width, height.toDouble()),
+        Paint()..color = const Color(0xFFFFFFFF),
       );
-      await file.writeAsBytes(bytes.buffer.asUint8List());
-      return file;
-    } catch (_) {
-      return null;
+      canvas.drawRect(
+        const Rect.fromLTWH(0, 0, _width, 8),
+        Paint()..color = _teal,
+      );
+      source.paint(canvas, Offset(_padding, sourceY));
+      heading.paint(canvas, Offset(_padding, headingY));
+      if (cover != null && imageRect != null) {
+        canvas.drawImageRect(
+          cover,
+          Rect.fromLTWH(0, 0, cover.width.toDouble(), cover.height.toDouble()),
+          imageRect,
+          Paint()..filterQuality = FilterQuality.medium,
+        );
+      }
+      if (description != null && excerptY != null) {
+        description.paint(canvas, Offset(_padding, excerptY));
+      }
+      canvas.drawLine(
+        Offset(_padding, dividerY),
+        Offset(_width - _padding, dividerY),
+        Paint()
+          ..color = const Color(0xFFE4E7E9)
+          ..strokeWidth = 2,
+      );
+      var textY = footerY + (footerHeight - footerTextHeight) / 2;
+      brand.paint(canvas, Offset(_padding, textY));
+      textY += brand.height + 12;
+      caption.paint(canvas, Offset(_padding, textY));
+      if (host != null) {
+        host.paint(canvas, Offset(_padding, textY + caption.height + 12));
+      }
+      if (qr != null) {
+        canvas.save();
+        canvas.translate(
+          _width - _padding - qrSize + quietZone,
+          footerY + quietZone,
+        );
+        qr.paint(canvas, Size.square(qrSize - quietZone * 2));
+        canvas.restore();
+      }
+      picture = recorder.endRecording();
+      output = await picture.toImage(_width.toInt(), height);
+      final bytes = await output.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) throw StateError('无法编码分享图片');
+      return bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes);
+    } finally {
+      output?.dispose();
+      picture?.dispose();
+      for (final painter in texts) {
+        painter.dispose();
+      }
     }
   }
-
-  void _paintCard(ui.Canvas canvas) {
-    const w = _width;
-    // Background
-    canvas.drawRect(
-      const Rect.fromLTWH(0, 0, w, 1520),
-      ui.Paint()..color = const Color(0xFFF6F7F9),
-    );
-    // Brand top bar
-    canvas.drawRect(
-      const Rect.fromLTWH(0, 0, w, 14),
-      ui.Paint()..color = _auroraOrange,
-    );
-    // Feed source row
-    _drawText(
-      canvas,
-      feed.toUpperCase(),
-      const Offset(64, 74),
-      fontSize: 34,
-      color: _auroraTeal,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 3,
-    );
-    // Title (up to 4 lines)
-    _drawText(
-      canvas,
-      title,
-      const Offset(64, 150),
-      fontSize: 68,
-      color: _ink,
-      fontWeight: FontWeight.w800,
-      maxWidth: w - 128,
-      maxLines: 4,
-    );
-    // Excerpt (up to 5 lines)
-    final excerptY = 640.0;
-    if (excerpt != null && excerpt!.trim().isNotEmpty) {
-      _drawText(
-        canvas,
-        excerpt!,
-        Offset(64, excerptY),
-        fontSize: 42,
-        color: const Color(0xFF4A4F55),
-        fontWeight: FontWeight.w400,
-        maxWidth: w - 128,
-        maxLines: 5,
-        lineHeight: 1.5,
-      );
-    }
-    // QR code block
-    _drawQr(canvas, const Offset(64, 1130), 300);
-    _drawText(
-      canvas,
-      '扫码或点击阅读原文',
-      const Offset(404, 1210),
-      fontSize: 34,
-      color: _muted,
-    );
-    _drawText(
-      canvas,
-      _ellipsize(url, 46),
-      const Offset(404, 1262),
-      fontSize: 30,
-      color: _muted,
-    );
-    // Brand footer
-    canvas.drawRect(
-      const Rect.fromLTWH(0, 1470, w, 50),
-      ui.Paint()..color = _auroraTeal.withValues(alpha: 0.12),
-    );
-    _drawText(
-      canvas,
-      'Aurora · 本地优先 RSS 阅读器',
-      const Offset(64, 1480),
-      fontSize: 30,
-      color: _auroraTeal,
-      fontWeight: FontWeight.w600,
-    );
-  }
-
-  Future<void> _drawQr(ui.Canvas canvas, Offset offset, double size) async {
-    try {
-      final painter = QrPainter(
-        data: url,
-        version: QrVersions.auto,
-        gapless: true,
-        eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: _ink),
-        dataModuleStyle: const QrDataModuleStyle(
-          dataModuleShape: QrDataModuleShape.square,
-          color: _ink,
-        ),
-      );
-      final qrImage = await painter.toImage(size);
-      final src = Rect.fromLTWH(
-        0,
-        0,
-        qrImage.width.toDouble(),
-        qrImage.height.toDouble(),
-      );
-      final dst = Rect.fromLTWH(offset.dx, offset.dy, size, size);
-      canvas.drawImageRect(
-        qrImage,
-        src,
-        dst,
-        ui.Paint()..filterQuality = FilterQuality.high,
-      );
-      qrImage.dispose();
-    } catch (_) {
-      // QR failure should not break the whole card.
-    }
-  }
-
-  void _drawText(
-    ui.Canvas canvas,
-    String text,
-    Offset offset, {
-    required double fontSize,
-    required Color color,
-    FontWeight fontWeight = FontWeight.w400,
-    double letterSpacing = 0,
-    double maxWidth = _width - 128,
-    int maxLines = 1,
-    double lineHeight = 1.3,
-  }) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          fontSize: fontSize,
-          color: color,
-          fontWeight: fontWeight,
-          letterSpacing: letterSpacing,
-          height: lineHeight,
-        ),
-      ),
-      textAlign: TextAlign.left,
-      maxLines: maxLines,
-      ellipsis: maxLines > 1 ? '…' : null,
-      textDirection: TextDirection.ltr,
-    );
-    tp.layout(maxWidth: maxWidth);
-    tp.paint(canvas, offset);
-  }
-
-  static String _ellipsize(String text, int max) =>
-      text.length <= max ? text : '${text.substring(0, max)}…';
 }
