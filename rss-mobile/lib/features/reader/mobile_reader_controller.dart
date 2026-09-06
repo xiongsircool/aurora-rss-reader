@@ -10,6 +10,8 @@ import '../../data/platform/ai_client.dart';
 import '../../data/platform/secure_key_store.dart';
 import '../../data/repositories/reader_prefs_repository.dart';
 import '../../data/repositories/local_content_repository.dart';
+import '../../data/services/favicon_resolver.dart';
+import '../../data/services/feed_icon_cache.dart';
 import '../../platform/notifications/notification_service.dart';
 import '../../domain/translation/bilingual_builder.dart';
 import '../../domain/translation/block_extractor.dart';
@@ -33,6 +35,11 @@ final class MobileReaderController extends ChangeNotifier {
   final ExtractArticle? extractArticle;
   final AiClient? aiClient;
   final SecureKeyStore? secureKeyStore;
+
+  /// Optional icon resolution; null in tests that do not touch the network.
+  FaviconResolver? faviconResolver;
+  FeedIconCache? feedIconCache;
+  final Set<String> _resolvingIcons = {};
   ReaderPrefsRepository? _prefs;
 
   List<Feed> _feeds = const [];
@@ -328,6 +335,7 @@ final class MobileReaderController extends ChangeNotifier {
           final result = await refreshFeed(feed);
           inserted += result.insertedEntries;
           await repository.updateFeedStatus(id: feed.id, lastError: null);
+          unawaited(_resolveFeedIcon(feed));
         } catch (error) {
           failed++;
           await repository.updateFeedStatus(
@@ -352,6 +360,24 @@ final class MobileReaderController extends ChangeNotifier {
     }
   }
 
+  /// Resolves and stores a feed icon in the background. Never throws.
+  Future<void> _resolveFeedIcon(Feed feed) async {
+    final resolver = faviconResolver;
+    if (resolver == null || feed.iconUrl != null) return;
+    if (!_resolvingIcons.add(feed.id)) return;
+    try {
+      final iconUrl = await resolver.resolve(feed.url);
+      if (iconUrl != null) {
+        await repository.updateFeedIconUrl(feed.id, iconUrl);
+        await _reload();
+      }
+    } catch (_) {
+      // Icon discovery is best-effort; letter avatars remain the fallback.
+    } finally {
+      _resolvingIcons.remove(feed.id);
+    }
+  }
+
   Future<void> refreshOne(Feed feed) async {
     if (_refreshing) return;
     _refreshing = true;
@@ -360,6 +386,7 @@ final class MobileReaderController extends ChangeNotifier {
     notifyListeners();
     try {
       final result = await refreshFeed(feed);
+      unawaited(_resolveFeedIcon(feed));
       await _reload();
       _notice = '${result.feedTitle}：新增 ${result.insertedEntries} 篇';
     } catch (error) {

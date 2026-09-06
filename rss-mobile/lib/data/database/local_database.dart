@@ -24,6 +24,7 @@ class Feeds extends Table {
   TextColumn get fetchLastModified => text().nullable()();
   DateTimeColumn get lastCheckedAt => dateTime().nullable()();
   TextColumn get lastError => text().nullable()();
+  TextColumn get iconUrl => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
@@ -204,7 +205,7 @@ final class LocalDatabase extends _$LocalDatabase {
   factory LocalDatabase.onDevice() => LocalDatabase(_openOnDevice());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -228,6 +229,9 @@ final class LocalDatabase extends _$LocalDatabase {
       }
       if (from < 4) {
         await migrator.addColumn(entries, entries.sourceLang);
+      }
+      if (from < 5) {
+        await migrator.addColumn(feeds, feeds.iconUrl);
       }
     },
     beforeOpen: (details) async {

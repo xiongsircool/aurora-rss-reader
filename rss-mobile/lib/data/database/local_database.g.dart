@@ -150,6 +150,17 @@ class $FeedsTable extends Feeds with TableInfo<$FeedsTable, FeedRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _iconUrlMeta = const VerificationMeta(
+    'iconUrl',
+  );
+  @override
+  late final GeneratedColumn<String> iconUrl = GeneratedColumn<String>(
+    'icon_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -187,6 +198,7 @@ class $FeedsTable extends Feeds with TableInfo<$FeedsTable, FeedRow> {
     fetchLastModified,
     lastCheckedAt,
     lastError,
+    iconUrl,
     createdAt,
     updatedAt,
   ];
@@ -298,6 +310,12 @@ class $FeedsTable extends Feeds with TableInfo<$FeedsTable, FeedRow> {
         lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
       );
     }
+    if (data.containsKey('icon_url')) {
+      context.handle(
+        _iconUrlMeta,
+        iconUrl.isAcceptableOrUnknown(data['icon_url']!, _iconUrlMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -375,6 +393,10 @@ class $FeedsTable extends Feeds with TableInfo<$FeedsTable, FeedRow> {
         DriftSqlType.string,
         data['${effectivePrefix}last_error'],
       ),
+      iconUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_url'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -406,6 +428,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
   final String? fetchLastModified;
   final DateTime? lastCheckedAt;
   final String? lastError;
+  final String? iconUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
   const FeedRow({
@@ -422,6 +445,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
     this.fetchLastModified,
     this.lastCheckedAt,
     this.lastError,
+    this.iconUrl,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -454,6 +478,9 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
     }
     if (!nullToAbsent || lastError != null) {
       map['last_error'] = Variable<String>(lastError);
+    }
+    if (!nullToAbsent || iconUrl != null) {
+      map['icon_url'] = Variable<String>(iconUrl);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -489,6 +516,9 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
       lastError: lastError == null && nullToAbsent
           ? const Value.absent()
           : Value(lastError),
+      iconUrl: iconUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(iconUrl),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -517,6 +547,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
       ),
       lastCheckedAt: serializer.fromJson<DateTime?>(json['lastCheckedAt']),
       lastError: serializer.fromJson<String?>(json['lastError']),
+      iconUrl: serializer.fromJson<String?>(json['iconUrl']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -538,6 +569,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
       'fetchLastModified': serializer.toJson<String?>(fetchLastModified),
       'lastCheckedAt': serializer.toJson<DateTime?>(lastCheckedAt),
       'lastError': serializer.toJson<String?>(lastError),
+      'iconUrl': serializer.toJson<String?>(iconUrl),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -557,6 +589,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
     Value<String?> fetchLastModified = const Value.absent(),
     Value<DateTime?> lastCheckedAt = const Value.absent(),
     Value<String?> lastError = const Value.absent(),
+    Value<String?> iconUrl = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => FeedRow(
@@ -577,6 +610,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
         ? lastCheckedAt.value
         : this.lastCheckedAt,
     lastError: lastError.present ? lastError.value : this.lastError,
+    iconUrl: iconUrl.present ? iconUrl.value : this.iconUrl,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -605,6 +639,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
           ? data.lastCheckedAt.value
           : this.lastCheckedAt,
       lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      iconUrl: data.iconUrl.present ? data.iconUrl.value : this.iconUrl,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -626,6 +661,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
           ..write('fetchLastModified: $fetchLastModified, ')
           ..write('lastCheckedAt: $lastCheckedAt, ')
           ..write('lastError: $lastError, ')
+          ..write('iconUrl: $iconUrl, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -647,6 +683,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
     fetchLastModified,
     lastCheckedAt,
     lastError,
+    iconUrl,
     createdAt,
     updatedAt,
   );
@@ -667,6 +704,7 @@ class FeedRow extends DataClass implements Insertable<FeedRow> {
           other.fetchLastModified == this.fetchLastModified &&
           other.lastCheckedAt == this.lastCheckedAt &&
           other.lastError == this.lastError &&
+          other.iconUrl == this.iconUrl &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -685,6 +723,7 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
   final Value<String?> fetchLastModified;
   final Value<DateTime?> lastCheckedAt;
   final Value<String?> lastError;
+  final Value<String?> iconUrl;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -702,6 +741,7 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     this.fetchLastModified = const Value.absent(),
     this.lastCheckedAt = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.iconUrl = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -720,6 +760,7 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     this.fetchLastModified = const Value.absent(),
     this.lastCheckedAt = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.iconUrl = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -742,6 +783,7 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     Expression<String>? fetchLastModified,
     Expression<DateTime>? lastCheckedAt,
     Expression<String>? lastError,
+    Expression<String>? iconUrl,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -761,6 +803,7 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
       if (fetchLastModified != null) 'fetch_last_modified': fetchLastModified,
       if (lastCheckedAt != null) 'last_checked_at': lastCheckedAt,
       if (lastError != null) 'last_error': lastError,
+      if (iconUrl != null) 'icon_url': iconUrl,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -781,6 +824,7 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     Value<String?>? fetchLastModified,
     Value<DateTime?>? lastCheckedAt,
     Value<String?>? lastError,
+    Value<String?>? iconUrl,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -800,6 +844,7 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
       fetchLastModified: fetchLastModified ?? this.fetchLastModified,
       lastCheckedAt: lastCheckedAt ?? this.lastCheckedAt,
       lastError: lastError ?? this.lastError,
+      iconUrl: iconUrl ?? this.iconUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -850,6 +895,9 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
     if (lastError.present) {
       map['last_error'] = Variable<String>(lastError.value);
     }
+    if (iconUrl.present) {
+      map['icon_url'] = Variable<String>(iconUrl.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -878,6 +926,7 @@ class FeedsCompanion extends UpdateCompanion<FeedRow> {
           ..write('fetchLastModified: $fetchLastModified, ')
           ..write('lastCheckedAt: $lastCheckedAt, ')
           ..write('lastError: $lastError, ')
+          ..write('iconUrl: $iconUrl, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -5295,6 +5344,7 @@ typedef $$FeedsTableCreateCompanionBuilder = FeedsCompanion Function({
   Value<String?> fetchLastModified,
   Value<DateTime?> lastCheckedAt,
   Value<String?> lastError,
+  Value<String?> iconUrl,
   required DateTime createdAt,
   required DateTime updatedAt,
   Value<int> rowid,
@@ -5313,6 +5363,7 @@ typedef $$FeedsTableUpdateCompanionBuilder = FeedsCompanion Function({
   Value<String?> fetchLastModified,
   Value<DateTime?> lastCheckedAt,
   Value<String?> lastError,
+  Value<String?> iconUrl,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -5413,6 +5464,11 @@ class $$FeedsTableFilterComposer
 
   ColumnFilters<String> get lastError => $composableBuilder(
     column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconUrl => $composableBuilder(
+    column: $table.iconUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5526,6 +5582,11 @@ class $$FeedsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get iconUrl => $composableBuilder(
+    column: $table.iconUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -5594,6 +5655,9 @@ class $$FeedsTableAnnotationComposer
 
   GeneratedColumn<String> get lastError =>
       $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<String> get iconUrl =>
+      $composableBuilder(column: $table.iconUrl, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -5668,6 +5732,7 @@ class $$FeedsTableTableManager
                 Value<String?> fetchLastModified = const Value.absent(),
                 Value<DateTime?> lastCheckedAt = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
+                Value<String?> iconUrl = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5685,6 +5750,7 @@ class $$FeedsTableTableManager
                 fetchLastModified: fetchLastModified,
                 lastCheckedAt: lastCheckedAt,
                 lastError: lastError,
+                iconUrl: iconUrl,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -5704,6 +5770,7 @@ class $$FeedsTableTableManager
                 Value<String?> fetchLastModified = const Value.absent(),
                 Value<DateTime?> lastCheckedAt = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
+                Value<String?> iconUrl = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -5721,6 +5788,7 @@ class $$FeedsTableTableManager
                 fetchLastModified: fetchLastModified,
                 lastCheckedAt: lastCheckedAt,
                 lastError: lastError,
+                iconUrl: iconUrl,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

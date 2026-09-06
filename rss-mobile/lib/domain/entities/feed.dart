@@ -8,6 +8,7 @@ final class Feed {
     this.groupName = 'default',
     this.viewType = FeedViewType.articles,
     this.updateInterval = const Duration(hours: 12),
+    this.iconUrl,
   });
 
   final String id;
@@ -16,6 +17,9 @@ final class Feed {
   final String groupName;
   final FeedViewType viewType;
   final Duration updateInterval;
+
+  /// Resolved site icon URL, discovered after the first refresh.
+  final Uri? iconUrl;
 
   Feed copyWith({
     String? title,

@@ -18,7 +18,7 @@ void main() {
       final database = LocalDatabase(connection);
       addTearDown(database.close);
 
-      await verifier.migrateAndValidate(database, 4);
+      await verifier.migrateAndValidate(database, 5);
 
       final settingsColumns = await database
           .customSelect('PRAGMA table_info(user_settings)')

@@ -38,6 +38,18 @@ final class LocalContentRepository {
 
   final LocalDatabase database;
 
+  /// Stores a resolved site icon URL for a feed (favicon discovery).
+  Future<void> updateFeedIconUrl(String id, Uri iconUrl) async {
+    await (database.update(database.feeds)
+          ..where((row) => row.id.equals(id)))
+        .write(
+      FeedsCompanion(
+        iconUrl: Value(iconUrl.toString()),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
   /// Records the outcome of a refresh attempt for diagnostics.
   /// Pass [lastError] = null after a successful fetch to clear it.
   Future<void> updateFeedStatus({
@@ -583,6 +595,7 @@ domain_feed.Feed _feedFromRow(FeedRow row) {
     groupName: row.groupName,
     viewType: _feedViewType(row.viewType),
     updateInterval: Duration(minutes: row.updateIntervalMinutes),
+    iconUrl: row.iconUrl == null ? null : Uri.tryParse(row.iconUrl!),
   );
 }
 
