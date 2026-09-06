@@ -9,7 +9,7 @@
 <p align="center">
   <img src="docs/screenshots/inbox.png" width="200" alt="收件箱"/>
   <img src="docs/screenshots/reader.png" width="200" alt="阅读器"/>
-  <img src="docs/screenshots/share.png" width="200" alt="分享"/>
+  <img src="docs/screenshots/dark-reader.png" width="200" alt="深色阅读"/>
   <img src="docs/screenshots/dark.png" width="200" alt="深色模式"/>
 </p>
 

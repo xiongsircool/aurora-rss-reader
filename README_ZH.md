@@ -23,7 +23,43 @@
 
 ## 📋 更新公告 | Update News
 
-### 🎉 v0.2.0 最新版本 | Latest Release
+## 一个仓库，两个客户端
+
+|  | 🖥️ 桌面端 | 📱 移动端 |
+|---|---|---|
+| 版本 | v0.2.0 | v0.1.0 |
+| 平台 | Windows · macOS · Linux | Android（iOS 已真机验证） |
+| 技术栈 | Electron + Vue 3 + Fastify | Flutter · 本地优先 |
+| 数据 | 本地 SQLite，可选后端 | 100% 设备本地 SQLite |
+| 下载 | [Releases](https://github.com/xiongsircool/aurora-rss-reader/releases) | [mobile-v0.1.0 APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0) |
+
+---
+
+## 📱 Aurora Mobile v0.1.0 — 全新发布
+
+**本地优先**的 RSS 阅读器：无账号、无服务器、无遥测。订阅、文章与 AI 设置全部只保存在你的设备上。
+
+<p align="center">
+  <img src="rss-mobile/docs/screenshots/inbox.png" width="180" alt="收件箱"/>
+  <img src="rss-mobile/docs/screenshots/reader.png" width="180" alt="阅读器"/>
+  <img src="rss-mobile/docs/screenshots/dark-reader.png" width="180" alt="深色阅读"/>
+  <img src="rss-mobile/docs/screenshots/dark.png" width="180" alt="深色模式"/>
+</p>
+
+**亮点功能**
+- 📡 全格式解析 — RSS 1.0/2.0、Atom、Media RSS、播客；UTF-8/16、GBK、Big5、Shift-JIS 多编码
+- 🤖 自带 Key 的 AI（SiliconFlow / DeepSeek）— 摘要、全文双语翻译、标题实时翻译
+- 🎧 播客播放器 — 倍速、播放进度记忆
+- 📺 YouTube / Bilibili 链接自动生成视频卡片
+- 📤 分享四件套 — 链接 / 文本 / Markdown / 截图 / 品牌分享卡片图
+- 🔍 FTS5 全文搜索 · OPML 导入导出 · 分组 · 深色模式
+- 🔔 本地通知 · 后台刷新
+
+📥 **安装**：从[发布页](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0)下载 `Aurora-mobile-v0.1.0-arm64.apk`（2019 年后设备）或通用版。iOS 公开分发（TestFlight）待开发者账号就绪。详见 [rss-mobile/README.md](rss-mobile/README.md)。
+
+---
+
+### 🖥️ 桌面端 v0.2.0 最新版本 | Latest Release
 
 **阅读统计、订阅稳定性与移动 API 基础 | Reading Analytics, Feed Reliability & Mobile API Foundation**
 
@@ -46,9 +82,6 @@ Aurora RSS Reader is a modern cross-platform desktop RSS reader integrated with 
 <summary><strong>📖 查看英文介绍 | View English Introduction</strong></summary>
 
 ## Introduction
-
-> 📱 **新版本 — Aurora Mobile v0.1.0 正式发布！** 本地优先的 Flutter RSS 阅读器，支持 Android（iOS 将通过 TestFlight 提供）。
-> 📥 [下载 APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0) · 📖 [移动端文档](rss-mobile/README.md)
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
@@ -289,21 +322,31 @@ chmod +x build-release-app.sh
 - **前端**：Vue 3 + Vite + Pinia + TypeScript
 - **后端**：Fastify + TypeScript + SQLite
 - **桌面应用**：Electron
+- **移动应用**：Flutter（Dart）· Drift/SQLite · FTS5
 - **构建工具**：electron-builder
 
 ## 项目结构
 
 ```
 aurora-rss-reader/
-├── rss-desktop/          # 前端代码
+├── rss-desktop/          # 桌面端前端（Vue 3）
 │   ├── src/             # Vue 源码
 │   └── electron/        # Electron 主进程
 ├── backend-node/        # Node.js 后端（Fastify）
+├── rss-mobile/          # Flutter 移动端（本地优先）
 ├── images/              # 图片资源
 └── start.sh            # 启动脚本
 ```
 
 ## 📋 更新日志 | Changelog
+
+### mobile-v0.1.0
+**移动端首个公开版本 — 本地优先的 Flutter RSS 阅读器（Android）**
+
+- 多编码订阅解析（RSS 1.0/2.0、Atom、Media RSS、播客；GBK/Big5/Shift-JIS）
+- 自带 API Key 的 AI 摘要、全文双语翻译与标题实时翻译
+- 播客播放器（倍速、进度记忆）；YouTube/Bilibili 视频卡片
+- FTS5 全文搜索、OPML 导入导出、分组、深色模式、分享卡片生成、后台刷新
 
 ### v0.2.0 (当前版本 | Current Version) 🎉
 **阅读统计 + Feed 稳定性 + 移动 API 基础 | Reading Analytics + Feed Reliability + Mobile API Foundation**
@@ -473,6 +516,12 @@ A: 检查后端服务是否正常启动，可以查看终端输出的启动日�
 ### 中期计划 (v0.3)
 - [ ] **数据同步** - 跨设备数据同步和云备份
 - [ ] **插件系统** - 支持第三方插件扩展功能
+
+### 移动端 (v0.1.x)
+- [x] **v0.1.0 Android 发布** - 本地优先 Flutter 客户端 ✅
+- [ ] **刷新可靠性** - 失败源上报与单源重试
+- [ ] **iPad 布局** - 自适应导航与双栏阅读
+- [ ] **iOS 分发** - TestFlight，待开发者账号
 
 ---
 

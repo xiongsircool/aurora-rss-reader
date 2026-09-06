@@ -25,7 +25,43 @@
   <img alt="Aurora RSS Reader" src="images/带版本号和软件名图标.png" height="120" />
 </div>
 
-## 🎉 v0.2.0 Latest Release | 最新版本
+## One Repo, Two Clients
+
+|  | 🖥️ Desktop | 📱 Mobile |
+|---|---|---|
+| Version | v0.2.0 | v0.1.0 |
+| Platform | Windows · macOS · Linux | Android (iOS verified on device) |
+| Stack | Electron + Vue 3 + Fastify | Flutter · local-first |
+| Data | Local SQLite, optional backend | 100% on-device SQLite |
+| Download | [Releases](https://github.com/xiongsircool/aurora-rss-reader/releases) | [mobile-v0.1.0 APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0) |
+
+---
+
+## 📱 Aurora Mobile v0.1.0 — NEW
+
+A **local-first** RSS reader: no account, no server, no telemetry. Feeds, articles and AI settings live only on your device.
+
+<p align="center">
+  <img src="rss-mobile/docs/screenshots/inbox.png" width="180" alt="Inbox"/>
+  <img src="rss-mobile/docs/screenshots/reader.png" width="180" alt="Reader"/>
+  <img src="rss-mobile/docs/screenshots/dark-reader.png" width="180" alt="Dark reader"/>
+  <img src="rss-mobile/docs/screenshots/dark.png" width="180" alt="Dark mode"/>
+</p>
+
+**Highlights**
+- 📡 Full-format parsing — RSS 1.0/2.0, Atom, Media RSS, podcasts; UTF-8/16, GBK, Big5, Shift-JIS encodings
+- 🤖 AI with your own key (SiliconFlow / DeepSeek) — summaries, bilingual full-text translation, live title translation
+- 🎧 Podcast player — speed control, position memory
+- 📺 Video cards for YouTube / Bilibili links
+- 📤 Share suite — link / text / Markdown / screenshot / branded share-card image
+- 🔍 FTS5 full-text search · OPML import/export · groups · dark mode
+- 🔔 Local notifications · background refresh
+
+📥 **Install**: grab `Aurora-mobile-v0.1.0-arm64.apk` (most devices since 2019) or the universal APK from the [release page](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0). iOS distribution (TestFlight) is pending a developer account. Details: [rss-mobile/README.md](rss-mobile/README.md).
+
+---
+
+## 🖥️ Desktop — v0.2.0 Latest Release | 最新版本
 
 **Reading Analytics, Feed Reliability & Mobile API Foundation | 阅读统计、订阅稳定性与移动 API 基础**
 
@@ -39,9 +75,6 @@
 ---
 
 ## Introduction
-
-> 📱 **NEW — Aurora Mobile v0.1.0 is out!** A local-first Flutter RSS reader for Android (iOS coming via TestFlight).
-> 📥 [Download the APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.0) · 📖 [Mobile README](rss-mobile/README.md)
 
 Aurora RSS Reader is a cross-platform desktop RSS reader integrated with AI translation and summarization features. It supports multiple layout modes, local data storage, and rich customization options.
 
@@ -262,16 +295,18 @@ Generated files:
 - **Frontend**: Vue 3 + Vite + Pinia + TypeScript
 - **Backend**: Fastify + TypeScript + SQLite
 - **Desktop App**: Electron
+- **Mobile App**: Flutter (Dart) · Drift/SQLite · FTS5
 - **Build Tools**: electron-builder
 
 ## Project Structure
 
 ```
 aurora-rss-reader/
-├── rss-desktop/          # Frontend code
+├── rss-desktop/          # Desktop frontend (Vue 3)
 │   ├── src/             # Vue source code
 │   └── electron/        # Electron main process
 ├── backend-node/        # Node.js backend (Fastify)
+├── rss-mobile/          # Flutter mobile client (local-first)
 ├── images/              # Image resources
 └── start.sh            # Startup script
 ```
@@ -301,10 +336,24 @@ This project uses [GNU General Public License v3.0](LICENSE), which is a copylef
 - [ ] **Data Synchronization** - Cross-device data sync and cloud backup
 - [ ] **Plugin System** - Support for third-party plugin extensions
 
+### Mobile (v0.1.x)
+- [x] **v0.1.0 Android release** - local-first Flutter client ✅
+- [ ] **Refresh reliability** - failure reporting and retry for individual feeds
+- [ ] **iPad layout** - adaptive navigation and two-pane reading
+- [ ] **iOS distribution** - TestFlight, pending developer account
+
 ---
 
 Give it a ⭐ if you find it useful!
 ## Changelog
+
+### mobile-v0.1.0
+**First public mobile release — local-first Flutter RSS reader (Android)**
+
+- Multi-encoding feed parsing (RSS 1.0/2.0, Atom, Media RSS, podcasts; GBK/Big5/Shift-JIS)
+- AI summaries, bilingual full-text translation and live title translation with your own API key
+- Podcast player with speed control and position memory; video cards for YouTube/Bilibili
+- FTS5 search, OPML import/export, groups, dark mode, share-card generation, background refresh
 
 ### v0.2.0 (Current Version)
 **Reading Analytics + Feed Reliability + Mobile API Foundation**
