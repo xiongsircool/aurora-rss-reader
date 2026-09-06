@@ -153,3 +153,9 @@ backend/data/development.*
 archive/
 docs_archive/
 
+
+# Internal planning docs & agent configs — kept local, not for the public repo
+/docs/
+CLAUDE.md
+AGENTS.md
+rss-mobile/ARCHIVE.md
