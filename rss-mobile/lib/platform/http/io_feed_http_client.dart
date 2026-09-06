@@ -77,7 +77,8 @@ final class IoFeedHttpClient implements FeedHttpClient {
 
       final response = await request.close().timeout(timeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        await response.drain<void>();
+        // Do not wait for an error body: a server may never finish sending it.
+        await response.listen(null).cancel();
         throw FeedHttpException(
           'Feed request failed',
           statusCode: response.statusCode,
@@ -86,7 +87,7 @@ final class IoFeedHttpClient implements FeedHttpClient {
 
       final declaredLength = response.contentLength;
       if (declaredLength > maxBytes) {
-        await response.drain<void>();
+        await response.listen(null).cancel();
         throw FeedHttpException(
           'Feed response exceeds $maxBytes bytes',
           statusCode: response.statusCode,

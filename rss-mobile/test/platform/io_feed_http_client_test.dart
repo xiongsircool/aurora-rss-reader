@@ -23,6 +23,15 @@ void main() {
           request.response.redirect(baseUri.resolve('/feed'));
         case '/large':
           request.response.add(List<int>.filled(64, 0x61));
+        case '/hanging-error':
+        case '/hanging-large':
+          request.response.statusCode = request.uri.path == '/hanging-error'
+              ? HttpStatus.serviceUnavailable
+              : HttpStatus.ok;
+          request.response.contentLength = 1024;
+          request.response.add([0x61]);
+          await request.response.flush();
+          return; // Headers arrive, but the server never completes the body.
         case '/gzip':
           request.response.headers.set(
             HttpHeaders.contentEncodingHeader,
@@ -103,6 +112,30 @@ void main() {
       throwsA(isA<FeedHttpException>()),
     );
   });
+
+  for (final path in ['/hanging-error', '/hanging-large']) {
+    test('rejects $path promptly and can refresh again', () async {
+      final client = IoFeedHttpClient(useEnvironmentProxy: false);
+      addTearDown(client.close);
+
+      await expectLater(
+        client
+            .get(baseUri.resolve(path), maxBytes: 16)
+            .timeout(const Duration(seconds: 2)),
+        throwsA(
+          isA<FeedHttpException>().having(
+            (error) => error.statusCode,
+            'original status',
+            path == '/hanging-error'
+                ? HttpStatus.serviceUnavailable
+                : HttpStatus.ok,
+          ),
+        ),
+      );
+      final next = await client.get(baseUri.resolve('/feed'));
+      expect(next.statusCode, HttpStatus.ok);
+    });
+  }
 
   test('rejects unsupported URL schemes before opening a connection', () async {
     final client = IoFeedHttpClient();
