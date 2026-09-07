@@ -13,6 +13,7 @@ final class EntryTile extends StatefulWidget {
     required this.onStarredChanged,
     this.onTap,
     this.onVisible,
+    this.feedIconUrl,
     this.referer,
     super.key,
   });
@@ -26,6 +27,9 @@ final class EntryTile extends StatefulWidget {
   /// Called once when the tile is built (≈ about to become visible).
   /// Used to request auto title translation for what the user sees.
   final VoidCallback? onVisible;
+
+  /// Resolved site icon for the source; falls back to a letter avatar.
+  final String? feedIconUrl;
 
   /// Feed page URL sent as Referer for cover images; some site CDNs
   /// reject image requests without it.
@@ -71,25 +75,7 @@ final class _EntryTileState extends State<EntryTile> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Feed avatar: soft-tinted circle with the source initial.
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: avatarColor.withValues(alpha: 0.16),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  _sourceInitial(tile.feedTitle),
-                  style: TextStyle(
-                    color: avatarColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
-                ),
-              ),
+              _sourceAvatar(tile, avatarColor),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -236,6 +222,40 @@ final class _EntryTileState extends State<EntryTile> {
       ),
     );
   }
+
+  /// Site icon when available; soft-tinted letter avatar otherwise.
+  Widget _sourceAvatar(EntryTile tile, Color avatarColor) {
+    final iconUrl = tile.feedIconUrl;
+    final fallback = Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: avatarColor.withValues(alpha: 0.16),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _sourceInitial(tile.feedTitle),
+        style: TextStyle(
+          color: avatarColor,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          height: 1,
+        ),
+      ),
+    );
+    if (iconUrl == null || iconUrl.isEmpty) return fallback;
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: iconUrl,
+        width: 38,
+        height: 38,
+        fit: BoxFit.cover,
+        placeholder: (_, _) => fallback,
+        errorWidget: (_, _, _) => fallback,
+      ),
+    );
+  }
 }
 
 /// Stable per-source color: a fixed pleasant palette indexed by a
@@ -264,10 +284,7 @@ Color _sourceColor(String seed) {
 String _sourceInitial(String title) {
   final trimmed = title.trim();
   if (trimmed.isEmpty) return '·';
-  final first = trimmed.substring(0, 1);
-  final lower = first.toLowerCase();
-  if (lower != first && first != first.toUpperCase()) return first;
-  return first.toUpperCase();
+  return trimmed.substring(0, 1).toUpperCase();
 }
 
 /// Compact relative time for the inbox meta row.

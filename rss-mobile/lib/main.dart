@@ -1,8 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-
-import 'package:path_provider/path_provider.dart';
 
 import 'app/aurora_app.dart';
 import 'application/use_cases/extract_article.dart';
@@ -12,7 +8,6 @@ import 'data/platform/ai_client.dart';
 import 'data/platform/secure_key_store.dart';
 import 'data/repositories/local_content_repository.dart';
 import 'data/services/favicon_resolver.dart';
-import 'data/services/feed_icon_cache.dart';
 import 'features/reader/mobile_reader_controller.dart';
 import 'platform/background/background_refresh.dart';
 import 'platform/notifications/notification_service.dart';
@@ -39,11 +34,7 @@ void main() async {
   );
   // Feed icon discovery and caching (best-effort, letter avatars remain
   // the fallback when every strategy fails).
-  final iconDirectory = Directory(
-    '${(await getApplicationSupportDirectory()).path}/feed-icons',
-  );
   controller.faviconResolver = FaviconResolver(httpClient);
-  controller.feedIconCache = FeedIconCache(iconDirectory, client: httpClient);
 
   runApp(AuroraApp(controller: controller));
 

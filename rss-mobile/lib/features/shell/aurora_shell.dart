@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
@@ -301,6 +302,7 @@ final class _InboxPage extends StatelessWidget {
             key: ValueKey(entry.id),
             entry: entry,
             feedTitle: controller.feedTitle(entry.feedId),
+            feedIconUrl: controller.feedIconUrl(entry.feedId),
             referer: controller.feedUrl(entry.feedId),
             onTap: () => _openReader(context, controller, entry),
             onVisible: () => controller.requestTitleTranslation(entry.id),
@@ -342,6 +344,7 @@ final class _SavedPage extends StatelessWidget {
                         key: ValueKey('saved-${entry.id}'),
                         entry: entry,
                         feedTitle: controller.feedTitle(entry.feedId),
+                        feedIconUrl: controller.feedIconUrl(entry.feedId),
                         referer: controller.feedUrl(entry.feedId),
                         onTap: () => _openReader(context, controller, entry),
                         onVisible: () =>
@@ -576,13 +579,34 @@ final class _FeedTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final iconUrl = feed.iconUrl?.toString();
+    final leading = iconUrl != null && iconUrl.isNotEmpty
+        ? ClipOval(
+            child: CachedNetworkImage(
+              imageUrl: iconUrl,
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => Container(
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                alignment: Alignment.center,
+                child: const Icon(Icons.rss_feed, size: 20),
+              ),
+              errorWidget: (_, _, _) => Container(
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                alignment: Alignment.center,
+                child: const Icon(Icons.rss_feed, size: 20),
+              ),
+            ),
+          )
+        : CircleAvatar(
+            backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+            foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+            child: const Icon(Icons.rss_feed, size: 20),
+          );
     return ListTile(
       contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-      leading: CircleAvatar(
-        backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-        foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
-        child: const Icon(Icons.rss_feed, size: 20),
-      ),
+      leading: leading,
       title: Text(feed.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         feed.url.toString(),

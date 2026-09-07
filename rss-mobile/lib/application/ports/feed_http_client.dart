@@ -24,7 +24,7 @@ final class FeedHttpResponse {
 abstract interface class FeedHttpClient {
   Future<FeedHttpResponse> get(
     Uri uri, {
-    Duration timeout = const Duration(seconds: 20),
+    Duration timeout = const Duration(seconds: 30),
     int maxBytes = 10 * 1024 * 1024,
     String? accept,
     String? userAgent,

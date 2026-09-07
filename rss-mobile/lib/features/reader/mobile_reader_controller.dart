@@ -12,7 +12,6 @@ import '../../data/repositories/reader_prefs_repository.dart';
 import '../../data/repositories/local_content_repository.dart';
 import '../settings/about_page.dart' show AppMeta;
 import '../../data/services/favicon_resolver.dart';
-import '../../data/services/feed_icon_cache.dart';
 import '../../platform/notifications/notification_service.dart';
 import '../../domain/translation/bilingual_builder.dart';
 import '../../domain/translation/block_extractor.dart';
@@ -39,7 +38,6 @@ final class MobileReaderController extends ChangeNotifier {
 
   /// Optional icon resolution; null in tests that do not touch the network.
   FaviconResolver? faviconResolver;
-  FeedIconCache? feedIconCache;
   final Set<String> _resolvingIcons = {};
   ReaderPrefsRepository? _prefs;
 
@@ -100,6 +98,15 @@ final class MobileReaderController extends ChangeNotifier {
   String? get notice => _notice;
   List<({String feedId, String title, String error})> get refreshFailures =>
       _refreshFailures;
+
+  /// Resolved site icon URL for a feed, if discovered.
+  String? feedIconUrl(String feedId) {
+    for (final feed in _feeds) {
+      if (feed.id == feedId) return feed.iconUrl?.toString();
+    }
+    return null;
+  }
+
   String? get proxyUrl => _proxyUrl;
 
   Future<void> initialize() async {
@@ -114,6 +121,7 @@ final class MobileReaderController extends ChangeNotifier {
       await _loadAutoTranslateSettings();
       await _reload();
       _initialized = true;
+      unawaited(_resolveAllMissingIcons());
     } catch (error) {
       _error = '无法打开本地数据库：$error';
     } finally {
@@ -257,7 +265,7 @@ final class MobileReaderController extends ChangeNotifier {
           : '${result.feedTitle} 已是最新状态';
       return true;
     } catch (error) {
-      _error = '添加订阅失败：$error';
+      _error = '添加订阅失败：${_friendlyRefreshError(error)}（站点可能无法从当前网络访问）';
       return false;
     } finally {
       _adding = false;
@@ -445,6 +453,17 @@ final class MobileReaderController extends ChangeNotifier {
   Future<void> clearRefreshFailures() async {
     _refreshFailures = const [];
     notifyListeners();
+  }
+
+  /// Resolves icons for feeds that still lack one, sequentially in the
+  /// background. Called after startup and after refreshes.
+  Future<void> _resolveAllMissingIcons() async {
+    final resolver = faviconResolver;
+    if (resolver == null) return;
+    for (final feed in List<Feed>.from(_feeds)) {
+      if (feed.iconUrl != null) continue;
+      await _resolveFeedIcon(feed);
+    }
   }
 
   /// Resolves and stores a feed icon in the background. Never throws.

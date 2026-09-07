@@ -113,6 +113,7 @@ class _SearchPageState extends State<SearchPage> {
         return EntryTile(
           entry: entry,
           feedTitle: feedTitle,
+          feedIconUrl: widget.controller.feedIconUrl(entry.feedId),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => ArticleReaderPage(
