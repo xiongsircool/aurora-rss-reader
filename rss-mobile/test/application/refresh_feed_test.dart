@@ -39,6 +39,20 @@ void main() {
           );
         case '/redirect':
           request.response.redirect(baseUri.resolve('/feed'));
+        case '/spa':
+          request.response.headers.contentType = ContentType.html;
+          request.response.add(
+            utf8.encode(
+              '<!DOCTYPE html><html><head>'
+              '<link rel="alternate" type="application/rss+xml" href="/feed">'
+              '</head><body>SPA page</body></html>',
+            ),
+          );
+        case '/empty':
+          request.response.headers.contentType = ContentType(
+            'application',
+            'rss+xml',
+          );
         case '/broken':
           request.response.add(utf8.encode('<html>not a feed</html>'));
         default:
@@ -96,6 +110,32 @@ void main() {
 
     final after = await database.select(database.entries).get();
     expect(after.map((entry) => entry.id), before.map((entry) => entry.id));
+  });
+
+  test(
+    'a webpage URL discovers its RSS link and refreshes successfully',
+    () async {
+      final feed = _feed('feed-spa', baseUri.resolve('/spa'));
+
+      final result = await refreshFeed(feed);
+
+      expect(result.feedTitle, 'Local Test Feed');
+      expect(result.insertedEntries, 2);
+      expect(result.finalUri.path, '/feed');
+    },
+  );
+
+  test('an empty RSS response reports a clear dead-service error', () async {
+    await expectLater(
+      refreshFeed(_feed('feed-empty', baseUri.resolve('/empty'))),
+      throwsA(
+        isA<FeedParseException>().having(
+          (error) => error.message,
+          'message',
+          contains('已停用'),
+        ),
+      ),
+    );
   });
 
   test('HTTP failure does not create feed or entry rows', () async {

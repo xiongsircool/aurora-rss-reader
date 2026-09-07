@@ -21,7 +21,16 @@ final class FeedParseException implements Exception {
 /// prefixes are matched loosely because real-world feeds mix `media:`,
 /// `itunes:`, `dc:`, and `content:` with unpredictable prefixes.
 ParsedFeed parseFeedBytes(Uint8List bytes, {Uri? feedUrl}) {
+  if (bytes.isEmpty) {
+    throw FeedParseException('源返回了空内容，该订阅服务可能已停用');
+  }
   final xmlText = decodeFeedBytes(bytes);
+  final trimmed = xmlText.trimLeft();
+  if (trimmed.startsWith('<!DOCTYPE html') ||
+      trimmed.startsWith('<html') ||
+      trimmed.startsWith('<HTML')) {
+    throw FeedParseException('该地址返回的是网页而非订阅源，站点可能已停用 RSS');
+  }
   final document = _parseXml(xmlText);
   final root = document.rootElement;
 
