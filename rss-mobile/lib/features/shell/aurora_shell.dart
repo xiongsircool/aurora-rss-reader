@@ -90,7 +90,7 @@ class _AuroraShellState extends State<AuroraShell> {
               _SettingsPage(controller: widget.controller),
             ],
           ),
-          bottomNavigationBar: _FrostedNavBar(
+          bottomNavigationBar: _FloatingCapsuleBar(
             selectedIndex: _selectedIndex,
             destinations: _destinations,
             onDestinationSelected: _select,
@@ -277,7 +277,9 @@ final class _InboxPage extends StatelessWidget {
       onRefresh: controller.refreshAll,
       child: ListView.separated(
         key: const PageStorageKey('inbox-list'),
-        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.paddingOf(context).bottom + 96,
+        ),
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: controller.entries.length + (controller.hasMore ? 1 : 0),
         separatorBuilder: (_, _) => const Divider(height: 1),
@@ -341,7 +343,7 @@ final class _SavedPage extends StatelessWidget {
                 : ListView.separated(
                     key: const PageStorageKey('saved-list'),
                     padding: EdgeInsets.only(
-                      bottom: MediaQuery.paddingOf(context).bottom,
+                      bottom: MediaQuery.paddingOf(context).bottom + 96,
                     ),
                     itemCount: controller.starredEntries.length,
                     separatorBuilder: (_, _) => const Divider(height: 1),
@@ -412,7 +414,7 @@ class _SourcesPageState extends State<_SourcesPage> {
                     onRefresh: controller.refreshAll,
                     child: ListView(
                       padding: EdgeInsets.only(
-                        bottom: MediaQuery.paddingOf(context).bottom + 8,
+                        bottom: MediaQuery.paddingOf(context).bottom + 104,
                       ),
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
@@ -833,10 +835,8 @@ class _SettingsPageState extends State<_SettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
-        padding: EdgeInsets.symmetric(
-          vertical: 8,
-          horizontal: 0,
-        ).copyWith(bottom: MediaQuery.paddingOf(context).bottom + 8),
+        padding: EdgeInsets.symmetric(vertical: 8)
+            .copyWith(bottom: MediaQuery.paddingOf(context).bottom + 104),
         children: [
           const ListTile(
             leading: Icon(Icons.phone_android),
@@ -1135,10 +1135,10 @@ void _openReader(
   );
 }
 
-/// App Store-style translucent bottom bar: backdrop blur + tinted
-/// surface + hairline top border. Requires [Scaffold.extendBody].
-final class _FrostedNavBar extends StatelessWidget {
-  const _FrostedNavBar({
+/// Floating capsule navigation bar (iOS 18 style): a rounded frosted
+/// pill hovering above the content with margins on all sides.
+final class _FloatingCapsuleBar extends StatelessWidget {
+  const _FloatingCapsuleBar({
     required this.selectedIndex,
     required this.destinations,
     required this.onDestinationSelected,
@@ -1150,30 +1150,81 @@ final class _FrostedNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final tint = (isDark ? const Color(0xFF14161A) : Colors.white).withValues(
-      alpha: 0.78,
+      alpha: 0.82,
     );
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          decoration: BoxDecoration(
-            color: tint,
-            border: Border(
-              top: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant
-                    .withValues(alpha: 0.4),
+
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            height: 62,
+            decoration: BoxDecoration(
+              color: tint,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(
+                  alpha: isDark ? 0.35 : 0.5,
+                ),
                 width: 0.6,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.10),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-          ),
-          child: NavigationBar(
-            selectedIndex: selectedIndex,
-            destinations: destinations,
-            onDestinationSelected: onDestinationSelected,
-            backgroundColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
+            child: Row(
+              children: [
+                for (var i = 0; i < destinations.length; i++)
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onDestinationSelected(i),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconTheme(
+                            data: IconThemeData(
+                              size: 24,
+                              color: i == selectedIndex
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant.withValues(
+                                      alpha: 0.8,
+                                    ),
+                            ),
+                            child:
+                                (destinations[i] as NavigationDestination).icon,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            (destinations[i] as NavigationDestination).label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1,
+                              fontWeight: i == selectedIndex
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: i == selectedIndex
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant.withValues(
+                                      alpha: 0.8,
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
