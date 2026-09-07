@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -72,6 +74,7 @@ class _AuroraShellState extends State<AuroraShell> {
       animation: widget.controller,
       builder: (context, _) {
         return Scaffold(
+          extendBody: true,
           body: IndexedStack(
             index: _selectedIndex,
             children: [
@@ -87,7 +90,7 @@ class _AuroraShellState extends State<AuroraShell> {
               _SettingsPage(controller: widget.controller),
             ],
           ),
-          bottomNavigationBar: NavigationBar(
+          bottomNavigationBar: _FrostedNavBar(
             selectedIndex: _selectedIndex,
             destinations: _destinations,
             onDestinationSelected: _select,
@@ -274,6 +277,7 @@ final class _InboxPage extends StatelessWidget {
       onRefresh: controller.refreshAll,
       child: ListView.separated(
         key: const PageStorageKey('inbox-list'),
+        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: controller.entries.length + (controller.hasMore ? 1 : 0),
         separatorBuilder: (_, _) => const Divider(height: 1),
@@ -336,6 +340,9 @@ final class _SavedPage extends StatelessWidget {
                   )
                 : ListView.separated(
                     key: const PageStorageKey('saved-list'),
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.paddingOf(context).bottom,
+                    ),
                     itemCount: controller.starredEntries.length,
                     separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, index) {
@@ -404,6 +411,9 @@ class _SourcesPageState extends State<_SourcesPage> {
                 : RefreshIndicator(
                     onRefresh: controller.refreshAll,
                     child: ListView(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.paddingOf(context).bottom + 8,
+                      ),
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
                         for (final group in controller.groups)
@@ -823,7 +833,10 @@ class _SettingsPageState extends State<_SettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(
+          vertical: 8,
+          horizontal: 0,
+        ).copyWith(bottom: MediaQuery.paddingOf(context).bottom + 8),
         children: [
           const ListTile(
             leading: Icon(Icons.phone_android),
@@ -1120,4 +1133,50 @@ void _openReader(
       ),
     ),
   );
+}
+
+/// App Store-style translucent bottom bar: backdrop blur + tinted
+/// surface + hairline top border. Requires [Scaffold.extendBody].
+final class _FrostedNavBar extends StatelessWidget {
+  const _FrostedNavBar({
+    required this.selectedIndex,
+    required this.destinations,
+    required this.onDestinationSelected,
+  });
+
+  final int selectedIndex;
+  final List<Widget> destinations;
+  final ValueChanged<int> onDestinationSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tint = (isDark ? const Color(0xFF14161A) : Colors.white).withValues(
+      alpha: 0.78,
+    );
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: tint,
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant
+                    .withValues(alpha: 0.4),
+                width: 0.6,
+              ),
+            ),
+          ),
+          child: NavigationBar(
+            selectedIndex: selectedIndex,
+            destinations: destinations,
+            onDestinationSelected: onDestinationSelected,
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+        ),
+      ),
+    );
+  }
 }
