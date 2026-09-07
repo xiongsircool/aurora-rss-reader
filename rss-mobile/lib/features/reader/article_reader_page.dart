@@ -61,6 +61,10 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
   StreamSubscription<String>? _summarySub;
   double _fontSize = 16.0;
   double _lineHeight = 1.65;
+  bool _serif = false;
+  final ScrollController _scrollController = ScrollController();
+  DateTime? _lastSavedScrollAt;
+  static const _scrollSaveInterval = Duration(seconds: 2);
   final GlobalKey _articleCaptureKey = GlobalKey();
   final GlobalKey _shareButtonKey = GlobalKey();
   bool _sharingCard = false;
@@ -74,6 +78,11 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     _prefs.loadFontSize().then((v) {
       if (mounted) setState(() => _fontSize = v);
     });
+    _prefs.loadFontFamily().then((v) {
+      if (mounted) setState(() => _serif = v == 'serif');
+    });
+    _restoreScrollOffset();
+    _scrollController.addListener(_maybeSaveScrollOffset);
     _prefs.loadLineHeight().then((v) {
       if (mounted) setState(() => _lineHeight = v);
     });
@@ -81,6 +90,26 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _markRead());
     }
     _loadCachedSummary();
+  }
+
+  /// Restores the last reading position after the first layout settles.
+  Future<void> _restoreScrollOffset() async {
+    final saved = await _prefs.loadScrollOffset(_entry.id);
+    if (saved == null || saved < 200 || !mounted) return;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !_scrollController.hasClients) return;
+    final target = saved.clamp(0.0, _scrollController.position.maxScrollExtent);
+    _scrollController.jumpTo(target);
+  }
+
+  /// Persists the scroll offset at most once every 2 seconds.
+  void _maybeSaveScrollOffset() {
+    if (!_scrollController.hasClients) return;
+    final now = DateTime.now();
+    final last = _lastSavedScrollAt;
+    if (last != null && now.difference(last) < _scrollSaveInterval) return;
+    _lastSavedScrollAt = now;
+    _prefs.saveScrollOffset(_entry.id, _scrollController.offset);
   }
 
   Future<void> _markRead() async {
@@ -356,6 +385,22 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 },
                 onChangeEnd: _prefs.saveLineHeight,
               ),
+              const SizedBox(height: 16),
+              Text('字体', style: Theme.of(sheetContext).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'sans', label: Text('系统默认')),
+                  ButtonSegment(value: 'serif', label: Text('衬线')),
+                ],
+                selected: {_serif ? 'serif' : 'sans'},
+                onSelectionChanged: (selection) {
+                  final family = selection.single;
+                  setSheetState(() {});
+                  setState(() => _serif = family == 'serif');
+                  _prefs.saveFontFamily(family);
+                },
+              ),
             ],
           ),
         ),
@@ -374,6 +419,10 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
 
   @override
   void dispose() {
+    if (_scrollController.hasClients) {
+      _prefs.saveScrollOffset(_entry.id, _scrollController.offset);
+    }
+    _scrollController.dispose();
     _summarySub?.cancel();
     _translateSub?.cancel();
     super.dispose();
@@ -550,6 +599,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
         child: RepaintBoundary(
           key: _articleCaptureKey,
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
             children: [
               Text(
@@ -921,8 +971,15 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                       }
                     },
                   ),
-                  textStyle: Theme.of(context).textTheme.bodyLarge
-                      ?.copyWith(fontSize: _fontSize, height: _lineHeight),
+                  textStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontSize: _fontSize,
+                    height: _lineHeight,
+                    fontFamily: _serif
+                        ? (Theme.of(context).platform == TargetPlatform.iOS
+                              ? 'Georgia'
+                              : 'serif')
+                        : null,
+                  ),
                   onTapUrl: (url) async {
                     await _openUrl(Uri.tryParse(url));
                     return true;
