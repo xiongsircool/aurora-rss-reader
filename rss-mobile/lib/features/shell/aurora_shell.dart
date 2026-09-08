@@ -1195,7 +1195,7 @@ final class _FloatingCapsuleBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final tint = (isDark ? const Color(0xFF14161A) : Colors.white).withValues(
-      alpha: 0.70,
+      alpha: isDark ? 0.55 : 0.45,
     );
 
     return ClipRRect(
