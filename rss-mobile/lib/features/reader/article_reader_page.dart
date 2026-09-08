@@ -3,8 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
-import 'package:flutter/services.dart'
-    show Clipboard, ClipboardData, PlatformException;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -14,9 +13,8 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:html2md/html2md.dart' as html2md;
 import 'package:share_plus/share_plus.dart';
 
-import '../../shared/share_card_renderer.dart';
 import '../../shared/share_card_content.dart';
-import '../../shared/share_card_image_loader.dart';
+import 'share_card_preview_page.dart';
 
 import 'package:html/dom.dart' as html;
 import 'package:html/parser.dart' as html_parser;
@@ -36,10 +34,12 @@ final class ArticleReaderPage extends StatefulWidget {
     required this.feedTitle,
     required this.controller,
     this.referer,
+    this.embedded = false,
     super.key,
   });
 
   final Entry entry;
+  final bool embedded;
   final String feedTitle;
   final MobileReaderController controller;
 
@@ -74,6 +74,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
   void initState() {
     super.initState();
     _entry = widget.entry;
+    _translatedTitle = widget.entry.translatedTitle;
     _prefs = ReaderPrefsRepository(widget.controller.repository.database);
     _prefs.loadFontSize().then((v) {
       if (mounted) setState(() => _fontSize = v);
@@ -154,8 +155,10 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (sheetContext) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -201,63 +204,31 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
 
   Future<void> _shareCardImage() async {
     if (_sharingCard) return;
-    final origin = _shareOrigin;
+    final contentHtml = _showOriginal
+        ? (_entry.content ?? _entry.summary)
+        : (_entry.readabilityContent ?? _entry.content ?? _entry.summary);
+    final baseUrl = !_showOriginal && _entry.readabilityContent != null
+        ? (_entry.contentSourceUrl ?? _entry.url)
+        : _entry.url;
     setState(() => _sharingCard = true);
-    ui.Image? image;
-    var openingShareSheet = false;
     try {
-      final contentHtml = _showOriginal
-          ? (_entry.content ?? _entry.summary)
-          : (_entry.readabilityContent ?? _entry.content ?? _entry.summary);
-      final baseUrl = !_showOriginal && _entry.readabilityContent != null
-          ? (_entry.contentSourceUrl ?? _entry.url)
-          : _entry.url;
-      final content = ShareCardContent.fromHtml(
-        html: contentHtml,
-        cover: _entry.imageUrl,
-        baseUrl: baseUrl,
-      );
-      image = await loadShareCardImage(
-        content.images,
-        referer: baseUrl ?? widget.referer,
-        proxyUrl: widget.controller.proxyUrl,
-      );
-      if (!mounted) return;
-      final file = await ShareCardRenderer(
-        title: _entry.title,
-        feed: widget.feedTitle,
-        url: _shareTargetUrl,
-        excerpt: content.excerpt,
-        articleImage: image,
-      ).render();
-      if (!mounted) return;
-      openingShareSheet = true;
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: 'image/png')],
-          subject: _entry.title,
-          sharePositionOrigin: origin,
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ShareCardPreviewPage(
+            title: _entry.title,
+            feed: widget.feedTitle,
+            url: _shareTargetUrl,
+            content: ShareCardContent.fromHtml(
+              html: contentHtml,
+              cover: _entry.imageUrl,
+              baseUrl: baseUrl,
+            ),
+            referer: baseUrl ?? widget.referer,
+            proxyUrl: widget.controller.proxyUrl,
+          ),
         ),
       );
-    } catch (error) {
-      if (mounted) {
-        final String message;
-        if (error is FormatException) {
-          message = error.message;
-        } else if (openingShareSheet) {
-          message = error is PlatformException
-              ? '无法打开系统分享面板（${error.code}），请重试'
-              : '无法打开系统分享面板，请重试';
-        } else if (error is FileSystemException) {
-          message = '分享图片保存失败，请检查设备可用存储空间后重试';
-        } else {
-          message = '分享图片生成失败，请重试或使用文本分享';
-        }
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
-      }
     } finally {
-      image?.dispose();
       if (mounted) setState(() => _sharingCard = false);
     }
   }
@@ -339,9 +310,16 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+        builder: (sheetContext, setSheetState) => SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            0,
+            24,
+            24 + MediaQuery.paddingOf(sheetContext).bottom,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -552,8 +530,12 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
         ? (_entry.content ?? _entry.summary)
         : (_entry.readabilityContent ?? _entry.content ?? _entry.summary);
     final referer = widget.referer;
+    final hasText = html != null && html.trim().length >= 30;
+    final width = MediaQuery.sizeOf(context).width;
+    final horizontal = width > 760 ? (width - 720) / 2 : 20.0;
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
         title: Text(
           widget.feedTitle,
           maxLines: 1,
@@ -568,14 +550,15 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               color: _entry.isStarred ? const Color(0xFFF4A000) : null,
             ),
           ),
-          IconButton(
-            tooltip: _entry.isRead ? '标为未读' : '标为已读',
-            onPressed: _toggleRead,
-            icon: Icon(
-              _entry.isRead
-                  ? Icons.mark_email_unread_outlined
-                  : Icons.check_circle_outline,
-            ),
+          PopupMenuButton<String>(
+            tooltip: '文章操作',
+            onSelected: (_) => _toggleRead(),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'read',
+                child: Text(_entry.isRead ? '标为未读' : '标为已读'),
+              ),
+            ],
           ),
           IconButton(
             key: _shareButtonKey,
@@ -600,7 +583,12 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
           key: _articleCaptureKey,
           child: ListView(
             controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+            padding: EdgeInsets.fromLTRB(
+              horizontal,
+              12,
+              horizontal,
+              24 + MediaQuery.paddingOf(context).bottom,
+            ),
             children: [
               Text(
                 _entry.title,
@@ -635,44 +623,66 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 ),
               ],
               const SizedBox(height: 6),
-              Row(
+              Text(
+                [
+                  readingTimeEstimate(html),
+                  _metadata(_entry, widget.feedTitle),
+                ].where((part) => part.isNotEmpty).join(' · '),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 4,
+                runSpacing: 2,
                 children: [
-                  Flexible(
-                    child: Text(
-                      '${readingTimeEstimate(html)} · ${_metadata(_entry, widget.feedTitle)}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  if (hasText)
+                    TextButton.icon(
+                      key: const ValueKey('generate-ai-summary'),
+                      onPressed: _summaryGenerating ? null : _startSummary,
+                      icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                      label: Text(_summaryGenerating ? '摘要生成中' : 'AI 摘要'),
+                    ),
+                  if (hasText)
+                    TextButton.icon(
+                      key: const ValueKey('translate-article'),
+                      onPressed: _translatingArticle
+                          ? null
+                          : _startArticleTranslation,
+                      icon: const Icon(Icons.translate, size: 18),
+                      label: Text(
+                        _translatingArticle
+                            ? '翻译中 ${(_translationProgress * 100).round()}%'
+                            : '翻译全文',
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  if (_translatedTitle == null && !_translatingTitle)
-                    GestureDetector(
-                      onTap: _translateTitle,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.translate,
-                            size: 14,
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '翻译标题',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary,
-                                ),
-                          ),
-                        ],
-                      ),
+                  if (_entry.url != null && !_isVideoArticle && !hasExtracted)
+                    TextButton.icon(
+                      key: const ValueKey('extract-full-text'),
+                      onPressed: _extracting ? null : _extractFullText,
+                      icon: const Icon(Icons.article_outlined, size: 18),
+                      label: Text(_extracting ? '正在提取' : '提取网页全文'),
+                    ),
+                  if (_translatedTitle == null)
+                    TextButton.icon(
+                      onPressed: _translatingTitle ? null : _translateTitle,
+                      icon: const Icon(Icons.short_text, size: 18),
+                      label: const Text('翻译标题'),
                     ),
                 ],
               ),
+              if (_extracting || _summaryGenerating || _translatingArticle)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: LinearProgressIndicator(
+                    value: _translatingArticle && _translationProgress > 0
+                        ? _translationProgress
+                        : null,
+                    minHeight: 2,
+                  ),
+                ),
               if (_entry.imageUrl != null) ...[
                 const SizedBox(height: 20),
                 GestureDetector(
@@ -768,67 +778,6 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                       ],
                     ],
                   ),
-                )
-              else
-              // AI 摘要按钮
-              if (!_summaryGenerating)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          key: const ValueKey('generate-ai-summary'),
-                          onPressed: _startSummary,
-                          icon: const Icon(Icons.auto_awesome, size: 18),
-                          label: const Text('AI 摘要'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Theme.of(context)
-                                .colorScheme
-                                .secondary,
-                            side: BorderSide(
-                              color: Theme.of(context).colorScheme.secondary
-                                  .withValues(alpha: 0.3),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          key: const ValueKey('translate-article'),
-                          onPressed: _translatingArticle
-                              ? null
-                              : _startArticleTranslation,
-                          icon: _translatingArticle
-                              ? SizedBox.square(
-                                  dimension: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    value: _translationProgress > 0
-                                        ? _translationProgress
-                                        : null,
-                                  ),
-                                )
-                              : const Icon(Icons.translate, size: 18),
-                          label: Text(
-                            _translatingArticle
-                                ? '${(_translationProgress * 100).toInt()}%'
-                                : '翻译全文',
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Theme.of(context)
-                                .colorScheme
-                                .primary,
-                            side: BorderSide(
-                              color: Theme.of(context).colorScheme.primary
-                                  .withValues(alpha: 0.3),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               if (hasExtracted && hasOriginal)
                 Padding(
@@ -859,54 +808,33 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                     },
                   ),
                 ),
-              if (!hasExtracted && _entry.url != null) ...[
-                FilledButton.tonalIcon(
-                  key: const ValueKey('extract-full-text'),
-                  onPressed: _extracting ? null : _extractFullText,
-                  icon: _extracting
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.article_outlined),
-                  label: Text(_extracting ? '正在提取' : '提取网页全文'),
-                ),
-                if (_entry.contentExtractionStatus ==
-                    ContentExtractionStatus.failed) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    '提取失败：'
-                    '${_friendlyExtractionError(_entry.contentExtractionError)}'
-                    '已保留订阅正文。',
+              if (!_isVideoArticle &&
+                  _entry.contentExtractionStatus ==
+                      ContentExtractionStatus.failed)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    '未能提取全文：${_friendlyExtractionError(_entry.contentExtractionError)}仍可阅读订阅内容或打开原文。',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
-                      fontSize: 13,
                     ),
                   ),
-                ],
-                const SizedBox(height: 16),
-              ] else if (hasExtracted) ...[
-                Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      size: 16,
+                ),
+              if (hasExtracted)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    _showOriginal ? '显示订阅原文' : '网页全文已缓存',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: Theme.of(context).colorScheme.secondary,
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _showOriginal ? '显示订阅原文' : '网页全文已缓存',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.secondary,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 10),
-              ],
               if (html == null || html.trim().isEmpty)
                 Text(
-                  '该订阅没有提供正文，请打开原文阅读。',
+                  _isVideoArticle
+                      ? '视频内容请点击下方卡片观看。'
+                      : '该订阅没有提供正文，请尝试提取全文或打开原文。',
                   style: Theme.of(context).textTheme.bodyLarge,
                 )
               else
@@ -1085,58 +1013,44 @@ final class _CodeBlockWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final code = element.text.trimRight();
     final colorScheme = Theme.of(context).colorScheme;
-    return Stack(
-      children: [
-        Container(
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-          decoration: BoxDecoration(
-            color: colorScheme.onSurface.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(8),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: const Text('复制代码'),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: code));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(const SnackBar(content: Text('代码已复制')));
+                }
+              },
+            ),
           ),
-          child: SingleChildScrollView(
+          SingleChildScrollView(
             scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: Text(
               code,
               style: TextStyle(
                 fontFamily: 'monospace',
-                fontSize: 13.5,
+                fontSize: 14,
                 height: 1.5,
                 color: colorScheme.onSurface,
               ),
             ),
           ),
-        ),
-        Positioned(
-          top: 14,
-          right: 8,
-          child: Material(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(6),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(6),
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: code));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('代码已复制'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(5),
-                child: Icon(
-                  Icons.copy_rounded,
-                  size: 16,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

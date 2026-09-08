@@ -29,6 +29,7 @@ class _AddFeedSheetState extends State<_AddFeedSheet> {
   final _urlController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String? _group;
+  String? _error;
 
   @override
   void dispose() {
@@ -48,13 +49,19 @@ class _AddFeedSheetState extends State<_AddFeedSheet> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (widget.controller.adding || !_formKey.currentState!.validate()) return;
+    setState(() => _error = null);
     FocusScope.of(context).unfocus();
     final added = await widget.controller.addFeed(
       _urlController.text,
       groupName: _group,
     );
-    if (added && mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    if (added) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() => _error = widget.controller.error ?? '添加失败，请检查地址后重试');
+    }
   }
 
   @override
@@ -62,7 +69,7 @@ class _AddFeedSheetState extends State<_AddFeedSheet> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
-        return Padding(
+        return SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
             20,
             4,
@@ -82,7 +89,7 @@ class _AddFeedSheetState extends State<_AddFeedSheet> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '输入 RSS、Atom 或 Podcast 地址',
+                  '粘贴 RSS、Atom、播客或带订阅链接的网页地址',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -102,15 +109,23 @@ class _AddFeedSheetState extends State<_AddFeedSheet> {
                     prefixIcon: Icon(Icons.link),
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? '请输入订阅地址' : null,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return '请输入订阅地址';
+                    final uri = Uri.tryParse(value.trim());
+                    if (uri == null ||
+                        !['http', 'https'].contains(uri.scheme) ||
+                        uri.host.isEmpty) {
+                      return '请输入完整的 http:// 或 https:// 地址';
+                    }
+                    return null;
+                  },
                   onFieldSubmitted: (_) => _submit(),
                 ),
                 const SizedBox(height: 14),
                 InkWell(
                   key: const ValueKey('feed-group-picker'),
                   borderRadius: BorderRadius.circular(8),
-                  onTap: _pickGroup,
+                  onTap: widget.controller.adding ? null : _pickGroup,
                   child: InputDecorator(
                     decoration: const InputDecoration(
                       labelText: '分组',
@@ -133,16 +148,21 @@ class _AddFeedSheetState extends State<_AddFeedSheet> {
                     ),
                   ),
                 ),
-                if (widget.controller.error != null) ...[
+                if (_error != null) ...[
                   const SizedBox(height: 12),
                   Text(
-                    widget.controller.error!,
+                    _error!,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                       fontSize: 13,
                     ),
                   ),
                 ],
+                if (widget.controller.adding)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: Text('正在获取并解析订阅…\n如果是网页，将尝试发现其中的订阅链接。'),
+                  ),
                 const SizedBox(height: 16),
                 FilledButton(
                   key: const ValueKey('add-feed-submit'),

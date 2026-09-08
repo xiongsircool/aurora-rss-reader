@@ -185,7 +185,19 @@ final class LocalContentRepository {
               (feed) => OrderingTerm.asc(feed.title),
             ]))
             .get();
-    return rows.map(_feedFromRow).toList();
+    final counts = await database
+        .customSelect(
+          'SELECT feed_id, COUNT(*) AS n FROM entries WHERE read_at IS NULL GROUP BY feed_id',
+        )
+        .get();
+    final unread = {
+      for (final row in counts) row.read<String>('feed_id'): row.read<int>('n'),
+    };
+    return rows
+        .map(
+          (row) => _feedFromRow(row).copyWith(unreadCount: unread[row.id] ?? 0),
+        )
+        .toList();
   }
 
   Future<({String baseUrl, String model})> loadAiConfig() async {
@@ -684,6 +696,8 @@ domain_feed.Feed _feedFromRow(FeedRow row) {
     viewType: _feedViewType(row.viewType),
     updateInterval: Duration(minutes: row.updateIntervalMinutes),
     iconUrl: row.iconUrl == null ? null : Uri.tryParse(row.iconUrl!),
+    lastCheckedAt: row.lastCheckedAt,
+    lastError: row.lastError,
   );
 }
 

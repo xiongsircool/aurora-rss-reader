@@ -9,6 +9,9 @@ final class Feed {
     this.viewType = FeedViewType.articles,
     this.updateInterval = const Duration(hours: 12),
     this.iconUrl,
+    this.unreadCount = 0,
+    this.lastCheckedAt,
+    this.lastError,
   });
 
   final String id;
@@ -20,12 +23,16 @@ final class Feed {
 
   /// Resolved site icon URL, discovered after the first refresh.
   final Uri? iconUrl;
+  final int unreadCount;
+  final DateTime? lastCheckedAt;
+  final String? lastError;
 
   Feed copyWith({
     String? title,
     String? groupName,
     FeedViewType? viewType,
     Duration? updateInterval,
+    int? unreadCount,
   }) {
     return Feed(
       id: id,
@@ -34,6 +41,10 @@ final class Feed {
       groupName: groupName ?? this.groupName,
       viewType: viewType ?? this.viewType,
       updateInterval: updateInterval ?? this.updateInterval,
+      iconUrl: iconUrl,
+      unreadCount: unreadCount ?? this.unreadCount,
+      lastCheckedAt: lastCheckedAt,
+      lastError: lastError,
     );
   }
 }

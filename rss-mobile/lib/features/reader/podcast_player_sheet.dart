@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../../data/repositories/reader_prefs_repository.dart';
 
-/// Full-featured audio player for podcast entries.
-/// Supports play/pause, seek, speed control, and position memory.
 class PodcastPlayerSheet extends StatefulWidget {
   const PodcastPlayerSheet({
     required this.title,
@@ -15,13 +13,9 @@ class PodcastPlayerSheet extends StatefulWidget {
     this.prefs,
     super.key,
   });
-
   final String title;
   final String feedTitle;
   final Uri url;
-
-  /// Optional persistence for play position memory. When null the
-  /// player works the same but does not remember progress.
   final ReaderPrefsRepository? prefs;
 
   static Future<void> show(
@@ -30,294 +24,319 @@ class PodcastPlayerSheet extends StatefulWidget {
     required String feedTitle,
     required Uri url,
     ReaderPrefsRepository? prefs,
-  }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => PodcastPlayerSheet(
-        title: title,
-        feedTitle: feedTitle,
-        url: url,
-        prefs: prefs,
-      ),
-    );
-  }
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => PodcastPlayerSheet(
+      title: title,
+      feedTitle: feedTitle,
+      url: url,
+      prefs: prefs,
+    ),
+  );
 
   @override
   State<PodcastPlayerSheet> createState() => _PodcastPlayerSheetState();
 }
 
 class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
-  late final AudioPlayer _player;
-  PlayerState? _playerState;
-  Duration? _duration;
-  Duration? _position;
-  double _speed = 1.0;
-  String? _error;
-  bool _disposed = false;
-  Duration? _lastSavedPosition;
+  final _player = AudioPlayer();
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+  PlayerState _state = PlayerState(false, ProcessingState.idle);
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+  Duration? _lastSaved;
+  double _speed = 1;
+  bool _loading = true;
+  bool _ready = false;
   bool _resumed = false;
-  ReaderPrefsRepository? get _prefs => widget.prefs;
+  String? _error;
+  Future<void> _saveTail = Future.value();
 
   @override
   void initState() {
     super.initState();
-    _player = AudioPlayer();
-    _init();
+    _subscriptions.add(
+      _player.playerStateStream.listen((state) {
+        if (!mounted) return;
+        setState(() => _state = state);
+        if (_ready && state.processingState == ProcessingState.completed) {
+          _save(_duration, force: true);
+        }
+      }),
+    );
+    _subscriptions.add(
+      _player.durationStream.listen((duration) {
+        if (mounted) setState(() => _duration = duration ?? Duration.zero);
+      }),
+    );
+    _subscriptions.add(
+      _player.positionStream.listen((position) {
+        if (!mounted) return;
+        setState(() => _position = position);
+        if (_ready) _save(position);
+      }),
+    );
+    _load();
   }
 
-  Future<void> _init() async {
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _ready = false;
+      _error = null;
+      _resumed = false;
+    });
     try {
-      _playerState = PlayerState(false, ProcessingState.idle);
+      final saved =
+          int.tryParse(
+            await widget.prefs?.loadPlaybackPosition(widget.url.toString()) ??
+                '',
+          ) ??
+          0;
+      if (!mounted) return;
+      final duration = await _player.setUrl(widget.url.toString());
+      if (!mounted) return;
+      if (saved >= 30 &&
+          (duration == null || duration.inSeconds - saved > 60)) {
+        await _player.seek(Duration(seconds: saved));
+        if (!mounted) return;
+        _resumed = true;
+      }
+      _ready = true;
+    } catch (_) {
+      if (mounted) _error = '音频暂时无法加载，请检查网络后重试';
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
-      _player.playerStateStream.listen((state) {
-        if (_disposed) return;
-        setState(() => _playerState = state);
-      });
+  void _save(Duration position, {bool force = false}) {
+    final prefs = widget.prefs;
+    if (prefs == null || !_ready) return;
+    if (!force &&
+        _lastSaved != null &&
+        (position - _lastSaved!).abs().inSeconds < 10) {
+      return;
+    }
+    _lastSaved = position;
+    final audioUrl = widget.url.toString();
+    _saveTail = _saveTail
+        .then((_) => prefs.savePlaybackPosition(audioUrl, position.inSeconds))
+        .catchError((Object _) {});
+  }
 
-      _player.durationStream.listen((duration) {
-        if (_disposed) return;
-        setState(() => _duration = duration);
-      });
+  Future<void> _toggle() async {
+    try {
+      if (_player.playing) {
+        await _player.pause();
+        _save(_player.position, force: true);
+      } else {
+        if (_state.processingState == ProcessingState.completed) {
+          await _player.seek(Duration.zero);
+        }
+        if (!mounted) return;
+        await _player.play();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _error = '播放中断，请重试');
+    }
+  }
 
-      _player.positionStream.listen((position) {
-        if (_disposed) return;
-        setState(() => _position = position);
-        _maybeSaveProgress(position);
-      });
+  Future<void> _seek(Duration target) async {
+    try {
+      await _player.seek(
+        Duration(
+          milliseconds: target.inMilliseconds.clamp(
+            0,
+            _duration.inMilliseconds,
+          ),
+        ),
+      );
+      _save(_player.position, force: true);
+    } catch (_) {
+      if (mounted) setState(() => _error = '跳转失败，请重试');
+    }
+  }
 
-      await _player.setUrl(widget.url.toString());
-      await _restoreProgress();
-    } catch (e) {
-      if (_disposed) return;
-      setState(() => _error = '加载音频失败：$e');
+  Future<void> _setSpeed(double speed) async {
+    try {
+      await _player.setSpeed(speed);
+      if (mounted) setState(() => _speed = speed);
+    } catch (_) {
+      if (mounted) setState(() => _error = '暂时无法调整倍速');
     }
   }
 
   @override
   void dispose() {
-    _disposed = true;
+    _save(_player.position, force: true);
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
     _player.dispose();
     super.dispose();
   }
 
-  Future<void> _toggle() async {
-    if (_player.playing) {
-      await _player.pause();
-    } else {
-      await _player.play();
-    }
-  }
-
-  Future<void> _seek(Duration position) async {
-    await _player.seek(position);
-  }
-
-  Future<void> _skip(Duration delta) async {
-    final current = _position ?? Duration.zero;
-    final target = current + delta;
-    await _seek(target);
-  }
-
-  /// Resumes playback from the last saved position (if meaningful).
-  Future<void> _restoreProgress() async {
-    final prefs = _prefs;
-    if (prefs == null) return;
-    final seconds = double.tryParse(
-      await prefs.loadPlaybackPosition(widget.url.toString()) ?? '',
-    );
-    if (seconds == null || seconds < 30) return;
-    final saved = Duration(seconds: seconds.round());
-    final duration = _player.duration;
-    if (duration != null && duration - saved < const Duration(seconds: 60)) {
-      return; // essentially finished; start over
-    }
-    await _player.seek(saved);
-    if (_disposed) return;
-    setState(() {
-      _position = saved;
-      _resumed = true;
-    });
-  }
-
-  /// Persists progress at most every 10 seconds of new playback.
-  void _maybeSaveProgress(Duration position) {
-    final prefs = _prefs;
-    if (prefs == null) return;
-    final last = _lastSavedPosition;
-    if (last != null && (position - last).abs() < const Duration(seconds: 10)) {
-      return;
-    }
-    _lastSavedPosition = position;
-    prefs.savePlaybackPosition(widget.url.toString(), position.inSeconds);
-  }
-
-  void _cycleSpeed() {
-    const speeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
-    final nextIndex = (speeds.indexOf(_speed) + 1) % speeds.length;
-    _speed = speeds[nextIndex];
-    _player.setSpeed(_speed);
-    setState(() {});
-  }
-
-  String _formatDuration(Duration? d) {
-    if (d == null) return '--:--';
-    final hours = d.inHours;
-    final minutes = d.inMinutes.remainder(60);
-    final seconds = d.inSeconds.remainder(60);
-    if (hours > 0) {
-      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    }
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  String _time(Duration duration) {
+    final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final m = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    return duration.inHours > 0
+        ? '${duration.inHours}:$m:$s'
+        : '${duration.inMinutes}:$s';
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isPlaying = _playerState?.playing ?? false;
-    final position = _position ?? Duration.zero;
-    final duration = _duration ?? Duration.zero;
-    final progress = duration.inMilliseconds > 0
-        ? position.inMilliseconds / duration.inMilliseconds
-        : 0.0;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+    final scheme = Theme.of(context).colorScheme;
+    final buffering = _state.processingState == ProcessingState.buffering;
+    final completed = _state.processingState == ProcessingState.completed;
+    final playable = _ready && !_loading && _error == null;
+    final status = _loading
+        ? '正在加载音频…'
+        : _error != null
+        ? '播放暂不可用'
+        : buffering
+        ? '正在缓冲…'
+        : completed
+        ? '已播放完毕'
+        : _state.playing
+        ? '正在播放'
+        : '已暂停';
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        0,
+        24,
+        24 + MediaQuery.paddingOf(context).bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Title
-          Text(
-            widget.title,
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
           Text(
             widget.feedTitle,
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: colorScheme.onSurfaceVariant),
+            style: Theme.of(context).textTheme.labelLarge
+                ?.copyWith(color: scheme.secondary),
           ),
-          const SizedBox(height: 24),
-
-          if (_resumed) ...[
-            Text(
-              '已恢复到上次播放位置',
-              style: Theme.of(context).textTheme.labelSmall
-                  ?.copyWith(color: colorScheme.secondary),
+          const SizedBox(height: 8),
+          Text(
+            widget.title,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(height: 1.35),
+          ),
+          const SizedBox(height: 16),
+          Text(status, style: Theme.of(context).textTheme.bodySmall),
+          if (_resumed && !completed) const Text('已恢复到上次播放位置'),
+          if (_loading || buffering)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: LinearProgressIndicator(minHeight: 2),
             ),
-            const SizedBox(height: 8),
-          ],
-
           if (_error != null) ...[
-            Text(_error!, style: TextStyle(color: colorScheme.error)),
-            const SizedBox(height: 16),
+            Text(_error!, style: TextStyle(color: scheme.error)),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _loading ? null : _load,
+                icon: const Icon(Icons.refresh),
+                label: const Text('重新加载'),
+              ),
+            ),
           ],
-
-          // Progress bar
+          const SizedBox(height: 16),
+          Slider(
+            value: _duration.inMilliseconds > 0
+                ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(
+                    0,
+                    1,
+                  )
+                : 0,
+            onChanged: playable && _duration > Duration.zero
+                ? (value) => _seek(
+                    Duration(
+                      milliseconds: (value * _duration.inMilliseconds).round(),
+                    ),
+                  )
+                : null,
+          ),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                _formatDuration(position),
-                style: Theme.of(context).textTheme.labelSmall
-                    ?.copyWith(color: colorScheme.onSurfaceVariant),
-              ),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 4,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 6,
-                    ),
-                    overlayShape: const RoundSliderOverlayShape(
-                      overlayRadius: 12,
-                    ),
-                  ),
-                  child: Slider(
-                    value: progress.clamp(0.0, 1.0),
-                    onChanged: (value) {
-                      final target = Duration(
-                        milliseconds: (value * duration.inMilliseconds).toInt(),
-                      );
-                      _seek(target);
-                    },
-                  ),
-                ),
-              ),
-              Text(
-                _formatDuration(duration),
-                style: Theme.of(context).textTheme.labelSmall
-                    ?.copyWith(color: colorScheme.onSurfaceVariant),
-              ),
+              Text(_time(_position)),
+              Text(_duration > Duration.zero ? _time(_duration) : '--:--'),
             ],
           ),
-
-          const SizedBox(height: 16),
-
-          // Controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          const SizedBox(height: 20),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 24,
             children: [
-              // Skip back 15s
               IconButton(
-                onPressed: () => _skip(const Duration(seconds: -15)),
+                tooltip: '后退 10 秒',
+                onPressed: playable
+                    ? () => _seek(_position - const Duration(seconds: 10))
+                    : null,
                 icon: const Icon(Icons.replay_10),
-                iconSize: 32,
-                color: colorScheme.onSurfaceVariant,
+                iconSize: 30,
               ),
-              const SizedBox(width: 24),
-
-              // Play/Pause
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+              FilledButton(
+                onPressed: playable ? _toggle : null,
+                style: FilledButton.styleFrom(
+                  shape: const CircleBorder(),
+                  minimumSize: const Size(64, 64),
                 ),
-                child: IconButton(
-                  onPressed: _error != null ? null : _toggle,
-                  icon: Icon(
-                    isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: colorScheme.onPrimary,
-                    size: 36,
-                  ),
+                child: Icon(
+                  completed
+                      ? Icons.replay
+                      : _state.playing
+                      ? Icons.pause
+                      : Icons.play_arrow,
+                  semanticLabel: completed
+                      ? '重新播放'
+                      : _state.playing
+                      ? '暂停'
+                      : '播放',
+                  size: 32,
                 ),
               ),
-              const SizedBox(width: 24),
-
-              // Skip forward 30s
               IconButton(
-                onPressed: () => _skip(const Duration(seconds: 30)),
+                tooltip: '前进 30 秒',
+                onPressed: playable
+                    ? () => _seek(_position + const Duration(seconds: 30))
+                    : null,
                 icon: const Icon(Icons.forward_30),
-                iconSize: 32,
-                color: colorScheme.onSurfaceVariant,
+                iconSize: 30,
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // Speed control
           Center(
-            child: TextButton(
-              onPressed: _cycleSpeed,
-              child: Text(
-                '${_speed.toStringAsFixed(_speed == _speed.truncateToDouble() ? 1 : 2)}x',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: colorScheme.secondary,
-                  fontWeight: FontWeight.w600,
+            child: PopupMenuButton<double>(
+              tooltip: '播放速度',
+              enabled: playable,
+              onSelected: _setSpeed,
+              itemBuilder: (_) => [
+                for (final speed in [0.75, 1.0, 1.25, 1.5, 1.75, 2.0])
+                  CheckedPopupMenuItem(
+                    value: speed,
+                    checked: _speed == speed,
+                    child: Text('$speed×'),
+                  ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  '$_speed× 播放速度',
+                  style: TextStyle(
+                    color: scheme.secondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

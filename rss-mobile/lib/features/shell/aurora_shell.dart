@@ -16,6 +16,7 @@ import '../../data/repositories/local_content_repository.dart'
 import '../../domain/entities/entry.dart';
 import '../../domain/entities/feed.dart';
 import '../inbox/entry_tile.dart';
+import '../inbox/refresh_status_banner.dart';
 import '../inbox/inbox_filter_sheet.dart';
 import '../reader/article_reader_page.dart';
 import '../reader/mobile_reader_controller.dart';
@@ -38,6 +39,7 @@ final class AuroraShell extends StatefulWidget {
 
 class _AuroraShellState extends State<AuroraShell> {
   int _selectedIndex = 0;
+  Entry? _selectedEntry;
 
   static const _destinations = <NavigationDestination>[
     NavigationDestination(
@@ -73,39 +75,118 @@ class _AuroraShellState extends State<AuroraShell> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
-        final bottomInset = MediaQuery.paddingOf(context).bottom;
-        return Scaffold(
-          body: Stack(
-            children: [
-              Positioned.fill(
-                child: IndexedStack(
-                  index: _selectedIndex,
-                  children: [
-                    _InboxPage(
-                      controller: widget.controller,
-                      onAddSource: _showAddFeed,
-                    ),
-                    _SavedPage(controller: widget.controller),
-                    _SourcesPage(
-                      controller: widget.controller,
-                      onAddSource: _showAddFeed,
-                    ),
-                    _SettingsPage(controller: widget.controller),
-                  ],
-                ),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final largeText = MediaQuery.textScalerOf(context).scale(16) > 22;
+            final rail = constraints.maxWidth >= 700;
+            final split =
+                constraints.maxWidth >= (largeText ? 1250 : 1000) &&
+                _selectedIndex < 2;
+            final inset = MediaQuery.viewPaddingOf(context).bottom;
+            final listWidth = split
+                ? (largeText ? 430.0 : 380.0)
+                : constraints.maxWidth - (rail ? 88 : 0);
+            final pages = MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(size: Size(listWidth, constraints.maxHeight)),
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: [
+                  _InboxPage(
+                    controller: widget.controller,
+                    onAddSource: _showAddFeed,
+                  ),
+                  _SavedPage(controller: widget.controller),
+                  _SourcesPage(
+                    controller: widget.controller,
+                    onAddSource: _showAddFeed,
+                  ),
+                  _SettingsPage(controller: widget.controller),
+                ],
               ),
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: bottomInset + 4,
-                child: _FloatingCapsuleBar(
-                  selectedIndex: _selectedIndex,
-                  destinations: _destinations,
-                  onDestinationSelected: _select,
-                ),
+            );
+            return _ReaderLayoutScope(
+              bottomClearance: rail ? 12 : 78,
+              openEntry: split
+                  ? (entry) => setState(() => _selectedEntry = entry)
+                  : null,
+              child: Scaffold(
+                body: rail
+                    ? Row(
+                        children: [
+                          SafeArea(
+                            child: NavigationRail(
+                              minWidth: 88,
+                              selectedIndex: _selectedIndex,
+                              labelType: NavigationRailLabelType.all,
+                              onDestinationSelected: _select,
+                              destinations: [
+                                for (final d in _destinations)
+                                  NavigationRailDestination(
+                                    icon: d.icon,
+                                    selectedIcon: d.selectedIcon,
+                                    label: Text(d.label),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const VerticalDivider(width: 1),
+                          if (split) ...[
+                            SizedBox(width: listWidth, child: pages),
+                            const VerticalDivider(width: 1),
+                            Expanded(
+                              child: _selectedEntry == null
+                                  ? const Center(child: Text('选择一篇文章开始阅读'))
+                                  : LayoutBuilder(
+                                      builder: (context, readerConstraints) =>
+                                          MediaQuery(
+                                            data: MediaQuery.of(context)
+                                                .copyWith(
+                                                  size: Size(
+                                                    readerConstraints.maxWidth,
+                                                    readerConstraints.maxHeight,
+                                                  ),
+                                                ),
+                                            child: ArticleReaderPage(
+                                              key: ValueKey(_selectedEntry!.id),
+                                              entry: _selectedEntry!,
+                                              feedTitle: widget.controller
+                                                  .feedTitle(
+                                                    _selectedEntry!.feedId,
+                                                  ),
+                                              referer: widget.controller
+                                                  .feedUrl(
+                                                    _selectedEntry!.feedId,
+                                                  ),
+                                              controller: widget.controller,
+                                              embedded: true,
+                                            ),
+                                          ),
+                                    ),
+                            ),
+                          ] else
+                            Expanded(child: pages),
+                        ],
+                      )
+                    : Stack(
+                        children: [
+                          Positioned.fill(child: pages),
+                          if (MediaQuery.viewInsetsOf(context).bottom == 0)
+                            Positioned(
+                              left: 20,
+                              right: 20,
+                              bottom: inset + 4,
+                              child: _FloatingCapsuleBar(
+                                selectedIndex: _selectedIndex,
+                                destinations: _destinations,
+                                onDestinationSelected: _select,
+                              ),
+                            ),
+                        ],
+                      ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -156,9 +237,11 @@ final class _InboxPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(greeting),
+                Text(greeting, maxLines: 1, overflow: TextOverflow.ellipsis),
                 Text(
                   subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -243,7 +326,7 @@ final class _InboxPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _StatusBanner(controller: controller),
+            RefreshStatusBanner(controller: controller),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
               child: SegmentedButton<int>(
@@ -287,7 +370,10 @@ final class _InboxPage extends StatelessWidget {
 
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
-        if (notification.metrics.extentAfter < 600 &&
+        if (notification.depth == 0 &&
+            notification is ScrollUpdateNotification &&
+            controller.error?.contains('加载更多') != true &&
+            notification.metrics.extentAfter < 600 &&
             controller.entries.length < 500) {
           controller.loadMore();
         }
@@ -298,11 +384,17 @@ final class _InboxPage extends StatelessWidget {
         child: ListView.separated(
           key: const PageStorageKey('inbox-list'),
           padding: EdgeInsets.only(
-            bottom: MediaQuery.paddingOf(context).bottom + 78,
+            bottom:
+                MediaQuery.viewPaddingOf(context).bottom +
+                _ReaderLayoutScope.clearance(context),
           ),
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: controller.entries.length + (controller.hasMore ? 1 : 0),
-          separatorBuilder: (_, _) => const Divider(height: 1),
+          separatorBuilder: (_, _) => Divider(
+            height: 1,
+            color: Theme.of(context).colorScheme.outlineVariant
+                .withValues(alpha: 0.35),
+          ),
           itemBuilder: (context, index) {
             if (index == controller.entries.length) {
               if (controller.loadingMore) {
@@ -375,7 +467,7 @@ final class _SavedPage extends StatelessWidget {
       appBar: AppBar(title: const Text('收藏')),
       body: Column(
         children: [
-          _StatusBanner(controller: controller),
+          RefreshStatusBanner(controller: controller),
           Expanded(
             child: controller.starredEntries.isEmpty
                 ? const _EmptyState(
@@ -385,10 +477,16 @@ final class _SavedPage extends StatelessWidget {
                 : ListView.separated(
                     key: const PageStorageKey('saved-list'),
                     padding: EdgeInsets.only(
-                      bottom: MediaQuery.paddingOf(context).bottom + 78,
+                      bottom:
+                          MediaQuery.viewPaddingOf(context).bottom +
+                          _ReaderLayoutScope.clearance(context),
                     ),
                     itemCount: controller.starredEntries.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => Divider(
+                      height: 1,
+                      color: Theme.of(context).colorScheme.outlineVariant
+                          .withValues(alpha: 0.35),
+                    ),
                     itemBuilder: (context, index) {
                       final entry = controller.starredEntries[index];
                       return EntryTile(
@@ -443,7 +541,7 @@ class _SourcesPageState extends State<_SourcesPage> {
       ),
       body: Column(
         children: [
-          _StatusBanner(controller: controller),
+          RefreshStatusBanner(controller: controller),
           Expanded(
             child: controller.feeds.isEmpty
                 ? _EmptyState(
@@ -456,7 +554,9 @@ class _SourcesPageState extends State<_SourcesPage> {
                     onRefresh: controller.refreshAll,
                     child: ListView(
                       padding: EdgeInsets.only(
-                        bottom: MediaQuery.paddingOf(context).bottom + 78,
+                        bottom:
+                            MediaQuery.viewPaddingOf(context).bottom +
+                            _ReaderLayoutScope.clearance(context),
                       ),
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
@@ -556,7 +656,11 @@ final class _GroupSection extends StatelessWidget {
         if (!collapsed)
           for (final feed in feedsInGroup)
             _FeedTile(feed: feed, controller: controller),
-        const Divider(height: 1),
+        Divider(
+          height: 1,
+          color: Theme.of(context).colorScheme.outlineVariant
+              .withValues(alpha: 0.35),
+        ),
       ],
     );
   }
@@ -631,6 +735,58 @@ final class _FeedTile extends StatelessWidget {
   final Feed feed;
   final MobileReaderController controller;
 
+  void _showDetails(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          0,
+          24,
+          24 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(feed.title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            SelectableText(feed.url.toString()),
+            const SizedBox(height: 12),
+            Text('${feed.unreadCount} 篇未读'),
+            if (feed.lastCheckedAt != null)
+              Text(
+                '上次检查：${MaterialLocalizations.of(context).formatShortDate(feed.lastCheckedAt!.toLocal())} '
+                '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(feed.lastCheckedAt!.toLocal()))}',
+              ),
+            if (feed.lastError != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  '上次刷新未完成，可以检查网络后重试。',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              onPressed: controller.refreshing
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      controller.refreshOne(feed);
+                    },
+              icon: const Icon(Icons.refresh),
+              label: const Text('刷新这个订阅'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final iconUrl = feed.iconUrl?.toString();
@@ -663,10 +819,16 @@ final class _FeedTile extends StatelessWidget {
       leading: leading,
       title: Text(feed.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-        feed.url.toString(),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        '${feed.unreadCount} 篇未读 · ${feed.lastError != null
+            ? '上次刷新失败'
+            : feed.lastCheckedAt == null
+            ? '尚未刷新'
+            : '已刷新'}',
+        style: feed.lastError == null
+            ? null
+            : TextStyle(color: Theme.of(context).colorScheme.error),
       ),
+      onTap: () => _showDetails(context),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -802,39 +964,49 @@ class _SettingsPageState extends State<_SettingsPage> {
   }
 
   Future<void> _importFullBackup(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final files = await FilePicker.pickFiles(type: FileType.any);
-    if (files.isEmpty) return;
-    final bytes = await files.single.readAsBytes();
     try {
-      await widget.controller.importFullBackup(bytes);
-    } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            error is ArgumentError ? error.message ?? '备份无效' : '恢复失败：$error',
-          ),
-        ),
-      );
-      return;
-    }
-    if (context.mounted) {
-      await showDialog<void>(
+      final files = await FilePicker.pickFiles(type: FileType.any);
+      if (files.isEmpty || !context.mounted) return;
+      final confirmed = await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('备份已验证'),
-          content: const Text(
-            '恢复将覆盖当前所有数据，并在重启应用后生效。\n\n'
-            '请从最近任务中关闭 Aurora，然后重新打开以完成恢复。',
-          ),
+        builder: (context) => AlertDialog(
+          title: const Text('替换当前数据？'),
+          content: const Text('恢复会覆盖当前订阅、文章和阅读记录。请先导出当前备份；API Key 不会随备份迁移。'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('验证并准备恢复'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+      final bytes = await files.single.readAsBytes();
+      await widget.controller.importFullBackup(bytes);
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('备份已验证'),
+          content: const Text('恢复已准备就绪。请关闭 Aurora 并重新打开；重启前的新增操作会被备份覆盖。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
               child: const Text('知道了'),
             ),
           ],
         ),
       );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('备份读取或验证失败，请确认文件完整且与此版本兼容')),
+        );
+      }
     }
   }
 
@@ -872,215 +1044,199 @@ class _SettingsPageState extends State<_SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    // Key forces the FutureBuilder to re-fetch when settings change.
-    final settingsKey = ValueKey('settings-ai-$_settingsRevision');
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
-      body: ListView(
-        padding: EdgeInsets.symmetric(vertical: 8)
-            .copyWith(bottom: MediaQuery.paddingOf(context).bottom + 104),
-        children: [
-          const ListTile(
-            leading: Icon(Icons.phone_android),
-            title: Text('数据模式'),
-            subtitle: Text('本地模式'),
-            trailing: Icon(Icons.check_circle_outline),
-          ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.storage_outlined),
-            title: const Text('本地数据'),
-            subtitle: FutureBuilder<({int total, int read, int starred})>(
-              future: controller.repository.entryStats(),
-              builder: (context, snapshot) {
-                final stats = snapshot.data;
-                final base =
-                    '${controller.feeds.length} 个订阅 · ${stats?.total ?? controller.entries.length} 篇文章';
-                if (stats == null) return Text(base);
-                return Text('$base · 已读 ${stats.read} · 收藏 ${stats.starred}');
-              },
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              MediaQuery.viewPaddingOf(context).bottom +
+                  _ReaderLayoutScope.clearance(context),
             ),
-          ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.backup_outlined),
-            title: const Text('备份全部数据'),
-            subtitle: const Text('订阅、文章、收藏、已读打包为单个备份文件'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _exportFullBackup(context),
-          ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.restore),
-            title: const Text('恢复备份'),
-            subtitle: const Text('选择备份文件，重启应用后完成恢复'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _importFullBackup(context),
-          ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.lan_outlined),
-            title: const Text('网络代理'),
-            subtitle: Text(controller.proxyUrl ?? '直连'),
-            trailing: const Icon(Icons.edit_outlined),
-            onTap: () => showProxySettingsDialog(context, controller),
-          ),
-          Divider(height: 1, indent: 56),
-          FutureBuilder<int>(
-            future: _getRefreshInterval(),
-            builder: (context, snapshot) {
-              final hours = snapshot.data ?? 3;
-              return ListTile(
-                leading: const Icon(Icons.sync),
-                title: const Text('后台刷新'),
-                subtitle: Text(hours > 0 ? '每 $hours 小时自动刷新订阅' : '已关闭'),
-                trailing: PopupMenuButton<int>(
-                  icon: const Icon(Icons.schedule),
-                  onSelected: (value) => _setRefreshInterval(value),
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(value: 0, child: Text('关闭')),
-                    for (final h in [1, 2, 3, 6, 12, 24])
-                      PopupMenuItem(
-                        value: h,
-                        child: Text('$h 小时${h == hours ? ' ✓' : ''}'),
+            children: [
+              _SettingsSection(
+                title: '阅读与外观',
+                children: [
+                  const ListTile(
+                    leading: Icon(Icons.auto_stories_outlined),
+                    title: Text('阅读排版'),
+                    subtitle: Text('在文章右上角调整字号、行距和字体，设置会自动保存。'),
+                  ),
+                  const ListTile(
+                    leading: Icon(Icons.dark_mode_outlined),
+                    title: Text('深浅主题'),
+                    subtitle: Text('跟随系统外观'),
+                  ),
+                ],
+              ),
+              _SettingsSection(
+                title: '订阅与网络',
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.lan_outlined),
+                    title: const Text('网络代理'),
+                    subtitle: Text(controller.proxyUrl ?? '直连'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => showProxySettingsDialog(context, controller),
+                  ),
+                  FutureBuilder<int>(
+                    future: _getRefreshInterval(),
+                    builder: (context, snapshot) {
+                      final hours = snapshot.data ?? 3;
+                      return ListTile(
+                        leading: const Icon(Icons.sync),
+                        title: const Text('后台刷新'),
+                        subtitle: Text(
+                          hours > 0 ? '约每 $hours 小时，执行时间由系统安排' : '已关闭',
+                        ),
+                        trailing: PopupMenuButton<int>(
+                          tooltip: '刷新间隔',
+                          icon: const Icon(Icons.schedule),
+                          onSelected: _setRefreshInterval,
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(value: 0, child: Text('关闭')),
+                            for (final h in [1, 2, 3, 6, 12, 24])
+                              PopupMenuItem(value: h, child: Text('$h 小时')),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  if (Theme.of(context).platform == TargetPlatform.android)
+                    ListTile(
+                      leading: const Icon(Icons.battery_saver),
+                      title: const Text('电池优化豁免'),
+                      subtitle: const Text('前往系统设置调整后台限制'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _openBatteryOptimizationSettings,
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.import_export),
+                    title: const Text('OPML 导入与导出'),
+                    subtitle: const Text('迁移订阅列表，不包含文章、收藏和阅读记录'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => showOpmlActionsSheet(context, controller),
+                  ),
+                ],
+              ),
+              _SettingsSection(
+                title: 'AI 服务',
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.auto_awesome_outlined),
+                    title: const Text('AI 服务'),
+                    subtitle: FutureBuilder<Map<String, dynamic>>(
+                      key: ValueKey(_settingsRevision),
+                      future: _loadAiStatus(controller),
+                      builder: (context, snapshot) {
+                        final data = snapshot.data ?? {};
+                        final model =
+                            data['modelName'] ?? data['modelId'] ?? '';
+                        return Text(
+                          model.toString().isEmpty
+                              ? '配置自己的服务地址、模型和 Key'
+                              : '已配置 · $model',
+                        );
+                      },
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () async {
+                      await showAiSettingsSheet(context, controller);
+                      if (mounted) setState(() => _settingsRevision++);
+                    },
+                  ),
+                ],
+              ),
+              _SettingsSection(
+                title: '数据与备份',
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.storage_outlined),
+                    title: const Text('本地数据'),
+                    subtitle: FutureBuilder<({int total, int read, int starred})>(
+                      future: controller.repository.entryStats(),
+                      builder: (context, snapshot) {
+                        final stats = snapshot.data;
+                        if (snapshot.hasError) return const Text('暂时无法读取统计');
+                        return Text(
+                          stats == null
+                              ? '正在读取统计…'
+                              : '${controller.feeds.length} 个订阅 · ${stats.total} 篇文章\n已读 ${stats.read} · 收藏 ${stats.starred}',
+                        );
+                      },
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.backup_outlined),
+                    title: const Text('备份全部数据'),
+                    subtitle: const Text('导出设备中的数据库，API Key 需单独保管'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _exportFullBackup(context),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.restore),
+                    title: const Text('恢复备份'),
+                    subtitle: const Text('恢复将替换当前数据，请先保留当前备份'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _importFullBackup(context),
+                  ),
+                ],
+              ),
+              _SettingsSection(
+                title: '关于',
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: const Text('关于 Aurora'),
+                    subtitle: const Text('${AppMeta.version} · 本地优先 · GPL-3.0'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AboutPage(),
                       ),
-                  ],
-                ),
-              );
-            },
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.battery_saver),
-            title: const Text('电池优化豁免'),
-            subtitle: const Text('防止后台刷新被系统终止'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _openBatteryOptimizationSettings,
-          ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.import_export),
-            title: const Text('OPML 导入与导出'),
-            subtitle: Text('${controller.feeds.length} 个订阅'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => showOpmlActionsSheet(context, controller),
-          ),
-          Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.smart_toy_outlined),
-            title: const Text('AI 服务'),
-            subtitle: FutureBuilder<Map<String, dynamic>>(
-              key: settingsKey,
-              future: _loadAiStatus(controller),
-              builder: (context, snapshot) {
-                final data = snapshot.data ?? {};
-                final baseUrl = data['baseUrl'] as String? ?? '';
-                final modelId = data['modelId'] as String? ?? '';
-                final configured = baseUrl.isNotEmpty && modelId.isNotEmpty;
-                final modelName = data['modelName'] as String? ?? '';
-                return Text(
-                  configured
-                      ? '已配置 · ${modelName.isNotEmpty ? modelName : modelId}'
-                      : '未配置',
-                );
-              },
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => showAiSettingsSheet(context, controller),
-          ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('关于 Aurora'),
-            subtitle: const Text('${AppMeta.version} · 本地优先 · GPL-3.0'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute<void>(builder: (_) => const AboutPage())),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-final class _StatusBanner extends StatelessWidget {
-  const _StatusBanner({required this.controller});
-
-  final MobileReaderController controller;
-
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({required this.title, required this.children});
+  final String title;
+  final List<Widget> children;
   @override
-  Widget build(BuildContext context) {
-    final message = controller.error ?? controller.notice;
-    if (message == null) return const SizedBox.shrink();
-    final isError = controller.error != null;
-    final color = isError
-        ? Theme.of(context).colorScheme.error
-        : Theme.of(context).colorScheme.secondary;
-    final failures = controller.refreshFailures;
-
-    return Container(
-      color: color.withValues(alpha: 0.08),
-      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isError ? Icons.error_outline : Icons.check_circle_outline,
-                color: color,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(color: color, fontSize: 13),
-                ),
-              ),
-              IconButton(
-                tooltip: '关闭',
-                visualDensity: VisualDensity.compact,
-                onPressed: () {
-                  controller.clearMessages();
-                  controller.clearRefreshFailures();
-                },
-                icon: const Icon(Icons.close, size: 18),
-              ),
-            ],
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.labelLarge
+                ?.copyWith(color: Theme.of(context).colorScheme.secondary),
           ),
-          if (failures.isNotEmpty) ...[
-            for (final failure in failures)
-              Padding(
-                padding: const EdgeInsets.only(left: 26, bottom: 2),
-                child: Text(
-                  '• ${failure.title}：${failure.error}',
-                  style: TextStyle(
-                    color: color.withValues(alpha: 0.85),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(left: 26, top: 4, bottom: 2),
-              child: ActionChip(
-                label: controller.refreshing
-                    ? const SizedBox.square(
-                        dimension: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('重试失败的订阅', style: TextStyle(fontSize: 12)),
-                onPressed: controller.refreshing
-                    ? null
-                    : controller.retryFailedRefreshes,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+        ),
+        Material(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: Column(children: children),
+        ),
+      ],
+    ),
+  );
 }
 
 final class _EmptyState extends StatelessWidget {
@@ -1165,6 +1321,13 @@ void _openReader(
   MobileReaderController controller,
   Entry entry,
 ) {
+  final openInPane = context
+      .dependOnInheritedWidgetOfExactType<_ReaderLayoutScope>()
+      ?.openEntry;
+  if (openInPane != null) {
+    openInPane(entry);
+    return;
+  }
   Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (_) => ArticleReaderPage(
@@ -1187,67 +1350,98 @@ final class _FloatingCapsuleBar extends StatelessWidget {
   });
 
   final int selectedIndex;
-  final List<Widget> destinations;
+  final List<NavigationDestination> destinations;
   final ValueChanged<int> onDestinationSelected;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return ClearGlassSurface(
-      child: SizedBox(
-        height: 62,
-        child: Row(
-          children: [
-            for (var i = 0; i < destinations.length; i++)
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onDestinationSelected(i),
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(end: i == selectedIndex ? 1.14 : 1.0),
-                    curve: Curves.easeOutBack,
-                    duration: const Duration(milliseconds: 260),
-                    builder: (context, scale, child) =>
-                        Transform.scale(scale: scale, child: child),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconTheme(
-                          data: IconThemeData(
-                            size: 24,
-                            color: i == selectedIndex
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant.withValues(
-                                    alpha: 0.8,
-                                  ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: SizedBox(
+          height: (48 + MediaQuery.textScalerOf(context).scale(11)).clamp(
+            62.0,
+            120.0,
+          ),
+          child: Row(
+            children: [
+              for (var i = 0; i < destinations.length; i++)
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(28),
+                    onTap: () => onDestinationSelected(i),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: i == selectedIndex ? 1.06 : 1.0),
+                      curve: Curves.easeOutBack,
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 220),
+                      builder: (context, scale, child) =>
+                          Transform.scale(scale: scale, child: child),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconTheme(
+                            data: IconThemeData(
+                              size: 24,
+                              color: i == selectedIndex
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant.withValues(
+                                      alpha: 0.8,
+                                    ),
+                            ),
+                            child: (i == selectedIndex
+                                ? destinations[i].selectedIcon ??
+                                      destinations[i].icon
+                                : destinations[i].icon),
                           ),
-                          child:
-                              (destinations[i] as NavigationDestination).icon,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          (destinations[i] as NavigationDestination).label,
-                          style: TextStyle(
-                            fontSize: 11,
-                            height: 1,
-                            fontWeight: i == selectedIndex
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: i == selectedIndex
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant.withValues(
-                                    alpha: 0.8,
-                                  ),
+                          const SizedBox(height: 2),
+                          Text(
+                            destinations[i].label,
+                            semanticsLabel: i == selectedIndex
+                                ? '${destinations[i].label}，已选择'
+                                : destinations[i].label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1,
+                              fontWeight: i == selectedIndex
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: i == selectedIndex
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant.withValues(
+                                      alpha: 0.8,
+                                    ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _ReaderLayoutScope extends InheritedWidget {
+  const _ReaderLayoutScope({
+    required this.bottomClearance,
+    required this.openEntry,
+    required super.child,
+  });
+  final double bottomClearance;
+  final ValueChanged<Entry>? openEntry;
+  static double clearance(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<_ReaderLayoutScope>()
+          ?.bottomClearance ??
+      78;
+  @override
+  bool updateShouldNotify(_ReaderLayoutScope old) =>
+      bottomClearance != old.bottomClearance || openEntry != old.openEntry;
 }

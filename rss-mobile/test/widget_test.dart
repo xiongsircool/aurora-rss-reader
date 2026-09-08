@@ -47,8 +47,8 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('数据模式'), findsOneWidget);
-    expect(find.text('本地模式'), findsOneWidget);
+    expect(find.text('阅读与外观'), findsOneWidget);
+    expect(find.text('深浅主题'), findsOneWidget);
   });
 
   testWidgets('opens OPML import and export actions from settings', (

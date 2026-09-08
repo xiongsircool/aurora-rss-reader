@@ -53,6 +53,10 @@ final class MobileReaderController extends ChangeNotifier {
   bool _loading = false;
   bool _adding = false;
   bool _refreshing = false;
+  int refreshCompleted = 0;
+  int refreshTotal = 0;
+  String? searchError;
+  int _searchRevision = 0;
   bool _loadingMore = false;
   int _unreadCount = 0;
   bool _searching = false;
@@ -339,6 +343,8 @@ final class MobileReaderController extends ChangeNotifier {
     _error = null;
     _notice = null;
     _refreshFailures = const [];
+    refreshCompleted = 0;
+    refreshTotal = _feeds.length;
     notifyListeners();
 
     try {
@@ -361,6 +367,8 @@ final class MobileReaderController extends ChangeNotifier {
             lastError: error.toString(),
           );
         }
+        refreshCompleted++;
+        notifyListeners();
       }
       await _reload();
       _refreshFailures = failures;
@@ -383,16 +391,22 @@ final class MobileReaderController extends ChangeNotifier {
   /// Retries only the feeds that failed during the last refreshAll.
   /// Succeeding entries are removed from the failure list; the notice
   /// reflects the retry round only.
-  Future<void> retryFailedRefreshes() async {
-    final pending = List.of(_refreshFailures);
+  Future<void> retryFailedRefreshes({String? feedId}) async {
+    final pending = _refreshFailures
+        .where((f) => feedId == null || f.feedId == feedId)
+        .toList();
     if (_refreshing || pending.isEmpty) return;
+    refreshCompleted = 0;
+    refreshTotal = pending.length;
     _refreshing = true;
     _error = null;
     _notice = null;
     notifyListeners();
     try {
       var inserted = 0;
-      final stillFailing = <({String feedId, String title, String error})>[];
+      final stillFailing = _refreshFailures
+          .where((f) => feedId != null && f.feedId != feedId)
+          .toList();
       for (final failure in pending) {
         final feed = _feeds.where((f) => f.id == failure.feedId).firstOrNull;
         if (feed == null) continue;
@@ -412,6 +426,8 @@ final class MobileReaderController extends ChangeNotifier {
             lastError: error.toString(),
           );
         }
+        refreshCompleted++;
+        notifyListeners();
       }
       await _reload();
       _refreshFailures = stillFailing;
@@ -445,7 +461,7 @@ final class MobileReaderController extends ChangeNotifier {
         raw.contains('parse')) {
       return '返回的不是有效的订阅格式';
     }
-    final match = RegExp(r'FeedHttpException\((\d+)\)').firstMatch(raw);
+    final match = RegExp(r'feedhttpexception\((\d+)\)').firstMatch(raw);
     if (match != null) return 'HTTP ${match.group(1)} 错误';
     return '未知错误';
   }
@@ -486,6 +502,8 @@ final class MobileReaderController extends ChangeNotifier {
 
   Future<void> refreshOne(Feed feed) async {
     if (_refreshing) return;
+    refreshCompleted = 0;
+    refreshTotal = 1;
     _refreshing = true;
     _error = null;
     _notice = null;
@@ -493,11 +511,20 @@ final class MobileReaderController extends ChangeNotifier {
     try {
       final result = await refreshFeed(feed);
       unawaited(_resolveFeedIcon(feed));
+      await repository.updateFeedStatus(id: feed.id, lastError: null);
+      _refreshFailures = _refreshFailures
+          .where((failure) => failure.feedId != feed.id)
+          .toList();
       await _reload();
       _notice = '${result.feedTitle}：新增 ${result.insertedEntries} 篇';
     } catch (error) {
-      _error = '刷新 ${feed.title} 失败：$error';
+      await repository.updateFeedStatus(
+        id: feed.id,
+        lastError: error.toString(),
+      );
+      _error = '刷新 ${feed.title} 失败：${_friendlyRefreshError(error)}';
     } finally {
+      refreshCompleted = 1;
       _refreshing = false;
       notifyListeners();
     }
@@ -539,8 +566,9 @@ final class MobileReaderController extends ChangeNotifier {
 
   Future<void> loadMore() async {
     final cursor = _nextCursor;
-    if (cursor == null || _loadingMore) return;
+    if (cursor == null || _loadingMore || _refreshing || _loading) return;
     _loadingMore = true;
+    _error = null;
     notifyListeners();
     try {
       final page = await repository.listInbox(
@@ -716,24 +744,31 @@ final class MobileReaderController extends ChangeNotifier {
       clearSearch();
       return;
     }
+    final revision = ++_searchRevision;
     _searching = true;
-    _error = null;
+    searchError = null;
     notifyListeners();
     try {
-      _searchResults = await repository.search(normalized);
-    } catch (error) {
+      final results = await repository.search(normalized);
+      if (revision != _searchRevision) return;
+      _searchResults = results;
+    } catch (_) {
+      if (revision != _searchRevision) return;
       _searchResults = const [];
-      _error = '搜索失败：$error';
+      searchError = '搜索失败，请重试';
     } finally {
-      _searching = false;
-      notifyListeners();
+      if (revision == _searchRevision) {
+        _searching = false;
+        notifyListeners();
+      }
     }
   }
 
   void clearSearch() {
-    if (_searchResults.isEmpty && !_searching) return;
+    _searchRevision++;
     _searchResults = const [];
     _searching = false;
+    searchError = null;
     notifyListeners();
   }
 

@@ -4,6 +4,7 @@ import 'package:html/parser.dart' as html_parser;
 
 import '../../domain/entities/entry.dart';
 import '../../shared/image_viewer_page.dart';
+import '../../shared/highlighted_text.dart';
 
 final class EntryTile extends StatefulWidget {
   const EntryTile({
@@ -14,12 +15,14 @@ final class EntryTile extends StatefulWidget {
     this.onTap,
     this.onVisible,
     this.feedIconUrl,
+    this.highlightQuery = '',
     this.referer,
     super.key,
   });
 
   final Entry entry;
   final String feedTitle;
+  final String highlightQuery;
   final ValueChanged<bool> onReadChanged;
   final ValueChanged<bool> onStarredChanged;
   final VoidCallback? onTap;
@@ -58,9 +61,15 @@ final class _EntryTileState extends State<EntryTile> {
   Widget _build(BuildContext context, EntryTile tile) {
     final colorScheme = Theme.of(context).colorScheme;
     final date = tile.entry.publishedAt ?? tile.entry.insertedAt;
-    final summary = tile.entry.summary == null
+    final compact =
+        MediaQuery.sizeOf(context).width < 380 ||
+        MediaQuery.textScalerOf(context).scale(16) > 22;
+    final rawSummary = tile.entry.summary == null
         ? null
         : html_parser.parseFragment(tile.entry.summary!).text?.trim();
+    final summary = rawSummary?.startsWith('Article URL:') == true
+        ? null
+        : rawSummary;
     final showSummary = summary != null && summary.isNotEmpty;
     final avatarColor = _sourceColor(tile.feedTitle);
 
@@ -75,8 +84,10 @@ final class _EntryTileState extends State<EntryTile> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _sourceAvatar(tile, avatarColor),
-              const SizedBox(width: 12),
+              if (!compact) ...[
+                _sourceAvatar(tile, avatarColor),
+                const SizedBox(width: 10),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,10 +127,10 @@ final class _EntryTileState extends State<EntryTile> {
                       ],
                     ),
                     const SizedBox(height: 5),
-                    Text(
+                    HighlightedText(
                       tile.entry.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      query: tile.highlightQuery,
+                      maxLines: 3,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: tile.entry.isRead
                             ? FontWeight.w500
@@ -132,19 +143,19 @@ final class _EntryTileState extends State<EntryTile> {
                       const SizedBox(height: 2),
                       Text(
                         tile.entry.translatedTitle!,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.secondary,
                         ),
                       ),
                     ],
                     if (showSummary) ...[
                       const SizedBox(height: 5),
-                      Text(
+                      HighlightedText(
                         summary,
+                        query: tile.highlightQuery,
                         maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           height: 1.35,
@@ -187,7 +198,7 @@ final class _EntryTileState extends State<EntryTile> {
                   ],
                 ),
               ),
-              if (tile.entry.imageUrl != null) ...[
+              if (!compact && tile.entry.imageUrl != null) ...[
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => ImageViewerPage.show(
@@ -284,7 +295,7 @@ Color _sourceColor(String seed) {
 String _sourceInitial(String title) {
   final trimmed = title.trim();
   if (trimmed.isEmpty) return '·';
-  return trimmed.substring(0, 1).toUpperCase();
+  return trimmed.characters.first.toUpperCase();
 }
 
 /// Compact relative time for the inbox meta row.
