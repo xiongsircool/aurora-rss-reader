@@ -1,4 +1,4 @@
-import 'dart:ui' as ui;
+import '../../shared/clear_glass_surface.dart';
 
 import 'dart:convert';
 
@@ -97,7 +97,7 @@ class _AuroraShellState extends State<AuroraShell> {
               Positioned(
                 left: 20,
                 right: 20,
-                bottom: bottomInset + 16,
+                bottom: bottomInset + 4,
                 child: _FloatingCapsuleBar(
                   selectedIndex: _selectedIndex,
                   destinations: _destinations,
@@ -298,7 +298,7 @@ final class _InboxPage extends StatelessWidget {
         child: ListView.separated(
           key: const PageStorageKey('inbox-list'),
           padding: EdgeInsets.only(
-            bottom: MediaQuery.paddingOf(context).bottom + 90,
+            bottom: MediaQuery.paddingOf(context).bottom + 78,
           ),
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: controller.entries.length + (controller.hasMore ? 1 : 0),
@@ -385,7 +385,7 @@ final class _SavedPage extends StatelessWidget {
                 : ListView.separated(
                     key: const PageStorageKey('saved-list'),
                     padding: EdgeInsets.only(
-                      bottom: MediaQuery.paddingOf(context).bottom + 90,
+                      bottom: MediaQuery.paddingOf(context).bottom + 78,
                     ),
                     itemCount: controller.starredEntries.length,
                     separatorBuilder: (_, _) => const Divider(height: 1),
@@ -456,7 +456,7 @@ class _SourcesPageState extends State<_SourcesPage> {
                     onRefresh: controller.refreshAll,
                     child: ListView(
                       padding: EdgeInsets.only(
-                        bottom: MediaQuery.paddingOf(context).bottom + 90,
+                        bottom: MediaQuery.paddingOf(context).bottom + 78,
                       ),
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
@@ -1193,89 +1193,59 @@ final class _FloatingCapsuleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          height: 62,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              // Faint top-light hairline: just enough to read the edge.
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.18)
-                  : Colors.white.withValues(alpha: 0.55),
-              width: 0.8,
-            ),
-            boxShadow: [
-              // Ambient shadow hugging the pill.
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
-                blurRadius: 24,
-                offset: const Offset(0, 6),
-              ),
-              // Deep diffused shadow that sells the floating 3D lift.
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.20),
-                blurRadius: 48,
-                offset: const Offset(0, 18),
-                spreadRadius: -6,
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              for (var i = 0; i < destinations.length; i++)
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onDestinationSelected(i),
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(end: i == selectedIndex ? 1.14 : 1.0),
-                      curve: Curves.easeOutBack,
-                      duration: const Duration(milliseconds: 260),
-                      builder: (context, scale, child) =>
-                          Transform.scale(scale: scale, child: child),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconTheme(
-                            data: IconThemeData(
-                              size: 24,
-                              color: i == selectedIndex
-                                  ? scheme.primary
-                                  : scheme.onSurfaceVariant.withValues(
-                                      alpha: 0.8,
-                                    ),
-                            ),
-                            child:
-                                (destinations[i] as NavigationDestination).icon,
+    return ClearGlassSurface(
+      child: SizedBox(
+        height: 62,
+        child: Row(
+          children: [
+            for (var i = 0; i < destinations.length; i++)
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onDestinationSelected(i),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(end: i == selectedIndex ? 1.14 : 1.0),
+                    curve: Curves.easeOutBack,
+                    duration: const Duration(milliseconds: 260),
+                    builder: (context, scale, child) =>
+                        Transform.scale(scale: scale, child: child),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconTheme(
+                          data: IconThemeData(
+                            size: 24,
+                            color: i == selectedIndex
+                                ? scheme.primary
+                                : scheme.onSurfaceVariant.withValues(
+                                    alpha: 0.8,
+                                  ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            (destinations[i] as NavigationDestination).label,
-                            style: TextStyle(
-                              fontSize: 11,
-                              height: 1,
-                              fontWeight: i == selectedIndex
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: i == selectedIndex
-                                  ? scheme.primary
-                                  : scheme.onSurfaceVariant.withValues(
-                                      alpha: 0.8,
-                                    ),
-                            ),
+                          child:
+                              (destinations[i] as NavigationDestination).icon,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          (destinations[i] as NavigationDestination).label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            height: 1,
+                            fontWeight: i == selectedIndex
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: i == selectedIndex
+                                ? scheme.primary
+                                : scheme.onSurfaceVariant.withValues(
+                                    alpha: 0.8,
+                                  ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
