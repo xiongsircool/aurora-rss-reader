@@ -1195,7 +1195,7 @@ final class _FloatingCapsuleBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final tint = (isDark ? const Color(0xFF14161A) : Colors.white).withValues(
-      alpha: isDark ? 0.55 : 0.45,
+      alpha: isDark ? 0.45 : 0.32,
     );
 
     return ClipRRect(
@@ -1208,16 +1208,33 @@ final class _FloatingCapsuleBar extends StatelessWidget {
             color: tint,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              color: scheme.outlineVariant.withValues(
-                alpha: isDark ? 0.35 : 0.5,
-              ),
-              width: 0.6,
+              // Top-light edge that catches light like real glass.
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.22)
+                  : Colors.white.withValues(alpha: 0.85),
+              width: 1.2,
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.white.withValues(alpha: isDark ? 0.10 : 0.22),
+                Colors.white.withValues(alpha: 0.0),
+              ],
             ),
             boxShadow: [
+              // Ambient shadow hugging the pill.
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.10),
-                blurRadius: 18,
+                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
+                blurRadius: 24,
                 offset: const Offset(0, 6),
+              ),
+              // Deep diffused shadow that sells the floating 3D lift.
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.20),
+                blurRadius: 48,
+                offset: const Offset(0, 18),
+                spreadRadius: -6,
               ),
             ],
           ),
