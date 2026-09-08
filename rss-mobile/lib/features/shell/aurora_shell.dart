@@ -239,6 +239,7 @@ final class _InboxPage extends StatelessWidget {
       ),
       body: SafeArea(
         top: false,
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -284,50 +285,80 @@ final class _InboxPage extends StatelessWidget {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: controller.refreshAll,
-      child: ListView.separated(
-        key: const PageStorageKey('inbox-list'),
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.paddingOf(context).bottom + 90,
-        ),
-        physics: const AlwaysScrollableScrollPhysics(),
-        itemCount: controller.entries.length + (controller.hasMore ? 1 : 0),
-        separatorBuilder: (_, _) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          if (index == controller.entries.length) {
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Center(
-                child: TextButton.icon(
-                  onPressed: controller.loadingMore
-                      ? null
-                      : controller.loadMore,
-                  icon: controller.loadingMore
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.extentAfter < 600 &&
+            controller.entries.length < 500) {
+          controller.loadMore();
+        }
+        return false;
+      },
+      child: RefreshIndicator(
+        onRefresh: controller.refreshAll,
+        child: ListView.separated(
+          key: const PageStorageKey('inbox-list'),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.paddingOf(context).bottom + 90,
+          ),
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: controller.entries.length + (controller.hasMore ? 1 : 0),
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            if (index == controller.entries.length) {
+              if (controller.loadingMore) {
+                return const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+              final failed = controller.error?.contains('加载更多') ?? false;
+              if (failed) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: ActionChip(
+                      avatar: const Icon(Icons.refresh, size: 16),
+                      label: const Text('加载失败，点击重试'),
+                      onPressed: controller.loadMore,
+                    ),
+                  ),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: controller.entries.length >= 500
+                      ? TextButton.icon(
+                          onPressed: controller.loadMore,
+                          icon: const Icon(Icons.expand_more),
+                          label: Text(
+                            '已加载 ${controller.entries.length} 篇，继续加载',
+                          ),
                         )
-                      : const Icon(Icons.expand_more),
-                  label: const Text('加载更多'),
+                      : const SizedBox(height: 4),
                 ),
-              ),
+              );
+            }
+            final entry = controller.entries[index];
+            return EntryTile(
+              key: ValueKey(entry.id),
+              entry: entry,
+              feedTitle: controller.feedTitle(entry.feedId),
+              feedIconUrl: controller.feedIconUrl(entry.feedId),
+              referer: controller.feedUrl(entry.feedId),
+              onTap: () => _openReader(context, controller, entry),
+              onVisible: () => controller.requestTitleTranslation(entry.id),
+              onReadChanged: (read) => controller.setRead(entry, read: read),
+              onStarredChanged: (starred) =>
+                  controller.setStarred(entry, starred: starred),
             );
-          }
-          final entry = controller.entries[index];
-          return EntryTile(
-            key: ValueKey(entry.id),
-            entry: entry,
-            feedTitle: controller.feedTitle(entry.feedId),
-            feedIconUrl: controller.feedIconUrl(entry.feedId),
-            referer: controller.feedUrl(entry.feedId),
-            onTap: () => _openReader(context, controller, entry),
-            onVisible: () => controller.requestTitleTranslation(entry.id),
-            onReadChanged: (read) => controller.setRead(entry, read: read),
-            onStarredChanged: (starred) =>
-                controller.setStarred(entry, starred: starred),
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -1197,38 +1228,45 @@ final class _FloatingCapsuleBar extends StatelessWidget {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => onDestinationSelected(i),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconTheme(
-                          data: IconThemeData(
-                            size: 24,
-                            color: i == selectedIndex
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant.withValues(
-                                    alpha: 0.8,
-                                  ),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: i == selectedIndex ? 1.14 : 1.0),
+                      curve: Curves.easeOutBack,
+                      duration: const Duration(milliseconds: 260),
+                      builder: (context, scale, child) =>
+                          Transform.scale(scale: scale, child: child),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconTheme(
+                            data: IconThemeData(
+                              size: 24,
+                              color: i == selectedIndex
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant.withValues(
+                                      alpha: 0.8,
+                                    ),
+                            ),
+                            child:
+                                (destinations[i] as NavigationDestination).icon,
                           ),
-                          child:
-                              (destinations[i] as NavigationDestination).icon,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          (destinations[i] as NavigationDestination).label,
-                          style: TextStyle(
-                            fontSize: 11,
-                            height: 1,
-                            fontWeight: i == selectedIndex
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: i == selectedIndex
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant.withValues(
-                                    alpha: 0.8,
-                                  ),
+                          const SizedBox(height: 2),
+                          Text(
+                            (destinations[i] as NavigationDestination).label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1,
+                              fontWeight: i == selectedIndex
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: i == selectedIndex
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant.withValues(
+                                      alpha: 0.8,
+                                    ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
