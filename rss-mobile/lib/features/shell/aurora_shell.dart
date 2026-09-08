@@ -1203,27 +1203,11 @@ final class _FloatingCapsuleBar extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              // Top-light edge that catches light like real glass.
+              // Faint top-light hairline: just enough to read the edge.
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.22)
-                  : Colors.white.withValues(alpha: 0.85),
-              width: 1.2,
-            ),
-            // gradient overrides BoxDecoration.color, so the white tint
-            // is baked into the stops: brighter on top (sheen), solid
-            // tint below — glass stays white, not gray.
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: isDark
-                  ? [
-                      const Color(0xFF14161A).withValues(alpha: 0.55),
-                      const Color(0xFF14161A).withValues(alpha: 0.45),
-                    ]
-                  : [
-                      Colors.white.withValues(alpha: 0.50),
-                      Colors.white.withValues(alpha: 0.34),
-                    ],
+                  ? Colors.white.withValues(alpha: 0.18)
+                  : Colors.white.withValues(alpha: 0.55),
+              width: 0.8,
             ),
             boxShadow: [
               // Ambient shadow hugging the pill.
