@@ -1,41 +1,32 @@
-import 'dart:async';
-
-import 'package:just_audio/just_audio.dart';
 import 'package:flutter/material.dart';
 
-import '../../data/repositories/reader_prefs_repository.dart';
 import '../../shared/choice_sheet.dart';
+import '../audio/podcast_controller.dart';
 
+String formatPodcastTime(Duration duration) {
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  return duration.inHours > 0
+      ? '${duration.inHours}:$minutes:$seconds'
+      : '${duration.inMinutes}:$seconds';
+}
+
+/// Expanded controls for the shared session. Dismissing this sheet never
+/// stops playback and never creates or disposes an AudioPlayer.
 class PodcastPlayerSheet extends StatefulWidget {
-  const PodcastPlayerSheet({
-    required this.title,
-    required this.feedTitle,
-    required this.url,
-    this.prefs,
-    super.key,
-  });
-  final String title;
-  final String feedTitle;
-  final Uri url;
-  final ReaderPrefsRepository? prefs;
+  const PodcastPlayerSheet({required this.controller, super.key});
+  final PodcastController controller;
 
   static Future<void> show(
     BuildContext context, {
-    required String title,
-    required String feedTitle,
-    required Uri url,
-    ReaderPrefsRepository? prefs,
+    required PodcastController controller,
   }) => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (_) => PodcastPlayerSheet(
-      title: title,
-      feedTitle: feedTitle,
-      url: url,
-      prefs: prefs,
-    ),
+    routeSettings: const RouteSettings(name: 'podcast-controls'),
+    builder: (_) => PodcastPlayerSheet(controller: controller),
   );
 
   @override
@@ -43,130 +34,14 @@ class PodcastPlayerSheet extends StatefulWidget {
 }
 
 class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
-  final _player = AudioPlayer();
-  final List<StreamSubscription<dynamic>> _subscriptions = [];
-  PlayerState _state = PlayerState(false, ProcessingState.idle);
-  Duration _duration = Duration.zero;
-  Duration _position = Duration.zero;
-  Duration? _lastSaved;
-  double _speed = 1;
-  bool _loading = true;
-  bool _ready = false;
-  bool _resumed = false;
-  String? _error;
-  Future<void> _saveTail = Future.value();
+  double? _seekFraction;
+  Uri? _dragEpisode;
 
-  @override
-  void initState() {
-    super.initState();
-    _subscriptions.add(
-      _player.playerStateStream.listen((state) {
-        if (!mounted) return;
-        setState(() => _state = state);
-        if (_ready && state.processingState == ProcessingState.completed) {
-          _save(_duration, force: true);
-        }
-      }),
-    );
-    _subscriptions.add(
-      _player.durationStream.listen((duration) {
-        if (mounted) setState(() => _duration = duration ?? Duration.zero);
-      }),
-    );
-    _subscriptions.add(
-      _player.positionStream.listen((position) {
-        if (!mounted) return;
-        setState(() => _position = position);
-        if (_ready) _save(position);
-      }),
-    );
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _ready = false;
-      _error = null;
-      _resumed = false;
-    });
-    try {
-      final saved =
-          int.tryParse(
-            await widget.prefs?.loadPlaybackPosition(widget.url.toString()) ??
-                '',
-          ) ??
-          0;
-      if (!mounted) return;
-      final duration = await _player.setUrl(widget.url.toString());
-      if (!mounted) return;
-      if (saved >= 30 &&
-          (duration == null || duration.inSeconds - saved > 60)) {
-        await _player.seek(Duration(seconds: saved));
-        if (!mounted) return;
-        _resumed = true;
-      }
-      _ready = true;
-    } catch (_) {
-      if (mounted) _error = '音频暂时无法加载，请检查网络后重试';
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  void _save(Duration position, {bool force = false}) {
-    final prefs = widget.prefs;
-    if (prefs == null || !_ready) return;
-    if (!force &&
-        _lastSaved != null &&
-        (position - _lastSaved!).abs().inSeconds < 10) {
-      return;
-    }
-    _lastSaved = position;
-    final audioUrl = widget.url.toString();
-    _saveTail = _saveTail
-        .then((_) => prefs.savePlaybackPosition(audioUrl, position.inSeconds))
-        .catchError((Object _) {});
-  }
-
-  Future<void> _toggle() async {
-    try {
-      if (_player.playing) {
-        await _player.pause();
-        _save(_player.position, force: true);
-      } else {
-        if (_state.processingState == ProcessingState.completed) {
-          await _player.seek(Duration.zero);
-        }
-        if (!mounted) return;
-        await _player.play();
-      }
-    } catch (_) {
-      if (mounted) setState(() => _error = '播放中断，请重试');
-    }
-  }
-
-  Future<void> _seek(Duration target) async {
-    try {
-      await _player.seek(
-        Duration(
-          milliseconds: target.inMilliseconds.clamp(
-            0,
-            _duration.inMilliseconds,
-          ),
-        ),
-      );
-      _save(_player.position, force: true);
-    } catch (_) {
-      if (mounted) setState(() => _error = '跳转失败，请重试');
-    }
-  }
-
-  Future<void> _chooseSpeed() async {
-    final speed = await showChoiceSheet<double>(
+  Future<void> _speed() async {
+    await showChoiceSheet<double>(
       context: context,
       title: '播放速度',
-      selected: _speed,
+      selected: widget.controller.speed,
       options: [
         for (final value in [0.75, 1.0, 1.25, 1.5, 1.75, 2.0])
           ChoiceOption(
@@ -175,166 +50,200 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
             subtitle: value == 1 ? '正常速度' : null,
           ),
       ],
-      onApply: _player.setSpeed,
+      onApply: widget.controller.setSpeed,
     );
-    if (mounted && speed != null) setState(() => _speed = speed);
   }
 
   @override
-  void dispose() {
-    _save(_player.position, force: true);
-    for (final sub in _subscriptions) {
-      sub.cancel();
-    }
-    _player.dispose();
-    super.dispose();
-  }
-
-  String _time(Duration duration) {
-    final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final m = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    return duration.inHours > 0
-        ? '${duration.inHours}:$m:$s'
-        : '${duration.inMinutes}:$s';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final buffering = _state.processingState == ProcessingState.buffering;
-    final completed = _state.processingState == ProcessingState.completed;
-    final playable = _ready && !_loading && _error == null;
-    final status = _loading
-        ? '正在加载音频…'
-        : _error != null
-        ? '播放暂不可用'
-        : buffering
-        ? '正在缓冲…'
-        : completed
-        ? '已播放完毕'
-        : _state.playing
-        ? '正在播放'
-        : '已暂停';
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        0,
-        24,
-        24 + MediaQuery.paddingOf(context).bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            widget.feedTitle,
-            style: Theme.of(context).textTheme.labelLarge
-                ?.copyWith(color: scheme.secondary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            widget.title,
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(height: 1.35),
-          ),
-          const SizedBox(height: 16),
-          Text(status, style: Theme.of(context).textTheme.bodySmall),
-          if (_resumed && !completed) const Text('已恢复到上次播放位置'),
-          if (_loading || buffering)
-            const Padding(
-              padding: EdgeInsets.only(top: 12),
-              child: LinearProgressIndicator(minHeight: 2),
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.controller,
+    builder: (context, _) {
+      final player = widget.controller;
+      final episode = player.episode;
+      if (episode == null) return const SizedBox.shrink();
+      final scheme = Theme.of(context).colorScheme;
+      final fraction = _dragEpisode == episode.url ? _seekFraction : null;
+      final displayed = fraction == null
+          ? player.position
+          : Duration(
+              milliseconds: (fraction * player.duration.inMilliseconds).round(),
+            );
+      final canSeek = player.canControl && player.duration > Duration.zero;
+      final progress =
+          fraction ??
+          (player.duration.inMilliseconds > 0
+              ? (player.position.inMilliseconds /
+                        player.duration.inMilliseconds)
+                    .clamp(0.0, 1.0)
+              : 0.0);
+      return SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          0,
+          24,
+          24 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    episode.feedTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge
+                        ?.copyWith(color: scheme.secondary),
+                  ),
+                ),
+                IconButton(
+                  tooltip: '收起播放器，继续播放',
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                ),
+              ],
             ),
-          if (_error != null) ...[
-            Text(_error!, style: TextStyle(color: scheme.error)),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _loading ? null : _load,
-                icon: const Icon(Icons.refresh),
-                label: const Text('重新加载'),
+            Text(
+              episode.title,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(height: 1.35),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              player.status,
+              style: TextStyle(
+                color: player.error == null
+                    ? scheme.onSurfaceVariant
+                    : scheme.error,
               ),
+            ),
+            if (player.resumed && player.error == null && !player.completed)
+              const Text('已恢复上次进度'),
+            if (player.loading || player.buffering)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+            if (player.error != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: player.loading ? null : player.retry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('重新加载'),
+                ),
+              ),
+            const SizedBox(height: 16),
+            Slider(
+              key: const ValueKey('podcast-seek'),
+              value: progress,
+              onChanged: canSeek
+                  ? (value) => setState(() {
+                      _dragEpisode = episode.url;
+                      _seekFraction = value;
+                    })
+                  : null,
+              onChangeEnd: canSeek
+                  ? (value) {
+                      final sameEpisode = _dragEpisode == player.episode?.url;
+                      setState(() => _seekFraction = null);
+                      if (sameEpisode) {
+                        player.seek(
+                          Duration(
+                            milliseconds:
+                                (value * player.duration.inMilliseconds)
+                                    .round(),
+                          ),
+                        );
+                      }
+                    }
+                  : null,
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(formatPodcastTime(displayed)),
+                Text(
+                  player.duration > Duration.zero
+                      ? formatPodcastTime(player.duration)
+                      : '--:--',
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 24,
+              children: [
+                IconButton(
+                  tooltip: '后退 10 秒',
+                  iconSize: 30,
+                  icon: const Icon(Icons.replay_10),
+                  onPressed: canSeek
+                      ? () => player.seek(
+                          player.position - const Duration(seconds: 10),
+                        )
+                      : null,
+                ),
+                FilledButton(
+                  onPressed: player.canControl ? player.toggle : null,
+                  style: FilledButton.styleFrom(
+                    shape: const CircleBorder(),
+                    minimumSize: const Size(64, 64),
+                  ),
+                  child: Icon(
+                    player.completed
+                        ? Icons.replay
+                        : player.playing
+                        ? Icons.pause
+                        : Icons.play_arrow,
+                    semanticLabel: player.completed
+                        ? '重新播放'
+                        : player.playing
+                        ? '暂停'
+                        : '播放',
+                    size: 32,
+                  ),
+                ),
+                IconButton(
+                  tooltip: '前进 30 秒',
+                  iconSize: 30,
+                  icon: const Icon(Icons.forward_30),
+                  onPressed: canSeek
+                      ? () => player.seek(
+                          player.position + const Duration(seconds: 30),
+                        )
+                      : null,
+                ),
+              ],
+            ),
+            Center(
+              child: TextButton.icon(
+                onPressed: player.canControl ? _speed : null,
+                icon: const Icon(Icons.speed),
+                label: Text('${player.speed}× 播放速度'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '收起后可继续浏览文章。当前支持应用内持续播放，离开应用时会暂停。',
+              textAlign: TextAlign.center,
+            ),
+            TextButton(
+              onPressed: () {
+                player.close();
+                Navigator.pop(context);
+              },
+              child: const Text('停止播放并关闭'),
             ),
           ],
-          const SizedBox(height: 16),
-          Slider(
-            value: _duration.inMilliseconds > 0
-                ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(
-                    0,
-                    1,
-                  )
-                : 0,
-            onChanged: playable && _duration > Duration.zero
-                ? (value) => _seek(
-                    Duration(
-                      milliseconds: (value * _duration.inMilliseconds).round(),
-                    ),
-                  )
-                : null,
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(_time(_position)),
-              Text(_duration > Duration.zero ? _time(_duration) : '--:--'),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 24,
-            children: [
-              IconButton(
-                tooltip: '后退 10 秒',
-                onPressed: playable
-                    ? () => _seek(_position - const Duration(seconds: 10))
-                    : null,
-                icon: const Icon(Icons.replay_10),
-                iconSize: 30,
-              ),
-              FilledButton(
-                onPressed: playable ? _toggle : null,
-                style: FilledButton.styleFrom(
-                  shape: const CircleBorder(),
-                  minimumSize: const Size(64, 64),
-                ),
-                child: Icon(
-                  completed
-                      ? Icons.replay
-                      : _state.playing
-                      ? Icons.pause
-                      : Icons.play_arrow,
-                  semanticLabel: completed
-                      ? '重新播放'
-                      : _state.playing
-                      ? '暂停'
-                      : '播放',
-                  size: 32,
-                ),
-              ),
-              IconButton(
-                tooltip: '前进 30 秒',
-                onPressed: playable
-                    ? () => _seek(_position + const Duration(seconds: 30))
-                    : null,
-                icon: const Icon(Icons.forward_30),
-                iconSize: 30,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Center(
-            child: TextButton.icon(
-              onPressed: playable ? _chooseSpeed : null,
-              icon: const Icon(Icons.speed),
-              label: Text('$_speed× 播放速度'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
+    },
+  );
 }

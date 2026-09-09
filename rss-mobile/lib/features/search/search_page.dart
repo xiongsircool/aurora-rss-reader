@@ -1,3 +1,4 @@
+import '../audio/podcast_overlay.dart';
 import '../../shared/right_scrollbar.dart';
 
 import 'dart:async';
@@ -138,12 +139,15 @@ class _SearchPageState extends State<SearchPage> {
         ),
         Expanded(
           child: RightScrollView(
-            bottomClearance: 0,
+            bottomClearance: PodcastInsets.of(context),
             builder: (context, scrollController) => ListView.separated(
               controller: scrollController,
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.only(
-                bottom: MediaQuery.paddingOf(context).bottom + 16,
+                bottom:
+                    MediaQuery.paddingOf(context).bottom +
+                    16 +
+                    PodcastInsets.of(context),
               ),
               itemCount: results.length,
               separatorBuilder: (_, _) => Divider(

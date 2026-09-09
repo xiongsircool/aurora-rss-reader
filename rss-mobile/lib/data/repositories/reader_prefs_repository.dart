@@ -103,9 +103,16 @@ class ReaderPrefsRepository {
 
   /// Podcast playback position memory, keyed by the audio URL.
   Future<String?> loadPlaybackPosition(String audioUrl) async {
-    return _get('podcast_pos_${audioUrl.hashCode.toRadixString(36)}');
+    final key = 'podcast_pos_v2:$audioUrl';
+    final saved = await _get(key);
+    if (saved != null) return saved;
+    final legacy = await _get(
+      'podcast_pos_${audioUrl.hashCode.toRadixString(36)}',
+    );
+    if (legacy != null) await _set(key, legacy);
+    return legacy;
   }
 
   Future<void> savePlaybackPosition(String audioUrl, int seconds) =>
-      _set('podcast_pos_${audioUrl.hashCode.toRadixString(36)}', '$seconds');
+      _set('podcast_pos_v2:$audioUrl', '${seconds < 0 ? 0 : seconds}');
 }

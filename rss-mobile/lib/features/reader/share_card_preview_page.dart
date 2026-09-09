@@ -1,3 +1,4 @@
+import '../audio/podcast_overlay.dart';
 import '../../shared/right_scrollbar.dart';
 
 import 'dart:io';
@@ -213,14 +214,16 @@ class _ShareCardPreviewPageState extends State<ShareCardPreviewPage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
           child: RightScrollView(
-            bottomClearance: 0,
+            bottomClearance: PodcastInsets.of(context),
             builder: (context, scrollController) => ListView(
               controller: scrollController,
               padding: EdgeInsets.fromLTRB(
                 20,
                 12,
                 20,
-                MediaQuery.paddingOf(context).bottom + 24,
+                MediaQuery.paddingOf(context).bottom +
+                    24 +
+                    PodcastInsets.of(context),
               ),
               children: [
                 Text('图文摘要', style: Theme.of(context).textTheme.titleMedium),

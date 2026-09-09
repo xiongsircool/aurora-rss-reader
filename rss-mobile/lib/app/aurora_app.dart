@@ -1,12 +1,27 @@
 import 'package:flutter/material.dart';
 
+import '../features/audio/podcast_overlay.dart';
 import '../features/reader/mobile_reader_controller.dart';
 import '../features/shell/aurora_shell.dart';
 
-final class AuroraApp extends StatelessWidget {
+final class AuroraApp extends StatefulWidget {
   const AuroraApp({required this.controller, super.key});
 
   final MobileReaderController controller;
+
+  @override
+  State<AuroraApp> createState() => _AuroraAppState();
+}
+
+class _AuroraAppState extends State<AuroraApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  final _podcastRoutes = PodcastRouteObserver();
+
+  @override
+  void dispose() {
+    _podcastRoutes.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +49,14 @@ final class AuroraApp extends StatelessWidget {
     );
 
     return MaterialApp(
+      navigatorKey: _navigatorKey,
+      navigatorObservers: [_podcastRoutes],
+      builder: (context, child) => PodcastOverlayHost(
+        controller: widget.controller.podcast,
+        observer: _podcastRoutes,
+        navigatorKey: _navigatorKey,
+        child: child!,
+      ),
       title: 'Aurora RSS Reader',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -85,7 +108,7 @@ final class AuroraApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: AuroraShell(controller: controller),
+      home: AuroraShell(controller: widget.controller),
     );
   }
 }

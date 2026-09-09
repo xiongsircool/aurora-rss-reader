@@ -1,3 +1,4 @@
+import '../audio/podcast_overlay.dart';
 import '../../shared/right_scrollbar.dart';
 import '../../shared/clear_glass_surface.dart';
 import '../../shared/choice_sheet.dart';
@@ -1462,10 +1463,11 @@ class _ReaderLayoutScope extends InheritedWidget {
   final double bottomClearance;
   final ValueChanged<Entry>? openEntry;
   static double clearance(BuildContext context) =>
-      context
-          .dependOnInheritedWidgetOfExactType<_ReaderLayoutScope>()
-          ?.bottomClearance ??
-      78;
+      (context
+              .dependOnInheritedWidgetOfExactType<_ReaderLayoutScope>()
+              ?.bottomClearance ??
+          78) +
+      PodcastInsets.of(context);
   @override
   bool updateShouldNotify(_ReaderLayoutScope old) =>
       bottomClearance != old.bottomClearance || openEntry != old.openEntry;

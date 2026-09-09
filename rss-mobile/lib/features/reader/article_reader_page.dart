@@ -26,6 +26,8 @@ import '../../domain/media/audio_source.dart';
 import '../../shared/image_viewer_page.dart';
 import '../../shared/reading_stats.dart';
 import '../../shared/right_scrollbar.dart';
+import '../audio/podcast_controller.dart';
+import '../audio/podcast_overlay.dart';
 import '../reader/podcast_player_sheet.dart';
 import '../reader/video_card.dart';
 import '../reader/mobile_reader_controller.dart';
@@ -592,6 +594,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
         child: RepaintBoundary(
           key: _articleCaptureKey,
           child: RightScrollbar(
+            bottomClearance: PodcastInsets.of(context),
             controller: _scrollController,
             child: ListView(
               controller: _scrollController,
@@ -599,7 +602,9 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 horizontal,
                 12,
                 horizontal,
-                24 + MediaQuery.paddingOf(context).bottom,
+                24 +
+                    MediaQuery.paddingOf(context).bottom +
+                    PodcastInsets.of(context),
               ),
               children: [
                 Text(
@@ -648,17 +653,40 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 if (audioUrl != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 12, bottom: 8),
-                    child: FilledButton.tonalIcon(
-                      key: const ValueKey('play-podcast'),
-                      onPressed: () => PodcastPlayerSheet.show(
-                        context,
-                        title: _entry.title,
-                        feedTitle: widget.feedTitle,
-                        url: audioUrl,
-                        prefs: _prefs,
-                      ),
-                      icon: const Icon(Icons.headphones),
-                      label: const Text('播放音频'),
+                    child: AnimatedBuilder(
+                      animation: widget.controller.podcast,
+                      builder: (context, _) {
+                        final player = widget.controller.podcast;
+                        final selected = player.episode?.url == audioUrl;
+                        return FilledButton.tonalIcon(
+                          key: const ValueKey('play-podcast'),
+                          onPressed: () {
+                            if (selected) {
+                              PodcastPlayerSheet.show(
+                                context,
+                                controller: player,
+                              );
+                            } else {
+                              unawaited(
+                                player.start(
+                                  PodcastEpisode(
+                                    url: audioUrl,
+                                    title: _entry.title,
+                                    feedTitle: widget.feedTitle,
+                                    cover: _entry.imageUrl,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          icon: Icon(
+                            selected && player.playing
+                                ? Icons.graphic_eq
+                                : Icons.headphones,
+                          ),
+                          label: Text(selected ? '打开播放器' : '播放音频'),
+                        );
+                      },
                     ),
                   ),
                 const SizedBox(height: 12),

@@ -418,8 +418,8 @@ final class LocalContentRepository {
     final row = rows.first;
     return (
       total: row.read<int>('total'),
-      read: row.read<int>('read_count'),
-      starred: row.read<int>('starred'),
+      read: row.read<int?>('read_count') ?? 0,
+      starred: row.read<int?>('starred') ?? 0,
     );
   }
 

@@ -1,3 +1,5 @@
+import '../audio/podcast_overlay.dart';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -30,7 +32,12 @@ class AboutPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('关于 Aurora')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
+        padding: EdgeInsets.fromLTRB(
+          24,
+          32,
+          24,
+          40 + PodcastInsets.of(context),
+        ),
         children: [
           Center(
             child: ClipRRect(

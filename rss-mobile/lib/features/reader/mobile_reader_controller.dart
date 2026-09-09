@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../audio/podcast_controller.dart';
 import '../../application/use_cases/extract_article.dart';
 import '../../application/use_cases/refresh_feed.dart';
 import '../../data/platform/ai_client.dart';
@@ -28,13 +29,24 @@ final class MobileReaderController extends ChangeNotifier {
     this.aiClient,
     this.secureKeyStore,
     String? initialProxyUrl,
-  }) : _proxyUrl = initialProxyUrl;
+    PodcastController? podcast,
+  }) : _proxyUrl = initialProxyUrl,
+       podcast =
+           podcast ??
+           PodcastController(prefs: ReaderPrefsRepository(repository.database));
 
   final LocalContentRepository repository;
   final RefreshFeed refreshFeed;
   final ExtractArticle? extractArticle;
   final AiClient? aiClient;
   final SecureKeyStore? secureKeyStore;
+  final PodcastController podcast;
+
+  @override
+  void dispose() {
+    podcast.dispose();
+    super.dispose();
+  }
 
   /// Optional icon resolution; null in tests that do not touch the network.
   FaviconResolver? faviconResolver;
