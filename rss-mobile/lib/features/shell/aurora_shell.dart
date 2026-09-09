@@ -119,18 +119,55 @@ class _AuroraShellState extends State<AuroraShell> {
                     ? Row(
                         children: [
                           SafeArea(
-                            child: NavigationRail(
-                              minWidth: 88,
-                              selectedIndex: _selectedIndex,
-                              labelType: NavigationRailLabelType.all,
-                              onDestinationSelected: _select,
-                              destinations: [
-                                for (final d in _destinations)
-                                  NavigationRailDestination(
-                                    icon: d.icon,
-                                    selectedIcon: d.selectedIcon,
-                                    label: Text(d.label),
+                            child: Column(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    4,
+                                    14,
+                                    4,
+                                    6,
                                   ),
+                                  child: Row(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Image.asset(
+                                          'assets/splash/logo.png',
+                                          width: 34,
+                                          height: 34,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        'Aurora',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: NavigationRail(
+                                    minWidth: 88,
+                                    selectedIndex: _selectedIndex,
+                                    labelType: NavigationRailLabelType.all,
+                                    onDestinationSelected: _select,
+                                    destinations: [
+                                      for (final d in _destinations)
+                                        NavigationRailDestination(
+                                          icon: d.icon,
+                                          selectedIcon: d.selectedIcon,
+                                          label: Text(d.label),
+                                        ),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -472,7 +509,26 @@ final class _SavedPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('收藏')),
+      appBar: AppBar(
+        title: LayoutBuilder(
+          builder: (context, constraints) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('收藏'),
+              if (constraints.maxWidth > 620)
+                Text(
+                  controller.starredEntries.isEmpty
+                      ? '收藏喜欢的文章，方便以后回看'
+                      : '已收藏 ${controller.starredEntries.length} 篇',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
       body: Column(
         children: [
           RefreshStatusBanner(controller: controller),

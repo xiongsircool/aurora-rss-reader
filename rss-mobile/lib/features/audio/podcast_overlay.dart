@@ -121,10 +121,8 @@ class _PodcastOverlayHostState extends State<PodcastOverlayHost> {
       final episode = player.episode;
       final width = MediaQuery.sizeOf(context).width;
       final scaler = MediaQuery.textScalerOf(context);
-      final height = math.max(
-        76.0,
-        scaler.scale(14) * 1.4 + scaler.scale(11) * 1.4 + 22,
-      );
+      final height = math.max(52.0, scaler.scale(13) * 1.4 + 22);
+      final maxWidth = math.min(width - 32, 480.0);
       final navHeight = (48 + scaler.scale(11)).clamp(62.0, 120.0);
       final compactHome = widget.observer.onHome && width < 700;
       final bottom =
@@ -141,125 +139,87 @@ class _PodcastOverlayHostState extends State<PodcastOverlayHost> {
               Positioned(
                 right: 16,
                 bottom: bottom,
-                width: math.min(width - 32, 560),
+                width: maxWidth,
                 height: height,
                 child: Material(
-                  elevation: 4,
-                  color: Theme.of(context).colorScheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(16),
+                  elevation: 3,
+                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(height / 2),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     key: const ValueKey('mini-player-open'),
                     onTap: _expand,
-                    child: Column(
+                    child: Row(
                       children: [
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 14, right: 4),
-                            child: Row(
-                              children: [
-                                if (width >= 380 && scaler.scale(14) < 22) ...[
-                                  if (episode.cover != null)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: CachedNetworkImage(
-                                        imageUrl: episode.cover.toString(),
-                                        width: 40,
-                                        height: 40,
-                                        fit: BoxFit.cover,
-                                        placeholder: (_, _) => const Icon(
-                                          Icons.headphones_outlined,
-                                        ),
-                                        errorWidget: (_, _, _) => const Icon(
-                                          Icons.headphones_outlined,
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    const Icon(
-                                      Icons.headphones_outlined,
-                                      size: 24,
-                                    ),
-                                  const SizedBox(width: 12),
-                                ],
-                                Expanded(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        episode.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall,
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        '${formatPodcastTime(player.position)} · ${player.status}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .labelSmall
-                                            ?.copyWith(
-                                              color: player.error == null
-                                                  ? Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurfaceVariant
-                                                  : Theme.of(context)
-                                                        .colorScheme
-                                                        .error,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  key: const ValueKey('mini-player-toggle'),
-                                  onPressed: player.loading
-                                      ? null
-                                      : player.toggle,
-                                  icon: Icon(
-                                    player.error != null
-                                        ? Icons.refresh
-                                        : player.completed
-                                        ? Icons.replay
-                                        : player.playing
-                                        ? Icons.pause
-                                        : Icons.play_arrow,
-                                    semanticLabel: player.error != null
-                                        ? '重试音频'
-                                        : player.playing
-                                        ? '暂停音频'
-                                        : '播放音频',
-                                  ),
-                                ),
-                                IconButton(
-                                  key: const ValueKey('mini-player-close'),
-                                  onPressed: player.close,
-                                  icon: const Icon(
-                                    Icons.close,
-                                    size: 20,
-                                    semanticLabel: '停止播放并关闭',
-                                  ),
-                                ),
-                              ],
-                            ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: _MiniCover(
+                            episode: episode,
+                            size: height - 14,
                           ),
                         ),
-                        LinearProgressIndicator(
-                          minHeight: 2,
-                          value: player.loading || player.buffering
-                              ? null
-                              : player.duration.inMilliseconds > 0
-                              ? (player.position.inMilliseconds /
-                                        player.duration.inMilliseconds)
-                                    .clamp(0.0, 1.0)
-                              : 0,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  episode.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.labelLarge
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Flexible(child: _MiniProgress(player: player)),
+                            ],
+                          ),
                         ),
+                        IconButton(
+                          key: const ValueKey('mini-player-toggle'),
+                          visualDensity: VisualDensity.compact,
+                          constraints: BoxConstraints(
+                            minWidth: 40,
+                            minHeight: height - 8,
+                          ),
+                          padding: EdgeInsets.zero,
+                          onPressed: player.loading ? null : player.toggle,
+                          icon: Icon(
+                            player.error != null
+                                ? Icons.refresh
+                                : player.completed
+                                ? Icons.replay
+                                : player.playing
+                                ? Icons.pause
+                                : Icons.play_arrow,
+                            size: 22,
+                            semanticLabel: player.error != null
+                                ? '重试音频'
+                                : player.playing
+                                ? '暂停音频'
+                                : '播放音频',
+                          ),
+                        ),
+                        IconButton(
+                          key: const ValueKey('mini-player-close'),
+                          visualDensity: VisualDensity.compact,
+                          constraints: BoxConstraints(
+                            minWidth: 36,
+                            minHeight: height - 8,
+                          ),
+                          padding: EdgeInsets.zero,
+                          onPressed: player.close,
+                          icon: const Icon(
+                            Icons.close,
+                            size: 18,
+                            semanticLabel: '停止播放并关闭',
+                          ),
+                        ),
+                        const SizedBox(width: 4),
                       ],
                     ),
                   ),
@@ -270,4 +230,83 @@ class _PodcastOverlayHostState extends State<PodcastOverlayHost> {
       );
     },
   );
+}
+
+final class _MiniCover extends StatelessWidget {
+  const _MiniCover({required this.episode, required this.size});
+  final PodcastEpisode episode;
+  final double size;
+  @override
+  Widget build(BuildContext context) {
+    final cover = episode.cover;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size / 3),
+      child: cover == null
+          ? SizedBox(
+              width: size,
+              height: size,
+              child: const Icon(Icons.headphones_outlined, size: 20),
+            )
+          : CachedNetworkImage(
+              imageUrl: cover.toString(),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => SizedBox(
+                width: size,
+                height: size,
+                child: const Icon(Icons.headphones_outlined, size: 20),
+              ),
+              errorWidget: (_, _, _) => SizedBox(
+                width: size,
+                height: size,
+                child: const Icon(Icons.headphones_outlined, size: 20),
+              ),
+            ),
+    );
+  }
+}
+
+final class _MiniProgress extends StatelessWidget {
+  const _MiniProgress({required this.player});
+  final PodcastController player;
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final failed = player.error != null;
+    final value = player.loading || player.buffering
+        ? null
+        : player.duration.inMilliseconds > 0
+        ? (player.position.inMilliseconds / player.duration.inMilliseconds)
+              .clamp(0.0, 1.0)
+        : 0.0;
+    return Row(
+      children: [
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              player.completed
+                  ? '已播完'
+                  : '${formatPodcastTime(player.position)} / ${player.duration > Duration.zero ? formatPodcastTime(player.duration) : '--:--'}',
+              maxLines: 1,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: failed ? scheme.error : scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: LinearProgressIndicator(
+            minHeight: 2,
+            borderRadius: BorderRadius.circular(2),
+            value: value,
+            color: failed ? scheme.error : scheme.secondary,
+            backgroundColor: scheme.onSurfaceVariant.withValues(alpha: 0.2),
+          ),
+        ),
+      ],
+    );
+  }
 }
