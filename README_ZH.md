@@ -27,15 +27,15 @@
 
 |  | 🖥️ 桌面端 | 📱 移动端 |
 |---|---|---|
-| 版本 | v0.2.0 | v0.1.1 |
+| 版本 | v0.2.0 | v0.1.2 |
 | 平台 | Windows · macOS · Linux | Android（iOS 已真机验证） |
 | 技术栈 | Electron + Vue 3 + Fastify | Flutter · 本地优先 |
 | 数据 | 本地 SQLite，可选后端 | 100% 设备本地 SQLite |
-| 下载 | [Releases](https://github.com/xiongsircool/aurora-rss-reader/releases) | [mobile-v0.1.1 APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.1) |
+| 下载 | [Releases](https://github.com/xiongsircool/aurora-rss-reader/releases) | [mobile-v0.1.2 APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.2) |
 
 ---
 
-## 📱 Aurora Mobile v0.1.1
+## 📱 Aurora Mobile v0.1.2
 
 **本地优先**的 RSS 阅读器：无账号、无服务器、无遥测。订阅、文章与 AI 设置全部只保存在你的设备上。
 
@@ -55,7 +55,7 @@
 - 🔍 FTS5 全文搜索 · OPML 导入导出 · 分组 · 深色模式
 - 🔔 本地通知 · 后台刷新
 
-📥 **安装**：从[发布页](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.1)下载 `Aurora-mobile-v0.1.1-arm64.apk`（ARM64 设备）或通用版。**GitHub v0.1.0 APK 的签名与新版不同，不能直接覆盖升级；请勿在没有数据迁移方案时卸载，OPML 仅备份订阅。** iOS 公开分发暂缓。详见 [rss-mobile/README.md](rss-mobile/README.md)。
+📥 **安装**：从[发布页](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.2)下载 `Aurora-mobile-v0.1.2-arm64.apk`（ARM64 设备）或通用版。**GitHub v0.1.0 APK 的签名与新版不同，不能直接覆盖升级；请勿在没有数据迁移方案时卸载，OPML 仅备份订阅。** iOS 公开分发暂缓。详见 [rss-mobile/README.md](rss-mobile/README.md)。
 
 ---
 

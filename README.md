@@ -29,15 +29,15 @@
 
 |  | 🖥️ Desktop | 📱 Mobile |
 |---|---|---|
-| Version | v0.2.0 | v0.1.1 |
+| Version | v0.2.0 | v0.1.2 |
 | Platform | Windows · macOS · Linux | Android (iOS verified on device) |
 | Stack | Electron + Vue 3 + Fastify | Flutter · local-first |
 | Data | Local SQLite, optional backend | 100% on-device SQLite |
-| Download | [Releases](https://github.com/xiongsircool/aurora-rss-reader/releases) | [mobile-v0.1.1 APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.1) |
+| Download | [Releases](https://github.com/xiongsircool/aurora-rss-reader/releases) | [mobile-v0.1.2 APK](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.2) |
 
 ---
 
-## 📱 Aurora Mobile v0.1.1
+## 📱 Aurora Mobile v0.1.2
 
 A **local-first** RSS reader: no account, no server, no telemetry. Feeds, articles and AI settings live only on your device.
 
@@ -57,7 +57,7 @@ A **local-first** RSS reader: no account, no server, no telemetry. Feeds, articl
 - 🔍 FTS5 full-text search · OPML import/export · groups · dark mode
 - 🔔 Local notifications · background refresh
 
-📥 **Install**: grab `Aurora-mobile-v0.1.1-arm64.apk` (ARM64 devices) or the universal APK from the [release page](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.1). **Upgrading from the GitHub v0.1.0 APK requires special care: its signing certificate differs; do not uninstall without a data migration plan. OPML only backs up subscriptions.** iOS public distribution is deferred. Details: [rss-mobile/README.md](rss-mobile/README.md).
+📥 **Install**: grab `Aurora-mobile-v0.1.2-arm64.apk` (ARM64 devices) or the universal APK from the [release page](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.2). **Upgrading from the GitHub v0.1.0 APK requires special care: its signing certificate differs; do not uninstall without a data migration plan. OPML only backs up subscriptions.** iOS public distribution is deferred. Details: [rss-mobile/README.md](rss-mobile/README.md).
 
 ---
 
