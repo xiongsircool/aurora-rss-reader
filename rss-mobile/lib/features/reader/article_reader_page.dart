@@ -22,6 +22,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/repositories/reader_prefs_repository.dart';
 import '../../domain/entities/entry.dart';
+import '../../domain/media/audio_source.dart';
 import '../../shared/image_viewer_page.dart';
 import '../../shared/reading_stats.dart';
 import '../../shared/right_scrollbar.dart';
@@ -531,6 +532,14 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
         ? (_entry.content ?? _entry.summary)
         : (_entry.readabilityContent ?? _entry.content ?? _entry.summary);
     final referer = widget.referer;
+    final audioUrl = findArticleAudio(
+      attachment: _entry.enclosureUrl,
+      attachmentType: _entry.enclosureType,
+      html: html,
+      baseUrl: !_showOriginal && _entry.readabilityContent != null
+          ? (_entry.contentSourceUrl ?? _entry.url)
+          : _entry.url,
+    );
     final hasText = html != null && html.trim().length >= 30;
     final width = MediaQuery.sizeOf(context).width;
     final horizontal = width > 760 ? (width - 720) / 2 : 20.0;
@@ -636,6 +645,22 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                     height: 1.5,
                   ),
                 ),
+                if (audioUrl != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12, bottom: 8),
+                    child: FilledButton.tonalIcon(
+                      key: const ValueKey('play-podcast'),
+                      onPressed: () => PodcastPlayerSheet.show(
+                        context,
+                        title: _entry.title,
+                        feedTitle: widget.feedTitle,
+                        url: audioUrl,
+                        prefs: _prefs,
+                      ),
+                      icon: const Icon(Icons.headphones),
+                      label: const Text('播放音频'),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 4,
@@ -951,26 +976,6 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                     url: _entry.url!,
                     title: _entry.title,
                     referer: referer,
-                  ),
-                ],
-                // Podcast player button (when audio enclosure exists)
-                if (_entry.enclosureUrl != null &&
-                    (_entry.enclosureType?.startsWith('audio/') ?? false)) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      key: const ValueKey('play-podcast'),
-                      onPressed: () => PodcastPlayerSheet.show(
-                        context,
-                        title: _entry.title,
-                        feedTitle: widget.feedTitle,
-                        url: _entry.enclosureUrl!,
-                        prefs: _prefs,
-                      ),
-                      icon: const Icon(Icons.headphones),
-                      label: const Text('播放播客'),
-                    ),
                   ),
                 ],
                 if (_entry.url != null) ...[

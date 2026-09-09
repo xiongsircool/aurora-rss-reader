@@ -93,6 +93,10 @@ final class Entry {
           ? null
           : (contentExtractionError ?? this.contentExtractionError),
       imageUrl: imageUrl,
+      enclosureUrl: enclosureUrl,
+      enclosureType: enclosureType,
+      enclosureDuration: enclosureDuration,
+      sourceLang: sourceLang,
       publishedAt: publishedAt,
       insertedAt: insertedAt,
       readAt: clearReadAt ? null : (readAt ?? this.readAt),

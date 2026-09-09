@@ -264,6 +264,7 @@ final class MobileReaderController extends ChangeNotifier {
       );
       final result = await refreshFeed(feed);
       await _reload();
+      unawaited(_resolveFeedIcon(feed));
       _notice = result.insertedEntries > 0
           ? '已添加 ${result.feedTitle}，获取 ${result.insertedEntries} 篇文章'
           : '${result.feedTitle} 已是最新状态';
@@ -485,13 +486,20 @@ final class MobileReaderController extends ChangeNotifier {
   /// Resolves and stores a feed icon in the background. Never throws.
   Future<void> _resolveFeedIcon(Feed feed) async {
     final resolver = faviconResolver;
-    if (resolver == null || feed.iconUrl != null) return;
+    final current = _feeds.where((source) => source.id == feed.id).firstOrNull;
+    if (resolver == null || current == null || current.iconUrl != null) return;
     if (!_resolvingIcons.add(feed.id)) return;
     try {
-      final iconUrl = await resolver.resolve(feed.url);
+      final iconUrl = await resolver.resolve(current.url);
       if (iconUrl != null) {
         await repository.updateFeedIconUrl(feed.id, iconUrl);
-        await _reload();
+        // Patch only the source metadata; icon completion must not reset
+        // pagination or move the reader back to its first loaded page.
+        _feeds = [
+          for (final source in _feeds)
+            source.id == feed.id ? source.copyWith(iconUrl: iconUrl) : source,
+        ];
+        notifyListeners();
       }
     } catch (_) {
       // Icon discovery is best-effort; letter avatars remain the fallback.
@@ -667,6 +675,7 @@ final class MobileReaderController extends ChangeNotifier {
       await _reload();
       _error = null;
       _notice = '已导入 ${imported.length} 个订阅';
+      unawaited(_resolveAllMissingIcons());
       notifyListeners();
       return imported.length;
     } catch (error) {

@@ -1,3 +1,5 @@
+import '../media/audio_source.dart';
+
 /// A parsed feed document, normalized across RSS 2.0 / Atom / Media RSS.
 final class ParsedFeed {
   const ParsedFeed({
@@ -99,7 +101,7 @@ final class ParsedEnclosure {
 
   final int? lengthInBytes;
 
-  bool get isAudio => type.startsWith('audio/');
+  bool get isAudio => isAudioAttachment(url, type);
   bool get isImage => type.startsWith('image/');
   bool get isVideo => type.startsWith('video/');
 }

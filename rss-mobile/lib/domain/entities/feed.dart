@@ -33,6 +33,7 @@ final class Feed {
     FeedViewType? viewType,
     Duration? updateInterval,
     int? unreadCount,
+    Uri? iconUrl,
   }) {
     return Feed(
       id: id,
@@ -41,7 +42,7 @@ final class Feed {
       groupName: groupName ?? this.groupName,
       viewType: viewType ?? this.viewType,
       updateInterval: updateInterval ?? this.updateInterval,
-      iconUrl: iconUrl,
+      iconUrl: iconUrl ?? this.iconUrl,
       unreadCount: unreadCount ?? this.unreadCount,
       lastCheckedAt: lastCheckedAt,
       lastError: lastError,

@@ -342,6 +342,9 @@ final class LocalContentRepository {
       var inserted = 0;
       final now = DateTime.now().toUtc();
       for (final item in items) {
+        final attachment =
+            item.enclosure.where((media) => media.isAudio).firstOrNull ??
+            item.enclosure.firstOrNull;
         final result = await database
             .into(database.entries)
             .insertReturningOrNull(
@@ -359,19 +362,9 @@ final class LocalContentRepository {
                 ),
                 publishedAt: Value(item.publishedAt),
                 insertedAt: now,
-                enclosureUrl: Value(
-                  item.enclosure.isEmpty
-                      ? null
-                      : item.enclosure.first.url.toString(),
-                ),
-                enclosureType: Value(
-                  item.enclosure.isEmpty ? null : item.enclosure.first.type,
-                ),
-                enclosureLength: Value(
-                  item.enclosure.isEmpty
-                      ? null
-                      : item.enclosure.first.lengthInBytes,
-                ),
+                enclosureUrl: Value(attachment?.url.toString()),
+                enclosureType: Value(attachment?.type),
+                enclosureLength: Value(attachment?.lengthInBytes),
                 durationSeconds: Value(item.duration?.inSeconds),
                 imageUrl: Value(
                   item.imageUrls.isEmpty ? null : item.imageUrls.first,
@@ -382,7 +375,30 @@ final class LocalContentRepository {
               ),
               mode: InsertMode.insertOrIgnore,
             );
-        if (result != null) inserted++;
+        if (result != null) {
+          inserted++;
+        } else if (attachment != null && attachment.isAudio) {
+          // Repair older entries that stored the cover as their first
+          // enclosure. Only update media fields; keep read/star/content state.
+          await (database.update(database.entries)..where(
+                (row) =>
+                    row.id.equals(_entryId(feedId, item.guid)) &
+                    (row.enclosureUrl.isNull() |
+                        row.enclosureUrl
+                            .equals(attachment.url.toString())
+                            .not() |
+                        row.enclosureType.isNull() |
+                        row.enclosureType.equals(attachment.type).not()),
+              ))
+              .write(
+                EntriesCompanion(
+                  enclosureUrl: Value(attachment.url.toString()),
+                  enclosureType: Value(attachment.type),
+                  enclosureLength: Value(attachment.lengthInBytes),
+                  durationSeconds: Value(item.duration?.inSeconds),
+                ),
+              );
+        }
       }
       return inserted;
     });
