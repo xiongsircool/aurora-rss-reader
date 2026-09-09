@@ -24,6 +24,7 @@ import '../../data/repositories/reader_prefs_repository.dart';
 import '../../domain/entities/entry.dart';
 import '../../shared/image_viewer_page.dart';
 import '../../shared/reading_stats.dart';
+import '../../shared/right_scrollbar.dart';
 import '../reader/podcast_player_sheet.dart';
 import '../reader/video_card.dart';
 import '../reader/mobile_reader_controller.dart';
@@ -581,401 +582,407 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
       body: SelectionArea(
         child: RepaintBoundary(
           key: _articleCaptureKey,
-          child: ListView(
+          child: RightScrollbar(
             controller: _scrollController,
-            padding: EdgeInsets.fromLTRB(
-              horizontal,
-              12,
-              horizontal,
-              24 + MediaQuery.paddingOf(context).bottom,
-            ),
-            children: [
-              Text(
-                _entry.title,
-                style: Theme.of(context).textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
+            child: ListView(
+              controller: _scrollController,
+              padding: EdgeInsets.fromLTRB(
+                horizontal,
+                12,
+                horizontal,
+                24 + MediaQuery.paddingOf(context).bottom,
               ),
-              if (_translatedTitle != null) ...[
-                const SizedBox(height: 4),
+              children: [
                 Text(
-                  _translatedTitle!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                    fontStyle: FontStyle.italic,
+                  _entry.title,
+                  style: Theme.of(context).textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w700, height: 1.3),
+                ),
+                if (_translatedTitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _translatedTitle!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ] else if (_translatingTitle) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const SizedBox.square(
+                        dimension: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '翻译标题中…',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Text(
+                  [
+                    readingTimeEstimate(html),
+                    _metadata(_entry, widget.feedTitle),
+                  ].where((part) => part.isNotEmpty).join(' · '),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.5,
                   ),
                 ),
-              ] else if (_translatingTitle) ...[
-                const SizedBox(height: 6),
-                Row(
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
                   children: [
-                    const SizedBox.square(
-                      dimension: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '翻译标题中…',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    if (hasText)
+                      TextButton.icon(
+                        key: const ValueKey('generate-ai-summary'),
+                        onPressed: _summaryGenerating ? null : _startSummary,
+                        icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                        label: Text(_summaryGenerating ? '摘要生成中' : 'AI 摘要'),
                       ),
-                    ),
+                    if (hasText)
+                      TextButton.icon(
+                        key: const ValueKey('translate-article'),
+                        onPressed: _translatingArticle
+                            ? null
+                            : _startArticleTranslation,
+                        icon: const Icon(Icons.translate, size: 18),
+                        label: Text(
+                          _translatingArticle
+                              ? '翻译中 ${(_translationProgress * 100).round()}%'
+                              : '翻译全文',
+                        ),
+                      ),
+                    if (_entry.url != null && !_isVideoArticle && !hasExtracted)
+                      TextButton.icon(
+                        key: const ValueKey('extract-full-text'),
+                        onPressed: _extracting ? null : _extractFullText,
+                        icon: const Icon(Icons.article_outlined, size: 18),
+                        label: Text(_extracting ? '正在提取' : '提取网页全文'),
+                      ),
+                    if (_translatedTitle == null)
+                      TextButton.icon(
+                        onPressed: _translatingTitle ? null : _translateTitle,
+                        icon: const Icon(Icons.short_text, size: 18),
+                        label: const Text('翻译标题'),
+                      ),
                   ],
                 ),
-              ],
-              const SizedBox(height: 6),
-              Text(
-                [
-                  readingTimeEstimate(html),
-                  _metadata(_entry, widget.feedTitle),
-                ].where((part) => part.isNotEmpty).join(' · '),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 4,
-                runSpacing: 2,
-                children: [
-                  if (hasText)
-                    TextButton.icon(
-                      key: const ValueKey('generate-ai-summary'),
-                      onPressed: _summaryGenerating ? null : _startSummary,
-                      icon: const Icon(Icons.auto_awesome_outlined, size: 18),
-                      label: Text(_summaryGenerating ? '摘要生成中' : 'AI 摘要'),
+                if (_extracting || _summaryGenerating || _translatingArticle)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: LinearProgressIndicator(
+                      value: _translatingArticle && _translationProgress > 0
+                          ? _translationProgress
+                          : null,
+                      minHeight: 2,
                     ),
-                  if (hasText)
-                    TextButton.icon(
-                      key: const ValueKey('translate-article'),
-                      onPressed: _translatingArticle
-                          ? null
-                          : _startArticleTranslation,
-                      icon: const Icon(Icons.translate, size: 18),
-                      label: Text(
-                        _translatingArticle
-                            ? '翻译中 ${(_translationProgress * 100).round()}%'
-                            : '翻译全文',
+                  ),
+                if (_entry.imageUrl != null) ...[
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: () => ImageViewerPage.show(
+                      context,
+                      url: _entry.imageUrl!,
+                      referer: referer,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: CachedNetworkImage(
+                        imageUrl: _entry.imageUrl.toString(),
+                        httpHeaders: referer == null
+                            ? null
+                            : {'Referer': referer.toString()},
+                        fit: BoxFit.cover,
+                        errorWidget: (_, _, _) => const SizedBox.shrink(),
                       ),
                     ),
-                  if (_entry.url != null && !_isVideoArticle && !hasExtracted)
-                    TextButton.icon(
-                      key: const ValueKey('extract-full-text'),
-                      onPressed: _extracting ? null : _extractFullText,
-                      icon: const Icon(Icons.article_outlined, size: 18),
-                      label: Text(_extracting ? '正在提取' : '提取网页全文'),
-                    ),
-                  if (_translatedTitle == null)
-                    TextButton.icon(
-                      onPressed: _translatingTitle ? null : _translateTitle,
-                      icon: const Icon(Icons.short_text, size: 18),
-                      label: const Text('翻译标题'),
-                    ),
-                ],
-              ),
-              if (_extracting || _summaryGenerating || _translatingArticle)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: LinearProgressIndicator(
-                    value: _translatingArticle && _translationProgress > 0
-                        ? _translationProgress
-                        : null,
-                    minHeight: 2,
                   ),
-                ),
-              if (_entry.imageUrl != null) ...[
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () => ImageViewerPage.show(
-                    context,
-                    url: _entry.imageUrl!,
+                ],
+                const SizedBox(height: 18),
+                // AI 摘要面板
+                if (_summaryText.isNotEmpty ||
+                    _summaryGenerating ||
+                    _summaryError != null)
+                  Container(
+                    key: const ValueKey('ai-summary-panel'),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.secondaryContainer
+                          .withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.secondary
+                            .withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.auto_awesome,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'AI 摘要',
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            const Spacer(),
+                            if (_summaryGenerating)
+                              const SizedBox.square(
+                                dimension: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            else if (_summaryText.isNotEmpty)
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                tooltip: '重新生成',
+                                onPressed: _startSummary,
+                                icon: const Icon(Icons.refresh, size: 16),
+                              ),
+                          ],
+                        ),
+                        if (_summaryText.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _summaryText,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(height: 1.6),
+                          ),
+                        ],
+                        if (_summaryError != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _summaryError!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                if (hasExtracted && hasOriginal)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                          value: true,
+                          label: Text('订阅原文'),
+                          icon: Icon(Icons.rss_feed, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: false,
+                          label: Text('网页全文'),
+                          icon: Icon(Icons.article_outlined, size: 16),
+                        ),
+                      ],
+                      selected: {_showOriginal},
+                      showSelectedIcon: false,
+                      style: ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: WidgetStatePropertyAll(
+                          Theme.of(context).textTheme.labelMedium,
+                        ),
+                      ),
+                      onSelectionChanged: (selection) {
+                        setState(() => _showOriginal = selection.single);
+                      },
+                    ),
+                  ),
+                if (!_isVideoArticle &&
+                    _entry.contentExtractionStatus ==
+                        ContentExtractionStatus.failed)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      '未能提取全文：${_friendlyExtractionError(_entry.contentExtractionError)}仍可阅读订阅内容或打开原文。',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                if (hasExtracted)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      _showOriginal ? '显示订阅原文' : '网页全文已缓存',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                  ),
+                if (html == null || html.trim().isEmpty)
+                  Text(
+                    _isVideoArticle
+                        ? '视频内容请点击下方卡片观看。'
+                        : '该订阅没有提供正文，请尝试提取全文或打开原文。',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  )
+                else
+                  HtmlWidget(
+                    _sanitizeArticleHtml(_bilingualHtml ?? html),
+                    customWidgetBuilder: (element) {
+                      if (element.localName != 'pre') return null;
+                      return _CodeBlockWidget(element: element);
+                    },
+                    customStylesBuilder: (element) {
+                      if (element.className.contains('aurora-translation')) {
+                        return {
+                          'color': '#8b9bb4',
+                          'font-style': 'italic',
+                          'font-size': '0.92em',
+                          'margin': '0.2em 0 0.6em 0',
+                          'padding-left': '10px',
+                          'border-left': '2px solid rgba(100,149,237,0.25)',
+                        };
+                      }
+                      final tag = element.localName;
+                      if (tag == 'pre') {
+                        return {
+                          'font-family': 'monospace',
+                          'font-size': '0.86em',
+                          'line-height': '1.5',
+                          'background': 'rgba(127,127,127,0.10)',
+                          'padding': '12px',
+                          'border-radius': '8px',
+                          'overflow-x': 'auto',
+                        };
+                      }
+                      if (tag == 'code') {
+                        return {
+                          'font-family': 'monospace',
+                          'font-size': '0.88em',
+                          'background': 'rgba(127,127,127,0.10)',
+                          'padding': '1px 5px',
+                          'border-radius': '4px',
+                        };
+                      }
+                      if (tag == 'blockquote') {
+                        return {
+                          'margin': '0.6em 0',
+                          'padding': '2px 0 2px 12px',
+                          'border-left': '3px solid rgba(127,127,127,0.30)',
+                          'color': 'rgba(127,127,127,0.85)',
+                        };
+                      }
+                      return null;
+                    },
+                    factoryBuilder: () => ArticleWidgetFactory(
+                      referer: referer?.toString(),
+                      onImageTap: (url) async {
+                        final uri = Uri.tryParse(url);
+                        if (uri != null) {
+                          await ImageViewerPage.show(
+                            context,
+                            url: uri,
+                            referer: referer,
+                          );
+                        }
+                      },
+                    ),
+                    textStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontSize: _fontSize,
+                      height: _lineHeight,
+                      fontFamily: _serif
+                          ? (Theme.of(context).platform == TargetPlatform.iOS
+                                ? 'Georgia'
+                                : 'serif')
+                          : null,
+                    ),
+                    onTapUrl: (url) async {
+                      await _openUrl(Uri.tryParse(url));
+                      return true;
+                    },
+                  ),
+                // Translation progress indicator
+                if (_translatingArticle) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          value: _translationProgress > 0
+                              ? _translationProgress
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '翻译中 · ${(_translationProgress * 100).toInt()}%',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                    ],
+                  ),
+                ],
+                // Video card (when the article is a video link)
+                if (_isVideoArticle) ...[
+                  const SizedBox(height: 12),
+                  VideoCard(
+                    url: _entry.url!,
+                    title: _entry.title,
                     referer: referer,
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: CachedNetworkImage(
-                      imageUrl: _entry.imageUrl.toString(),
-                      httpHeaders: referer == null
-                          ? null
-                          : {'Referer': referer.toString()},
-                      fit: BoxFit.cover,
-                      errorWidget: (_, _, _) => const SizedBox.shrink(),
+                ],
+                // Podcast player button (when audio enclosure exists)
+                if (_entry.enclosureUrl != null &&
+                    (_entry.enclosureType?.startsWith('audio/') ?? false)) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: const ValueKey('play-podcast'),
+                      onPressed: () => PodcastPlayerSheet.show(
+                        context,
+                        title: _entry.title,
+                        feedTitle: widget.feedTitle,
+                        url: _entry.enclosureUrl!,
+                        prefs: _prefs,
+                      ),
+                      icon: const Icon(Icons.headphones),
+                      label: const Text('播放播客'),
                     ),
                   ),
-                ),
+                ],
+                if (_entry.url != null) ...[
+                  const SizedBox(height: 24),
+                  OutlinedButton.icon(
+                    onPressed: () => _openUrl(_entry.url),
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('打开原文'),
+                  ),
+                ],
               ],
-              const SizedBox(height: 18),
-              // AI 摘要面板
-              if (_summaryText.isNotEmpty ||
-                  _summaryGenerating ||
-                  _summaryError != null)
-                Container(
-                  key: const ValueKey('ai-summary-panel'),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.secondaryContainer
-                        .withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.secondary
-                          .withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.auto_awesome,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'AI 摘要',
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .secondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          const Spacer(),
-                          if (_summaryGenerating)
-                            const SizedBox.square(
-                              dimension: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          else if (_summaryText.isNotEmpty)
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              tooltip: '重新生成',
-                              onPressed: _startSummary,
-                              icon: const Icon(Icons.refresh, size: 16),
-                            ),
-                        ],
-                      ),
-                      if (_summaryText.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _summaryText,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(height: 1.6),
-                        ),
-                      ],
-                      if (_summaryError != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _summaryError!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              if (hasExtracted && hasOriginal)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                        value: true,
-                        label: Text('订阅原文'),
-                        icon: Icon(Icons.rss_feed, size: 16),
-                      ),
-                      ButtonSegment(
-                        value: false,
-                        label: Text('网页全文'),
-                        icon: Icon(Icons.article_outlined, size: 16),
-                      ),
-                    ],
-                    selected: {_showOriginal},
-                    showSelectedIcon: false,
-                    style: ButtonStyle(
-                      visualDensity: VisualDensity.compact,
-                      textStyle: WidgetStatePropertyAll(
-                        Theme.of(context).textTheme.labelMedium,
-                      ),
-                    ),
-                    onSelectionChanged: (selection) {
-                      setState(() => _showOriginal = selection.single);
-                    },
-                  ),
-                ),
-              if (!_isVideoArticle &&
-                  _entry.contentExtractionStatus ==
-                      ContentExtractionStatus.failed)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    '未能提取全文：${_friendlyExtractionError(_entry.contentExtractionError)}仍可阅读订阅内容或打开原文。',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              if (hasExtracted)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    _showOriginal ? '显示订阅原文' : '网页全文已缓存',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                  ),
-                ),
-              if (html == null || html.trim().isEmpty)
-                Text(
-                  _isVideoArticle
-                      ? '视频内容请点击下方卡片观看。'
-                      : '该订阅没有提供正文，请尝试提取全文或打开原文。',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                )
-              else
-                HtmlWidget(
-                  _sanitizeArticleHtml(_bilingualHtml ?? html),
-                  customWidgetBuilder: (element) {
-                    if (element.localName != 'pre') return null;
-                    return _CodeBlockWidget(element: element);
-                  },
-                  customStylesBuilder: (element) {
-                    if (element.className.contains('aurora-translation')) {
-                      return {
-                        'color': '#8b9bb4',
-                        'font-style': 'italic',
-                        'font-size': '0.92em',
-                        'margin': '0.2em 0 0.6em 0',
-                        'padding-left': '10px',
-                        'border-left': '2px solid rgba(100,149,237,0.25)',
-                      };
-                    }
-                    final tag = element.localName;
-                    if (tag == 'pre') {
-                      return {
-                        'font-family': 'monospace',
-                        'font-size': '0.86em',
-                        'line-height': '1.5',
-                        'background': 'rgba(127,127,127,0.10)',
-                        'padding': '12px',
-                        'border-radius': '8px',
-                        'overflow-x': 'auto',
-                      };
-                    }
-                    if (tag == 'code') {
-                      return {
-                        'font-family': 'monospace',
-                        'font-size': '0.88em',
-                        'background': 'rgba(127,127,127,0.10)',
-                        'padding': '1px 5px',
-                        'border-radius': '4px',
-                      };
-                    }
-                    if (tag == 'blockquote') {
-                      return {
-                        'margin': '0.6em 0',
-                        'padding': '2px 0 2px 12px',
-                        'border-left': '3px solid rgba(127,127,127,0.30)',
-                        'color': 'rgba(127,127,127,0.85)',
-                      };
-                    }
-                    return null;
-                  },
-                  factoryBuilder: () => ArticleWidgetFactory(
-                    referer: referer?.toString(),
-                    onImageTap: (url) async {
-                      final uri = Uri.tryParse(url);
-                      if (uri != null) {
-                        await ImageViewerPage.show(
-                          context,
-                          url: uri,
-                          referer: referer,
-                        );
-                      }
-                    },
-                  ),
-                  textStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontSize: _fontSize,
-                    height: _lineHeight,
-                    fontFamily: _serif
-                        ? (Theme.of(context).platform == TargetPlatform.iOS
-                              ? 'Georgia'
-                              : 'serif')
-                        : null,
-                  ),
-                  onTapUrl: (url) async {
-                    await _openUrl(Uri.tryParse(url));
-                    return true;
-                  },
-                ),
-              // Translation progress indicator
-              if (_translatingArticle) ...[
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        value: _translationProgress > 0
-                            ? _translationProgress
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '翻译中 · ${(_translationProgress * 100).toInt()}%',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              // Video card (when the article is a video link)
-              if (_isVideoArticle) ...[
-                const SizedBox(height: 12),
-                VideoCard(
-                  url: _entry.url!,
-                  title: _entry.title,
-                  referer: referer,
-                ),
-              ],
-              // Podcast player button (when audio enclosure exists)
-              if (_entry.enclosureUrl != null &&
-                  (_entry.enclosureType?.startsWith('audio/') ?? false)) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    key: const ValueKey('play-podcast'),
-                    onPressed: () => PodcastPlayerSheet.show(
-                      context,
-                      title: _entry.title,
-                      feedTitle: widget.feedTitle,
-                      url: _entry.enclosureUrl!,
-                      prefs: _prefs,
-                    ),
-                    icon: const Icon(Icons.headphones),
-                    label: const Text('播放播客'),
-                  ),
-                ),
-              ],
-              if (_entry.url != null) ...[
-                const SizedBox(height: 24),
-                OutlinedButton.icon(
-                  onPressed: () => _openUrl(_entry.url),
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('打开原文'),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),

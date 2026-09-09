@@ -1,3 +1,5 @@
+import '../../shared/right_scrollbar.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -135,46 +137,50 @@ class _SearchPageState extends State<SearchPage> {
           ),
         ),
         Expanded(
-          child: ListView.separated(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.paddingOf(context).bottom + 16,
-            ),
-            itemCount: results.length,
-            separatorBuilder: (_, _) => Divider(
-              height: 1,
-              color: Theme.of(context).colorScheme.outlineVariant
-                  .withValues(alpha: 0.35),
-            ),
-            itemBuilder: (context, index) {
-              final entry = results[index];
-              final feedTitle = widget.controller.feedTitle(entry.feedId);
-              return EntryTile(
-                key: ValueKey(entry.id),
-                entry: entry,
-                feedTitle: feedTitle,
-                highlightQuery: _queryController.text,
-                feedIconUrl: widget.controller.feedIconUrl(entry.feedId),
-                referer: widget.controller.feedUrl(entry.feedId),
-                onTap: () {
-                  FocusScope.of(context).unfocus();
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ArticleReaderPage(
-                        entry: entry,
-                        feedTitle: feedTitle,
-                        referer: widget.controller.feedUrl(entry.feedId),
-                        controller: widget.controller,
+          child: RightScrollView(
+            bottomClearance: 0,
+            builder: (context, scrollController) => ListView.separated(
+              controller: scrollController,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.paddingOf(context).bottom + 16,
+              ),
+              itemCount: results.length,
+              separatorBuilder: (_, _) => Divider(
+                height: 1,
+                color: Theme.of(context).colorScheme.outlineVariant
+                    .withValues(alpha: 0.35),
+              ),
+              itemBuilder: (context, index) {
+                final entry = results[index];
+                final feedTitle = widget.controller.feedTitle(entry.feedId);
+                return EntryTile(
+                  key: ValueKey(entry.id),
+                  entry: entry,
+                  feedTitle: feedTitle,
+                  highlightQuery: _queryController.text,
+                  feedIconUrl: widget.controller.feedIconUrl(entry.feedId),
+                  referer: widget.controller.feedUrl(entry.feedId),
+                  onTap: () {
+                    FocusScope.of(context).unfocus();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => ArticleReaderPage(
+                          entry: entry,
+                          feedTitle: feedTitle,
+                          referer: widget.controller.feedUrl(entry.feedId),
+                          controller: widget.controller,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                onReadChanged: (read) =>
-                    widget.controller.setRead(entry, read: read),
-                onStarredChanged: (starred) =>
-                    widget.controller.setStarred(entry, starred: starred),
-              );
-            },
+                    );
+                  },
+                  onReadChanged: (read) =>
+                      widget.controller.setRead(entry, read: read),
+                  onStarredChanged: (starred) =>
+                      widget.controller.setStarred(entry, starred: starred),
+                );
+              },
+            ),
           ),
         ),
       ],

@@ -42,10 +42,7 @@ void main() async {
   NotificationService.init().catchError((_) {});
 
   // Initialize background refresh after the UI is up.
-  initBackgroundRefresh(
-    interval: const Duration(hours: 3),
-    enabled: true,
-  ).catchError((_) {
+  backgroundRefreshSettings.restore().catchError((_) {
     // Background refresh is a bonus; ignore init failures.
   });
 }

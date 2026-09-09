@@ -10,6 +10,14 @@
 	</array>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>保存文章图片到相册</string>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>fetch</string>
+		</array>
+		<key>BGTaskSchedulerPermittedIdentifiers</key>
+		<array>
+			<string>aurora.background.refresh</string>
+		</array>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>

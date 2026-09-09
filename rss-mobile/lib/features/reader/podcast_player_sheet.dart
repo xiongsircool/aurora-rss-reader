@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/reader_prefs_repository.dart';
+import '../../shared/choice_sheet.dart';
 
 class PodcastPlayerSheet extends StatefulWidget {
   const PodcastPlayerSheet({
@@ -161,13 +162,22 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
     }
   }
 
-  Future<void> _setSpeed(double speed) async {
-    try {
-      await _player.setSpeed(speed);
-      if (mounted) setState(() => _speed = speed);
-    } catch (_) {
-      if (mounted) setState(() => _error = '暂时无法调整倍速');
-    }
+  Future<void> _chooseSpeed() async {
+    final speed = await showChoiceSheet<double>(
+      context: context,
+      title: '播放速度',
+      selected: _speed,
+      options: [
+        for (final value in [0.75, 1.0, 1.25, 1.5, 1.75, 2.0])
+          ChoiceOption(
+            value: value,
+            title: '$value×',
+            subtitle: value == 1 ? '正常速度' : null,
+          ),
+      ],
+      onApply: _player.setSpeed,
+    );
+    if (mounted && speed != null) setState(() => _speed = speed);
   }
 
   @override
@@ -317,28 +327,10 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
           ),
           const SizedBox(height: 16),
           Center(
-            child: PopupMenuButton<double>(
-              tooltip: '播放速度',
-              enabled: playable,
-              onSelected: _setSpeed,
-              itemBuilder: (_) => [
-                for (final speed in [0.75, 1.0, 1.25, 1.5, 1.75, 2.0])
-                  CheckedPopupMenuItem(
-                    value: speed,
-                    checked: _speed == speed,
-                    child: Text('$speed×'),
-                  ),
-              ],
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  '$_speed× 播放速度',
-                  style: TextStyle(
-                    color: scheme.secondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+            child: TextButton.icon(
+              onPressed: playable ? _chooseSpeed : null,
+              icon: const Icon(Icons.speed),
+              label: Text('$_speed× 播放速度'),
             ),
           ),
         ],

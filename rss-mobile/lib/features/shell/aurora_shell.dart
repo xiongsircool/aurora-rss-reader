@@ -1,4 +1,7 @@
+import '../../shared/right_scrollbar.dart';
 import '../../shared/clear_glass_surface.dart';
+import '../../shared/choice_sheet.dart';
+import '../../platform/background/refresh_schedule_settings.dart';
 
 import 'dart:convert';
 
@@ -381,75 +384,79 @@ final class _InboxPage extends StatelessWidget {
       },
       child: RefreshIndicator(
         onRefresh: controller.refreshAll,
-        child: ListView.separated(
-          key: const PageStorageKey('inbox-list'),
-          padding: EdgeInsets.only(
-            bottom:
-                MediaQuery.viewPaddingOf(context).bottom +
-                _ReaderLayoutScope.clearance(context),
-          ),
-          physics: const AlwaysScrollableScrollPhysics(),
-          itemCount: controller.entries.length + (controller.hasMore ? 1 : 0),
-          separatorBuilder: (_, _) => Divider(
-            height: 1,
-            color: Theme.of(context).colorScheme.outlineVariant
-                .withValues(alpha: 0.35),
-          ),
-          itemBuilder: (context, index) {
-            if (index == controller.entries.length) {
-              if (controller.loadingMore) {
-                return const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(
-                    child: SizedBox.square(
-                      dimension: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+        child: RightScrollView(
+          bottomClearance: _ReaderLayoutScope.clearance(context),
+          builder: (context, scrollController) => ListView.separated(
+            controller: scrollController,
+            key: const PageStorageKey('inbox-list'),
+            padding: EdgeInsets.only(
+              bottom:
+                  MediaQuery.viewPaddingOf(context).bottom +
+                  _ReaderLayoutScope.clearance(context),
+            ),
+            physics: const AlwaysScrollableScrollPhysics(),
+            itemCount: controller.entries.length + (controller.hasMore ? 1 : 0),
+            separatorBuilder: (_, _) => Divider(
+              height: 1,
+              color: Theme.of(context).colorScheme.outlineVariant
+                  .withValues(alpha: 0.35),
+            ),
+            itemBuilder: (context, index) {
+              if (index == controller.entries.length) {
+                if (controller.loadingMore) {
+                  return const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(
+                      child: SizedBox.square(
+                        dimension: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     ),
-                  ),
-                );
-              }
-              final failed = controller.error?.contains('加载更多') ?? false;
-              if (failed) {
+                  );
+                }
+                final failed = controller.error?.contains('加载更多') ?? false;
+                if (failed) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: ActionChip(
+                        avatar: const Icon(Icons.refresh, size: 16),
+                        label: const Text('加载失败，点击重试'),
+                        onPressed: controller.loadMore,
+                      ),
+                    ),
+                  );
+                }
                 return Padding(
                   padding: const EdgeInsets.all(16),
                   child: Center(
-                    child: ActionChip(
-                      avatar: const Icon(Icons.refresh, size: 16),
-                      label: const Text('加载失败，点击重试'),
-                      onPressed: controller.loadMore,
-                    ),
+                    child: controller.entries.length >= 500
+                        ? TextButton.icon(
+                            onPressed: controller.loadMore,
+                            icon: const Icon(Icons.expand_more),
+                            label: Text(
+                              '已加载 ${controller.entries.length} 篇，继续加载',
+                            ),
+                          )
+                        : const SizedBox(height: 4),
                   ),
                 );
               }
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: controller.entries.length >= 500
-                      ? TextButton.icon(
-                          onPressed: controller.loadMore,
-                          icon: const Icon(Icons.expand_more),
-                          label: Text(
-                            '已加载 ${controller.entries.length} 篇，继续加载',
-                          ),
-                        )
-                      : const SizedBox(height: 4),
-                ),
+              final entry = controller.entries[index];
+              return EntryTile(
+                key: ValueKey(entry.id),
+                entry: entry,
+                feedTitle: controller.feedTitle(entry.feedId),
+                feedIconUrl: controller.feedIconUrl(entry.feedId),
+                referer: controller.feedUrl(entry.feedId),
+                onTap: () => _openReader(context, controller, entry),
+                onVisible: () => controller.requestTitleTranslation(entry.id),
+                onReadChanged: (read) => controller.setRead(entry, read: read),
+                onStarredChanged: (starred) =>
+                    controller.setStarred(entry, starred: starred),
               );
-            }
-            final entry = controller.entries[index];
-            return EntryTile(
-              key: ValueKey(entry.id),
-              entry: entry,
-              feedTitle: controller.feedTitle(entry.feedId),
-              feedIconUrl: controller.feedIconUrl(entry.feedId),
-              referer: controller.feedUrl(entry.feedId),
-              onTap: () => _openReader(context, controller, entry),
-              onVisible: () => controller.requestTitleTranslation(entry.id),
-              onReadChanged: (read) => controller.setRead(entry, read: read),
-              onStarredChanged: (starred) =>
-                  controller.setStarred(entry, starred: starred),
-            );
-          },
+            },
+          ),
         ),
       ),
     );
@@ -474,36 +481,40 @@ final class _SavedPage extends StatelessWidget {
                     icon: Icons.bookmark_border,
                     title: '暂无收藏文章',
                   )
-                : ListView.separated(
-                    key: const PageStorageKey('saved-list'),
-                    padding: EdgeInsets.only(
-                      bottom:
-                          MediaQuery.viewPaddingOf(context).bottom +
-                          _ReaderLayoutScope.clearance(context),
+                : RightScrollView(
+                    bottomClearance: _ReaderLayoutScope.clearance(context),
+                    builder: (context, scrollController) => ListView.separated(
+                      controller: scrollController,
+                      key: const PageStorageKey('saved-list'),
+                      padding: EdgeInsets.only(
+                        bottom:
+                            MediaQuery.viewPaddingOf(context).bottom +
+                            _ReaderLayoutScope.clearance(context),
+                      ),
+                      itemCount: controller.starredEntries.length,
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        color: Theme.of(context).colorScheme.outlineVariant
+                            .withValues(alpha: 0.35),
+                      ),
+                      itemBuilder: (context, index) {
+                        final entry = controller.starredEntries[index];
+                        return EntryTile(
+                          key: ValueKey('saved-${entry.id}'),
+                          entry: entry,
+                          feedTitle: controller.feedTitle(entry.feedId),
+                          feedIconUrl: controller.feedIconUrl(entry.feedId),
+                          referer: controller.feedUrl(entry.feedId),
+                          onTap: () => _openReader(context, controller, entry),
+                          onVisible: () =>
+                              controller.requestTitleTranslation(entry.id),
+                          onReadChanged: (read) =>
+                              controller.setRead(entry, read: read),
+                          onStarredChanged: (starred) =>
+                              controller.setStarred(entry, starred: starred),
+                        );
+                      },
                     ),
-                    itemCount: controller.starredEntries.length,
-                    separatorBuilder: (_, _) => Divider(
-                      height: 1,
-                      color: Theme.of(context).colorScheme.outlineVariant
-                          .withValues(alpha: 0.35),
-                    ),
-                    itemBuilder: (context, index) {
-                      final entry = controller.starredEntries[index];
-                      return EntryTile(
-                        key: ValueKey('saved-${entry.id}'),
-                        entry: entry,
-                        feedTitle: controller.feedTitle(entry.feedId),
-                        feedIconUrl: controller.feedIconUrl(entry.feedId),
-                        referer: controller.feedUrl(entry.feedId),
-                        onTap: () => _openReader(context, controller, entry),
-                        onVisible: () =>
-                            controller.requestTitleTranslation(entry.id),
-                        onReadChanged: (read) =>
-                            controller.setRead(entry, read: read),
-                        onStarredChanged: (starred) =>
-                            controller.setStarred(entry, starred: starred),
-                      );
-                    },
                   ),
           ),
         ],
@@ -552,27 +563,31 @@ class _SourcesPageState extends State<_SourcesPage> {
                   )
                 : RefreshIndicator(
                     onRefresh: controller.refreshAll,
-                    child: ListView(
-                      padding: EdgeInsets.only(
-                        bottom:
-                            MediaQuery.viewPaddingOf(context).bottom +
-                            _ReaderLayoutScope.clearance(context),
+                    child: RightScrollView(
+                      bottomClearance: _ReaderLayoutScope.clearance(context),
+                      builder: (context, scrollController) => ListView(
+                        controller: scrollController,
+                        padding: EdgeInsets.only(
+                          bottom:
+                              MediaQuery.viewPaddingOf(context).bottom +
+                              _ReaderLayoutScope.clearance(context),
+                        ),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          for (final group in controller.groups)
+                            _GroupSection(
+                              key: ValueKey('group-${group.name}'),
+                              controller: controller,
+                              group: group,
+                              collapsed: _collapsedGroups.contains(group.name),
+                              onToggle: () => setState(() {
+                                if (!_collapsedGroups.remove(group.name)) {
+                                  _collapsedGroups.add(group.name);
+                                }
+                              }),
+                            ),
+                        ],
                       ),
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        for (final group in controller.groups)
-                          _GroupSection(
-                            key: ValueKey('group-${group.name}'),
-                            controller: controller,
-                            group: group,
-                            collapsed: _collapsedGroups.contains(group.name),
-                            onToggle: () => setState(() {
-                              if (!_collapsedGroups.remove(group.name)) {
-                                _collapsedGroups.add(group.name);
-                              }
-                            }),
-                          ),
-                      ],
                     ),
                   ),
           ),
@@ -913,19 +928,31 @@ final class _SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<_SettingsPage> {
   int _settingsRevision = 0;
 
-  Future<int> _getRefreshInterval() async {
-    final sp = await SharedPreferences.getInstance();
-    return sp.getInt('refresh_interval_hours') ?? 3;
-  }
+  Future<int> _getRefreshInterval() => backgroundRefreshSettings.load();
 
-  Future<void> _setRefreshInterval(int hours) async {
-    final sp = await SharedPreferences.getInstance();
-    await sp.setInt('refresh_interval_hours', hours);
-    initBackgroundRefresh(
-      interval: Duration(hours: hours),
-      enabled: hours > 0,
-    ).catchError((_) {});
-    setState(() {});
+  Future<void> _chooseRefreshInterval() async {
+    final hours = await _getRefreshInterval();
+    if (!mounted) return;
+    final selected = await showChoiceSheet<int>(
+      context: context,
+      title: '后台刷新间隔',
+      selected: hours,
+      description: '这是后台检查订阅的目标间隔，不影响手动刷新。iOS 会根据使用习惯、电量和网络决定实际执行时间，并非定时闹钟。',
+      options: [
+        for (final h in RefreshScheduleSettings.options)
+          ChoiceOption(
+            value: h,
+            title: h == 0 ? '关闭后台刷新' : '每 $h 小时',
+            subtitle: h == 0
+                ? '保留手动刷新功能'
+                : h == 3
+                ? '默认间隔'
+                : null,
+          ),
+      ],
+      onApply: backgroundRefreshSettings.update,
+    );
+    if (mounted && selected != null) setState(() {});
   }
 
   Future<void> _exportFullBackup(BuildContext context) async {
@@ -1049,160 +1076,158 @@ class _SettingsPageState extends State<_SettingsPage> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              MediaQuery.viewPaddingOf(context).bottom +
-                  _ReaderLayoutScope.clearance(context),
-            ),
-            children: [
-              _SettingsSection(
-                title: '阅读与外观',
-                children: [
-                  const ListTile(
-                    leading: Icon(Icons.auto_stories_outlined),
-                    title: Text('阅读排版'),
-                    subtitle: Text('在文章右上角调整字号、行距和字体，设置会自动保存。'),
-                  ),
-                  const ListTile(
-                    leading: Icon(Icons.dark_mode_outlined),
-                    title: Text('深浅主题'),
-                    subtitle: Text('跟随系统外观'),
-                  ),
-                ],
+          child: RightScrollView(
+            bottomClearance: _ReaderLayoutScope.clearance(context),
+            builder: (context, scrollController) => ListView(
+              controller: scrollController,
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                MediaQuery.viewPaddingOf(context).bottom +
+                    _ReaderLayoutScope.clearance(context),
               ),
-              _SettingsSection(
-                title: '订阅与网络',
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.lan_outlined),
-                    title: const Text('网络代理'),
-                    subtitle: Text(controller.proxyUrl ?? '直连'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => showProxySettingsDialog(context, controller),
-                  ),
-                  FutureBuilder<int>(
-                    future: _getRefreshInterval(),
-                    builder: (context, snapshot) {
-                      final hours = snapshot.data ?? 3;
-                      return ListTile(
-                        leading: const Icon(Icons.sync),
-                        title: const Text('后台刷新'),
-                        subtitle: Text(
-                          hours > 0 ? '约每 $hours 小时，执行时间由系统安排' : '已关闭',
-                        ),
-                        trailing: PopupMenuButton<int>(
-                          tooltip: '刷新间隔',
-                          icon: const Icon(Icons.schedule),
-                          onSelected: _setRefreshInterval,
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(value: 0, child: Text('关闭')),
-                            for (final h in [1, 2, 3, 6, 12, 24])
-                              PopupMenuItem(value: h, child: Text('$h 小时')),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  if (Theme.of(context).platform == TargetPlatform.android)
+              children: [
+                _SettingsSection(
+                  title: '阅读与外观',
+                  children: [
+                    const ListTile(
+                      leading: Icon(Icons.auto_stories_outlined),
+                      title: Text('阅读排版'),
+                      subtitle: Text('在文章右上角调整字号、行距和字体，设置会自动保存。'),
+                    ),
+                    const ListTile(
+                      leading: Icon(Icons.dark_mode_outlined),
+                      title: Text('深浅主题'),
+                      subtitle: Text('跟随系统外观'),
+                    ),
+                  ],
+                ),
+                _SettingsSection(
+                  title: '订阅与网络',
+                  children: [
                     ListTile(
-                      leading: const Icon(Icons.battery_saver),
-                      title: const Text('电池优化豁免'),
-                      subtitle: const Text('前往系统设置调整后台限制'),
+                      leading: const Icon(Icons.lan_outlined),
+                      title: const Text('网络代理'),
+                      subtitle: Text(controller.proxyUrl ?? '直连'),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: _openBatteryOptimizationSettings,
+                      onTap: () => showProxySettingsDialog(context, controller),
                     ),
-                  ListTile(
-                    leading: const Icon(Icons.import_export),
-                    title: const Text('OPML 导入与导出'),
-                    subtitle: const Text('迁移订阅列表，不包含文章、收藏和阅读记录'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => showOpmlActionsSheet(context, controller),
-                  ),
-                ],
-              ),
-              _SettingsSection(
-                title: 'AI 服务',
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.auto_awesome_outlined),
-                    title: const Text('AI 服务'),
-                    subtitle: FutureBuilder<Map<String, dynamic>>(
-                      key: ValueKey(_settingsRevision),
-                      future: _loadAiStatus(controller),
+                    FutureBuilder<int>(
+                      future: _getRefreshInterval(),
                       builder: (context, snapshot) {
-                        final data = snapshot.data ?? {};
-                        final model =
-                            data['modelName'] ?? data['modelId'] ?? '';
-                        return Text(
-                          model.toString().isEmpty
-                              ? '配置自己的服务地址、模型和 Key'
-                              : '已配置 · $model',
+                        final hours = snapshot.data ?? 3;
+                        return ListTile(
+                          leading: const Icon(Icons.sync),
+                          title: const Text('后台刷新'),
+                          subtitle: Text(
+                            hours > 0 ? '约每 $hours 小时，执行时间由系统安排' : '已关闭',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: _chooseRefreshInterval,
                         );
                       },
                     ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () async {
-                      await showAiSettingsSheet(context, controller);
-                      if (mounted) setState(() => _settingsRevision++);
-                    },
-                  ),
-                ],
-              ),
-              _SettingsSection(
-                title: '数据与备份',
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.storage_outlined),
-                    title: const Text('本地数据'),
-                    subtitle: FutureBuilder<({int total, int read, int starred})>(
-                      future: controller.repository.entryStats(),
-                      builder: (context, snapshot) {
-                        final stats = snapshot.data;
-                        if (snapshot.hasError) return const Text('暂时无法读取统计');
-                        return Text(
-                          stats == null
-                              ? '正在读取统计…'
-                              : '${controller.feeds.length} 个订阅 · ${stats.total} 篇文章\n已读 ${stats.read} · 收藏 ${stats.starred}',
-                        );
+                    if (Theme.of(context).platform == TargetPlatform.android)
+                      ListTile(
+                        leading: const Icon(Icons.battery_saver),
+                        title: const Text('电池优化豁免'),
+                        subtitle: const Text('前往系统设置调整后台限制'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: _openBatteryOptimizationSettings,
+                      ),
+                    ListTile(
+                      leading: const Icon(Icons.import_export),
+                      title: const Text('OPML 导入与导出'),
+                      subtitle: const Text('迁移订阅列表，不包含文章、收藏和阅读记录'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => showOpmlActionsSheet(context, controller),
+                    ),
+                  ],
+                ),
+                _SettingsSection(
+                  title: 'AI 服务',
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.auto_awesome_outlined),
+                      title: const Text('AI 服务'),
+                      subtitle: FutureBuilder<Map<String, dynamic>>(
+                        key: ValueKey(_settingsRevision),
+                        future: _loadAiStatus(controller),
+                        builder: (context, snapshot) {
+                          final data = snapshot.data ?? {};
+                          final model =
+                              data['modelName'] ?? data['modelId'] ?? '';
+                          return Text(
+                            model.toString().isEmpty
+                                ? '配置自己的服务地址、模型和 Key'
+                                : '已配置 · $model',
+                          );
+                        },
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () async {
+                        await showAiSettingsSheet(context, controller);
+                        if (mounted) setState(() => _settingsRevision++);
                       },
                     ),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.backup_outlined),
-                    title: const Text('备份全部数据'),
-                    subtitle: const Text('导出设备中的数据库，API Key 需单独保管'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _exportFullBackup(context),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.restore),
-                    title: const Text('恢复备份'),
-                    subtitle: const Text('恢复将替换当前数据，请先保留当前备份'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _importFullBackup(context),
-                  ),
-                ],
-              ),
-              _SettingsSection(
-                title: '关于',
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: const Text('关于 Aurora'),
-                    subtitle: const Text('${AppMeta.version} · 本地优先 · GPL-3.0'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const AboutPage(),
+                  ],
+                ),
+                _SettingsSection(
+                  title: '数据与备份',
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.storage_outlined),
+                      title: const Text('本地数据'),
+                      subtitle: FutureBuilder<({int total, int read, int starred})>(
+                        future: controller.repository.entryStats(),
+                        builder: (context, snapshot) {
+                          final stats = snapshot.data;
+                          if (snapshot.hasError) return const Text('暂时无法读取统计');
+                          return Text(
+                            stats == null
+                                ? '正在读取统计…'
+                                : '${controller.feeds.length} 个订阅 · ${stats.total} 篇文章\n已读 ${stats.read} · 收藏 ${stats.starred}',
+                          );
+                        },
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    ListTile(
+                      leading: const Icon(Icons.backup_outlined),
+                      title: const Text('备份全部数据'),
+                      subtitle: const Text('导出设备中的数据库，API Key 需单独保管'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _exportFullBackup(context),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.restore),
+                      title: const Text('恢复备份'),
+                      subtitle: const Text('恢复将替换当前数据，请先保留当前备份'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _importFullBackup(context),
+                    ),
+                  ],
+                ),
+                _SettingsSection(
+                  title: '关于',
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.info_outline),
+                      title: const Text('关于 Aurora'),
+                      subtitle: const Text(
+                        '${AppMeta.version} · 本地优先 · GPL-3.0',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const AboutPage(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

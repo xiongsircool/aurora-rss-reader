@@ -1,3 +1,5 @@
+import '../../shared/right_scrollbar.dart';
+
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -7,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../shared/share_card_content.dart';
+import '../../shared/choice_sheet.dart';
 import '../../shared/share_card_image_loader.dart';
 import '../../shared/share_card_renderer.dart';
 
@@ -43,6 +46,80 @@ class _ShareCardPreviewPageState extends State<ShareCardPreviewPage> {
   int _imageIndex = 0;
   String? _error;
   bool _imageUnavailable = false;
+  final Map<int, Future<ui.Image?>> _imageRequests = {};
+  final List<ui.Image> _loadedImages = [];
+
+  Future<ui.Image?> _loadImage(int index) =>
+      _imageRequests.putIfAbsent(index, () async {
+        final image = await loadShareCardImage(
+          [widget.content.images[index]],
+          referer: widget.referer,
+          proxyUrl: widget.proxyUrl,
+        );
+        if (image != null) {
+          if (!mounted) {
+            image.dispose();
+            return null;
+          }
+          _loadedImages.add(image);
+        }
+        return image;
+      });
+
+  Future<void> _chooseImage() async {
+    FocusScope.of(context).unfocus();
+    final selected = await showChoiceSheet<int>(
+      context: context,
+      title: '选择分享配图',
+      selected: _withImage ? _imageIndex + 1 : 0,
+      description: '图片会等比完整显示。选择后点“使用此配图”，预览会自动更新。',
+      confirmLabel: '使用此配图',
+      options: [
+        const ChoiceOption(
+          value: 0,
+          title: '纯文字卡片',
+          subtitle: '不包含文章图片',
+          leading: SizedBox(width: 64, height: 52, child: Icon(Icons.notes)),
+        ),
+        for (var i = 0; i < widget.content.images.length; i++)
+          ChoiceOption(
+            value: i + 1,
+            title: '配图 ${i + 1}',
+            subtitle: widget.content.images[i].host,
+            leading: SizedBox(
+              width: 64,
+              height: 52,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: FutureBuilder<ui.Image?>(
+                  future: _loadImage(i),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Center(
+                        child: SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      );
+                    }
+                    return snapshot.data == null
+                        ? const Icon(Icons.broken_image_outlined)
+                        : RawImage(image: snapshot.data, fit: BoxFit.contain);
+                  },
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      _withImage = selected != 0;
+      if (selected != 0) _imageIndex = selected - 1;
+      _dirty = true;
+    });
+    await _generate();
+  }
 
   @override
   void initState() {
@@ -53,6 +130,9 @@ class _ShareCardPreviewPageState extends State<ShareCardPreviewPage> {
   @override
   void dispose() {
     _excerpt.dispose();
+    for (final image in _loadedImages) {
+      image.dispose();
+    }
     super.dispose();
   }
 
@@ -65,11 +145,7 @@ class _ShareCardPreviewPageState extends State<ShareCardPreviewPage> {
     ui.Image? image;
     try {
       if (_withImage && widget.content.images.isNotEmpty) {
-        image = await loadShareCardImage(
-          [widget.content.images[_imageIndex]],
-          referer: widget.referer,
-          proxyUrl: widget.proxyUrl,
-        );
+        image = await _loadImage(_imageIndex);
       }
       if (!mounted) return;
       final png = await ShareCardRenderer(
@@ -95,7 +171,6 @@ class _ShareCardPreviewPageState extends State<ShareCardPreviewPage> {
         );
       }
     } finally {
-      image?.dispose();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -137,107 +212,100 @@ class _ShareCardPreviewPageState extends State<ShareCardPreviewPage> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              12,
-              20,
-              MediaQuery.paddingOf(context).bottom + 24,
-            ),
-            children: [
-              Text('图文摘要', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              const Text('确认排版后分享图片，二维码指向文章原文。'),
-              if (_busy)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: LinearProgressIndicator(minHeight: 2),
-                ),
-              if (_png != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 480),
-                    child: Image.memory(
-                      _png!,
-                      fit: BoxFit.contain,
-                      gaplessPlayback: true,
-                      semanticLabel: '即将分享的卡片预览',
+          child: RightScrollView(
+            bottomClearance: 0,
+            builder: (context, scrollController) => ListView(
+              controller: scrollController,
+              padding: EdgeInsets.fromLTRB(
+                20,
+                12,
+                20,
+                MediaQuery.paddingOf(context).bottom + 24,
+              ),
+              children: [
+                Text('图文摘要', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                const Text('确认排版后分享图片，二维码指向文章原文。'),
+                if (_busy)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
+                if (_png != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 480),
+                      child: Image.memory(
+                        _png!,
+                        fit: BoxFit.contain,
+                        gaplessPlayback: true,
+                        semanticLabel: '即将分享的卡片预览',
+                      ),
                     ),
                   ),
-                ),
-              if (_imageUnavailable) const Text('这张图片暂时无法读取，预览已使用纯文字；可以换一张图片。'),
-              if (_error != null)
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              if (widget.content.images.isNotEmpty) ...[
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('包含配图'),
-                  value: _withImage,
-                  onChanged: _busy
-                      ? null
-                      : (value) => setState(() {
-                          _withImage = value;
-                          _dirty = true;
-                        }),
-                ),
-                if (_withImage)
-                  DropdownButtonFormField<int>(
-                    initialValue: _imageIndex,
-                    decoration: const InputDecoration(labelText: '文章配图'),
-                    items: [
-                      for (var i = 0; i < widget.content.images.length; i++)
-                        DropdownMenuItem(value: i, child: Text('配图 ${i + 1}')),
-                    ],
-                    onChanged: _busy
-                        ? null
-                        : (value) => setState(() {
-                            _imageIndex = value!;
-                            _dirty = true;
-                          }),
+                if (_imageUnavailable)
+                  const Text('这张图片暂时无法读取，预览已使用纯文字；可以换一张图片。'),
+                if (_error != null)
+                  Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
-              ],
-              const SizedBox(height: 16),
-              TextField(
-                controller: _excerpt,
-                enabled: !_busy,
-                minLines: 3,
-                maxLines: 6,
-                maxLength: 600,
-                decoration: const InputDecoration(
-                  labelText: '分享摘要',
-                  helperText: '卡片最多展示六行，较长内容会省略。',
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (_) => setState(() => _dirty = true),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : _generate,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('更新预览'),
-                  ),
-                  FilledButton.icon(
-                    key: _shareKey,
-                    onPressed: _busy || _dirty || _png == null ? null : _share,
-                    icon: const Icon(Icons.ios_share),
-                    label: const Text('分享这张图片'),
+                if (widget.content.images.isNotEmpty) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.image_outlined),
+                    title: const Text('文章配图'),
+                    subtitle: Text(
+                      _withImage ? '配图 ${_imageIndex + 1}' : '纯文字卡片',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _busy ? null : _chooseImage,
                   ),
                 ],
-              ),
-              if (_dirty && _png != null)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text('内容已修改，请先更新预览。'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _excerpt,
+                  enabled: !_busy,
+                  minLines: 3,
+                  maxLines: 6,
+                  maxLength: 600,
+                  decoration: const InputDecoration(
+                    labelText: '分享摘要',
+                    helperText: '卡片最多展示六行，较长内容会省略。',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setState(() => _dirty = true),
                 ),
-            ],
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _generate,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('更新预览'),
+                    ),
+                    FilledButton.icon(
+                      key: _shareKey,
+                      onPressed: _busy || _dirty || _png == null
+                          ? null
+                          : _share,
+                      icon: const Icon(Icons.ios_share),
+                      label: const Text('分享这张图片'),
+                    ),
+                  ],
+                ),
+                if (_dirty && _png != null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text('内容已修改，请先更新预览。'),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
