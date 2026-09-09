@@ -31,6 +31,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  flutter_localizations:
+    sdk: flutter
   xml: ^6.5.0
   charset: ^2.0.1
   enough_convert: ^1.6.0
@@ -81,6 +83,8 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

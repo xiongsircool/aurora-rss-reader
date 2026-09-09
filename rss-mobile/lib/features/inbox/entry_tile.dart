@@ -1,5 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
+import '../../l10n/generated/app_localizations.dart';
+
 import 'package:html/parser.dart' as html_parser;
 
 import '../../domain/entities/entry.dart';
@@ -120,7 +123,7 @@ final class _EntryTileState extends State<EntryTile> {
                           const SizedBox(width: 5),
                         ],
                         Text(
-                          _relativeDate(date),
+                          _relativeDate(date, AppLocalizations.of(context)!),
                           style: Theme.of(context).textTheme.labelSmall
                               ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
@@ -168,7 +171,9 @@ final class _EntryTileState extends State<EntryTile> {
                       children: [
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          tooltip: tile.entry.isStarred ? '取消收藏' : '收藏',
+                          tooltip: tile.entry.isStarred
+                              ? AppLocalizations.of(context)!.unstar
+                              : AppLocalizations.of(context)!.star,
                           onPressed: () =>
                               tile.onStarredChanged(!tile.entry.isStarred),
                           icon: Icon(
@@ -183,7 +188,9 @@ final class _EntryTileState extends State<EntryTile> {
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          tooltip: tile.entry.isRead ? '标为未读' : '标为已读',
+                          tooltip: tile.entry.isRead
+                              ? AppLocalizations.of(context)!.markUnread
+                              : AppLocalizations.of(context)!.markRead,
                           onPressed: () =>
                               tile.onReadChanged(!tile.entry.isRead),
                           icon: Icon(
@@ -299,17 +306,17 @@ String _sourceInitial(String title) {
 }
 
 /// Compact relative time for the inbox meta row.
-String _relativeDate(DateTime date) {
+String _relativeDate(DateTime date, AppLocalizations l10n) {
   final local = date.toLocal();
   final diff = DateTime.now().difference(local);
-  if (diff.isNegative) return '刚刚';
-  if (diff.inMinutes < 1) return '刚刚';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
-  if (diff.inHours < 24) return '${diff.inHours}小时前';
-  if (diff.inDays == 1) return '昨天';
-  if (diff.inDays < 7) return '${diff.inDays}天前';
+  if (diff.isNegative) return l10n.justNow;
+  if (diff.inMinutes < 1) return l10n.justNow;
+  if (diff.inMinutes < 60) return l10n.minutesAgo(diff.inMinutes);
+  if (diff.inHours < 24) return l10n.hoursAgo(diff.inHours);
+  if (diff.inDays == 1) return l10n.yesterday;
+  if (diff.inDays < 7) return l10n.daysAgo(diff.inDays);
   if (local.year == DateTime.now().year) {
-    return '${local.month}月${local.day}日';
+    return l10n.dateMD(local.month, local.day);
   }
-  return '${local.year}年${local.month}月${local.day}日';
+  return l10n.dateYMD(local.year, local.month, local.day);
 }

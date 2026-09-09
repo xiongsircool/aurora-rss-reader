@@ -3,6 +3,9 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import '../../l10n/generated/app_localizations.dart';
+
 import 'package:share_plus/share_plus.dart';
 
 import '../reader/mobile_reader_controller.dart';
@@ -110,7 +113,7 @@ class _OpmlActionsSheetState extends State<_OpmlActionsSheet> {
           ListTile(
             enabled: !_busy,
             leading: const Icon(Icons.file_open_outlined),
-            title: const Text('导入 OPML'),
+            title: Text(AppLocalizations.of(context)!.opmlImport),
             trailing: const Icon(Icons.chevron_right),
             onTap: _busy ? null : _import,
           ),
@@ -118,7 +121,7 @@ class _OpmlActionsSheetState extends State<_OpmlActionsSheet> {
           ListTile(
             enabled: !_busy,
             leading: const Icon(Icons.ios_share_outlined),
-            title: const Text('导出 OPML'),
+            title: Text(AppLocalizations.of(context)!.opmlExport),
             subtitle: Text('${widget.controller.feeds.length} 个订阅'),
             trailing: _busy
                 ? const SizedBox.square(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/generated/app_localizations.dart';
+
 import '../../shared/choice_sheet.dart';
 import '../audio/podcast_controller.dart';
 
@@ -40,7 +42,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
   Future<void> _speed() async {
     await showChoiceSheet<double>(
       context: context,
-      title: '播放速度',
+      title: AppLocalizations.of(context)!.speedLabel,
       selected: widget.controller.speed,
       options: [
         for (final value in [0.75, 1.0, 1.25, 1.5, 1.75, 2.0])
@@ -59,6 +61,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
     animation: widget.controller,
     builder: (context, _) {
       final player = widget.controller;
+      final l10n = AppLocalizations.of(context)!;
       final episode = player.episode;
       if (episode == null) return const SizedBox.shrink();
       final scheme = Theme.of(context).colorScheme;
@@ -99,7 +102,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
                   ),
                 ),
                 IconButton(
-                  tooltip: '收起播放器，继续播放',
+                  tooltip: l10n.collapseKeepPlaying,
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.keyboard_arrow_down),
                 ),
@@ -122,7 +125,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
               ),
             ),
             if (player.resumed && player.error == null && !player.completed)
-              const Text('已恢复上次进度'),
+              Text(l10n.playbackResumed),
             if (player.loading || player.buffering)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
@@ -134,7 +137,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
                 child: TextButton.icon(
                   onPressed: player.loading ? null : player.retry,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('重新加载'),
+                  label: Text(l10n.audioRetry),
                 ),
               ),
             const SizedBox(height: 16),
@@ -181,7 +184,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
               spacing: 24,
               children: [
                 IconButton(
-                  tooltip: '后退 10 秒',
+                  tooltip: l10n.back10,
                   iconSize: 30,
                   icon: const Icon(Icons.replay_10),
                   onPressed: canSeek
@@ -203,15 +206,15 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
                         ? Icons.pause
                         : Icons.play_arrow,
                     semanticLabel: player.completed
-                        ? '重新播放'
+                        ? l10n.replay
                         : player.playing
-                        ? '暂停'
-                        : '播放',
+                        ? l10n.paused
+                        : l10n.playAudio,
                     size: 32,
                   ),
                 ),
                 IconButton(
-                  tooltip: '前进 30 秒',
+                  tooltip: l10n.forward30,
                   iconSize: 30,
                   icon: const Icon(Icons.forward_30),
                   onPressed: canSeek
@@ -239,11 +242,25 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
                 player.close();
                 Navigator.pop(context);
               },
-              child: const Text('停止播放并关闭'),
+              child: Text(l10n.stopAndClose),
             ),
           ],
         ),
       );
     },
   );
+}
+
+extension PodcastStatusL10n on PodcastController {
+  String statusText(AppLocalizations l10n) => error != null
+      ? l10n.audioFailed
+      : loading
+      ? l10n.audioLoading
+      : buffering
+      ? l10n.audioBuffering
+      : completed
+      ? l10n.audioCompleted
+      : playing
+      ? l10n.playing
+      : l10n.paused;
 }

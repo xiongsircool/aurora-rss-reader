@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import '../l10n/generated/app_localizations.dart';
 
 import '../features/audio/podcast_overlay.dart';
 import '../features/reader/mobile_reader_controller.dart';
@@ -107,6 +110,13 @@ class _AuroraAppState extends State<AuroraApp> {
           ),
         ),
       ),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       themeMode: ThemeMode.system,
       home: AuroraShell(controller: widget.controller),
     );

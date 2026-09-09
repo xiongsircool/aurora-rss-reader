@@ -8,6 +8,7 @@ import 'package:aurora_mobile/application/use_cases/refresh_feed.dart';
 import 'package:aurora_mobile/data/database/local_database.dart';
 import 'package:aurora_mobile/data/repositories/local_content_repository.dart';
 import 'package:aurora_mobile/features/reader/mobile_reader_controller.dart';
+import 'package:aurora_mobile/features/inbox/entry_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -38,17 +39,22 @@ void main() {
     await tester.pumpWidget(AuroraApp(controller: controller));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining(RegExp('早上好|中午好|下午好|晚上好|夜深了')), findsOneWidget);
-    expect(find.text('收件箱为空'), findsOneWidget);
+    expect(
+      find.textContaining(
+        RegExp('Good morning|Good noon|Good afternoon|Good evening|Up late'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Inbox is empty'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.rss_feed_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('还没有订阅源'), findsOneWidget);
+    expect(find.text('No subscriptions yet'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('阅读与外观'), findsOneWidget);
-    expect(find.text('深浅主题'), findsOneWidget);
+    expect(find.text('Reading & Appearance'), findsOneWidget);
+    expect(find.text('Network proxy'), findsOneWidget);
   });
 
   testWidgets('opens OPML import and export actions from settings', (
@@ -60,16 +66,16 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('OPML 导入与导出'),
+      find.text('OPML import & export'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('OPML 导入与导出'));
+    await tester.tap(find.text('OPML import & export'));
     await tester.pumpAndSettle();
 
-    expect(find.text('导入 OPML'), findsOneWidget);
-    expect(find.text('导出 OPML'), findsOneWidget);
+    expect(find.text('Import OPML'), findsOneWidget);
+    expect(find.text('Export OPML'), findsOneWidget);
   });
 
   testWidgets('persists and applies a proxy from settings', (tester) async {
@@ -78,7 +84,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('网络代理'));
+    await tester.tap(find.text('Network proxy'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('proxy-url-input')),
@@ -103,7 +109,7 @@ void main() {
     await controller.addFeed('https://example.com/feed.xml');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('搜索'));
+    await tester.tap(find.byTooltip('Search'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('search-input')),
@@ -124,7 +130,7 @@ void main() {
     await tester.pumpWidget(AuroraApp(controller: controller));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, '添加订阅'));
+    await tester.tap(find.byType(FilledButton));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('feed-url-input')),
@@ -158,7 +164,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Fixture article'), findsOneWidget);
-    expect(find.byTooltip('取消收藏'), findsOneWidget);
+    expect(find.text('Fixture article'), findsOneWidget);
+    expect(find.widgetWithText(EntryTile, 'Fixture article'), findsOneWidget);
   });
 }
 

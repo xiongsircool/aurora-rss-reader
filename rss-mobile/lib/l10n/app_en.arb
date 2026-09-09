@@ -1,0 +1,359 @@
+{
+  "@@locale": "en",
+  "tabInbox": "Inbox",
+  "tabSaved": "Saved",
+  "tabSources": "Sources",
+  "tabSettings": "Settings",
+  "inboxEmpty": "Inbox is empty",
+  "inboxNoUnread": "No unread articles",
+  "inboxNoEntriesYet": "No articles fetched yet",
+  "greetingLateNight": "Up late",
+  "greetingMorning": "Good morning",
+  "greetingNoon": "Good noon",
+  "greetingAfternoon": "Good afternoon",
+  "greetingEvening": "Good evening",
+  "allRead": "All caught up",
+  "unreadCount": "{count} unread",
+  "@unreadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "filter": "Filter",
+  "search": "Search",
+  "searchArticles": "Search local articles",
+  "searchHint": "Search titles and content",
+  "searchResults": "{count} matching results",
+  "@searchResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchNoMatch": "No matching articles",
+  "searchNoMatchHint": "Try a shorter keyword",
+  "searchSearching": "Searching…",
+  "searchFailed": "Search failed, try again",
+  "searchRetry": "Retry",
+  "refreshAll": "Refresh all subscriptions",
+  "refreshing": "Refreshing {done}/{total}",
+  "@refreshing": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "refreshDone": "Refreshed, {count} new articles",
+  "@refreshDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "refreshDoneWithFailures": "Refreshed, {count} new, {failed} failed",
+  "@refreshDoneWithFailures": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "retryFailed": "Retry failed subscriptions",
+  "retryAllFailed": "{count} subscriptions still failing after retry",
+  "@retryAllFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "viewDetails": "View",
+  "refreshDetails": "Refresh details",
+  "noFailedFeeds": "No subscriptions need retrying",
+  "loadMore": "Load more",
+  "loadedCount": "{count} loaded, continue",
+  "@loadedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loadingMore": "Loading…",
+  "loadMoreFailed": "Load failed, tap to retry",
+  "markRead": "Mark as read",
+  "markUnread": "Mark as unread",
+  "star": "Save",
+  "unstar": "Unsave",
+  "markAllRead": "Mark all as read",
+  "justNow": "just now",
+  "minutesAgo": "{count}m ago",
+  "@minutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursAgo": "{count}h ago",
+  "@hoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "yesterday": "yesterday",
+  "daysAgo": "{count}d ago",
+  "@daysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dateMD": "{month}/{day}",
+  "@dateMD": {
+    "placeholders": {
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "dateYMD": "{year}/{month}/{day}",
+  "@dateYMD": {
+    "placeholders": {
+      "year": {
+        "type": "int"
+      },
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "readerSettings": "Reading settings",
+  "fontSize": "Font size",
+  "lineHeight": "Line height",
+  "fontFamily": "Typeface",
+  "fontSans": "System default",
+  "fontSerif": "Serif",
+  "share": "Share",
+  "shareCard": "Share card",
+  "shareLink": "Copy link",
+  "shareText": "Share text",
+  "shareMarkdown": "Share Markdown",
+  "shareScreenshot": "Share screenshot",
+  "linkCopied": "Link copied",
+  "translateTitle": "Translate title",
+  "translatingTitle": "Translating title…",
+  "aiSummary": "AI summary",
+  "translateArticle": "Translate article",
+  "extractFullText": "Extract full text",
+  "extracting": "Extracting",
+  "extractFailed": "Extraction failed: {reason}Showing subscription content.",
+  "@extractFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "openOriginal": "Open original",
+  "playAudio": "Play audio",
+  "openPlayer": "Open player",
+  "playing": "Playing",
+  "paused": "Paused",
+  "audioLoading": "Loading audio…",
+  "audioBuffering": "Buffering…",
+  "audioCompleted": "Playback finished",
+  "audioFailed": "Audio unavailable right now, check the network and retry",
+  "audioRetry": "Reload",
+  "speed": "Playback speed",
+  "playbackResumed": "Resumed from last position",
+  "playbackResumedShort": "Resumed previous position",
+  "settings": "Settings",
+  "readingAndAppearance": "Reading & Appearance",
+  "readerLayout": "Reading layout",
+  "readerLayoutHint": "Adjust font size, line height and typeface from the article toolbar; changes save automatically.",
+  "theme": "Theme",
+  "themeFollowSystem": "Follows system appearance",
+  "feedsAndNetwork": "Sources & Network",
+  "networkProxy": "Network proxy",
+  "directConnection": "Direct",
+  "backgroundRefresh": "Background refresh",
+  "backgroundRefreshOff": "Off",
+  "backgroundRefreshEvery": "About every {hours}h, scheduled by the OS",
+  "@backgroundRefreshEvery": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "refreshIntervalTitle": "Background refresh interval",
+  "refreshIntervalHint": "Target interval for checking subscriptions in the background; manual refresh is unaffected. iOS decides actual timing based on usage, battery and network — not an alarm clock.",
+  "everyHours": "Every {hours} hours",
+  "@everyHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "turnOff": "Turn off background refresh",
+  "keepManualRefresh": "Manual refresh stays available",
+  "defaultInterval": "Default interval",
+  "apply": "Apply",
+  "cancel": "Cancel",
+  "batteryExemption": "Battery optimization exemption",
+  "batteryExemptionHint": "Adjust background restrictions in system settings",
+  "opmlImportExport": "OPML import & export",
+  "opmlHint": "Migrates subscriptions only; articles, saves and read state are not included",
+  "aiService": "AI service",
+  "aiNotConfigured": "Configure your own endpoint, model and key",
+  "aiConfigured": "Configured · {model}",
+  "@aiConfigured": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "dataAndBackup": "Data & Backup",
+  "localData": "Local data",
+  "readingStats": "{feeds} subscriptions · {total} articles",
+  "@readingStats": {
+    "placeholders": {
+      "feeds": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "statsDetail": "{read} read · {starred} saved",
+  "@statsDetail": {
+    "placeholders": {
+      "read": {
+        "type": "int"
+      },
+      "starred": {
+        "type": "int"
+      }
+    }
+  },
+  "backupAll": "Back up all data",
+  "backupHint": "Exports the on-device database; keep your API key separately",
+  "restoreBackup": "Restore backup",
+  "restoreHint": "Restoring replaces current data; keep a backup first",
+  "replaceData": "Replace current data?",
+  "replaceDataBody": "Restoring overwrites current subscriptions, articles and reading state. Export a backup first; the API key does not migrate with backups.",
+  "verifyAndPrepare": "Verify and prepare",
+  "backupVerified": "Backup verified",
+  "backupVerifiedBody": "Restore is ready. Close Aurora and reopen it; changes made before restarting will be overwritten by the backup.",
+  "gotIt": "Got it",
+  "about": "About",
+  "aboutAurora": "About Aurora",
+  "noFeedsYet": "No subscriptions yet",
+  "addFeed": "Add subscription",
+  "addSubscription": "Add subscription",
+  "feedAddressHint": "Enter an RSS, Atom or podcast address",
+  "feedAddressLabel": "Subscription address",
+  "groupLabel": "Group",
+  "fetchAndAdd": "Fetch and add",
+  "addingInProgress": "Fetching and parsing the subscription…\nIf it is a webpage, feed links will be discovered automatically.",
+  "defaultGroup": "Ungrouped",
+  "all": "All",
+  "unread": "Unread",
+  "groups": "Groups",
+  "unreadEntries": "{count} unread",
+  "@unreadEntries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "feedUnreadAndStatus": "{count} unread · {status}",
+  "@feedUnreadAndStatus": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "lastRefreshFailed": "last refresh failed",
+  "notRefreshedYet": "not refreshed yet",
+  "refreshed": "refreshed",
+  "refreshThisFeed": "Refresh this subscription",
+  "lastCheck": "Last checked: {time}",
+  "@lastCheck": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "savedEmpty": "No saved articles",
+  "savedHint": "Save articles you like for later",
+  "savedCount": "{count} saved",
+  "@savedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectArticle": "Select an article to read",
+  "sharePreview": "Share preview",
+  "cardSummary": "Summary card",
+  "cardSummaryHint": "Confirm the layout before sharing; the QR code points to the original article.",
+  "updatePreview": "Update preview",
+  "shareThisImage": "Share this image",
+  "contentModified": "Content changed — update the preview first.",
+  "includeImage": "Include image",
+  "articleImage": "Article image",
+  "chooseImage": "Choose card image",
+  "chooseImageHint": "Images are shown in full proportion. Tap “Use this image” and the preview updates automatically.",
+  "useThisImage": "Use this image",
+  "textOnlyCard": "Text-only card",
+  "noImage": "No article image",
+  "imageUnavailable": "This image is unavailable; the preview fell back to text. You can pick another one.",
+  "shareExcerpt": "Share excerpt",
+  "excerptHint": "Up to six lines on the card; longer text is ellipsized.",
+  "previewFailed": "Preview failed, try again",
+  "shareSaveFailed": "Could not save the image or open the share sheet, try again",
+  "close": "Close",
+  "stopAndClose": "Stop and close",
+  "collapseKeepPlaying": "Collapse player, keep playing",
+  "appLanguage": "Follow system",
+  "back10": "Back 10 seconds",
+  "forward30": "Forward 30 seconds",
+  "replay": "Replay",
+  "pauseAudio": "Pause audio",
+  "retryAudio": "Retry audio",
+  "backgroundPlayNote": "Keep browsing after collapsing. In-app playback continues; leaving the app pauses it.",
+  "opmlImport": "Import OPML",
+  "opmlExport": "Export OPML"
+}

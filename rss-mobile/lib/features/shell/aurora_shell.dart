@@ -10,6 +10,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
+
+import '../../l10n/generated/app_localizations.dart';
+
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,26 +48,26 @@ class _AuroraShellState extends State<AuroraShell> {
   int _selectedIndex = 0;
   Entry? _selectedEntry;
 
-  static const _destinations = <NavigationDestination>[
+  static List<NavigationDestination> _destinations(AppLocalizations l10n) => [
     NavigationDestination(
-      icon: Icon(Icons.inbox_outlined),
-      selectedIcon: Icon(Icons.inbox),
-      label: '收件箱',
+      icon: const Icon(Icons.inbox_outlined),
+      selectedIcon: const Icon(Icons.inbox),
+      label: l10n.tabInbox,
     ),
     NavigationDestination(
-      icon: Icon(Icons.bookmark_border),
-      selectedIcon: Icon(Icons.bookmark),
-      label: '收藏',
+      icon: const Icon(Icons.bookmark_border),
+      selectedIcon: const Icon(Icons.bookmark),
+      label: l10n.tabSaved,
     ),
     NavigationDestination(
-      icon: Icon(Icons.rss_feed_outlined),
-      selectedIcon: Icon(Icons.rss_feed),
-      label: '订阅',
+      icon: const Icon(Icons.rss_feed_outlined),
+      selectedIcon: const Icon(Icons.rss_feed),
+      label: l10n.tabSources,
     ),
     NavigationDestination(
-      icon: Icon(Icons.settings_outlined),
-      selectedIcon: Icon(Icons.settings),
-      label: '设置',
+      icon: const Icon(Icons.settings_outlined),
+      selectedIcon: const Icon(Icons.settings),
+      label: l10n.tabSettings,
     ),
   ];
 
@@ -159,7 +162,9 @@ class _AuroraShellState extends State<AuroraShell> {
                                     labelType: NavigationRailLabelType.all,
                                     onDestinationSelected: _select,
                                     destinations: [
-                                      for (final d in _destinations)
+                                      for (final d in _destinations(
+                                        AppLocalizations.of(context)!,
+                                      ))
                                         NavigationRailDestination(
                                           icon: d.icon,
                                           selectedIcon: d.selectedIcon,
@@ -219,7 +224,9 @@ class _AuroraShellState extends State<AuroraShell> {
                               bottom: inset + 4,
                               child: _FloatingCapsuleBar(
                                 selectedIndex: _selectedIndex,
-                                destinations: _destinations,
+                                destinations: _destinations(
+                                  AppLocalizations.of(context)!,
+                                ),
                                 onDestinationSelected: _select,
                               ),
                             ),
@@ -259,21 +266,20 @@ final class _InboxPage extends StatelessWidget {
           builder: (context) {
             final now = DateTime.now();
             final hour = now.hour;
+            final l = AppLocalizations.of(context)!;
             final greeting = hour < 6
-                ? '夜深了'
+                ? l.greetingLateNight
                 : hour < 12
-                ? '早上好'
+                ? l.greetingMorning
                 : hour < 14
-                ? '中午好'
+                ? l.greetingNoon
                 : hour < 18
-                ? '下午好'
-                : '晚上好';
-            const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+                ? l.greetingAfternoon
+                : l.greetingEvening;
             final unread = controller.unreadCount;
             final subtitle =
-                '${now.month}月${now.day}日 '
-                '${weekdays[now.weekday - 1]}'
-                '${unread > 0 ? ' · $unread 篇未读' : ' · 已全部读完'}';
+                '${l.dateMD(now.month, now.day)}'
+                '${unread > 0 ? ' · ${l.unreadCount(unread)}' : ' · ${l.allRead}'}';
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -293,7 +299,7 @@ final class _InboxPage extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            tooltip: '筛选',
+            tooltip: AppLocalizations.of(context)!.filter,
             onPressed: () => showInboxFilterSheet(context, controller),
             icon: Stack(
               clipBehavior: Clip.none,
@@ -316,7 +322,7 @@ final class _InboxPage extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: '搜索',
+            tooltip: AppLocalizations.of(context)!.search,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => SearchPage(controller: controller),
@@ -325,7 +331,7 @@ final class _InboxPage extends StatelessWidget {
             icon: const Icon(Icons.search),
           ),
           IconButton(
-            tooltip: '刷新全部订阅',
+            tooltip: AppLocalizations.of(context)!.refreshAll,
             onPressed: controller.refreshing || controller.feeds.isEmpty
                 ? null
                 : controller.refreshAll,
@@ -399,11 +405,13 @@ final class _InboxPage extends StatelessWidget {
             ? Icons.mark_email_read_outlined
             : Icons.inbox_outlined,
         title: controller.unreadOnly
-            ? '没有未读文章'
+            ? AppLocalizations.of(context)!.inboxNoUnread
             : noFeeds
-            ? '收件箱为空'
-            : '还没有获取到文章',
-        actionLabel: noFeeds ? '添加订阅' : '刷新订阅',
+            ? AppLocalizations.of(context)!.inboxEmpty
+            : AppLocalizations.of(context)!.inboxNoEntriesYet,
+        actionLabel: noFeeds
+            ? AppLocalizations.of(context)!.addFeed
+            : AppLocalizations.of(context)!.refreshAll,
         actionIcon: noFeeds ? Icons.add : Icons.refresh,
         onAction: noFeeds ? onAddSource : controller.refreshAll,
       );
@@ -459,7 +467,9 @@ final class _InboxPage extends StatelessWidget {
                     child: Center(
                       child: ActionChip(
                         avatar: const Icon(Icons.refresh, size: 16),
-                        label: const Text('加载失败，点击重试'),
+                        label: Text(
+                          AppLocalizations.of(context)!.loadMoreFailed,
+                        ),
                         onPressed: controller.loadMore,
                       ),
                     ),
@@ -519,8 +529,9 @@ final class _SavedPage extends StatelessWidget {
               if (constraints.maxWidth > 620)
                 Text(
                   controller.starredEntries.isEmpty
-                      ? '收藏喜欢的文章，方便以后回看'
-                      : '已收藏 ${controller.starredEntries.length} 篇',
+                      ? AppLocalizations.of(context)!.savedHint
+                      : AppLocalizations.of(context)!
+                            .savedCount(controller.starredEntries.length),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -534,9 +545,9 @@ final class _SavedPage extends StatelessWidget {
           RefreshStatusBanner(controller: controller),
           Expanded(
             child: controller.starredEntries.isEmpty
-                ? const _EmptyState(
+                ? _EmptyState(
                     icon: Icons.bookmark_border,
-                    title: '暂无收藏文章',
+                    title: AppLocalizations.of(context)!.savedEmpty,
                   )
                 : RightScrollView(
                     bottomClearance: _ReaderLayoutScope.clearance(context),
@@ -614,8 +625,8 @@ class _SourcesPageState extends State<_SourcesPage> {
             child: controller.feeds.isEmpty
                 ? _EmptyState(
                     icon: Icons.rss_feed,
-                    title: '还没有订阅源',
-                    actionLabel: '添加订阅',
+                    title: AppLocalizations.of(context)!.noFeedsYet,
+                    actionLabel: AppLocalizations.of(context)!.addFeed,
                     onAction: widget.onAddSource,
                   )
                 : RefreshIndicator(
@@ -1129,7 +1140,7 @@ class _SettingsPageState extends State<_SettingsPage> {
   Widget build(BuildContext context) {
     final controller = widget.controller;
     return Scaffold(
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.tabSettings)),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
@@ -1146,7 +1157,7 @@ class _SettingsPageState extends State<_SettingsPage> {
               ),
               children: [
                 _SettingsSection(
-                  title: '阅读与外观',
+                  title: AppLocalizations.of(context)!.readingAndAppearance,
                   children: [
                     const ListTile(
                       leading: Icon(Icons.auto_stories_outlined),
@@ -1161,12 +1172,15 @@ class _SettingsPageState extends State<_SettingsPage> {
                   ],
                 ),
                 _SettingsSection(
-                  title: '订阅与网络',
+                  title: AppLocalizations.of(context)!.feedsAndNetwork,
                   children: [
                     ListTile(
                       leading: const Icon(Icons.lan_outlined),
-                      title: const Text('网络代理'),
-                      subtitle: Text(controller.proxyUrl ?? '直连'),
+                      title: Text(AppLocalizations.of(context)!.networkProxy),
+                      subtitle: Text(
+                        controller.proxyUrl ??
+                            AppLocalizations.of(context)!.proxyDirect,
+                      ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => showProxySettingsDialog(context, controller),
                     ),
@@ -1176,9 +1190,15 @@ class _SettingsPageState extends State<_SettingsPage> {
                         final hours = snapshot.data ?? 3;
                         return ListTile(
                           leading: const Icon(Icons.sync),
-                          title: const Text('后台刷新'),
+                          title: Text(
+                            AppLocalizations.of(context)!.backgroundRefresh,
+                          ),
                           subtitle: Text(
-                            hours > 0 ? '约每 $hours 小时，执行时间由系统安排' : '已关闭',
+                            hours > 0
+                                ? AppLocalizations.of(context)!
+                                      .backgroundRefreshEvery(hours)
+                                : AppLocalizations.of(context)!
+                                      .backgroundRefreshOff,
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: _chooseRefreshInterval,
@@ -1188,26 +1208,32 @@ class _SettingsPageState extends State<_SettingsPage> {
                     if (Theme.of(context).platform == TargetPlatform.android)
                       ListTile(
                         leading: const Icon(Icons.battery_saver),
-                        title: const Text('电池优化豁免'),
-                        subtitle: const Text('前往系统设置调整后台限制'),
+                        title: Text(
+                          AppLocalizations.of(context)!.batteryExemption,
+                        ),
+                        subtitle: Text(
+                          AppLocalizations.of(context)!.batteryExemptionHint,
+                        ),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: _openBatteryOptimizationSettings,
                       ),
                     ListTile(
                       leading: const Icon(Icons.import_export),
-                      title: const Text('OPML 导入与导出'),
-                      subtitle: const Text('迁移订阅列表，不包含文章、收藏和阅读记录'),
+                      title: Text(
+                        AppLocalizations.of(context)!.opmlImportExport,
+                      ),
+                      subtitle: Text(AppLocalizations.of(context)!.opmlHint),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => showOpmlActionsSheet(context, controller),
                     ),
                   ],
                 ),
                 _SettingsSection(
-                  title: 'AI 服务',
+                  title: AppLocalizations.of(context)!.aiService,
                   children: [
                     ListTile(
                       leading: const Icon(Icons.auto_awesome_outlined),
-                      title: const Text('AI 服务'),
+                      title: Text(AppLocalizations.of(context)!.aiService),
                       subtitle: FutureBuilder<Map<String, dynamic>>(
                         key: ValueKey(_settingsRevision),
                         future: _loadAiStatus(controller),
@@ -1217,8 +1243,9 @@ class _SettingsPageState extends State<_SettingsPage> {
                               data['modelName'] ?? data['modelId'] ?? '';
                           return Text(
                             model.toString().isEmpty
-                                ? '配置自己的服务地址、模型和 Key'
-                                : '已配置 · $model',
+                                ? AppLocalizations.of(context)!.aiNotConfigured
+                                : AppLocalizations.of(context)!
+                                      .aiConfiguredWith(model),
                           );
                         },
                       ),
@@ -1231,46 +1258,48 @@ class _SettingsPageState extends State<_SettingsPage> {
                   ],
                 ),
                 _SettingsSection(
-                  title: '数据与备份',
+                  title: AppLocalizations.of(context)!.dataAndBackup,
                   children: [
                     ListTile(
                       leading: const Icon(Icons.storage_outlined),
-                      title: const Text('本地数据'),
+                      title: Text(AppLocalizations.of(context)!.localData),
                       subtitle: FutureBuilder<({int total, int read, int starred})>(
                         future: controller.repository.entryStats(),
                         builder: (context, snapshot) {
                           final stats = snapshot.data;
-                          if (snapshot.hasError) return const Text('暂时无法读取统计');
+                          if (snapshot.hasError) return const Text('…');
                           return Text(
                             stats == null
-                                ? '正在读取统计…'
-                                : '${controller.feeds.length} 个订阅 · ${stats.total} 篇文章\n已读 ${stats.read} · 收藏 ${stats.starred}',
+                                ? '…'
+                                : '${AppLocalizations.of(context)!.readingStats(controller.feeds.length, stats.total)}\n${AppLocalizations.of(context)!.statsDetail(stats.read, stats.starred)}',
                           );
                         },
                       ),
                     ),
                     ListTile(
                       leading: const Icon(Icons.backup_outlined),
-                      title: const Text('备份全部数据'),
-                      subtitle: const Text('导出设备中的数据库，API Key 需单独保管'),
+                      title: Text(AppLocalizations.of(context)!.backupAll),
+                      subtitle: Text(
+                        AppLocalizations.of(context)!.backupAllHint,
+                      ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => _exportFullBackup(context),
                     ),
                     ListTile(
                       leading: const Icon(Icons.restore),
-                      title: const Text('恢复备份'),
-                      subtitle: const Text('恢复将替换当前数据，请先保留当前备份'),
+                      title: Text(AppLocalizations.of(context)!.restoreBackup),
+                      subtitle: Text(AppLocalizations.of(context)!.restoreHint),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => _importFullBackup(context),
                     ),
                   ],
                 ),
                 _SettingsSection(
-                  title: '关于',
+                  title: AppLocalizations.of(context)!.about,
                   children: [
                     ListTile(
                       leading: const Icon(Icons.info_outline),
-                      title: const Text('关于 Aurora'),
+                      title: Text(AppLocalizations.of(context)!.aboutAurora),
                       subtitle: const Text(
                         '${AppMeta.version} · 本地优先 · GPL-3.0',
                       ),
