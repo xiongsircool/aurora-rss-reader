@@ -174,6 +174,7 @@ private struct Hairline: View {
       colors: [AuroraHomeWidgetFlavor.orange, AuroraHomeWidgetFlavor.teal],
       startPoint: .leading, endPoint: .trailing
     )
+    .opacity(0.75)
     .frame(height: 2.5)
   }
 }
@@ -187,7 +188,7 @@ private struct UnreadBadge: View {
       .foregroundStyle(.white)
       .padding(.horizontal, 7)
       .padding(.vertical, 2)
-      .background(Capsule().fill(AuroraHomeWidgetFlavor.teal))
+      .background(Capsule().fill(AuroraHomeWidgetFlavor.teal.opacity(0.88)))
   }
 }
 
@@ -208,12 +209,12 @@ private struct MediumView: View {
     VStack(spacing: 0) {
       Hairline()
       if let data = entry.data, !data.articles.isEmpty {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 8) {
           HStack(spacing: 6) {
             Text("AURORA")
-              .font(.system(size: 10, weight: .heavy))
-              .kerning(1.5)
-              .foregroundStyle(.secondary)
+              .font(.system(size: 9.5, weight: .heavy))
+              .kerning(2)
+              .foregroundStyle(.tertiary)
             if let hours = staleHours {
               Text("· \(hours)小时前更新")
                 .font(.system(size: 10))
@@ -226,12 +227,12 @@ private struct MediumView: View {
           }
           ForEach(data.articles.prefix(articleLimit)) { ArticleRow(article: $0) }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
       } else {
         // All caught up — celebrate instead of showing an error.
         VStack(spacing: 4) {
-          Text("🎉").font(.system(size: 28))
+          Text("🎉").font(.system(size: 30))
           Text("全部读完了").font(.system(size: 14, weight: .semibold))
           Text("打开 Aurora 刷新订阅源")
             .font(.system(size: 11))
@@ -256,16 +257,15 @@ private struct LargeView: View {
         VStack(alignment: .leading, spacing: 6) {
           HStack(spacing: 6) {
             Text("AURORA")
-              .font(.system(size: 10, weight: .heavy))
-              .kerning(1.5)
-              .foregroundStyle(.secondary)
+              .font(.system(size: 9.5, weight: .heavy))
+              .kerning(2)
+              .foregroundStyle(.tertiary)
             Spacer()
             if data.unreadCount > 0 {
               UnreadBadge(count: data.unreadCount)
             }
           }
           ForEach(data.articles.prefix(6)) { ArticleRow(article: $0) }
-          Divider().opacity(0.4)
           Link(destination: URL(string: "aurora://stats?homeWidget")!) {
             HStack(spacing: 5) {
               Text("本周已读")
@@ -279,10 +279,16 @@ private struct LargeView: View {
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+              RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(.quaternary.opacity(0.6))
+            )
           }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
       } else {
         MediumView(entry: entry)
       }
@@ -303,6 +309,18 @@ private struct SmallStatsView: View {
     return ("与上周持平", .secondary)
   }
 
+  private var numberStyle: AnyShapeStyle {
+    if #available(iOSApplicationExtension 16.0, *) {
+      return AnyShapeStyle(
+        LinearGradient(
+          colors: [AuroraHomeWidgetFlavor.orange, AuroraHomeWidgetFlavor.teal],
+          startPoint: .leading, endPoint: .trailing
+        )
+      )
+    }
+    return AnyShapeStyle(AuroraHomeWidgetFlavor.orange)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 3) {
       Spacer(minLength: 0)
@@ -311,8 +329,9 @@ private struct SmallStatsView: View {
         .foregroundStyle(.secondary)
       HStack(alignment: .firstTextBaseline, spacing: 3) {
         Text("\(entry.data?.weekCount ?? 0)")
-          .font(.system(size: 38, weight: .bold, design: .rounded))
-          .foregroundStyle(AuroraHomeWidgetFlavor.orange)
+          .font(.system(size: 40, weight: .bold, design: .rounded))
+          .monospacedDigit()
+          .foregroundStyle(numberStyle)
         Text("篇")
           .font(.system(size: 13))
           .foregroundStyle(.secondary)
@@ -452,9 +471,11 @@ extension View {
   @ViewBuilder
   func auroraWidgetBackground() -> some View {
     if #available(iOSApplicationExtension 17.0, *) {
-      self.containerBackground(.fill.tertiary, for: .widget)
+      // True frosted glass: the wallpaper shows through and iOS 26 renders
+      // it with the Liquid Glass treatment automatically.
+      self.containerBackground(.ultraThinMaterial, for: .widget)
     } else if #available(iOSApplicationExtension 15.0, *) {
-      self.background()
+      self.background(Color(uiColor: .secondarySystemBackground))
     } else {
       self
     }
