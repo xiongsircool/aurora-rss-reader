@@ -25,10 +25,11 @@ Future<void> updateAuroraWidget(LocalContentRepository repository) async {
     await HomeWidget.setAppGroupId(_appGroupId);
 
     // Latest unread articles (falls back to latest overall when all read).
-    final unreadPage = await repository.listInbox(unreadOnly: true, limit: 3);
+    // Fetch 6: medium widget shows 3, large widget shows 6.
+    final unreadPage = await repository.listInbox(unreadOnly: true, limit: 6);
     var articles = unreadPage.entries;
     if (articles.isEmpty) {
-      final latestPage = await repository.listInbox(limit: 3);
+      final latestPage = await repository.listInbox(limit: 6);
       articles = latestPage.entries;
     }
 

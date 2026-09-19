@@ -195,6 +195,7 @@ private struct UnreadBadge: View {
 
 private struct MediumView: View {
   let entry: AuroraHomeWidgetEntry
+  private var articleLimit: Int { 3 }
 
   private var staleHours: Int? {
     guard let updated = entry.data?.updatedAtDate else { return nil }
@@ -223,7 +224,7 @@ private struct MediumView: View {
               UnreadBadge(count: data.unreadCount)
             }
           }
-          ForEach(data.articles) { ArticleRow(article: $0) }
+          ForEach(data.articles.prefix(articleLimit)) { ArticleRow(article: $0) }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -238,6 +239,52 @@ private struct MediumView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .widgetURL(URL(string: "aurora://home?homeWidget"))
+      }
+    }
+  }
+}
+
+// MARK: - Large: six articles + weekly stats footer (HIG: more size = more info)
+
+private struct LargeView: View {
+  let entry: AuroraHomeWidgetEntry
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Hairline()
+      if let data = entry.data, !data.articles.isEmpty {
+        VStack(alignment: .leading, spacing: 6) {
+          HStack(spacing: 6) {
+            Text("AURORA")
+              .font(.system(size: 10, weight: .heavy))
+              .kerning(1.5)
+              .foregroundStyle(.secondary)
+            Spacer()
+            if data.unreadCount > 0 {
+              UnreadBadge(count: data.unreadCount)
+            }
+          }
+          ForEach(data.articles.prefix(6)) { ArticleRow(article: $0) }
+          Divider().opacity(0.4)
+          Link(destination: URL(string: "aurora://stats?homeWidget")!) {
+            HStack(spacing: 5) {
+              Text("本周已读")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+              Text("\(data.weekCount) 篇")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(AuroraHomeWidgetFlavor.teal)
+              Spacer()
+              Text("↑\(max(0, data.weekCount - data.prevWeekCount)) vs 上周")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+            }
+          }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+      } else {
+        MediumView(entry: entry)
       }
     }
   }
@@ -356,6 +403,8 @@ struct AuroraHomeWidgetEntryView: View {
     switch family {
     case .systemSmall:
       SmallStatsView(entry: entry)
+    case .systemLarge:
+      LargeView(entry: entry)
     case .accessoryInline:
       if #available(iOSApplicationExtension 16.0, *) {
         InlineView(entry: entry)
@@ -380,7 +429,7 @@ struct AuroraHomeWidget: Widget {
   let kind: String = "AuroraHomeWidget"
 
   private var supportedFamilies: [WidgetFamily] {
-    var families: [WidgetFamily] = [.systemSmall, .systemMedium]
+    var families: [WidgetFamily] = [.systemSmall, .systemMedium, .systemLarge]
     if #available(iOSApplicationExtension 16.0, *) {
       families.append(contentsOf: [.accessoryInline, .accessoryRectangular])
     }
@@ -424,4 +473,11 @@ extension View {
     entry: AuroraHomeWidgetEntry(date: Date(), data: .sample)
   )
   .previewContext(WidgetPreviewContext(family: .systemSmall))
+})
+
+#Preview("large", body: {
+  AuroraHomeWidgetEntryView(
+    entry: AuroraHomeWidgetEntry(date: Date(), data: .sample)
+  )
+  .previewContext(WidgetPreviewContext(family: .systemLarge))
 })
