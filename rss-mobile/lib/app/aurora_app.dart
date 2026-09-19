@@ -74,16 +74,11 @@ class _AuroraAppState extends State<AuroraApp> with WidgetsBindingObserver {
       }
     }
     if (entry == null) {
-      // Cold start may race with the inbox load — retry briefly.
-      for (var attempt = 0; attempt < 3 && entry == null; attempt++) {
-        await Future<void>.delayed(const Duration(seconds: 1));
-        for (final e in widget.controller.entries) {
-          if (e.id == id) {
-            entry = e;
-            break;
-          }
-        }
-      }
+      // Cold start may race with the inbox load — fall back to a direct
+      // database lookup instead of waiting for the list.
+      try {
+        entry = await widget.controller.repository.entryById(id);
+      } catch (_) {}
     }
     if (entry == null || !mounted) return; // Fall back to the home screen.
 

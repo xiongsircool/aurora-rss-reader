@@ -726,6 +726,17 @@ final class LocalContentRepository {
     return rows.map(_entryFromRow).toList();
   }
 
+  /// Returns a single entry by id, or null when missing. Used by home
+  /// screen widget deep links that may fire before the inbox list loads.
+  Future<domain_entry.Entry?> entryById(String id) async {
+    final rows = await (database.select(database.entries)
+          ..where((entry) => entry.id.equals(id))
+          ..limit(1))
+        .get();
+    if (rows.isEmpty) return null;
+    return _entryFromRow(rows.first);
+  }
+
   Future<List<domain_entry.Entry>> search(
     String query, {
     int limit = 50,
