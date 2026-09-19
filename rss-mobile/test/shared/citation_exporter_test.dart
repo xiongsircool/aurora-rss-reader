@@ -108,6 +108,18 @@ void main() {
     });
   });
 
+  group('toBibTeXCollections', () {
+    test('joins entries with blank lines', () {
+      final out = toBibTeXCollections([
+        (_entry(author: 'Ann Lee'), 'ACM'),
+        (_entry(author: 'Bo Chen'), 'IEEE'),
+      ]);
+      expect(out, contains('@article{lee2025study'));
+      expect(out, contains('@article{chen2025study'));
+      expect(out, contains('}\n\n@article'));
+    });
+  });
+
   group('toFrontMatter', () {
     test('emits YAML metadata for archiving', () {
       final fm = toFrontMatter(

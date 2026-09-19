@@ -51,6 +51,11 @@ String toBibTeX(Entry entry, String feedTitle) {
   return b.toString();
 }
 
+/// Joins multiple entries into one `.bib` file body (blank line between
+/// entries, as expected by BibTeX tools).
+String toBibTeXCollections(Iterable<(Entry, String)> items) =>
+    items.map((i) => toBibTeX(i.$1, i.$2)).join('\n\n');
+
 /// YAML front-matter for Obsidian-style archival Markdown.
 String toFrontMatter(Entry entry, String feedTitle) {
   final date = entry.publishedAt ?? entry.insertedAt;

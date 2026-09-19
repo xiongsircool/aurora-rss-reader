@@ -2,9 +2,11 @@ import '../audio/podcast_overlay.dart';
 import '../../shared/right_scrollbar.dart';
 import '../../shared/clear_glass_surface.dart';
 import '../../shared/choice_sheet.dart';
+import '../../shared/export/citation_exporter.dart';
 import '../../platform/background/refresh_schedule_settings.dart';
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
@@ -541,6 +543,14 @@ final class _SavedPage extends StatelessWidget {
             ],
           ),
         ),
+        actions: [
+          if (controller.starredEntries.isNotEmpty)
+            IconButton(
+              tooltip: '导出 BibTeX',
+              icon: const Icon(Icons.file_download_outlined),
+              onPressed: () => _exportStarredBibTeX(context, controller),
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -1431,6 +1441,31 @@ Future<Map<String, dynamic>> _loadAiStatus(
     }
   } catch (_) {}
   return {};
+}
+
+/// Exports every starred entry as one .bib file via the system share
+/// sheet (save to Files, AirDrop to a colleague, attach to email…).
+Future<void> _exportStarredBibTeX(
+  BuildContext context,
+  MobileReaderController controller,
+) async {
+  final entries = controller.starredEntries;
+  if (entries.isEmpty) return;
+  final bib = toBibTeXCollections([
+    for (final e in entries) (e, controller.feedTitle(e.feedId)),
+  ]);
+  final now = DateTime.now();
+  final stamp = '${now.year}'
+      '${now.month.toString().padLeft(2, '0')}'
+      '${now.day.toString().padLeft(2, '0')}';
+  final file = File('${Directory.systemTemp.path}/aurora-starred-$stamp.bib');
+  await file.writeAsString(bib);
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [XFile(file.path, mimeType: 'text/plain')],
+      subject: 'Aurora 收藏导出($stamp)',
+    ),
+  );
 }
 
 void _openReader(
