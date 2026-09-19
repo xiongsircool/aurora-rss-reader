@@ -159,3 +159,6 @@ docs_archive/
 CLAUDE.md
 AGENTS.md
 rss-mobile/ARCHIVE.md
+
+# Local design assets (imagegen / prototypes)
+/output/
