@@ -374,6 +374,8 @@ final class _InboxPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             RefreshStatusBanner(controller: controller),
+            if (controller.continueReading.isNotEmpty)
+              _ContinueReadingCard(controller: controller),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
               child: SegmentedButton<int>(
@@ -543,6 +545,8 @@ final class _SavedPage extends StatelessWidget {
       body: Column(
         children: [
           RefreshStatusBanner(controller: controller),
+          if (controller.continueReading.isNotEmpty)
+            _ContinueReadingSection(controller: controller),
           Expanded(
             child: controller.starredEntries.isEmpty
                 ? _EmptyState(
@@ -621,6 +625,8 @@ class _SourcesPageState extends State<_SourcesPage> {
       body: Column(
         children: [
           RefreshStatusBanner(controller: controller),
+          if (controller.continueReading.isNotEmpty)
+            _ContinueReadingSection(controller: controller),
           Expanded(
             child: controller.feeds.isEmpty
                 ? _EmptyState(
@@ -1533,6 +1539,133 @@ final class _FloatingCapsuleBar extends StatelessWidget {
                 ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact card in the inbox showing the most recent unfinished article.
+final class _ContinueReadingCard extends StatelessWidget {
+  const _ContinueReadingCard({required this.controller});
+  final MobileReaderController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final entry = controller.continueReading.first;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Material(
+        color: scheme.secondaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _openReader(context, controller, entry),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.auto_stories_outlined,
+                  size: 20,
+                  color: scheme.secondary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.continueReading,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.secondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        entry.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Expandable section in the saved page listing all unfinished articles.
+final class _ContinueReadingSection extends StatelessWidget {
+  const _ContinueReadingSection({required this.controller});
+  final MobileReaderController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Material(
+        color: scheme.secondaryContainer.withValues(alpha: 0.30),
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.auto_stories_outlined,
+                    size: 16,
+                    color: scheme.secondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.continueReading,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: scheme.secondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            for (final entry in controller.continueReading.take(3))
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  Icons.schedule,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+                title: Text(
+                  entry.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: scheme.onSurfaceVariant,
+                ),
+                onTap: () => _openReader(context, controller, entry),
+              ),
+          ],
         ),
       ),
     );

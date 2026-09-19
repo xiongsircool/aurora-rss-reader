@@ -1112,4 +1112,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String refreshAllFailedMsg(String error) {
     return '刷新订阅失败：$error';
   }
+
+  @override
+  String get continueReading => 'Continue reading';
 }

@@ -355,5 +355,6 @@
   "retryAudio": "Retry audio",
   "backgroundPlayNote": "Keep browsing after collapsing. In-app playback continues; leaving the app pauses it.",
   "opmlImport": "Import OPML",
-  "opmlExport": "Export OPML"
+  "opmlExport": "Export OPML",
+  "continueReading": "Continue reading"
 }

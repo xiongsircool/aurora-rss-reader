@@ -1099,4 +1099,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String refreshAllFailedMsg(String error) {
     return '刷新订阅失败：$error';
   }
+
+  @override
+  String get continueReading => '继续阅读';
 }

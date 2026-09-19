@@ -14,7 +14,13 @@
   "greetingEvening": "晚上好",
   "allRead": "已全部读完",
   "unreadCount": "{count} 篇未读",
-  "@unreadCount": {"placeholders": {"count": {"type": "int"}}},
+  "@unreadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "filter": "筛选",
   "search": "搜索",
   "searchArticles": "搜索本地文章",
@@ -25,17 +31,53 @@
   "searchNoMatch": "没有匹配文章",
   "searchNoMatchHint": "试试更短的关键词",
   "searchResultsCount": "显示 {count} 条匹配结果",
-  "@searchResultsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@searchResultsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "refreshAll": "刷新全部订阅",
   "refreshingProgress": "正在刷新 {done}/{total}",
-  "@refreshingProgress": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "@refreshingProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "refreshDone": "刷新完成，新增 {count} 篇文章",
-  "@refreshDone": {"placeholders": {"count": {"type": "int"}}},
+  "@refreshDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "refreshDoneWithFailures": "刷新完成，新增 {count} 篇，{failed} 个订阅失败",
-  "@refreshDoneWithFailures": {"placeholders": {"count": {"type": "int"}, "failed": {"type": "int"}}},
+  "@refreshDoneWithFailures": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "retryFailedSubs": "重试失败的订阅",
   "retryStillFailing": "重试后仍有 {count} 个订阅失败",
-  "@retryStillFailing": {"placeholders": {"count": {"type": "int"}}},
+  "@retryStillFailing": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "viewDetails": "查看",
   "refreshDetails": "刷新详情",
   "noFailedFeeds": "没有需要重试的订阅",
@@ -50,7 +92,13 @@
   "loadingMore": "正在加载…",
   "loadMoreFailed": "加载失败，点击重试",
   "loadedSoFar": "已加载 {count} 篇，继续加载",
-  "@loadedSoFar": {"placeholders": {"count": {"type": "int"}}},
+  "@loadedSoFar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "markRead": "标为已读",
   "markUnread": "标为未读",
   "markAllRead": "全部标为已读",
@@ -58,22 +106,55 @@
   "unstar": "取消收藏",
   "justNow": "刚刚",
   "minutesAgo": "{count}分钟前",
-  "@minutesAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@minutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "hoursAgo": "{count}小时前",
-  "@hoursAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@hoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "yesterday": "昨天",
   "daysAgo": "{count}天前",
-  "@daysAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@daysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "dateMD": "{month}月{day}日",
-  "@dateMD": {"placeholders": {"month": {"type": "int"}, "day": {"type": "int"}}},
+  "@dateMD": {
+    "placeholders": {
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
   "dateYMD": "{year}年{month}月{day}日",
-  "@dateYMD": {"placeholders": {"year": {"type": "int"}, "month": {"type": "int"}, "day": {"type": "int"}}},
-  "greetingLateNight": "夜深了",
-  "greetingMorning": "早上好",
-  "greetingNoon": "中午好",
-  "greetingAfternoon": "下午好",
-  "greetingEvening": "晚上好",
-  "allRead": "已全部读完",
+  "@dateYMD": {
+    "placeholders": {
+      "year": {
+        "type": "int"
+      },
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
   "readerSettings": "阅读设置",
   "fontSize": "字号",
   "lineHeight": "行距",
@@ -93,14 +174,26 @@
   "translatingTitle": "翻译标题中…",
   "aiSummary": "AI 摘要",
   "aiSummaryFailed": "AI 摘要失败：{message}",
-  "@aiSummaryFailed": {"placeholders": {"message": {"type": "String"}}},
+  "@aiSummaryFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "aiNotConfigured": "AI 未配置",
   "aiTimeout": "AI 请求超时",
   "regenerate": "重新生成",
   "summaryGenerating": "摘要生成中",
   "translateArticle": "翻译全文",
   "translatingProgress": "翻译中 · {percent}%",
-  "@translatingProgress": {"placeholders": {"percent": {"type": "int"}}},
+  "@translatingProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
   "extractFullText": "提取网页全文",
   "extracting": "正在提取",
   "extractFailedPrefix": "提取失败：",
@@ -148,18 +241,42 @@
   "proxyAddressHint": "代理地址格式应为 host:port 或 http://host:port",
   "proxySaved": "代理设置已保存",
   "proxySaveFailed": "保存代理设置失败：{error}",
-  "@proxySaveFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@proxySaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "httpProxy": "HTTP 代理",
   "backgroundRefresh": "后台刷新",
   "backgroundRefreshOff": "已关闭",
   "backgroundRefreshEvery": "约每 {hours} 小时，执行时间由系统安排",
-  "@backgroundRefreshEvery": {"placeholders": {"hours": {"type": "int"}}},
+  "@backgroundRefreshEvery": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "refreshIntervalTitle": "后台刷新间隔",
   "refreshIntervalHint": "这是后台检查订阅的目标间隔，不影响手动刷新。iOS 会根据使用习惯、电量和网络决定实际执行时间，并非定时闹钟。",
   "everyHours": "每 {hours} 小时",
-  "@everyHours": {"placeholders": {"hours": {"type": "int"}}},
+  "@everyHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "hoursSuffix": "{hours} 小时",
-  "@hoursSuffix": {"placeholders": {"hours": {"type": "int"}}},
+  "@hoursSuffix": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "turnOff": "关闭后台刷新",
   "keepManualRefresh": "保留手动刷新功能",
   "defaultInterval": "默认间隔",
@@ -171,9 +288,14 @@
   "opmlImport": "导入 OPML",
   "opmlExport": "导出 OPML",
   "aiService": "AI 服务",
-  "aiNotConfigured": "AI 未配置",
   "aiConfiguredWith": "已配置 · {model}",
-  "@aiConfiguredWith": {"placeholders": {"model": {"type": "String"}}},
+  "@aiConfiguredWith": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
   "aiConnection": "服务连接",
   "aiConnectionHint": "端点 · 模型 · API Key",
   "aiEndpoint": "API 端点",
@@ -191,14 +313,38 @@
   "statsLoading": "正在读取统计…",
   "statsError": "暂时无法读取统计",
   "readingStats": "{feeds} 个订阅 · {total} 篇文章",
-  "@readingStats": {"placeholders": {"feeds": {"type": "int"}, "total": {"type": "int"}}},
+  "@readingStats": {
+    "placeholders": {
+      "feeds": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "statsDetail": "已读 {read} · 收藏 {starred}",
-  "@statsDetail": {"placeholders": {"read": {"type": "int"}, "starred": {"type": "int"}}},
+  "@statsDetail": {
+    "placeholders": {
+      "read": {
+        "type": "int"
+      },
+      "starred": {
+        "type": "int"
+      }
+    }
+  },
   "backupAll": "备份全部数据",
   "backupAllHint": "导出设备中的数据库，API Key 需单独保管",
   "backupFile": "Aurora 数据备份",
   "backupFailed": "备份失败：{error}",
-  "@backupFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@backupFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "backupDuringRefresh": "刷新中无法备份，请稍后再试",
   "restoreBackup": "恢复备份",
   "restoreHint": "恢复将替换当前数据，请先保留当前备份",
@@ -213,7 +359,16 @@
   "backupSourceMismatch": "备份文件来源不符",
   "backupReadFailed": "备份读取或验证失败，请确认文件完整且与此版本兼容",
   "backupNewerVersion": "备份来自更新版本的 App（数据结构 {userVersion} > {currentVersion}），请先升级应用",
-  "@backupNewerVersion": {"placeholders": {"userVersion": {"type": "int"}, "currentVersion": {"type": "int"}}},
+  "@backupNewerVersion": {
+    "placeholders": {
+      "userVersion": {
+        "type": "int"
+      },
+      "currentVersion": {
+        "type": "int"
+      }
+    }
+  },
   "about": "关于",
   "aboutAurora": "关于 Aurora",
   "aboutPrivacy": "隐私",
@@ -243,43 +398,118 @@
   "feedAddressInvalid": "请输入完整的 http:// 或 https:// 地址",
   "addingInProgress": "正在获取并解析订阅…\n如果是网页，将尝试发现其中的订阅链接。",
   "addFailedNetwork": "添加订阅失败：{reason}（站点可能无法从当前网络访问）",
-  "@addFailedNetwork": {"placeholders": {"reason": {"type": "String"}}},
+  "@addFailedNetwork": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "feedUpToDate": "{title} 已是最新状态",
-  "@feedUpToDate": {"placeholders": {"title": {"type": "String"}}},
+  "@feedUpToDate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "feedAdded": "已添加 {title}，获取 {count} 篇文章",
-  "@feedAdded": {"placeholders": {"title": {"type": "String"}, "count": {"type": "int"}}},
+  "@feedAdded": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "all": "全部",
   "unread": "未读",
   "groups": "分组",
-  "ungrouped": "未分组",
   "newGroupName": "新分组名称",
   "newGroupEllipsis": "新建分组…",
   "moveToGroup": "移动到分组",
   "groupMoved": "「{title}」已移动到 {group}",
-  "@groupMoved": {"placeholders": {"title": {"type": "String"}, "group": {"type": "String"}}},
+  "@groupMoved": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "group": {
+        "type": "String"
+      }
+    }
+  },
   "groupRenamed": "分组已重命名为 {name}",
-  "@groupRenamed": {"placeholders": {"name": {"type": "String"}}},
+  "@groupRenamed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "groupDeleteConfirm": "“{title}”及其本地文章将被删除。",
-  "@groupDeleteConfirm": {"placeholders": {"title": {"type": "String"}}},
+  "@groupDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "deleteSubscription": "删除订阅",
   "deleteSubscriptionConfirm": "删除订阅？",
   "subscriptionDeleted": "已删除 {title}",
-  "@subscriptionDeleted": {"placeholders": {"title": {"type": "String"}}},
+  "@subscriptionDeleted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "unreadEntries": "{count} 篇未读",
-  "@unreadEntries": {"placeholders": {"count": {"type": "int"}}},
+  "@unreadEntries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "feedUnreadAndStatus": "{count} 篇未读 · {status}",
-  "@feedUnreadAndStatus": {"placeholders": {"count": {"type": "int"}, "status": {"type": "String"}}},
+  "@feedUnreadAndStatus": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
   "lastRefreshFailed": "上次刷新失败",
   "notRefreshedYet": "尚未刷新",
   "refreshed": "已刷新",
   "refreshThisFeed": "刷新这个订阅",
   "moreActions": "更多操作",
   "lastCheck": "上次检查：{time}",
-  "@lastCheck": {"type": "String", "placeholders": {"time": {"type": "String"}}},
+  "@lastCheck": {
+    "type": "String",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "savedEmpty": "暂无收藏文章",
   "savedHint": "收藏喜欢的文章，方便以后回看",
   "savedCount": "已收藏 {count} 篇",
-  "@savedCount": {"placeholders": {"count": {"type": "int"}}},
+  "@savedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "selectArticle": "选择一篇文章开始阅读",
   "sharePreview": "分享预览",
   "cardSummary": "图文摘要",
@@ -309,42 +539,122 @@
   "auroraBrand": "Aurora",
   "noFeedsForExport": "当前没有可导出的订阅",
   "opmlImportFailed": "导入 OPML 失败：{error}",
-  "@opmlImportFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@opmlImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "opmlExportFailed": "导出失败：{error}",
-  "@opmlExportFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@opmlExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "opmlNoValidFeeds": "文件中没有有效订阅",
   "opmlImported": "已导入 {count} 个订阅",
-  "@opmlImported": {"placeholders": {"count": {"type": "int"}}},
+  "@opmlImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "notificationNewArticles": "{count} 篇新文章",
-  "@notificationNewArticles": {"placeholders": {"count": {"type": "int"}}},
+  "@notificationNewArticles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "subscriptionNotificationChannel": "订阅源刷新后收到的新文章通知",
   "deleteGroupTitle": "解散分组（订阅移入未分组）",
   "renameGroup": "重命名分组",
-  "newGroupName": "新分组名称",
   "showGroupName": "显示的分组",
   "noGroupsYet": "暂无分组",
   "groupFeedCount": "{count} 源",
-  "@groupFeedCount": {"placeholders": {"count": {"type": "int"}}},
+  "@groupFeedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "groupUnread": "{count} 未读",
-  "@groupUnread": {"placeholders": {"count": {"type": "int"}}},
+  "@groupUnread": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "groupFeedsAndUnread": "{count} 源 · {unread} 未读",
-  "@groupFeedsAndUnread": {"placeholders": {"count": {"type": "int"}, "unread": {"type": "int"}}},
+  "@groupFeedsAndUnread": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "unread": {
+        "type": "int"
+      }
+    }
+  },
   "moveGroupFailed": "移动分组失败：{error}",
-  "@moveGroupFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@moveGroupFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "renameGroupFailed": "重命名分组失败：{error}",
-  "@renameGroupFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@renameGroupFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "loadArticlesFailed": "加载文章失败：{error}",
-  "@loadArticlesFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@loadArticlesFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "updateReadStateFailed": "更新阅读状态失败：{error}",
-  "@updateReadStateFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@updateReadStateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "updateStarredFailed": "更新收藏状态失败：{error}",
-  "@updateStarredFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@updateStarredFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "imageLoadFailed": "图片加载失败",
   "savedToGallery": "已保存到相册",
   "saveToGallery": "保存到相册",
   "saveFailed": "保存失败",
   "extractFailedKeepContent": "全文提取失败，继续显示订阅正文：{error}",
-  "@extractFailedKeepContent": {"placeholders": {"error": {"type": "String"}}},
+  "@extractFailedKeepContent": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "openLinkFailed": "无法打开链接",
   "bili": "哔哩哔哩",
   "video": "视频",
@@ -361,30 +671,42 @@
   "errorHandshake": "安全连接被中断（网络或代理不稳定）",
   "errorParse": "返回的不是有效的订阅格式",
   "errorHttpStatus": "HTTP {code} 错误",
-  "@errorHttpStatus": {"placeholders": {"code": {"type": "String"}}},
+  "@errorHttpStatus": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "refreshOneFailed": "刷新 {title} 失败：{reason}",
-  "@refreshOneFailed": {"placeholders": {"title": {"type": "String"}, "reason": {"type": "String"}}},
+  "@refreshOneFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "refreshAllFailed": "刷新订阅失败：{error}",
-  "@refreshAllFailed": {"placeholders": {"error": {"type": "String"}}},
-  "addSubscription": "添加订阅",
-  "addFeedTitle": "添加订阅",
-  "addFeedHint": "粘贴 RSS、Atom、播客或带订阅链接的网页地址",
-  "feedAddressLabel": "订阅地址",
-  "feedAddressHintText": "https://example.com/feed.xml",
-  "groupLabel": "分组",
-  "ungrouped": "未分组",
-  "fetchAndAdd": "获取并添加",
-  "addingInProgress": "正在获取并解析订阅…\n如果是网页，将尝试发现其中的订阅链接。",
-  "feedAddressRequired": "请输入订阅地址",
-  "feedAddressInvalid": "请输入完整的 http:// 或 https:// 地址",
+  "@refreshAllFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "addFailedPrefix": "添加订阅失败：",
   "addFailedNetworkReason": "站点可能无法从当前网络访问",
-  "feedUpToDate": "{title} 已是最新状态",
-  "@feedUpToDate": {"placeholders": {"title": {"type": "String"}}},
-  "feedAdded": "已添加 {title}，获取 {count} 篇文章",
-  "@feedAdded": {"placeholders": {"title": {"type": "String"}, "count": {"type": "int"}}},
   "newArticlesNotification": "{count} 篇新文章",
-  "@newArticlesNotification": {"placeholders": {"count": {"type": "int"}}},
+  "@newArticlesNotification": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "subscriptionChannelName": "订阅源刷新后收到的新文章通知",
   "deleteGroupMoveToDefault": "解散分组（订阅移入未分组）",
   "renameGroupTitle": "重命名分组",
@@ -392,16 +714,13 @@
   "showGroupNameLabel": "显示的分组",
   "noGroupsLabel": "暂无分组",
   "sourcesCount": "{count} 个订阅",
-  "@sourcesCount": {"placeholders": {"count": {"type": "int"}}},
-  "openLinkFailed": "无法打开链接",
-  "bili": "哔哩哔哩",
-  "video": "视频",
-  "videoCardHint": "视频内容请点击下方卡片观看。",
-  "noBodyTryExtract": "该订阅没有提供正文，请尝试提取全文或打开原文。",
-  "translateTitleButton": "翻译标题",
-  "translatingTitleProgress": "翻译标题中…",
-  "unknownFeed": "未知订阅",
-  "unknownError": "未知错误",
+  "@sourcesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "errorTimeoutMsg": "站点响应超时，",
   "errorAntiBotMsg": "该网站启用了反爬保护，",
   "error403Msg": "站点拒绝访问（403），",
@@ -409,9 +728,31 @@
   "errorHandshakeMsg": "安全连接被中断（网络或代理不稳定）",
   "errorParseMsg": "返回的不是有效的订阅格式",
   "errorHttpStatusMsg": "HTTP {code} 错误",
-  "@errorHttpStatusMsg": {"placeholders": {"code": {"type": "String"}}},
+  "@errorHttpStatusMsg": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "refreshOneFailedMsg": "刷新 {title} 失败：{reason}",
-  "@refreshOneFailedMsg": {"placeholders": {"title": {"type": "String"}, "reason": {"type": "String"}}},
+  "@refreshOneFailedMsg": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "refreshAllFailedMsg": "刷新订阅失败：{error}",
-  "@refreshAllFailedMsg": {"placeholders": {"error": {"type": "String"}}}
+  "@refreshAllFailedMsg": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "continueReading": "继续阅读"
 }

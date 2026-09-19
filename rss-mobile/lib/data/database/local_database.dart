@@ -62,6 +62,7 @@ class Entries extends Table {
   TextColumn get doi => text().nullable()();
   TextColumn get pmid => text().nullable()();
   TextColumn get sourceLang => text().nullable()();
+  DateTimeColumn get lastOpenedAt => dateTime().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -223,7 +224,7 @@ final class LocalDatabase extends _$LocalDatabase {
   factory LocalDatabase.onDevice() => LocalDatabase(_openOnDevice());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -250,6 +251,9 @@ final class LocalDatabase extends _$LocalDatabase {
       }
       if (from < 5) {
         await migrator.addColumn(feeds, feeds.iconUrl);
+      }
+      if (from < 6) {
+        await migrator.addColumn(entries, entries.lastOpenedAt);
       }
     },
     beforeOpen: (details) async {

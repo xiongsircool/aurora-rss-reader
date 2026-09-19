@@ -1,4 +1,5 @@
 import 'package:aurora_mobile/app/aurora_app.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:aurora_mobile/application/use_cases/refresh_feed.dart';
 import 'package:aurora_mobile/data/database/local_database.dart';
 import 'package:aurora_mobile/data/repositories/local_content_repository.dart';
@@ -11,7 +12,6 @@ import 'package:aurora_mobile/platform/http/io_feed_http_client.dart';
 import 'package:aurora_mobile/shared/clear_glass_surface.dart';
 import 'package:aurora_mobile/shared/share_card_content.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'dart:convert';

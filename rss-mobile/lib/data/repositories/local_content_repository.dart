@@ -661,6 +661,58 @@ final class LocalContentRepository {
     });
   }
 
+  /// Entries the user opened recently but hasn't finished reading.
+  /// Used by the "Continue reading" card in the inbox and the saved page.
+  Future<List<domain_entry.Entry>> listContinueReading({int limit = 10}) async {
+    final rows = await database
+        .customSelect(
+          'SELECT entries.*, t.title AS translated_title '
+          'FROM entries '
+          'LEFT JOIN translations t '
+          "ON t.entry_id = entries.id AND t.language = 'zh' "
+          'WHERE entries.last_opened_at IS NOT NULL '
+          'AND entries.starred = 1 '
+          'ORDER BY entries.last_opened_at DESC LIMIT ?',
+          variables: [Variable<int>(limit)],
+        )
+        .get();
+    return rows.map(_entryFromQueryRow).toList();
+  }
+
+  /// Records when an entry was last opened, for continue-reading.
+  Future<void> updateLastOpenedAt(String entryId) async {
+    await (database.update(database.entries)
+          ..where((row) => row.id.equals(entryId)))
+        .write(EntriesCompanion(lastOpenedAt: Value(DateTime.now().toUtc())));
+  }
+
+  domain_entry.Entry _entryFromQueryRow(QueryRow row) {
+    return domain_entry.Entry(
+      id: row.read<String>('id'),
+      feedId: row.read<String>('feed_id'),
+      guid: row.read<String>('guid'),
+      title: row.read<String?>('title') ?? '(untitled)',
+      url: row.read<String?>('url') == null
+          ? null
+          : Uri.tryParse(row.read<String?>('url')!),
+      author: row.read<String?>('author'),
+      summary: row.read<String?>('summary'),
+      content: row.read<String?>('content'),
+      imageUrl: row.read<String?>('image_url') == null
+          ? null
+          : Uri.tryParse(row.read<String?>('image_url')!),
+      enclosureUrl: row.read<String?>('enclosure_url') == null
+          ? null
+          : Uri.tryParse(row.read<String?>('enclosure_url')!),
+      enclosureType: row.read<String?>('enclosure_type'),
+      publishedAt: row.read<DateTime?>('published_at'),
+      insertedAt: row.read<DateTime>('inserted_at'),
+      readAt: row.read<DateTime?>('read_at'),
+      isStarred: row.read<bool>('starred'),
+      translatedTitle: row.read<String?>('translated_title'),
+    );
+  }
+
   Future<List<domain_entry.Entry>> listStarred({int limit = 100}) async {
     final rows =
         await (database.select(database.entries)

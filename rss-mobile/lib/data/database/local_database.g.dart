@@ -1216,6 +1216,17 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _lastOpenedAtMeta = const VerificationMeta(
+    'lastOpenedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastOpenedAt = GeneratedColumn<DateTime>(
+    'last_opened_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1244,6 +1255,7 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
     doi,
     pmid,
     sourceLang,
+    lastOpenedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1451,6 +1463,15 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
         sourceLang.isAcceptableOrUnknown(data['source_lang']!, _sourceLangMeta),
       );
     }
+    if (data.containsKey('last_opened_at')) {
+      context.handle(
+        _lastOpenedAtMeta,
+        lastOpenedAt.isAcceptableOrUnknown(
+          data['last_opened_at']!,
+          _lastOpenedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1568,6 +1589,10 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
         DriftSqlType.string,
         data['${effectivePrefix}source_lang'],
       ),
+      lastOpenedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_opened_at'],
+      ),
     );
   }
 
@@ -1604,6 +1629,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
   final String? doi;
   final String? pmid;
   final String? sourceLang;
+  final DateTime? lastOpenedAt;
   const EntryRow({
     required this.id,
     required this.feedId,
@@ -1631,6 +1657,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     this.doi,
     this.pmid,
     this.sourceLang,
+    this.lastOpenedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1705,6 +1732,9 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     if (!nullToAbsent || sourceLang != null) {
       map['source_lang'] = Variable<String>(sourceLang);
     }
+    if (!nullToAbsent || lastOpenedAt != null) {
+      map['last_opened_at'] = Variable<DateTime>(lastOpenedAt);
+    }
     return map;
   }
 
@@ -1770,6 +1800,9 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       sourceLang: sourceLang == null && nullToAbsent
           ? const Value.absent()
           : Value(sourceLang),
+      lastOpenedAt: lastOpenedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastOpenedAt),
     );
   }
 
@@ -1813,6 +1846,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       doi: serializer.fromJson<String?>(json['doi']),
       pmid: serializer.fromJson<String?>(json['pmid']),
       sourceLang: serializer.fromJson<String?>(json['sourceLang']),
+      lastOpenedAt: serializer.fromJson<DateTime?>(json['lastOpenedAt']),
     );
   }
   @override
@@ -1849,6 +1883,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       'doi': serializer.toJson<String?>(doi),
       'pmid': serializer.toJson<String?>(pmid),
       'sourceLang': serializer.toJson<String?>(sourceLang),
+      'lastOpenedAt': serializer.toJson<DateTime?>(lastOpenedAt),
     };
   }
 
@@ -1879,6 +1914,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     Value<String?> doi = const Value.absent(),
     Value<String?> pmid = const Value.absent(),
     Value<String?> sourceLang = const Value.absent(),
+    Value<DateTime?> lastOpenedAt = const Value.absent(),
   }) => EntryRow(
     id: id ?? this.id,
     feedId: feedId ?? this.feedId,
@@ -1923,6 +1959,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     doi: doi.present ? doi.value : this.doi,
     pmid: pmid.present ? pmid.value : this.pmid,
     sourceLang: sourceLang.present ? sourceLang.value : this.sourceLang,
+    lastOpenedAt: lastOpenedAt.present ? lastOpenedAt.value : this.lastOpenedAt,
   );
   EntryRow copyWithCompanion(EntriesCompanion data) {
     return EntryRow(
@@ -1978,6 +2015,9 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
       sourceLang: data.sourceLang.present
           ? data.sourceLang.value
           : this.sourceLang,
+      lastOpenedAt: data.lastOpenedAt.present
+          ? data.lastOpenedAt.value
+          : this.lastOpenedAt,
     );
   }
 
@@ -2009,7 +2049,8 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
           ..write('imageUrl: $imageUrl, ')
           ..write('doi: $doi, ')
           ..write('pmid: $pmid, ')
-          ..write('sourceLang: $sourceLang')
+          ..write('sourceLang: $sourceLang, ')
+          ..write('lastOpenedAt: $lastOpenedAt')
           ..write(')'))
         .toString();
   }
@@ -2042,6 +2083,7 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
     doi,
     pmid,
     sourceLang,
+    lastOpenedAt,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2072,7 +2114,8 @@ class EntryRow extends DataClass implements Insertable<EntryRow> {
           other.imageUrl == this.imageUrl &&
           other.doi == this.doi &&
           other.pmid == this.pmid &&
-          other.sourceLang == this.sourceLang);
+          other.sourceLang == this.sourceLang &&
+          other.lastOpenedAt == this.lastOpenedAt);
 }
 
 class EntriesCompanion extends UpdateCompanion<EntryRow> {
@@ -2102,6 +2145,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
   final Value<String?> doi;
   final Value<String?> pmid;
   final Value<String?> sourceLang;
+  final Value<DateTime?> lastOpenedAt;
   final Value<int> rowid;
   const EntriesCompanion({
     this.id = const Value.absent(),
@@ -2130,6 +2174,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     this.doi = const Value.absent(),
     this.pmid = const Value.absent(),
     this.sourceLang = const Value.absent(),
+    this.lastOpenedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EntriesCompanion.insert({
@@ -2159,6 +2204,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     this.doi = const Value.absent(),
     this.pmid = const Value.absent(),
     this.sourceLang = const Value.absent(),
+    this.lastOpenedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        feedId = Value(feedId),
@@ -2191,6 +2237,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     Expression<String>? doi,
     Expression<String>? pmid,
     Expression<String>? sourceLang,
+    Expression<DateTime>? lastOpenedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2223,6 +2270,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
       if (doi != null) 'doi': doi,
       if (pmid != null) 'pmid': pmid,
       if (sourceLang != null) 'source_lang': sourceLang,
+      if (lastOpenedAt != null) 'last_opened_at': lastOpenedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2254,6 +2302,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     Value<String?>? doi,
     Value<String?>? pmid,
     Value<String?>? sourceLang,
+    Value<DateTime?>? lastOpenedAt,
     Value<int>? rowid,
   }) {
     return EntriesCompanion(
@@ -2285,6 +2334,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
       doi: doi ?? this.doi,
       pmid: pmid ?? this.pmid,
       sourceLang: sourceLang ?? this.sourceLang,
+      lastOpenedAt: lastOpenedAt ?? this.lastOpenedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2376,6 +2426,9 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
     if (sourceLang.present) {
       map['source_lang'] = Variable<String>(sourceLang.value);
     }
+    if (lastOpenedAt.present) {
+      map['last_opened_at'] = Variable<DateTime>(lastOpenedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2411,6 +2464,7 @@ class EntriesCompanion extends UpdateCompanion<EntryRow> {
           ..write('doi: $doi, ')
           ..write('pmid: $pmid, ')
           ..write('sourceLang: $sourceLang, ')
+          ..write('lastOpenedAt: $lastOpenedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5869,6 +5923,7 @@ typedef $$EntriesTableCreateCompanionBuilder = EntriesCompanion Function({
   Value<String?> doi,
   Value<String?> pmid,
   Value<String?> sourceLang,
+  Value<DateTime?> lastOpenedAt,
   Value<int> rowid,
 });
 typedef $$EntriesTableUpdateCompanionBuilder = EntriesCompanion Function({
@@ -5898,6 +5953,7 @@ typedef $$EntriesTableUpdateCompanionBuilder = EntriesCompanion Function({
   Value<String?> doi,
   Value<String?> pmid,
   Value<String?> sourceLang,
+  Value<DateTime?> lastOpenedAt,
   Value<int> rowid,
 });
 
@@ -6129,6 +6185,11 @@ class $$EntriesTableFilterComposer
 
   ColumnFilters<String> get sourceLang => $composableBuilder(
     column: $table.sourceLang,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastOpenedAt => $composableBuilder(
+    column: $table.lastOpenedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6390,6 +6451,11 @@ class $$EntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get lastOpenedAt => $composableBuilder(
+    column: $table.lastOpenedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$FeedsTableOrderingComposer get feedId {
     final $$FeedsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6521,6 +6587,11 @@ class $$EntriesTableAnnotationComposer
 
   GeneratedColumn<String> get sourceLang => $composableBuilder(
     column: $table.sourceLang,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastOpenedAt => $composableBuilder(
+    column: $table.lastOpenedAt,
     builder: (column) => column,
   );
 
@@ -6709,6 +6780,7 @@ class $$EntriesTableTableManager
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pmid = const Value.absent(),
                 Value<String?> sourceLang = const Value.absent(),
+                Value<DateTime?> lastOpenedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntriesCompanion(
                 id: id,
@@ -6737,6 +6809,7 @@ class $$EntriesTableTableManager
                 doi: doi,
                 pmid: pmid,
                 sourceLang: sourceLang,
+                lastOpenedAt: lastOpenedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6767,6 +6840,7 @@ class $$EntriesTableTableManager
                 Value<String?> doi = const Value.absent(),
                 Value<String?> pmid = const Value.absent(),
                 Value<String?> sourceLang = const Value.absent(),
+                Value<DateTime?> lastOpenedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntriesCompanion.insert(
                 id: id,
@@ -6795,6 +6869,7 @@ class $$EntriesTableTableManager
                 doi: doi,
                 pmid: pmid,
                 sourceLang: sourceLang,
+                lastOpenedAt: lastOpenedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

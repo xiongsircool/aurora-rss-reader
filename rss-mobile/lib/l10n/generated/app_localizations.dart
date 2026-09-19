@@ -2053,6 +2053,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'刷新订阅失败：{error}'**
   String refreshAllFailedMsg(String error);
+
+  /// No description provided for @continueReading.
+  ///
+  /// In zh, this message translates to:
+  /// **'继续阅读'**
+  String get continueReading;
 }
 
 class _AppLocalizationsDelegate

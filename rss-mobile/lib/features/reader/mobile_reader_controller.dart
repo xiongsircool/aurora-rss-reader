@@ -56,6 +56,7 @@ final class MobileReaderController extends ChangeNotifier {
   List<Feed> _feeds = const [];
   List<Entry> _entries = const [];
   List<Entry> _starredEntries = const [];
+  List<Entry> _continueReading = const [];
   List<Entry> _searchResults = const [];
   final Set<String> _extractingEntryIds = {};
   List<GroupSummary> _groups = const [];
@@ -99,6 +100,7 @@ final class MobileReaderController extends ChangeNotifier {
   String? get aiConfigError => _error;
   List<Entry> get entries => _entries;
   List<Entry> get starredEntries => _starredEntries;
+  List<Entry> get continueReading => _continueReading;
   List<Entry> get searchResults => _searchResults;
   bool get initialized => _initialized;
   bool get loading => _loading;
@@ -565,6 +567,7 @@ final class MobileReaderController extends ChangeNotifier {
     final updated = await repository.markInboxRead();
     await _loadFirstPage();
     _starredEntries = await repository.listStarred();
+    _continueReading = await repository.listContinueReading();
     notifyListeners();
     return updated;
   }
@@ -607,11 +610,18 @@ final class MobileReaderController extends ChangeNotifier {
     }
   }
 
+  Future<void> markOpened(String entryId) async {
+    await repository.updateLastOpenedAt(entryId);
+    _continueReading = await repository.listContinueReading();
+    notifyListeners();
+  }
+
   Future<void> setRead(Entry entry, {required bool read}) async {
     try {
       await repository.markRead(entry.id, read: read);
       await _loadFirstPage();
       _starredEntries = await repository.listStarred();
+      _continueReading = await repository.listContinueReading();
     } catch (error) {
       _error = '更新阅读状态失败：$error';
     }
@@ -623,6 +633,7 @@ final class MobileReaderController extends ChangeNotifier {
       await repository.setStarred(entry.id, starred: starred);
       await _loadFirstPage();
       _starredEntries = await repository.listStarred();
+      _continueReading = await repository.listContinueReading();
     } catch (error) {
       _error = '更新收藏状态失败：$error';
     }
@@ -651,6 +662,7 @@ final class MobileReaderController extends ChangeNotifier {
       );
       await _loadFirstPage();
       _starredEntries = await repository.listStarred();
+      _continueReading = await repository.listContinueReading();
       return entry.copyWith(
         readabilityContent: extracted.contentHtml,
         contentSourceUrl: extracted.sourceUrl,
@@ -1214,6 +1226,7 @@ final class MobileReaderController extends ChangeNotifier {
     );
     await _loadFirstPage();
     _starredEntries = await repository.listStarred();
+    _continueReading = await repository.listContinueReading();
   }
 
   Future<void> _loadFirstPage() async {

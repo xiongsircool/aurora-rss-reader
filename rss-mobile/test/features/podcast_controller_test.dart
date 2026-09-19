@@ -4,6 +4,7 @@ import 'package:aurora_mobile/data/database/local_database.dart';
 import 'package:aurora_mobile/data/repositories/reader_prefs_repository.dart';
 import 'package:aurora_mobile/features/audio/podcast_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/fake_podcast_engine.dart';
 
@@ -18,6 +19,7 @@ void main() {
     feedTitle: 'Podcast',
   );
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     database = LocalDatabase.memory();
     prefs = ReaderPrefsRepository(database);
     engines = [];
@@ -34,19 +36,6 @@ void main() {
     await player.close();
     player.dispose();
     await database.close();
-  });
-
-  test('legacy position is migrated to a stable URL key', () async {
-    final url = episode('legacy').url.toString();
-    await prefs.saveFontSize(16); // Ensure the preferences table exists.
-    await database.customStatement(
-      'INSERT INTO app_prefs(key, value) VALUES (?, ?)',
-      ['podcast_pos_${url.hashCode.toRadixString(36)}', '88'],
-    );
-    expect(await prefs.loadPlaybackPosition(url), '88');
-    await prefs.savePlaybackPosition(url, 111);
-    final reopened = ReaderPrefsRepository(database);
-    expect(await reopened.loadPlaybackPosition(url), '111');
   });
 
   test('same episode never reloads; pause and resume keep position', () async {

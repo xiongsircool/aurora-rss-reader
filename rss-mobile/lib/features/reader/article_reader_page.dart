@@ -91,6 +91,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     _prefs.loadLineHeight().then((v) {
       if (mounted) setState(() => _lineHeight = v);
     });
+    widget.controller.markOpened(_entry.id);
     if (!_entry.isRead) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _markRead());
     }
@@ -102,6 +103,9 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     final saved = await _prefs.loadScrollOffset(_entry.id);
     if (saved == null || saved < 200 || !mounted) return;
     await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !_scrollController.hasClients) return;
+    // One extra frame lets cached images settle their intrinsic size.
+    await Future<void>.delayed(const Duration(milliseconds: 50));
     if (!mounted || !_scrollController.hasClients) return;
     final target = saved.clamp(0.0, _scrollController.position.maxScrollExtent);
     _scrollController.jumpTo(target);
