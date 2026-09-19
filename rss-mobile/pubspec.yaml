@@ -61,6 +61,8 @@ dependencies:
   gal: ^2.3.3
   qr_flutter: ^4.1.0
 
+  intl: any
+  home_widget: ^0.10.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -77,6 +79,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  home_widget_cli: ^0.1.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -9,6 +9,7 @@ import '../../application/use_cases/refresh_feed.dart';
 import '../../data/database/local_database.dart';
 import '../../data/repositories/local_content_repository.dart';
 import '../../platform/http/io_feed_http_client.dart';
+import '../widget/aurora_widget.dart';
 
 const String kBackgroundRefreshTask = 'aurora.background.refresh';
 
@@ -71,6 +72,9 @@ void callbackDispatcher() {
 
       // ignore: avoid_print
       print('Background refresh: $updated new articles');
+
+      // Push the freshest snapshot to the home screen widget (best-effort).
+      await updateAuroraWidget(repository);
       return true;
     } catch (e) {
       // ignore: avoid_print

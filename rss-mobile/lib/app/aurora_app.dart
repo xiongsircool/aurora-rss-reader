@@ -1,11 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:home_widget/home_widget.dart';
 
 import '../l10n/generated/app_localizations.dart';
 
+import '../domain/entities/entry.dart';
 import '../features/audio/podcast_overlay.dart';
+import '../features/reader/article_reader_page.dart';
 import '../features/reader/mobile_reader_controller.dart';
 import '../features/shell/aurora_shell.dart';
+import '../platform/widget/aurora_widget.dart';
 
 final class AuroraApp extends StatefulWidget {
   const AuroraApp({required this.controller, super.key});
@@ -16,12 +22,100 @@ final class AuroraApp extends StatefulWidget {
   State<AuroraApp> createState() => _AuroraAppState();
 }
 
-class _AuroraAppState extends State<AuroraApp> {
+class _AuroraAppState extends State<AuroraApp> with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _podcastRoutes = PodcastRouteObserver();
+  StreamSubscription<Uri?>? _widgetClickSub;
+  bool _deepLinkHandled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Home screen widget deep links.
+    _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetUri);
+    HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
+      if (uri != null) _handleWidgetUri(uri);
+    });
+
+    // Push an initial snapshot once entries are (very likely) loaded.
+    Timer(const Duration(seconds: 4), () {
+      updateAuroraWidget(widget.controller.repository);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh the widget whenever the app leaves the foreground so the
+    // home screen always reflects the latest reading state.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      updateAuroraWidget(widget.controller.repository);
+    }
+  }
+
+  /// Handles `aurora://article/<id>` (and ignores other widget URIs for now).
+  void _handleWidgetUri(Uri? uri) {
+    if (uri == null || uri.scheme != 'aurora') return;
+    if (uri.host != 'article') return; // stats/home just open the app (v1).
+    final id = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
+    if (id.isEmpty) return;
+    _openArticleFromWidget(id);
+  }
+
+  Future<void> _openArticleFromWidget(String id) async {
+    if (_deepLinkHandled) return;
+    Entry? entry;
+    for (final e in widget.controller.entries) {
+      if (e.id == id) {
+        entry = e;
+        break;
+      }
+    }
+    if (entry == null) {
+      // Cold start may race with the inbox load — retry briefly.
+      for (var attempt = 0; attempt < 3 && entry == null; attempt++) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        for (final e in widget.controller.entries) {
+          if (e.id == id) {
+            entry = e;
+            break;
+          }
+        }
+      }
+    }
+    if (entry == null || !mounted) return; // Fall back to the home screen.
+
+    String feedTitle = '';
+    try {
+      final feeds = await widget.controller.repository.listFeeds();
+      for (final f in feeds) {
+        if (f.id == entry.feedId) {
+          feedTitle = f.title;
+          break;
+        }
+      }
+    } catch (_) {}
+
+    _deepLinkHandled = true;
+    _navigatorKey.currentState?.push(
+      MaterialPageRoute<void>(
+        builder: (_) => ArticleReaderPage(
+          entry: entry!,
+          feedTitle: feedTitle,
+          controller: widget.controller,
+        ),
+      ),
+    );
+    Future<void>.delayed(const Duration(seconds: 1))
+        .then((_) => _deepLinkHandled = false);
+  }
 
   @override
   void dispose() {
+    _widgetClickSub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _podcastRoutes.dispose();
     super.dispose();
   }

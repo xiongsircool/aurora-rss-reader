@@ -551,6 +551,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.2"
+  home_widget:
+    dependency: "direct main"
+    description:
+      name: home_widget
+      sha256: "1dbfdfbb3b47de24639adfba352050d85d66af112b9cc3ec5bf7627a7813abcb"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.10.0"
+  home_widget_cli:
+    dependency: "direct dev"
+    description:
+      name: home_widget_cli
+      sha256: "716733c942a44851c3c004d02133232a1d3c3d3bbeaa9a28feebe32f087a2f8f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.0"
+  home_widget_generator:
+    dependency: transitive
+    description:
+      name: home_widget_generator
+      sha256: e57dcfcdc264dc2ec9726edf691c24271a3d5475fd791e7703b8743546b308d4
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.0"
   hooks:
     dependency: transitive
     description:
@@ -613,7 +637,7 @@ packages:
     source: sdk
     version: "0.0.0"
   intl:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: intl
       sha256: "1ca20c894b1717686a2319b8548763d812bc0aabdac580420a44c5178c57a867"
@@ -724,6 +748,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.3.0"
+  mason_logger:
+    dependency: transitive
+    description:
+      name: mason_logger
+      sha256: "495a2732647b1c861f75c8bcc36766b8af4c59999a6c8562d7e604cc6fba0fa3"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.6"
   matcher:
     dependency: transitive
     description:
