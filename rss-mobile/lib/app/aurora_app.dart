@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:home_widget/home_widget.dart';
@@ -26,6 +28,7 @@ class _AuroraAppState extends State<AuroraApp> with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _podcastRoutes = PodcastRouteObserver();
   StreamSubscription<Uri?>? _widgetClickSub;
+  Timer? _initialWidgetUpdateTimer;
   bool _deepLinkHandled = false;
 
   @override
@@ -33,16 +36,24 @@ class _AuroraAppState extends State<AuroraApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Home screen widget deep links.
-    _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetUri);
-    HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
-      if (uri != null) _handleWidgetUri(uri);
-    });
+    // Home screen widget deep links (mobile platforms only — also keeps
+    // widget tests on desktop hosts free of MissingPluginException noise).
+    if (Platform.isIOS || Platform.isAndroid) {
+      _widgetClickSub = HomeWidget.widgetClicked.listen(
+        _handleWidgetUri,
+        onError: (Object _) {},
+      );
+      HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
+        if (uri != null) _handleWidgetUri(uri);
+      }).catchError((Object _) {});
+    }
 
     // Push an initial snapshot once entries are (very likely) loaded.
-    Timer(const Duration(seconds: 4), () {
-      updateAuroraWidget(widget.controller.repository);
-    });
+    if (Platform.isIOS || Platform.isAndroid) {
+      _initialWidgetUpdateTimer = Timer(const Duration(seconds: 4), () {
+        updateAuroraWidget(widget.controller.repository);
+      });
+    }
   }
 
   @override
@@ -109,7 +120,11 @@ class _AuroraAppState extends State<AuroraApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    _widgetClickSub?.cancel();
+    _initialWidgetUpdateTimer?.cancel();
+    final sub = _widgetClickSub;
+    if (sub != null) {
+      unawaited(sub.cancel().catchError((Object _) {}));
+    }
     WidgetsBinding.instance.removeObserver(this);
     _podcastRoutes.dispose();
     super.dispose();

@@ -84,6 +84,8 @@ void main() {
   testWidgets(
     'mini player persists across tabs and search; closing controls keeps playing',
     (tester) async {
+    tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -143,6 +145,8 @@ void main() {
   testWidgets('mini-player remains usable with large text on a narrow screen', (
     tester,
   ) async {
+    tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
     tester.view.physicalSize = const Size(320, 720);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 2;

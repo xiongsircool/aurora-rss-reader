@@ -115,6 +115,8 @@ void main() {
   testWidgets('large system text keeps compact navigation and header usable', (
     tester,
   ) async {
+    tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 2;

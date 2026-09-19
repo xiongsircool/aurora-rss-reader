@@ -1554,6 +1554,9 @@ final class _FloatingCapsuleBar extends StatelessWidget {
                             semanticsLabel: i == selectedIndex
                                 ? '${destinations[i].label}，已选择'
                                 : destinations[i].label,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 11,
                               height: 1,

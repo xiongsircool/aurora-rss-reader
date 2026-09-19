@@ -42,7 +42,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
   Future<void> _speed() async {
     await showChoiceSheet<double>(
       context: context,
-      title: AppLocalizations.of(context)!.speedLabel,
+      title: Localizations.of<AppLocalizations>(context, AppLocalizations)?.speedLabel ?? '播放速度',
       selected: widget.controller.speed,
       options: [
         for (final value in [0.75, 1.0, 1.25, 1.5, 1.75, 2.0])
@@ -61,7 +61,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
     animation: widget.controller,
     builder: (context, _) {
       final player = widget.controller;
-      final l10n = AppLocalizations.of(context)!;
+      final l10n = Localizations.of<AppLocalizations>(context, AppLocalizations);
       final episode = player.episode;
       if (episode == null) return const SizedBox.shrink();
       final scheme = Theme.of(context).colorScheme;
@@ -102,7 +102,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
                   ),
                 ),
                 IconButton(
-                  tooltip: l10n.collapseKeepPlaying,
+                  tooltip: l10n?.collapseKeepPlaying ?? '收起播放器，继续播放',
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.keyboard_arrow_down),
                 ),
@@ -125,7 +125,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
               ),
             ),
             if (player.resumed && player.error == null && !player.completed)
-              Text(l10n.playbackResumed),
+              Text(l10n?.playbackResumed ?? '已恢复播放'),
             if (player.loading || player.buffering)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
@@ -137,7 +137,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
                 child: TextButton.icon(
                   onPressed: player.loading ? null : player.retry,
                   icon: const Icon(Icons.refresh),
-                  label: Text(l10n.audioRetry),
+                  label: Text(l10n?.audioRetry ?? '重试'),
                 ),
               ),
             const SizedBox(height: 16),
@@ -184,7 +184,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
               spacing: 24,
               children: [
                 IconButton(
-                  tooltip: l10n.back10,
+                  tooltip: l10n?.back10 ?? '后退 10 秒',
                   iconSize: 30,
                   icon: const Icon(Icons.replay_10),
                   onPressed: canSeek
@@ -206,15 +206,15 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
                         ? Icons.pause
                         : Icons.play_arrow,
                     semanticLabel: player.completed
-                        ? l10n.replay
+                        ? (l10n?.replay ?? '重新播放')
                         : player.playing
-                        ? l10n.paused
-                        : l10n.playAudio,
+                        ? (l10n?.paused ?? '暂停')
+                        : (l10n?.playAudio ?? '播放音频'),
                     size: 32,
                   ),
                 ),
                 IconButton(
-                  tooltip: l10n.forward30,
+                  tooltip: l10n?.forward30 ?? '前进 30 秒',
                   iconSize: 30,
                   icon: const Icon(Icons.forward_30),
                   onPressed: canSeek
@@ -242,7 +242,7 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
                 player.close();
                 Navigator.pop(context);
               },
-              child: Text(l10n.stopAndClose),
+              child: Text(l10n?.stopAndClose ?? '停止并关闭'),
             ),
           ],
         ),
@@ -252,15 +252,15 @@ class _PodcastPlayerSheetState extends State<PodcastPlayerSheet> {
 }
 
 extension PodcastStatusL10n on PodcastController {
-  String statusText(AppLocalizations l10n) => error != null
-      ? l10n.audioFailed
+  String statusText(AppLocalizations? l10n) => error != null
+      ? l10n?.audioFailed ?? '音频加载失败'
       : loading
-      ? l10n.audioLoading
+      ? l10n?.audioLoading ?? '加载中…'
       : buffering
-      ? l10n.audioBuffering
+      ? l10n?.audioBuffering ?? '缓冲中…'
       : completed
-      ? l10n.audioCompleted
+      ? l10n?.audioCompleted ?? '播放完成'
       : playing
-      ? l10n.playing
-      : l10n.paused;
+      ? (l10n?.playing ?? '正在播放')
+      : (l10n?.paused ?? '已暂停');
 }

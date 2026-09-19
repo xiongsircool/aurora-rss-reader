@@ -7,6 +7,11 @@ on:
   pull_request:
     paths: ['rss-mobile/**', '.github/workflows/mobile-ci.yml']
 
+# Rapid successive pushes cancel superseded runs — saves minutes.
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest

@@ -118,8 +118,9 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
-    expect(find.text('Fixture article'), findsOneWidget);
-    await tester.tap(find.text('Fixture article'));
+    // May appear in both the inbox list and the continue-reading section.
+    expect(find.text('Fixture article'), findsAtLeastNWidgets(1));
+    await tester.tap(find.text('Fixture article').first);
     await tester.pumpAndSettle();
     expect(find.widgetWithText(OutlinedButton, '打开原文'), findsOneWidget);
   });
@@ -139,10 +140,11 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add-feed-submit')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Fixture article'), findsOneWidget);
+    // May appear in both the inbox list and the continue-reading section.
+    expect(find.text('Fixture article'), findsAtLeastNWidgets(1));
     expect(find.text('Fixture Feed'), findsOneWidget);
 
-    await tester.tap(find.text('Fixture article'));
+    await tester.tap(find.text('Fixture article').first);
     await tester.pumpAndSettle();
     expect(find.text('Fixture summary', findRichText: true), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '打开原文'), findsOneWidget);
@@ -163,8 +165,10 @@ void main() {
     await tester.tap(find.byIcon(Icons.bookmark_border));
     await tester.pumpAndSettle();
 
-    expect(find.text('Fixture article'), findsOneWidget);
-    expect(find.text('Fixture article'), findsOneWidget);
+    // May appear in both the inbox list and the continue-reading section.
+    expect(find.text('Fixture article'), findsAtLeastNWidgets(1));
+    // May appear in both the inbox list and the continue-reading section.
+    expect(find.text('Fixture article'), findsAtLeastNWidgets(1));
     expect(find.widgetWithText(EntryTile, 'Fixture article'), findsOneWidget);
   });
 }
