@@ -25,6 +25,8 @@ final class Entry {
     this.isStarred = false,
     this.translatedTitle,
     this.sourceLang,
+    this.doi,
+    this.pmid,
   });
 
   final String id;
@@ -54,6 +56,12 @@ final class Entry {
   /// Cached AI-translated title (from translations table).
   final String? translatedTitle;
 
+  /// Digital Object Identifier, when the feed provides one.
+  final String? doi;
+
+  /// PubMed identifier, when the feed provides one.
+  final String? pmid;
+
   /// Detected source language (zh/en/ja/ko/ru/unknown).
   final String? sourceLang;
 
@@ -74,6 +82,8 @@ final class Entry {
     ContentExtractionStatus? contentExtractionStatus,
     String? contentExtractionError,
     bool clearContentExtractionError = false,
+    String? doi,
+    String? pmid,
   }) {
     return Entry(
       id: id,
@@ -102,6 +112,8 @@ final class Entry {
       readAt: clearReadAt ? null : (readAt ?? this.readAt),
       isStarred: isStarred ?? this.isStarred,
       translatedTitle: translatedTitle ?? this.translatedTitle,
+      doi: doi ?? this.doi,
+      pmid: pmid ?? this.pmid,
     );
   }
 }

@@ -810,6 +810,8 @@ domain_entry.Entry _entryFromRow(EntryRow row) {
     insertedAt: row.insertedAt,
     readAt: row.readAt,
     isStarred: row.starred,
+    doi: row.doi,
+    pmid: row.pmid,
   );
 }
 

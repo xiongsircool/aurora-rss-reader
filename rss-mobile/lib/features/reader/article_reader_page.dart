@@ -26,6 +26,7 @@ import '../../domain/media/audio_source.dart';
 import '../../shared/image_viewer_page.dart';
 import '../../shared/reading_stats.dart';
 import '../../shared/right_scrollbar.dart';
+import '../../shared/export/citation_exporter.dart';
 import '../audio/podcast_controller.dart';
 import '../audio/podcast_overlay.dart';
 import '../reader/podcast_player_sheet.dart';
@@ -178,8 +179,14 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 (
                   Icons.format_align_left,
                   '分享 Markdown',
-                  '保留标题、列表、链接等格式',
+                  '含 front-matter,适合 Obsidian 存档',
                   _shareMarkdown,
+                ),
+                (
+                  Icons.library_books_outlined,
+                  '导出 BibTeX',
+                  '复制文献引用,可导入 Zotero / LaTeX',
+                  _copyBibTeX,
                 ),
                 (Icons.photo_camera, '分享截图', '当前阅读画面', _shareScreenshot),
               ])
@@ -263,6 +270,17 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
     );
   }
 
+  Future<void> _copyBibTeX() async {
+    await Clipboard.setData(
+      ClipboardData(text: toBibTeX(_entry, widget.feedTitle)),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('BibTeX 已复制,可直接导入 Zotero 或 LaTeX')),
+      );
+    }
+  }
+
   Future<void> _shareMarkdown() async {
     final html = _entry.readabilityContent ?? _entry.content ?? _entry.summary;
     if (html == null || html.trim().isEmpty) {
@@ -270,7 +288,10 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
       return;
     }
     final md = html2md.convert(html);
-    final header = '# ${_entry.title}\n\n> 来自 ${widget.feedTitle}\n\n';
+    // Academic archive format: YAML front-matter (title/source/doi/…)
+    // followed by the converted body — Obsidian & Notion pick up the
+    // metadata automatically.
+    final header = '${toFrontMatter(_entry, widget.feedTitle)}\n\n';
     final footer = _shareTargetUrl.isEmpty
         ? ''
         : '\n\n---\n原文：$_shareTargetUrl';
