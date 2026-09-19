@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aurora brand hairline: orange -> teal gradient (top edge of widgets). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="0"
+        android:startColor="#E85D24"
+        android:endColor="#087E8B" />
+</shape>

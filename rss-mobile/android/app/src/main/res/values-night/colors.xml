@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="aurora_widget_bg">#14161A</color>
+    <color name="aurora_widget_on_bg">#E4E2E6</color>
+    <color name="aurora_widget_secondary">#9AA0A6</color>
+    <color name="aurora_widget_teal">#6FD6E3</color>
+    <color name="aurora_widget_orange">#FFB68A</color>
+    <color name="aurora_widget_white">#00363B</color>
+</resources>

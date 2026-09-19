@@ -9,7 +9,9 @@ import '../../data/repositories/local_content_repository.dart';
 
 const String _appGroupId = 'group.com.xiongsircool.aurora.mobile';
 const String _widgetDataKey = 'auroraWidgetData';
+const String _pendingActionsKey = 'auroraWidgetPendingActions';
 const String _iOSWidgetName = 'AuroraHomeWidget';
+const String _androidWidgetName = 'AuroraHomeWidgetProvider';
 
 /// Builds a snapshot of glanceable data (latest articles + weekly reading
 /// stats) and pushes it into the shared App Group container, then asks
@@ -20,9 +22,10 @@ const String _iOSWidgetName = 'AuroraHomeWidget';
 ///   to the 3 newest articles overall so the widget never looks broken.
 /// - Titles prefer the cached Chinese translation when available.
 Future<void> updateAuroraWidget(LocalContentRepository repository) async {
-  if (!Platform.isIOS) return;
+  if (!Platform.isIOS && !Platform.isAndroid) return;
   try {
     await HomeWidget.setAppGroupId(_appGroupId);
+    await _drainPendingMarkRead(repository);
 
     // Latest unread articles (falls back to latest overall when all read).
     // Fetch 6: medium widget shows 3, large widget shows 6.
@@ -68,11 +71,34 @@ Future<void> updateAuroraWidget(LocalContentRepository repository) async {
       _widgetDataKey,
       jsonEncode(snapshot),
     );
-    await HomeWidget.updateWidget(iOSName: _iOSWidgetName);
+    await HomeWidget.updateWidget(
+      iOSName: _iOSWidgetName,
+      androidName: _androidWidgetName,
+    );
   } catch (e) {
     // Widget updates must never break the host flow (background refresh,
     // app lifecycle) — log and move on.
     debugPrint('AuroraWidget: update failed: $e');
+  }
+}
+
+/// Applies mark-as-read actions queued by the iOS 17 widget button, then
+/// clears the queue. Idempotent: missing ids are ignored.
+Future<void> _drainPendingMarkRead(LocalContentRepository repository) async {
+  try {
+    final raw = await HomeWidget.getWidgetData<List>(_pendingActionsKey);
+    final ids = (raw ?? const []).whereType<String>().toList();
+    if (ids.isEmpty) return;
+    for (final id in ids) {
+      try {
+        await repository.markRead(id, read: true);
+      } catch (_) {
+        // Unknown id — the entry may have been deleted; skip it.
+      }
+    }
+    await HomeWidget.saveWidgetData<List>(_pendingActionsKey, const []);
+  } catch (e) {
+    debugPrint('AuroraWidget: drain pending actions failed: $e');
   }
 }
 

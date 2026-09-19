@@ -20,6 +20,7 @@
 // - Relative timestamps driven by the system (no refresh budget spent).
 // - Honest staleness indicator when the snapshot is older than 12h.
 
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -28,6 +29,7 @@ import WidgetKit
 enum AuroraHomeWidgetFlavor {
   static let appGroupId = "group.com.xiongsircool.aurora.mobile"
   static let dataKey = "auroraWidgetData"
+  static let pendingActionsKey = "auroraWidgetPendingActions"
 
   static let orange = Color(red: 232 / 255, green: 93 / 255, blue: 36 / 255)
   static let teal = Color(red: 8 / 255, green: 126 / 255, blue: 139 / 255)
@@ -36,12 +38,12 @@ enum AuroraHomeWidgetFlavor {
 // MARK: - Data model
 
 struct AuroraArticle: Codable, Identifiable {
-  let id: String
-  let title: String
-  let feed: String
-  let publishedAtMs: Int64
-  let unread: Bool
-  let starred: Bool
+  var id: String
+  var title: String
+  var feed: String
+  var publishedAtMs: Int64
+  var unread: Bool
+  var starred: Bool
 
   var publishedAt: Date {
     Date(timeIntervalSince1970: Double(publishedAtMs) / 1000)
@@ -49,11 +51,11 @@ struct AuroraArticle: Codable, Identifiable {
 }
 
 struct AuroraWidgetData: Codable {
-  let updatedAt: Int64
-  let unreadCount: Int
-  let articles: [AuroraArticle]
-  let weekCount: Int
-  let prevWeekCount: Int
+  var updatedAt: Int64
+  var unreadCount: Int
+  var articles: [AuroraArticle]
+  var weekCount: Int
+  var prevWeekCount: Int
 
   var updatedAtDate: Date {
     Date(timeIntervalSince1970: Double(updatedAt) / 1000)
@@ -87,6 +89,50 @@ struct AuroraWidgetData: Codable {
       let json = prefs.string(forKey: AuroraHomeWidgetFlavor.dataKey)?.data(using: .utf8)
     else { return nil }
     return try? JSONDecoder().decode(AuroraWidgetData.self, from: json)
+  }
+}
+
+// MARK: - Mark-as-read interaction (iOS 17+)
+// Pure-Swift intent using the pending-queue pattern: it flips the snapshot
+// for an immediate UI update and queues the id for the Flutter app to apply
+// to the database on its next run — no Flutter engine spin-up required.
+
+@available(iOSApplicationExtension 17.0, *)
+struct MarkReadIntent: AppIntent {
+  static var title: LocalizedStringResource = "标记为已读"
+
+  @Parameter(title: "Article ID")
+  var entryId: String
+
+  init() {}
+
+  init(entryId: String) {
+    self.entryId = entryId
+  }
+
+  func perform() async throws -> some IntentResult {
+    guard let prefs = UserDefaults(suiteName: AuroraHomeWidgetFlavor.appGroupId) else {
+      return .result()
+    }
+    // 1) Flip the snapshot so the widget UI updates on this reload.
+    if let data = prefs.string(forKey: AuroraHomeWidgetFlavor.dataKey)?.data(using: .utf8),
+       var widget = try? JSONDecoder().decode(AuroraWidgetData.self, from: data) {
+      for i in widget.articles.indices where widget.articles[i].id == entryId {
+        widget.articles[i].unread = false
+      }
+      if widget.unreadCount > 0 { widget.unreadCount -= 1 }
+      if let out = try? JSONEncoder().encode(widget),
+         let json = String(data: out, encoding: .utf8) {
+        prefs.set(json, forKey: AuroraHomeWidgetFlavor.dataKey)
+      }
+      // 2) Queue the action for the app.
+      var queue = prefs.stringArray(forKey: AuroraHomeWidgetFlavor.pendingActionsKey) ?? []
+      if !queue.contains(entryId) {
+        queue.append(entryId)
+        prefs.set(queue, forKey: AuroraHomeWidgetFlavor.pendingActionsKey)
+      }
+    }
+    return .result()
   }
 }
 
@@ -152,16 +198,31 @@ private struct ArticleRow: View {
   let article: AuroraArticle
 
   var body: some View {
-    Link(destination: URL(string: "aurora://article/\(article.id)?homeWidget")!) {
-      VStack(alignment: .leading, spacing: 2) {
-        MetaLine(article: article)
-        HStack(alignment: .top, spacing: 4) {
-          Text(article.title)
-            // Dual encoding: weight AND color carry the unread state so
-            // tinted/monochrome rendering stays readable (HIG).
-            .font(.system(size: 14, weight: article.unread ? .semibold : .regular))
-            .foregroundStyle(article.unread ? Color.primary : Color.secondary)
-            .lineLimit(2)
+    HStack(alignment: .top, spacing: 6) {
+      Link(destination: URL(string: "aurora://article/\(article.id)?homeWidget")!) {
+        VStack(alignment: .leading, spacing: 2) {
+          MetaLine(article: article)
+          HStack(alignment: .top, spacing: 4) {
+            Text(article.title)
+              // Dual encoding: weight AND color carry the unread state so
+              // tinted/monochrome rendering stays readable (HIG).
+              .font(.system(size: 14, weight: article.unread ? .semibold : .regular))
+              .foregroundStyle(article.unread ? Color.primary : Color.secondary)
+              .lineLimit(2)
+          }
+        }
+      }
+      // iOS 17 interactive widget: mark as read without launching the app.
+      if article.unread {
+        if #available(iOSApplicationExtension 17.0, *) {
+          Button(intent: MarkReadIntent(entryId: article.id)) {
+            Image(systemName: "checkmark.circle")
+              .font(.system(size: 16))
+              .foregroundStyle(.tertiary)
+              .frame(width: 30, height: 30)
+              .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
         }
       }
     }
@@ -310,15 +371,12 @@ private struct SmallStatsView: View {
   }
 
   private var numberStyle: AnyShapeStyle {
-    if #available(iOSApplicationExtension 16.0, *) {
-      return AnyShapeStyle(
-        LinearGradient(
-          colors: [AuroraHomeWidgetFlavor.orange, AuroraHomeWidgetFlavor.teal],
-          startPoint: .leading, endPoint: .trailing
-        )
+    AnyShapeStyle(
+      LinearGradient(
+        colors: [AuroraHomeWidgetFlavor.orange, AuroraHomeWidgetFlavor.teal],
+        startPoint: .leading, endPoint: .trailing
       )
-    }
-    return AnyShapeStyle(AuroraHomeWidgetFlavor.orange)
+    )
   }
 
   var body: some View {
@@ -351,9 +409,8 @@ private struct SmallStatsView: View {
   }
 }
 
-// MARK: - Lock screen accessories (iOS 16+)
+// MARK: - Lock screen accessories
 
-@available(iOSApplicationExtension 16.0, *)
 private struct InlineView: View {
   let entry: AuroraHomeWidgetEntry
 
@@ -369,7 +426,6 @@ private struct InlineView: View {
   }
 }
 
-@available(iOSApplicationExtension 16.0, *)
 private struct RectangularView: View {
   let entry: AuroraHomeWidgetEntry
 
@@ -425,17 +481,9 @@ struct AuroraHomeWidgetEntryView: View {
     case .systemLarge:
       LargeView(entry: entry)
     case .accessoryInline:
-      if #available(iOSApplicationExtension 16.0, *) {
-        InlineView(entry: entry)
-      } else {
-        SmallStatsView(entry: entry)
-      }
+      InlineView(entry: entry)
     case .accessoryRectangular:
-      if #available(iOSApplicationExtension 16.0, *) {
-        RectangularView(entry: entry)
-      } else {
-        SmallStatsView(entry: entry)
-      }
+      RectangularView(entry: entry)
     default:
       MediumView(entry: entry)
     }
@@ -448,11 +496,7 @@ struct AuroraHomeWidget: Widget {
   let kind: String = "AuroraHomeWidget"
 
   private var supportedFamilies: [WidgetFamily] {
-    var families: [WidgetFamily] = [.systemSmall, .systemMedium, .systemLarge]
-    if #available(iOSApplicationExtension 16.0, *) {
-      families.append(contentsOf: [.accessoryInline, .accessoryRectangular])
-    }
-    return families
+    [.systemSmall, .systemMedium, .systemLarge, .accessoryInline, .accessoryRectangular]
   }
 
   var body: some WidgetConfiguration {

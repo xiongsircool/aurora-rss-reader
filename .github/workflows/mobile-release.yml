@@ -24,7 +24,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: '3.47.2'
+          flutter-version: '3.47.5'
 
       # Preserve the GitHub preview signing identity across ephemeral runners.
       # Missing secrets must fail, never silently create a new debug key.
