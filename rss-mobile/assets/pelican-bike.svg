@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" width="400" height="260">
+  <style>
+    .frame { fill: none; stroke: #333; stroke-width: 3; }
+    .wheel-rim { fill: none; stroke: #333; stroke-width: 2.5; }
+    .wheel-spoke { stroke: #555; stroke-width: 1; }
+    .wheel-hub { fill: #333; }
+    .pelican-body { fill: #F5F0E1; stroke: #D4C9A3; stroke-width: 1.5; }
+    .pelican-head { fill: #F5F0E1; stroke: #D4C9A3; stroke-width: 1.5; }
+    .pelican-beak-top { fill: #E8A845; stroke: #C8953A; stroke-width: 1; }
+    .pelican-beak-bottom { fill: #F0C060; stroke: #C8953A; stroke-width: 1; }
+    .pelican-eye { fill: #222; }
+    .pelican-wing { fill: #EBE3D0; stroke: #D4C9A3; stroke-width: 1.5; }
+    .pelican-leg { stroke: #E8A845; stroke-width: 3; stroke-linecap: round; }
+    .pelican-foot { fill: #E8A845; }
+    .handlebar { fill: none; stroke: #333; stroke-width: 2.5; stroke-linecap: round; }
+    .seat { fill: #333; }
+    .pedal { fill: #555; }
+    .basket { fill: none; stroke: #8B6914; stroke-width: 2; }
+    .basket-weave { stroke: #C4A050; stroke-width: 1; }
+    .saddle-bag { fill: #8B6914; stroke: #6B5210; stroke-width: 1.5; }
+    .motion-line { stroke: #CCC; stroke-width: 1.5; stroke-linecap: round; }
+    .ground { stroke: #DDD; stroke-width: 2; stroke-linecap: round; }
+    .pelican-neck { fill: none; stroke: #D4C9A3; stroke-width: 1.5; }
+    .peanuts { fill: #C4A050; }
+    .peanut-line { stroke: #8B6914; stroke-width: 0.8; }
+  </style>
+
+  <!-- Ground -->
+  <line class="ground" x1="10" y1="230" x2="390" y2="230"/>
+
+  <!-- Motion lines -->
+  <line class="motion-line" x1="20" y1="200" x2="50" y2="200"/>
+  <line class="motion-line" x1="15" y1="210" x2="45" y2="210"/>
+  <line class="motion-line" x1="25" y1="190" x2="55" y2="190"/>
+
+  <!-- Rear wheel -->
+  <circle class="wheel-rim" cx="110" cy="195" r="38"/>
+  <g class="wheel-spoke">
+    <line x1="110" y1="195" x2="110" y2="157"/>
+    <line x1="110" y1="195" x2="137" y2="177"/>
+    <line x1="110" y1="195" x2="148" y2="195"/>
+    <line x1="110" y1="195" x2="137" y2="213"/>
+    <line x1="110" y1="195" x2="110" y2="233"/>
+    <line x1="110" y1="195" x2="83" y2="213"/>
+    <line x1="110" y1="195" x2="72" y2="195"/>
+    <line x1="110" y1="195" x2="83" y2="177"/>
+  </g>
+  <circle class="wheel-hub" cx="110" cy="195" r="4"/>
+
+  <!-- Front wheel -->
+  <circle class="wheel-rim" cx="290" cy="195" r="38"/>
+  <g class="wheel-spoke">
+    <line x1="290" y1="195" x2="290" y2="157"/>
+    <line x1="290" y1="195" x2="317" y2="177"/>
+    <line x1="290" y1="195" x2="328" y2="195"/>
+    <line x1="290" y1="195" x2="317" y2="213"/>
+    <line x1="290" y1="195" x2="290" y2="233"/>
+    <line x1="290" y1="195" x2="263" y2="213"/>
+    <line x1="290" y1="195" x2="252" y2="195"/>
+    <line x1="290" y1="195" x2="263" y2="177"/>
+  </g>
+  <circle class="wheel-hub" cx="290" cy="195" r="4"/>
+
+  <!-- Frame -->
+  <polyline class="frame" points="110,195 175,120 260,195 110,195"/>
+  <polyline class="frame" points="175,120 165,100 155,100"/>
+  <polyline class="frame" points="175,120 255,125 290,195"/>
+  <line class="frame" x1="260" y1="195" x2="255" y2="125"/>
+  <line class="handlebar" x1="155" y1="100" x2="148" y2="88"/>
+  <line class="handlebar" x1="148" y1="88" x2="140" y2="86"/>
+
+  <!-- Seat -->
+  <ellipse class="seat" cx="162" cy="96" rx="14" ry="5"/>
+
+  <!-- Pedals -->
+  <circle cx="185" cy="195" r="6" fill="none" stroke="#333" stroke-width="2"/>
+  <line class="frame" x1="110" y1="195" x2="185" y2="195" opacity="0"/>
+  <rect class="pedal" x="179" y="189" width="12" height="5" rx="1"/>
+
+  <!-- Basket on front -->
+  <path class="basket" d="M255,80 L290,80 L285,105 L260,105 Z"/>
+  <line class="basket-weave" x1="258" y1="88" x2="288" y2="88"/>
+  <line class="basket-weave" x1="259" y1="96" x2="287" y2="96"/>
+  <line class="basket-weave" x1="268" y1="80" x2="266" y2="105"/>
+  <line class="basket-weave" x1="277" y1="80" x2="275" y2="105"/>
+
+  <!-- Saddle bag -->
+  <rect class="saddle-bag" x="170" y="100" width="24" height="20" rx="4"/>
+  <line x1="182" y1="100" x2="182" y2="120" stroke="#6B5210" stroke-width="1"/>
+
+  <!-- Pelican -->
+  <!-- Body -->
+  <ellipse class="pelican-body" cx="210" cy="55" rx="38" ry="24" transform="rotate(-8 210 55)"/>
+
+  <!-- Neck curve from body to head -->
+  <path class="pelican-neck" d="M245,45 Q265,15 285,30"/>
+
+  <!-- Head -->
+  <ellipse class="pelican-head" cx="290" cy="28" rx="16" ry="13" transform="rotate(5 290 28)"/>
+
+  <!-- Beak: top -->
+  <path class="pelican-beak-top" d="M303,26 Q340,30 352,38 L350,42 Q330,40 300,32 Z"/>
+
+  <!-- Beak: bottom pouch -->
+  <path class="pelican-beak-bottom" d="M302,32 Q330,42 348,42 Q345,52 320,50 Q310,48 300,36 Z"/>
+
+  <!-- Eye -->
+  <circle class="pelican-eye" cx="296" cy="23" r="3"/>
+  <circle cx="297" cy="22" r="1" fill="#FFF"/>
+
+  <!-- Wing (flapping) -->
+  <path class="pelican-wing" d="M195,45 Q175,20 150,25 Q180,35 195,55 Z"/>
+
+  <!-- Legs pedaling -->
+  <polyline class="pelican-leg" points="205,75 195,100 185,115" fill="none"/>
+  <polyline class="pelican-leg" points="215,75 225,110 215,125" fill="none"/>
+  <ellipse class="pelican-foot" cx="185" cy="118" rx="8" ry="3"/>
+  <ellipse class="pelican-foot" cx="215" cy="127" rx="8" ry="3"/>
+
+  <!-- Peanuts in pouch -->
+  <ellipse class="peanuts" cx="322" cy="47" rx="4" ry="3"/>
+  <ellipse class="peanuts" cx="335" cy="45" rx="3" ry="2.5"/>
+  <line class="peanut-line" x1="320" y1="46" x2="326" y2="46"/>
+  <line class="peanut-line" x1="333" y1="44" x2="338" y2="44"/>
+</svg>
