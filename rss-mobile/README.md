@@ -2,7 +2,7 @@
 
 [![mobile-ci](https://github.com/xiongsircool/aurora-rss-reader/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/xiongsircool/aurora-rss-reader/actions/workflows/mobile-ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/xiongsircool/aurora-rss-reader/blob/main/LICENSE)
-[![Release](https://img.shields.io/badge/Release-mobile--v0.1.2-orange)](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.2)
+[![Release](https://img.shields.io/badge/Release-mobile--v0.1.4-orange)](https://github.com/xiongsircool/aurora-rss-reader/releases/tag/mobile-v0.1.4)
 
 **Aurora Mobile** 是 [Aurora RSS Reader](../../README_ZH.md) 的 Flutter 移动端。
 
@@ -39,13 +39,26 @@ iOS 通过 TestFlight 分发（开发中）。
 - 📖 阅读进度记忆、字号/行距/衬线字体调节、代码块复制
 - 🖼️ 图片点击放大、保存到相册
 
+### 标签与过滤
+- 🏷️ 手动标签：阅读中打标、收藏页按标签浏览、重命名/改色管理
+- 🤖 规则自动打标：14 类目中英词典（科技/AI/编程/科研/生物…），
+  DOI 文献自动归「科研」、PMID 归「科研+生物」，支持历史补打
+- 🚫 过滤规则：关键词（| 分隔）或正则，屏蔽/标已读/自动收藏，
+  全局或单源生效，保存即作用于现有文章，带命中统计
+
+### 朗读（TTS）
+- 🔊 听全文：系统语音离线朗读，从当前阅读位置开始
+- 📜 沉浸式朗读页：逐句高亮、自动滚动、点句跳读
+- 🎛️ 全局迷你条 + 倍速（0.75–2.0x），与播客互斥，锁屏可续播
+- ✅ 可选「朗读完成自动标为已读」
+
 ### AI（自带 API Key，不经过 Aurora 服务器）
 - 📝 文章摘要生成（DeepSeek / SiliconFlow）
 - 🌍 全文双语对照翻译、标题实时翻译（视口触发，同语言跳过）
 
 ### 播客
 - 🎧 音频播放器：倍速（0.75–2.0x）、进度记忆、跨页面持续播放
-- 📱 全局迷你播放条：返回列表后仍可控制
+- 📱 全局迷你播放条：返回列表后仍可控制，锁屏后台不断音
 
 ### 界面与体验
 - 🌙 深色模式（跟随系统）
@@ -71,7 +84,7 @@ iOS 通过 TestFlight 分发（开发中）。
 cd rss-mobile
 flutter pub get
 flutter run            # 真机或模拟器
-flutter test           # 125 项测试
+flutter test           # 167 项测试
 flutter analyze
 flutter build apk --release --split-per-abi
 ```
