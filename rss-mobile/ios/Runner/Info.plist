@@ -13,6 +13,7 @@
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>fetch</string>
+			<string>audio</string>
 		</array>
 		<key>BGTaskSchedulerPermittedIdentifiers</key>
 		<array>
@@ -20,6 +21,8 @@
 		</array>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 		<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
