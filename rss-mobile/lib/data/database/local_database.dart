@@ -180,6 +180,32 @@ class CollectionEntries extends Table {
   Set<Column<Object>> get primaryKey => {collectionId, entryId};
 }
 
+@DataClassName('FilterRuleRow')
+class FilterRules extends Table {
+  TextColumn get id => text()();
+
+  /// Keyword list separated by `|`, or a regex when [isRegex] is set.
+  TextColumn get pattern => text()();
+  BoolColumn get isRegex => boolean().withDefault(const Constant(false))();
+
+  /// 'title' or 'titleAndSummary'.
+  TextColumn get matchField => text().withDefault(const Constant('title'))();
+
+  /// 'hide', 'markRead' or 'star'.
+  TextColumn get action => text().withDefault(const Constant('hide'))();
+
+  /// Null means the rule applies to every feed.
+  TextColumn get feedId =>
+      text().nullable().references(Feeds, #id, onDelete: KeyAction.cascade)();
+  BoolColumn get enabled => boolean().withDefault(const Constant(true))();
+  IntColumn get hitCount => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     Feeds,
@@ -191,6 +217,7 @@ class CollectionEntries extends Table {
     EntryTags,
     Collections,
     CollectionEntries,
+    FilterRules,
   ],
 )
 final class LocalDatabase extends _$LocalDatabase {
@@ -224,7 +251,7 @@ final class LocalDatabase extends _$LocalDatabase {
   factory LocalDatabase.onDevice() => LocalDatabase(_openOnDevice());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -254,6 +281,9 @@ final class LocalDatabase extends _$LocalDatabase {
       }
       if (from < 6) {
         await migrator.addColumn(entries, entries.lastOpenedAt);
+      }
+      if (from < 7) {
+        await migrator.createTable(filterRules);
       }
     },
     beforeOpen: (details) async {

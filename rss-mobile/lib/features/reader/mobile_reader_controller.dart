@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../audio/podcast_controller.dart';
+import '../audio/tts_controller.dart';
 import '../../application/use_cases/extract_article.dart';
 import '../../application/use_cases/refresh_feed.dart';
 import '../../data/platform/ai_client.dart';
@@ -40,10 +41,14 @@ final class MobileReaderController extends ChangeNotifier {
   final ExtractArticle? extractArticle;
   final AiClient? aiClient;
   final SecureKeyStore? secureKeyStore;
+
+  /// App-owned TTS session; pausing podcasts and vice versa is mutual.
+  final TtsController tts = TtsController();
   final PodcastController podcast;
 
   @override
   void dispose() {
+    tts.dispose();
     podcast.dispose();
     super.dispose();
   }
@@ -60,6 +65,7 @@ final class MobileReaderController extends ChangeNotifier {
   List<Entry> _searchResults = const [];
   final Set<String> _extractingEntryIds = {};
   List<GroupSummary> _groups = const [];
+  List<TagSummary> _tags = const [];
   final Set<String> _mutedGroups = {};
   InboxCursor? _nextCursor;
   bool _initialized = false;
@@ -101,6 +107,7 @@ final class MobileReaderController extends ChangeNotifier {
   List<Entry> get entries => _entries;
   List<Entry> get starredEntries => _starredEntries;
   List<Entry> get continueReading => _continueReading;
+  List<TagSummary> get tags => _tags;
   List<Entry> get searchResults => _searchResults;
   bool get initialized => _initialized;
   bool get loading => _loading;
@@ -139,6 +146,7 @@ final class MobileReaderController extends ChangeNotifier {
       await _loadAutoTranslateSettings();
       await _reload();
       _initialized = true;
+      unawaited(reloadTags());
       unawaited(_resolveAllMissingIcons());
     } catch (error) {
       _error = '无法打开本地数据库：$error';
@@ -616,8 +624,7 @@ final class MobileReaderController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setRead(Entry entry, {required bool read}) async {
-    try {
+  Future<void> setRead(Entry entry, {required bool read}) async {    try {
       await repository.markRead(entry.id, read: read);
       await _loadFirstPage();
       _starredEntries = await repository.listStarred();
@@ -638,6 +645,61 @@ final class MobileReaderController extends ChangeNotifier {
       _error = '更新收藏状态失败：$error';
     }
     notifyListeners();
+  }
+
+  /// Reloads the tag list (with entry counts) and notifies listeners.
+  Future<void> reloadTags() async {
+    _tags = await repository.listTags();
+    notifyListeners();
+  }
+
+  /// Creates (or reuses) a tag by name and returns its summary.
+  Future<TagSummary> createTag(String name) async {
+    await repository.ensureTag(name);
+    await reloadTags();
+    final trimmed = name.trim();
+    return _tags.firstWhere(
+      (tag) => tag.name.toLowerCase() == trimmed.toLowerCase(),
+      orElse: () => throw StateError('标签创建失败'),
+    );
+  }
+
+  /// Starts TTS for [entry]. Pauses any podcast playback first; when
+  /// the article finishes and "auto mark read" is enabled, marks it read.
+  Future<void> startTts(Entry entry, {int startIndex = 0}) async {
+    if (podcast.playing) await podcast.pause();
+    final html =
+        entry.readabilityContent ?? entry.content ?? entry.summary ?? '';
+    if (html.trim().isEmpty) return;
+    _prefs ??= ReaderPrefsRepository(repository.database);
+    await tts.start(
+      meta: TtsEntryMeta(
+        entryId: entry.id,
+        title: entry.title,
+        feedTitle: feedTitle(entry.feedId),
+      ),
+      html: html,
+      language: entry.sourceLang ?? 'zh',
+      startIndex: startIndex,
+      onCompleted: () async {
+        if (!await (_prefs!.loadTtsAutoMarkRead())) return;
+        if (!entry.isRead) await setRead(entry, read: true);
+      },
+    );
+  }
+
+  /// Toggles a tag on an entry, then refreshes tag counters.
+  Future<void> setEntryTag({
+    required String entryId,
+    required String tagId,
+    required bool assigned,
+  }) async {
+    await repository.setEntryTag(
+      entryId: entryId,
+      tagId: tagId,
+      assigned: assigned,
+    );
+    await reloadTags();
   }
 
   Future<Entry?> extractFullText(Entry entry) async {

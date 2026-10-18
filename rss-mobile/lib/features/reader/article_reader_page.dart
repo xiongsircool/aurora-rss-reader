@@ -15,6 +15,9 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../shared/share_card_content.dart';
 import 'share_card_preview_page.dart';
+import '../../domain/tts/sentence_splitter.dart';
+import '../tags/tag_picker_sheet.dart';
+import '../settings/filter_rule_edit_sheet.dart';
 
 import 'package:html/dom.dart' as html;
 import 'package:html/parser.dart' as html_parser;
@@ -138,6 +141,27 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
           ? _entry.markRead(DateTime.now().toUtc())
           : _entry.markUnread();
     });
+  }
+
+  /// Starts TTS near the reader's current scroll position instead of
+  /// always from the top — the fraction of scrolled content maps onto
+  /// the sentence list.
+  Future<void> _startTts() async {
+    final sentences = splitIntoSentences(
+      _entry.readabilityContent ?? _entry.content ?? _entry.summary,
+    );
+    var startIndex = 0;
+    if (sentences.length > 4 && _scrollController.hasClients) {
+      final position = _scrollController.position;
+      if (position.maxScrollExtent > 0) {
+        final fraction = (position.pixels / position.maxScrollExtent)
+            .clamp(0.0, 1.0);
+        startIndex = (fraction * sentences.length)
+            .floor()
+            .clamp(0, sentences.length - 1);
+      }
+    }
+    await widget.controller.startTts(_entry, startIndex: startIndex);
   }
 
   Future<void> _toggleStarred() async {
@@ -408,6 +432,20 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                   _prefs.saveFontFamily(family);
                 },
               ),
+              const SizedBox(height: 16),
+              FutureBuilder<bool>(
+                future: _prefs.loadTtsAutoMarkRead(),
+                builder: (sheetContext, snapshot) => SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('朗读完成自动标为已读'),
+                  subtitle: const Text('全文读完后标记，手动暂停不计'),
+                  value: snapshot.data ?? false,
+                  onChanged: (enabled) {
+                    _prefs.saveTtsAutoMarkRead(enabled);
+                    setSheetState(() {});
+                  },
+                ),
+              ),
             ],
           ),
         ),
@@ -587,16 +625,6 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               color: _entry.isStarred ? const Color(0xFFF4A000) : null,
             ),
           ),
-          PopupMenuButton<String>(
-            tooltip: '文章操作',
-            onSelected: (_) => _toggleRead(),
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'read',
-                child: Text(_entry.isRead ? '标为未读' : '标为已读'),
-              ),
-            ],
-          ),
           IconButton(
             key: _shareButtonKey,
             tooltip: _sharingCard ? '正在生成分享卡片' : '分享',
@@ -608,10 +636,81 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
                 : const Icon(Icons.ios_share),
             onPressed: _sharingCard ? null : _showShareSheet,
           ),
-          IconButton(
-            tooltip: '阅读设置',
-            icon: const Icon(Icons.tune),
-            onPressed: _showReaderSettingsSheet,
+          PopupMenuButton<String>(
+            tooltip: '更多',
+            onSelected: (action) {
+              switch (action) {
+                case 'tts':
+                  _startTts();
+                case 'tag':
+                  showTagPickerSheet(
+                    context,
+                    controller: widget.controller,
+                    entryId: _entry.id,
+                  );
+                case 'read':
+                  _toggleRead();
+                case 'settings':
+                  _showReaderSettingsSheet();
+                case 'filter':
+                  showFilterRuleEditSheet(
+                    context,
+                    controller: widget.controller,
+                    initialFeedId: _entry.feedId,
+                  );
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'tts',
+                child: ListTile(
+                  leading: Icon(Icons.volume_up_rounded),
+                  title: Text('听全文'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'tag',
+                child: ListTile(
+                  leading: Icon(Icons.tag),
+                  title: Text('添加标签'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'read',
+                child: ListTile(
+                  leading: Icon(
+                    _entry.isRead
+                        ? Icons.mark_email_unread_outlined
+                        : Icons.check_circle_outline,
+                  ),
+                  title: Text(_entry.isRead ? '标为未读' : '标为已读'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'settings',
+                child: ListTile(
+                  leading: Icon(Icons.tune),
+                  title: Text('阅读设置'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'filter',
+                child: ListTile(
+                  leading: Icon(Icons.filter_alt_outlined),
+                  title: Text('创建过滤规则'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+            ],
           ),
         ],
       ),

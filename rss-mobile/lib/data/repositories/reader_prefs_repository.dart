@@ -101,6 +101,13 @@ class ReaderPrefsRepository {
   Future<void> saveScrollOffset(String entryId, double offset) =>
       _set('reader_pos_$entryId', offset.toStringAsFixed(0));
 
+  /// "Mark as read after TTS finishes" — off by default.
+  Future<bool> loadTtsAutoMarkRead() async =>
+      (await _get('tts_auto_mark_read')) == '1';
+
+  Future<void> saveTtsAutoMarkRead(bool enabled) =>
+      _set('tts_auto_mark_read', enabled ? '1' : '0');
+
   /// Podcast playback position memory, keyed by the audio URL.
   Future<String?> loadPlaybackPosition(String audioUrl) async {
     final key = 'podcast_pos_v2:$audioUrl';

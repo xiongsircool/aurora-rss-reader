@@ -754,5 +754,79 @@
       }
     }
   },
-  "continueReading": "继续阅读"
+  "continueReading": "继续阅读",
+  "tags": "标签",
+  "tagPickerTitle": "添加标签",
+  "tagFilterHint": "筛选标签",
+  "tagNewNameHint": "输入新标签名",
+  "tagCreate": "创建并添加",
+  "tagPickerEmpty": "还没有标签，输入名称创建第一个",
+  "tagCount": "{count} 篇",
+  "@tagCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tagEntriesEmpty": "该标签下暂无文章",
+  "tagManage": "标签管理",
+  "tagManageHint": "重命名、改色或删除标签",
+  "tagRename": "重命名标签",
+  "tagColor": "颜色",
+  "tagDelete": "删除标签",
+  "tagDeleteConfirmBody": "标签会从所有文章上移除，文章本身不受影响。",
+  "tagManageEmpty": "还没有标签。阅读文章时点 # 按钮即可添加。",
+  "tagAutoBackfill": "为历史文章自动打标签",
+  "tagAutoBackfillBusy": "刷新中无法补打标签，请稍后再试",
+  "tagAutoBackfillRunning": "正在为历史文章补打标签…",
+  "tagAutoBackfillDone": "已为 {count} 篇文章打上标签",
+  "@tagAutoBackfillDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "filterRules": "过滤规则",
+  "filterRulesHint": "自动屏蔽、标已读或收藏匹配的文章",
+  "filterRulesEmpty": "还没有规则。新建一条，用关键词或正则自动处理订阅。",
+  "filterRuleNew": "新建规则",
+  "filterRuleEdit": "编辑规则",
+  "filterRulePattern": "匹配内容",
+  "filterRulePatternHint": "多个关键词用 | 分隔",
+  "filterRuleIsRegex": "作为正则表达式",
+  "filterRuleFieldLabel": "匹配范围",
+  "filterRuleFieldTitle": "标题",
+  "filterRuleFieldTitleSummary": "标题和摘要",
+  "filterRuleActionLabel": "执行动作",
+  "filterActionHide": "屏蔽",
+  "filterActionHideDesc": "匹配文章不进入收件箱",
+  "filterActionMarkRead": "标为已读",
+  "filterActionMarkReadDesc": "进入收件箱但不算未读",
+  "filterActionStar": "自动收藏",
+  "filterActionStarDesc": "匹配文章直接进收藏夹",
+  "filterRuleScopeLabel": "作用范围",
+  "filterRuleScopeAll": "全部订阅源",
+  "filterRuleScopeFeed": "指定订阅源",
+  "filterRulePickFeed": "选择订阅源",
+  "filterRuleDelete": "删除规则",
+  "filterRuleDeleteBody": "删除后新文章不再按此规则处理，已处理的文章不变。",
+  "filterRuleApplied": "已应用：处理 {count} 篇现有文章",
+  "@filterRuleApplied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "filterRuleAppliedZero": "规则已保存，现有文章无匹配",
+  "filterRuleHits": "{count} 次命中",
+  "@filterRuleHits": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -356,5 +356,79 @@
   "backgroundPlayNote": "Keep browsing after collapsing. In-app playback continues; leaving the app pauses it.",
   "opmlImport": "Import OPML",
   "opmlExport": "Export OPML",
-  "continueReading": "Continue reading"
+  "continueReading": "Continue reading",
+  "tags": "Tags",
+  "tagPickerTitle": "Add tags",
+  "tagFilterHint": "Filter tags",
+  "tagNewNameHint": "Enter a new tag name",
+  "tagCreate": "Create & add",
+  "tagPickerEmpty": "No tags yet — type a name to create the first one",
+  "tagCount": "{count} articles",
+  "@tagCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tagEntriesEmpty": "No articles with this tag yet",
+  "tagManage": "Manage tags",
+  "tagManageHint": "Rename, recolor or delete tags",
+  "tagRename": "Rename tag",
+  "tagColor": "Color",
+  "tagDelete": "Delete tag",
+  "tagDeleteConfirmBody": "The tag will be removed from all articles. The articles themselves are not affected.",
+  "tagManageEmpty": "No tags yet. Tap the # button while reading to add one.",
+  "tagAutoBackfill": "Auto-tag existing articles",
+  "tagAutoBackfillBusy": "Cannot backfill while refreshing; try again later",
+  "tagAutoBackfillRunning": "Tagging existing articles…",
+  "tagAutoBackfillDone": "Tagged {count} articles",
+  "@tagAutoBackfillDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "filterRules": "Filter rules",
+  "filterRulesHint": "Automatically hide, mark read or star matching articles",
+  "filterRulesEmpty": "No rules yet. Create one to auto-process subscriptions with keywords or regexes.",
+  "filterRuleNew": "New rule",
+  "filterRuleEdit": "Edit rule",
+  "filterRulePattern": "Match pattern",
+  "filterRulePatternHint": "Separate keywords with |",
+  "filterRuleIsRegex": "Treat as regular expression",
+  "filterRuleFieldLabel": "Match in",
+  "filterRuleFieldTitle": "Title",
+  "filterRuleFieldTitleSummary": "Title & summary",
+  "filterRuleActionLabel": "Action",
+  "filterActionHide": "Hide",
+  "filterActionHideDesc": "Matching articles never reach the inbox",
+  "filterActionMarkRead": "Mark read",
+  "filterActionMarkReadDesc": "Enters the inbox without counting as unread",
+  "filterActionStar": "Auto-star",
+  "filterActionStarDesc": "Matching articles go straight to saved",
+  "filterRuleScopeLabel": "Applies to",
+  "filterRuleScopeAll": "All feeds",
+  "filterRuleScopeFeed": "Selected feed",
+  "filterRulePickFeed": "Pick a feed",
+  "filterRuleDelete": "Delete rule",
+  "filterRuleDeleteBody": "New articles will no longer follow this rule. Already processed articles stay as they are.",
+  "filterRuleApplied": "Applied: {count} existing articles processed",
+  "@filterRuleApplied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "filterRuleAppliedZero": "Rule saved; no existing articles matched",
+  "filterRuleHits": "{count} hits",
+  "@filterRuleHits": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

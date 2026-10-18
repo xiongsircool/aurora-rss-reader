@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:drift/drift.dart';
 import 'package:path_provider/path_provider.dart';
@@ -9,6 +10,8 @@ import '../../domain/entities/feed.dart' as domain_feed;
 import '../../domain/value_objects/feed_view_type.dart' as domain_type;
 import '../../domain/feed_parsing/parsed_feed.dart';
 import '../../domain/translation/lang_detect.dart';
+import '../../domain/tagging/auto_tag_rules.dart';
+import '../../domain/filtering/filter_matcher.dart';
 import '../database/local_database.dart';
 
 final class InboxCursor {
@@ -35,6 +38,34 @@ final class GroupSummary {
   final String name;
   final int feedCount;
   final int unreadEntries;
+}
+
+/// Tag palette used to auto-assign colors when creating a tag.
+const List<String> kTagPalette = <String>[
+  '#3B82F6', // blue
+  '#F97316', // orange
+  '#22C55E', // green
+  '#A855F7', // purple
+  '#EC4899', // pink
+  '#14B8A6', // teal
+  '#EAB308', // yellow
+  '#6366F1', // indigo
+  '#EF4444', // red
+  '#64748B', // slate
+];
+
+final class TagSummary {
+  const TagSummary({
+    required this.id,
+    required this.name,
+    required this.color,
+    required this.entryCount,
+  });
+
+  final String id;
+  final String name;
+  final String color;
+  final int entryCount;
 }
 
 final class LocalContentRepository {
@@ -341,7 +372,28 @@ final class LocalContentRepository {
     return database.transaction(() async {
       var inserted = 0;
       final now = DateTime.now().toUtc();
+      final autoTagIds = <String, String>{};
+      final ruleRows = await database.select(database.filterRules).get();
+      final rules = _compileRules(
+        ruleRows.where((row) => row.enabled).toList(),
+      );
+      final ruleHits = <String, int>{};
       for (final item in items) {
+        FilterVerdict? verdict;
+        if (rules.isNotEmpty) {
+          verdict = evaluateFilterRules(
+            rules,
+            title: item.title,
+            summary: item.summaryHtml,
+            feedId: feedId,
+          );
+          if (verdict.hide) {
+            for (final ruleId in verdict.matchedRuleIds) {
+              ruleHits[ruleId] = (ruleHits[ruleId] ?? 0) + 1;
+            }
+            continue; // Filtered out: never reaches the inbox.
+          }
+        }
         final attachment =
             item.enclosure.where((media) => media.isAudio).firstOrNull ??
             item.enclosure.firstOrNull;
@@ -372,11 +424,35 @@ final class LocalContentRepository {
                 doi: Value(item.doi),
                 pmid: Value(item.pmid),
                 sourceLang: Value(detectSourceLang(item.title)),
+                readAt: Value(
+                  verdict != null && verdict.markRead ? now : null,
+                ),
+                starred: Value(verdict != null && verdict.star),
               ),
               mode: InsertMode.insertOrIgnore,
             );
         if (result != null) {
           inserted++;
+          final autoNames = matchAutoTags(
+            title: item.title,
+            summary: item.summaryHtml,
+            doi: item.doi,
+            pmid: item.pmid,
+          );
+          for (final name in autoNames) {
+            final tagId = autoTagIds[name] ??= (await ensureTag(name)).id;
+            await database
+                .into(database.entryTags)
+                .insert(
+                  EntryTagsCompanion.insert(
+                    entryId: result.id,
+                    tagId: tagId,
+                    isManual: const Value(false),
+                    createdAt: now,
+                  ),
+                  mode: InsertMode.insertOrIgnore,
+                );
+          }
         } else if (attachment != null && attachment.isAudio) {
           // Repair older entries that stored the cover as their first
           // enclosure. Only update media fields; keep read/star/content state.
@@ -396,6 +472,21 @@ final class LocalContentRepository {
                   enclosureType: Value(attachment.type),
                   enclosureLength: Value(attachment.lengthInBytes),
                   durationSeconds: Value(item.duration?.inSeconds),
+                ),
+              );
+        }
+      }
+      if (rules.isNotEmpty) {
+        for (final entry in ruleHits.entries) {
+          await (database.update(database.filterRules)
+                ..where((r) => r.id.equals(entry.key)))
+              .write(
+                FilterRulesCompanion(
+                  hitCount: Value(
+                    (ruleRows.firstWhere((r) => r.id == entry.key).hitCount) +
+                        entry.value,
+                  ),
+                  updatedAt: Value(now),
                 ),
               );
         }
@@ -645,20 +736,216 @@ final class LocalContentRepository {
   }
 
   Future<void> assignTag({required String entryId, required String tagId}) {
-    return database.transaction(() async {
-      final now = DateTime.now().toUtc();
+    return setEntryTag(entryId: entryId, tagId: tagId, assigned: true);
+  }
+
+  /// Creates a tag by [name], or returns the existing one when the name
+  /// (case-insensitive, trimmed) already exists. New tags get a color from
+  /// [kTagPalette] by rotation.
+  Future<UserTagRow> ensureTag(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('标签名不能为空');
+    }
+    final existing =
+        await (database.select(database.userTags)
+              ..where((row) => row.name.lower().equals(trimmed.toLowerCase()))
+              ..limit(1))
+            .getSingleOrNull();
+    if (existing != null) return existing;
+
+    final count = await database.userTags.count().getSingle();
+    final now = DateTime.now().toUtc();
+    final id = 'tag-${now.microsecondsSinceEpoch}-$count';
+    return database
+        .into(database.userTags)
+        .insertReturning(
+          UserTagsCompanion.insert(
+            id: id,
+            name: trimmed,
+            color: Value(kTagPalette[count % kTagPalette.length]),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+  }
+
+  /// All tags with their entry counts, most-used first.
+  Future<List<TagSummary>> listTags() async {
+    final rows = await database
+        .customSelect(
+          'SELECT ut.id AS id, ut.name AS name, ut.color AS color, '
+          'COUNT(et.entry_id) AS entry_count '
+          'FROM user_tags ut '
+          'LEFT JOIN entry_tags et ON et.tag_id = ut.id '
+          'GROUP BY ut.id '
+          'ORDER BY entry_count DESC, ut.name COLLATE NOCASE',
+        )
+        .get();
+    return rows
+        .map(
+          (row) => TagSummary(
+            id: row.read<String>('id'),
+            name: row.read<String>('name'),
+            color: row.read<String>('color'),
+            entryCount: row.read<int>('entry_count'),
+          ),
+        )
+        .toList();
+  }
+
+  Future<void> renameTag(String id, String name) {
+    return (database.update(database.userTags)
+          ..where((row) => row.id.equals(id)))
+        .write(
+          UserTagsCompanion(
+            name: Value(name.trim()),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ),
+        );
+  }
+
+  Future<void> updateTagColor(String id, String color) {
+    return (database.update(database.userTags)
+          ..where((row) => row.id.equals(id)))
+        .write(
+          UserTagsCompanion(
+            color: Value(color),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ),
+        );
+  }
+
+  /// Deletes a tag. Entry associations cascade away; entries themselves
+  /// are untouched.
+  Future<void> deleteTag(String id) {
+    return (database.delete(database.userTags)
+          ..where((row) => row.id.equals(id)))
+        .go();
+  }
+
+  /// Tag ids currently assigned to [entryId].
+  Future<Set<String>> entryTagIds(String entryId) async {
+    final rows =
+        await (database.select(database.entryTags)
+              ..where((row) => row.entryId.equals(entryId)))
+            .get();
+    return rows.map((row) => row.tagId).toSet();
+  }
+
+  /// Assigns or unassigns a tag on an entry. [isManual] distinguishes
+  /// user-added tags from rule-generated (auto) ones.
+  Future<void> setEntryTag({
+    required String entryId,
+    required String tagId,
+    required bool assigned,
+    bool isManual = true,
+  }) async {
+    if (assigned) {
       await database
           .into(database.entryTags)
           .insert(
             EntryTagsCompanion.insert(
               entryId: entryId,
               tagId: tagId,
-              isManual: const Value(true),
-              createdAt: now,
+              isManual: Value(isManual),
+              createdAt: DateTime.now().toUtc(),
             ),
             mode: InsertMode.insertOrIgnore,
           );
-    });
+    } else {
+      await (database.delete(database.entryTags)
+            ..where(
+              (row) => row.entryId.equals(entryId) & row.tagId.equals(tagId),
+            ))
+          .go();
+    }
+  }
+
+  /// Tag ids assigned to an entry, mapped to whether they were added
+  /// manually. Used by the picker to style auto tags differently.
+  Future<Map<String, bool>> entryTagDetails(String entryId) async {
+    final rows =
+        await (database.select(database.entryTags)
+              ..where((row) => row.entryId.equals(entryId)))
+            .get();
+    return {
+      for (final row in rows) row.tagId: row.isManual,
+    };
+  }
+
+  /// Runs rule-based auto-tagging over entries that have no auto tags
+  /// yet (typically articles fetched before this feature existed).
+  /// Returns the number of entries that received at least one tag.
+  /// Yields periodically so the UI stays responsive on large libraries.
+  Future<int> backfillAutoTags({
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final rows = await database
+        .customSelect(
+          'SELECT e.id AS id, e.title AS title, e.summary AS summary, '
+          'e.doi AS doi, e.pmid AS pmid '
+          'FROM entries e '
+          'LEFT JOIN entry_tags et ON et.entry_id = e.id AND et.is_manual = 0 '
+          'WHERE et.entry_id IS NULL',
+          readsFrom: {database.entries, database.entryTags},
+        )
+        .get();
+    var tagged = 0;
+    final autoTagIds = <String, String>{};
+    final now = DateTime.now().toUtc();
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows[i];
+      final names = matchAutoTags(
+        title: row.read<String?>('title') ?? '',
+        summary: row.read<String?>('summary'),
+        doi: row.read<String?>('doi'),
+        pmid: row.read<String?>('pmid'),
+      );
+      if (names.isNotEmpty) {
+        for (final name in names) {
+          final tagId = autoTagIds[name] ??= (await ensureTag(name)).id;
+          await database
+              .into(database.entryTags)
+              .insert(
+                EntryTagsCompanion.insert(
+                  entryId: row.read<String>('id'),
+                  tagId: tagId,
+                  isManual: const Value(false),
+                  createdAt: now,
+                ),
+                mode: InsertMode.insertOrIgnore,
+              );
+        }
+        tagged++;
+      }
+      if (i % 500 == 499) {
+        onProgress?.call(i + 1, rows.length);
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    onProgress?.call(rows.length, rows.length);
+    return tagged;
+  }
+
+  /// Entries carrying a tag, newest first, with translated titles joined in.
+  Future<List<domain_entry.Entry>> entriesByTag(
+    String tagId, {
+    int limit = 200,
+  }) async {
+    final rows = await database
+        .customSelect(
+          'SELECT entries.*, t.title AS translated_title '
+          'FROM entries '
+          'JOIN entry_tags et ON et.entry_id = entries.id AND et.tag_id = ? '
+          'LEFT JOIN translations t '
+          "ON t.entry_id = entries.id AND t.language = 'zh' "
+          'ORDER BY COALESCE(entries.published_at, entries.inserted_at) DESC '
+          'LIMIT ?',
+          variables: [Variable<String>(tagId), Variable<int>(limit)],
+        )
+        .get();
+    return rows.map(_entryFromQueryRow).toList();
   }
 
   /// Entries the user opened recently but hasn't finished reading.
@@ -763,6 +1050,143 @@ final class LocalContentRepository {
     await (database.delete(
       database.feeds,
     )..where((feed) => feed.id.equals(feedId))).go();
+  }
+
+  // ----------------------------------------------------------------------
+  // Filter rules
+  // ----------------------------------------------------------------------
+
+  /// All filter rules, newest first.
+  Future<List<FilterRuleRow>> listFilterRules() {
+    return (database.select(database.filterRules)
+          ..orderBy([(r) => OrderingTerm.desc(r.createdAt)]))
+        .get();
+  }
+
+  /// Inserts or updates a rule (id-keyed upsert).
+  Future<void> saveFilterRule(FilterRulesCompanion entry) async {
+    await database
+        .into(database.filterRules)
+        .insertOnConflictUpdate(entry);
+  }
+
+  Future<void> deleteFilterRule(String id) {
+    return (database.delete(database.filterRules)
+          ..where((r) => r.id.equals(id)))
+        .go();
+  }
+
+  Future<void> setFilterRuleEnabled(String id, bool enabled) {
+    return (database.update(database.filterRules)
+          ..where((r) => r.id.equals(id)))
+        .write(
+          FilterRulesCompanion(
+            enabled: Value(enabled),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ),
+        );
+  }
+
+  List<CompiledFilterRule> _compileRules(List<FilterRuleRow> rows) {
+    return [
+      for (final row in rows)
+        CompiledFilterRule.fromValues(
+          id: row.id,
+          pattern: row.pattern,
+          isRegex: row.isRegex,
+          matchField: row.matchField,
+          action: row.action,
+          feedId: row.feedId,
+          enabled: row.enabled,
+        ),
+    ];
+  }
+
+  /// Applies enabled rules over every stored entry: matches are hidden
+  /// (deleted), marked read or starred. Returns the number of entries
+  /// affected. Used right after a rule is created or edited.
+  Future<int> applyFilterRulesToExisting({
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final rows = await listFilterRules();
+    final rules = _compileRules(
+      rows.where((row) => row.enabled).toList(),
+    );
+    if (rules.isEmpty) return 0;
+
+    final entries = await database
+        .customSelect('SELECT id, feed_id, title, summary FROM entries')
+        .get();
+    final now = DateTime.now().toUtc();
+    final hitCounts = <String, int>{};
+    final hideIds = <String>[];
+    final readIds = <String>[];
+    final starIds = <String>[];
+
+    for (var i = 0; i < entries.length; i++) {
+      final row = entries[i];
+      final verdict = evaluateFilterRules(
+        rules,
+        title: row.read<String?>('title') ?? '',
+        summary: row.read<String?>('summary'),
+        feedId: row.read<String>('feed_id'),
+      );
+      if (!verdict.hasAction) continue;
+      for (final ruleId in verdict.matchedRuleIds) {
+        hitCounts[ruleId] = (hitCounts[ruleId] ?? 0) + 1;
+      }
+      final id = row.read<String>('id');
+      if (verdict.hide) {
+        hideIds.add(id);
+      } else {
+        if (verdict.markRead) readIds.add(id);
+        if (verdict.star) starIds.add(id);
+      }
+      if (i % 1000 == 999) {
+        onProgress?.call(i + 1, entries.length);
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    Future<void> chunked(
+      List<String> ids,
+      Future<void> Function(List<String>) action,
+    ) async {
+      for (var i = 0; i < ids.length; i += 500) {
+        await action(ids.sublist(i, math.min(i + 500, ids.length)));
+      }
+    }
+
+    await chunked(hideIds, (ids) async {
+      await (database.delete(database.entries)
+            ..where((row) => row.id.isIn(ids)))
+          .go();
+    });
+    await chunked(readIds, (ids) async {
+      await (database.update(database.entries)
+            ..where((row) => row.id.isIn(ids)))
+          .write(EntriesCompanion(readAt: Value(now)));
+    });
+    await chunked(starIds, (ids) async {
+      await (database.update(database.entries)
+            ..where((row) => row.id.isIn(ids)))
+          .write(const EntriesCompanion(starred: Value(true)));
+    });
+    for (final entry in hitCounts.entries) {
+      await (database.update(database.filterRules)
+            ..where((r) => r.id.equals(entry.key)))
+          .write(
+            FilterRulesCompanion(
+              hitCount: Value(
+                (rows.firstWhere((r) => r.id == entry.key).hitCount) +
+                    entry.value,
+              ),
+              updatedAt: Value(now),
+            ),
+          );
+    }
+    onProgress?.call(entries.length, entries.length);
+    return hideIds.length + readIds.length + starIds.length;
   }
 }
 

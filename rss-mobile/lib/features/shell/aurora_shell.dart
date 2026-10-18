@@ -36,6 +36,10 @@ import '../settings/opml_actions_sheet.dart';
 import '../settings/proxy_settings_dialog.dart';
 import '../sources/add_feed_sheet.dart';
 import '../sources/group_picker.dart';
+import '../tags/tag_list_page.dart';
+import '../tags/tag_picker_sheet.dart' show tagDotColor;
+import '../tags/tag_management_page.dart';
+import '../settings/filter_rules_page.dart';
 
 final class AuroraShell extends StatefulWidget {
   const AuroraShell({required this.controller, super.key});
@@ -557,6 +561,7 @@ final class _SavedPage extends StatelessWidget {
           RefreshStatusBanner(controller: controller),
           if (controller.continueReading.isNotEmpty)
             _ContinueReadingSection(controller: controller),
+          if (controller.tags.isNotEmpty) _TagSection(controller: controller),
           Expanded(
             child: controller.starredEntries.isEmpty
                 ? _EmptyState(
@@ -1242,6 +1247,34 @@ class _SettingsPageState extends State<_SettingsPage> {
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => showOpmlActionsSheet(context, controller),
                     ),
+                    ListTile(
+                      leading: const Icon(Icons.label_outline),
+                      title: Text(AppLocalizations.of(context)!.tagManage),
+                      subtitle: Text(
+                        AppLocalizations.of(context)!.tagManageHint,
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              TagManagementPage(controller: controller),
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.filter_alt_outlined),
+                      title: Text(AppLocalizations.of(context)!.filterRules),
+                      subtitle: Text(
+                        AppLocalizations.of(context)!.filterRulesHint,
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              FilterRulesPage(controller: controller),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 _SettingsSection(
@@ -1647,6 +1680,78 @@ final class _ContinueReadingCard extends StatelessWidget {
 }
 
 /// Expandable section in the saved page listing all unfinished articles.
+final class _TagSection extends StatelessWidget {
+  const _TagSection({required this.controller});
+
+  final MobileReaderController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
+            child: Row(
+              children: [
+                Icon(Icons.label_outline, size: 16, color: scheme.tertiary),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.tags,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: scheme.tertiary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: controller.tags.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final tag = controller.tags[index];
+                return ActionChip(
+                  visualDensity: VisualDensity.compact,
+                  avatar: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: tagDotColor(tag.color),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  label: Text(
+                    '${tag.name} ${tag.entryCount}',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => TagListPage(
+                        controller: controller,
+                        tagId: tag.id,
+                        tagName: tag.name,
+                        tagColor: tag.color,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 final class _ContinueReadingSection extends StatelessWidget {
   const _ContinueReadingSection({required this.controller});
   final MobileReaderController controller;

@@ -2059,6 +2059,282 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'继续阅读'**
   String get continueReading;
+
+  /// No description provided for @tags.
+  ///
+  /// In zh, this message translates to:
+  /// **'标签'**
+  String get tags;
+
+  /// No description provided for @tagPickerTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加标签'**
+  String get tagPickerTitle;
+
+  /// No description provided for @tagFilterHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'筛选标签'**
+  String get tagFilterHint;
+
+  /// No description provided for @tagNewNameHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'输入新标签名'**
+  String get tagNewNameHint;
+
+  /// No description provided for @tagCreate.
+  ///
+  /// In zh, this message translates to:
+  /// **'创建并添加'**
+  String get tagCreate;
+
+  /// No description provided for @tagPickerEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有标签，输入名称创建第一个'**
+  String get tagPickerEmpty;
+
+  /// No description provided for @tagCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 篇'**
+  String tagCount(int count);
+
+  /// No description provided for @tagEntriesEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'该标签下暂无文章'**
+  String get tagEntriesEmpty;
+
+  /// No description provided for @tagManage.
+  ///
+  /// In zh, this message translates to:
+  /// **'标签管理'**
+  String get tagManage;
+
+  /// No description provided for @tagManageHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'重命名、改色或删除标签'**
+  String get tagManageHint;
+
+  /// No description provided for @tagRename.
+  ///
+  /// In zh, this message translates to:
+  /// **'重命名标签'**
+  String get tagRename;
+
+  /// No description provided for @tagColor.
+  ///
+  /// In zh, this message translates to:
+  /// **'颜色'**
+  String get tagColor;
+
+  /// No description provided for @tagDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除标签'**
+  String get tagDelete;
+
+  /// No description provided for @tagDeleteConfirmBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'标签会从所有文章上移除，文章本身不受影响。'**
+  String get tagDeleteConfirmBody;
+
+  /// No description provided for @tagManageEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有标签。阅读文章时点 # 按钮即可添加。'**
+  String get tagManageEmpty;
+
+  /// No description provided for @tagAutoBackfill.
+  ///
+  /// In zh, this message translates to:
+  /// **'为历史文章自动打标签'**
+  String get tagAutoBackfill;
+
+  /// No description provided for @tagAutoBackfillBusy.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新中无法补打标签，请稍后再试'**
+  String get tagAutoBackfillBusy;
+
+  /// No description provided for @tagAutoBackfillRunning.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在为历史文章补打标签…'**
+  String get tagAutoBackfillRunning;
+
+  /// No description provided for @tagAutoBackfillDone.
+  ///
+  /// In zh, this message translates to:
+  /// **'已为 {count} 篇文章打上标签'**
+  String tagAutoBackfillDone(int count);
+
+  /// No description provided for @filterRules.
+  ///
+  /// In zh, this message translates to:
+  /// **'过滤规则'**
+  String get filterRules;
+
+  /// No description provided for @filterRulesHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动屏蔽、标已读或收藏匹配的文章'**
+  String get filterRulesHint;
+
+  /// No description provided for @filterRulesEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有规则。新建一条，用关键词或正则自动处理订阅。'**
+  String get filterRulesEmpty;
+
+  /// No description provided for @filterRuleNew.
+  ///
+  /// In zh, this message translates to:
+  /// **'新建规则'**
+  String get filterRuleNew;
+
+  /// No description provided for @filterRuleEdit.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑规则'**
+  String get filterRuleEdit;
+
+  /// No description provided for @filterRulePattern.
+  ///
+  /// In zh, this message translates to:
+  /// **'匹配内容'**
+  String get filterRulePattern;
+
+  /// No description provided for @filterRulePatternHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'多个关键词用 | 分隔'**
+  String get filterRulePatternHint;
+
+  /// No description provided for @filterRuleIsRegex.
+  ///
+  /// In zh, this message translates to:
+  /// **'作为正则表达式'**
+  String get filterRuleIsRegex;
+
+  /// No description provided for @filterRuleFieldLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'匹配范围'**
+  String get filterRuleFieldLabel;
+
+  /// No description provided for @filterRuleFieldTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'标题'**
+  String get filterRuleFieldTitle;
+
+  /// No description provided for @filterRuleFieldTitleSummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'标题和摘要'**
+  String get filterRuleFieldTitleSummary;
+
+  /// No description provided for @filterRuleActionLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'执行动作'**
+  String get filterRuleActionLabel;
+
+  /// No description provided for @filterActionHide.
+  ///
+  /// In zh, this message translates to:
+  /// **'屏蔽'**
+  String get filterActionHide;
+
+  /// No description provided for @filterActionHideDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'匹配文章不进入收件箱'**
+  String get filterActionHideDesc;
+
+  /// No description provided for @filterActionMarkRead.
+  ///
+  /// In zh, this message translates to:
+  /// **'标为已读'**
+  String get filterActionMarkRead;
+
+  /// No description provided for @filterActionMarkReadDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'进入收件箱但不算未读'**
+  String get filterActionMarkReadDesc;
+
+  /// No description provided for @filterActionStar.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动收藏'**
+  String get filterActionStar;
+
+  /// No description provided for @filterActionStarDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'匹配文章直接进收藏夹'**
+  String get filterActionStarDesc;
+
+  /// No description provided for @filterRuleScopeLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'作用范围'**
+  String get filterRuleScopeLabel;
+
+  /// No description provided for @filterRuleScopeAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部订阅源'**
+  String get filterRuleScopeAll;
+
+  /// No description provided for @filterRuleScopeFeed.
+  ///
+  /// In zh, this message translates to:
+  /// **'指定订阅源'**
+  String get filterRuleScopeFeed;
+
+  /// No description provided for @filterRulePickFeed.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择订阅源'**
+  String get filterRulePickFeed;
+
+  /// No description provided for @filterRuleDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除规则'**
+  String get filterRuleDelete;
+
+  /// No description provided for @filterRuleDeleteBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除后新文章不再按此规则处理，已处理的文章不变。'**
+  String get filterRuleDeleteBody;
+
+  /// No description provided for @filterRuleApplied.
+  ///
+  /// In zh, this message translates to:
+  /// **'已应用：处理 {count} 篇现有文章'**
+  String filterRuleApplied(int count);
+
+  /// No description provided for @filterRuleAppliedZero.
+  ///
+  /// In zh, this message translates to:
+  /// **'规则已保存，现有文章无匹配'**
+  String get filterRuleAppliedZero;
+
+  /// No description provided for @filterRuleHits.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 次命中'**
+  String filterRuleHits(int count);
 }
 
 class _AppLocalizationsDelegate

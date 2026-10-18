@@ -1115,4 +1115,159 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get continueReading => 'Continue reading';
+
+  @override
+  String get tags => 'Tags';
+
+  @override
+  String get tagPickerTitle => 'Add tags';
+
+  @override
+  String get tagFilterHint => 'Filter tags';
+
+  @override
+  String get tagNewNameHint => 'Enter a new tag name';
+
+  @override
+  String get tagCreate => 'Create & add';
+
+  @override
+  String get tagPickerEmpty =>
+      'No tags yet — type a name to create the first one';
+
+  @override
+  String tagCount(int count) {
+    return '$count articles';
+  }
+
+  @override
+  String get tagEntriesEmpty => 'No articles with this tag yet';
+
+  @override
+  String get tagManage => 'Manage tags';
+
+  @override
+  String get tagManageHint => 'Rename, recolor or delete tags';
+
+  @override
+  String get tagRename => 'Rename tag';
+
+  @override
+  String get tagColor => 'Color';
+
+  @override
+  String get tagDelete => 'Delete tag';
+
+  @override
+  String get tagDeleteConfirmBody =>
+      'The tag will be removed from all articles. The articles themselves are not affected.';
+
+  @override
+  String get tagManageEmpty =>
+      'No tags yet. Tap the # button while reading to add one.';
+
+  @override
+  String get tagAutoBackfill => 'Auto-tag existing articles';
+
+  @override
+  String get tagAutoBackfillBusy =>
+      'Cannot backfill while refreshing; try again later';
+
+  @override
+  String get tagAutoBackfillRunning => 'Tagging existing articles…';
+
+  @override
+  String tagAutoBackfillDone(int count) {
+    return 'Tagged $count articles';
+  }
+
+  @override
+  String get filterRules => 'Filter rules';
+
+  @override
+  String get filterRulesHint =>
+      'Automatically hide, mark read or star matching articles';
+
+  @override
+  String get filterRulesEmpty =>
+      'No rules yet. Create one to auto-process subscriptions with keywords or regexes.';
+
+  @override
+  String get filterRuleNew => 'New rule';
+
+  @override
+  String get filterRuleEdit => 'Edit rule';
+
+  @override
+  String get filterRulePattern => 'Match pattern';
+
+  @override
+  String get filterRulePatternHint => 'Separate keywords with |';
+
+  @override
+  String get filterRuleIsRegex => 'Treat as regular expression';
+
+  @override
+  String get filterRuleFieldLabel => 'Match in';
+
+  @override
+  String get filterRuleFieldTitle => 'Title';
+
+  @override
+  String get filterRuleFieldTitleSummary => 'Title & summary';
+
+  @override
+  String get filterRuleActionLabel => 'Action';
+
+  @override
+  String get filterActionHide => 'Hide';
+
+  @override
+  String get filterActionHideDesc => 'Matching articles never reach the inbox';
+
+  @override
+  String get filterActionMarkRead => 'Mark read';
+
+  @override
+  String get filterActionMarkReadDesc =>
+      'Enters the inbox without counting as unread';
+
+  @override
+  String get filterActionStar => 'Auto-star';
+
+  @override
+  String get filterActionStarDesc => 'Matching articles go straight to saved';
+
+  @override
+  String get filterRuleScopeLabel => 'Applies to';
+
+  @override
+  String get filterRuleScopeAll => 'All feeds';
+
+  @override
+  String get filterRuleScopeFeed => 'Selected feed';
+
+  @override
+  String get filterRulePickFeed => 'Pick a feed';
+
+  @override
+  String get filterRuleDelete => 'Delete rule';
+
+  @override
+  String get filterRuleDeleteBody =>
+      'New articles will no longer follow this rule. Already processed articles stay as they are.';
+
+  @override
+  String filterRuleApplied(int count) {
+    return 'Applied: $count existing articles processed';
+  }
+
+  @override
+  String get filterRuleAppliedZero =>
+      'Rule saved; no existing articles matched';
+
+  @override
+  String filterRuleHits(int count) {
+    return '$count hits';
+  }
 }

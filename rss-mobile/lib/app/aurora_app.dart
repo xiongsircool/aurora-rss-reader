@@ -10,6 +10,7 @@ import '../l10n/generated/app_localizations.dart';
 
 import '../domain/entities/entry.dart';
 import '../features/audio/podcast_overlay.dart';
+import '../features/audio/tts_overlay.dart';
 import '../features/reader/article_reader_page.dart';
 import '../features/reader/mobile_reader_controller.dart';
 import '../features/shell/aurora_shell.dart';
@@ -162,7 +163,12 @@ class _AuroraAppState extends State<AuroraApp> with WidgetsBindingObserver {
         controller: widget.controller.podcast,
         observer: _podcastRoutes,
         navigatorKey: _navigatorKey,
-        child: child!,
+        child: TtsOverlayHost(
+          controller: widget.controller.tts,
+          observer: _podcastRoutes,
+          navigatorKey: _navigatorKey,
+          child: child!,
+        ),
       ),
       title: 'Aurora RSS Reader',
       debugShowCheckedModeBanner: false,

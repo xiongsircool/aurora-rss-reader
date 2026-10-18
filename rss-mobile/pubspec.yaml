@@ -63,6 +63,7 @@ dependencies:
 
   intl: any
   home_widget: ^0.10.0
+  flutter_tts: ^4.2.5
 dev_dependencies:
   flutter_test:
     sdk: flutter

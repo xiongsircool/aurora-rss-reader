@@ -5302,6 +5302,620 @@ class CollectionEntriesCompanion extends UpdateCompanion<CollectionEntryRow> {
   }
 }
 
+class $FilterRulesTable extends FilterRules
+    with TableInfo<$FilterRulesTable, FilterRuleRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FilterRulesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _patternMeta = const VerificationMeta(
+    'pattern',
+  );
+  @override
+  late final GeneratedColumn<String> pattern = GeneratedColumn<String>(
+    'pattern',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isRegexMeta = const VerificationMeta(
+    'isRegex',
+  );
+  @override
+  late final GeneratedColumn<bool> isRegex = GeneratedColumn<bool>(
+    'is_regex',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_regex" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _matchFieldMeta = const VerificationMeta(
+    'matchField',
+  );
+  @override
+  late final GeneratedColumn<String> matchField = GeneratedColumn<String>(
+    'match_field',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('title'),
+  );
+  static const VerificationMeta _actionMeta = const VerificationMeta('action');
+  @override
+  late final GeneratedColumn<String> action = GeneratedColumn<String>(
+    'action',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('hide'),
+  );
+  static const VerificationMeta _feedIdMeta = const VerificationMeta('feedId');
+  @override
+  late final GeneratedColumn<String> feedId = GeneratedColumn<String>(
+    'feed_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES feeds (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _enabledMeta = const VerificationMeta(
+    'enabled',
+  );
+  @override
+  late final GeneratedColumn<bool> enabled = GeneratedColumn<bool>(
+    'enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _hitCountMeta = const VerificationMeta(
+    'hitCount',
+  );
+  @override
+  late final GeneratedColumn<int> hitCount = GeneratedColumn<int>(
+    'hit_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    pattern,
+    isRegex,
+    matchField,
+    action,
+    feedId,
+    enabled,
+    hitCount,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'filter_rules';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FilterRuleRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('pattern')) {
+      context.handle(
+        _patternMeta,
+        pattern.isAcceptableOrUnknown(data['pattern']!, _patternMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_patternMeta);
+    }
+    if (data.containsKey('is_regex')) {
+      context.handle(
+        _isRegexMeta,
+        isRegex.isAcceptableOrUnknown(data['is_regex']!, _isRegexMeta),
+      );
+    }
+    if (data.containsKey('match_field')) {
+      context.handle(
+        _matchFieldMeta,
+        matchField.isAcceptableOrUnknown(data['match_field']!, _matchFieldMeta),
+      );
+    }
+    if (data.containsKey('action')) {
+      context.handle(
+        _actionMeta,
+        action.isAcceptableOrUnknown(data['action']!, _actionMeta),
+      );
+    }
+    if (data.containsKey('feed_id')) {
+      context.handle(
+        _feedIdMeta,
+        feedId.isAcceptableOrUnknown(data['feed_id']!, _feedIdMeta),
+      );
+    }
+    if (data.containsKey('enabled')) {
+      context.handle(
+        _enabledMeta,
+        enabled.isAcceptableOrUnknown(data['enabled']!, _enabledMeta),
+      );
+    }
+    if (data.containsKey('hit_count')) {
+      context.handle(
+        _hitCountMeta,
+        hitCount.isAcceptableOrUnknown(data['hit_count']!, _hitCountMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FilterRuleRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FilterRuleRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      pattern: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pattern'],
+      )!,
+      isRegex: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_regex'],
+      )!,
+      matchField: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}match_field'],
+      )!,
+      action: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}action'],
+      )!,
+      feedId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}feed_id'],
+      ),
+      enabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}enabled'],
+      )!,
+      hitCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hit_count'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $FilterRulesTable createAlias(String alias) {
+    return $FilterRulesTable(attachedDatabase, alias);
+  }
+}
+
+class FilterRuleRow extends DataClass implements Insertable<FilterRuleRow> {
+  final String id;
+
+  /// Keyword list separated by `|`, or a regex when [isRegex] is set.
+  final String pattern;
+  final bool isRegex;
+
+  /// 'title' or 'titleAndSummary'.
+  final String matchField;
+
+  /// 'hide', 'markRead' or 'star'.
+  final String action;
+
+  /// Null means the rule applies to every feed.
+  final String? feedId;
+  final bool enabled;
+  final int hitCount;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const FilterRuleRow({
+    required this.id,
+    required this.pattern,
+    required this.isRegex,
+    required this.matchField,
+    required this.action,
+    this.feedId,
+    required this.enabled,
+    required this.hitCount,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['pattern'] = Variable<String>(pattern);
+    map['is_regex'] = Variable<bool>(isRegex);
+    map['match_field'] = Variable<String>(matchField);
+    map['action'] = Variable<String>(action);
+    if (!nullToAbsent || feedId != null) {
+      map['feed_id'] = Variable<String>(feedId);
+    }
+    map['enabled'] = Variable<bool>(enabled);
+    map['hit_count'] = Variable<int>(hitCount);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  FilterRulesCompanion toCompanion(bool nullToAbsent) {
+    return FilterRulesCompanion(
+      id: Value(id),
+      pattern: Value(pattern),
+      isRegex: Value(isRegex),
+      matchField: Value(matchField),
+      action: Value(action),
+      feedId: feedId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(feedId),
+      enabled: Value(enabled),
+      hitCount: Value(hitCount),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory FilterRuleRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FilterRuleRow(
+      id: serializer.fromJson<String>(json['id']),
+      pattern: serializer.fromJson<String>(json['pattern']),
+      isRegex: serializer.fromJson<bool>(json['isRegex']),
+      matchField: serializer.fromJson<String>(json['matchField']),
+      action: serializer.fromJson<String>(json['action']),
+      feedId: serializer.fromJson<String?>(json['feedId']),
+      enabled: serializer.fromJson<bool>(json['enabled']),
+      hitCount: serializer.fromJson<int>(json['hitCount']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'pattern': serializer.toJson<String>(pattern),
+      'isRegex': serializer.toJson<bool>(isRegex),
+      'matchField': serializer.toJson<String>(matchField),
+      'action': serializer.toJson<String>(action),
+      'feedId': serializer.toJson<String?>(feedId),
+      'enabled': serializer.toJson<bool>(enabled),
+      'hitCount': serializer.toJson<int>(hitCount),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  FilterRuleRow copyWith({
+    String? id,
+    String? pattern,
+    bool? isRegex,
+    String? matchField,
+    String? action,
+    Value<String?> feedId = const Value.absent(),
+    bool? enabled,
+    int? hitCount,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => FilterRuleRow(
+    id: id ?? this.id,
+    pattern: pattern ?? this.pattern,
+    isRegex: isRegex ?? this.isRegex,
+    matchField: matchField ?? this.matchField,
+    action: action ?? this.action,
+    feedId: feedId.present ? feedId.value : this.feedId,
+    enabled: enabled ?? this.enabled,
+    hitCount: hitCount ?? this.hitCount,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  FilterRuleRow copyWithCompanion(FilterRulesCompanion data) {
+    return FilterRuleRow(
+      id: data.id.present ? data.id.value : this.id,
+      pattern: data.pattern.present ? data.pattern.value : this.pattern,
+      isRegex: data.isRegex.present ? data.isRegex.value : this.isRegex,
+      matchField: data.matchField.present
+          ? data.matchField.value
+          : this.matchField,
+      action: data.action.present ? data.action.value : this.action,
+      feedId: data.feedId.present ? data.feedId.value : this.feedId,
+      enabled: data.enabled.present ? data.enabled.value : this.enabled,
+      hitCount: data.hitCount.present ? data.hitCount.value : this.hitCount,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FilterRuleRow(')
+          ..write('id: $id, ')
+          ..write('pattern: $pattern, ')
+          ..write('isRegex: $isRegex, ')
+          ..write('matchField: $matchField, ')
+          ..write('action: $action, ')
+          ..write('feedId: $feedId, ')
+          ..write('enabled: $enabled, ')
+          ..write('hitCount: $hitCount, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    pattern,
+    isRegex,
+    matchField,
+    action,
+    feedId,
+    enabled,
+    hitCount,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FilterRuleRow &&
+          other.id == this.id &&
+          other.pattern == this.pattern &&
+          other.isRegex == this.isRegex &&
+          other.matchField == this.matchField &&
+          other.action == this.action &&
+          other.feedId == this.feedId &&
+          other.enabled == this.enabled &&
+          other.hitCount == this.hitCount &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class FilterRulesCompanion extends UpdateCompanion<FilterRuleRow> {
+  final Value<String> id;
+  final Value<String> pattern;
+  final Value<bool> isRegex;
+  final Value<String> matchField;
+  final Value<String> action;
+  final Value<String?> feedId;
+  final Value<bool> enabled;
+  final Value<int> hitCount;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const FilterRulesCompanion({
+    this.id = const Value.absent(),
+    this.pattern = const Value.absent(),
+    this.isRegex = const Value.absent(),
+    this.matchField = const Value.absent(),
+    this.action = const Value.absent(),
+    this.feedId = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.hitCount = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FilterRulesCompanion.insert({
+    required String id,
+    required String pattern,
+    this.isRegex = const Value.absent(),
+    this.matchField = const Value.absent(),
+    this.action = const Value.absent(),
+    this.feedId = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.hitCount = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       pattern = Value(pattern),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<FilterRuleRow> custom({
+    Expression<String>? id,
+    Expression<String>? pattern,
+    Expression<bool>? isRegex,
+    Expression<String>? matchField,
+    Expression<String>? action,
+    Expression<String>? feedId,
+    Expression<bool>? enabled,
+    Expression<int>? hitCount,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (pattern != null) 'pattern': pattern,
+      if (isRegex != null) 'is_regex': isRegex,
+      if (matchField != null) 'match_field': matchField,
+      if (action != null) 'action': action,
+      if (feedId != null) 'feed_id': feedId,
+      if (enabled != null) 'enabled': enabled,
+      if (hitCount != null) 'hit_count': hitCount,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FilterRulesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? pattern,
+    Value<bool>? isRegex,
+    Value<String>? matchField,
+    Value<String>? action,
+    Value<String?>? feedId,
+    Value<bool>? enabled,
+    Value<int>? hitCount,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return FilterRulesCompanion(
+      id: id ?? this.id,
+      pattern: pattern ?? this.pattern,
+      isRegex: isRegex ?? this.isRegex,
+      matchField: matchField ?? this.matchField,
+      action: action ?? this.action,
+      feedId: feedId ?? this.feedId,
+      enabled: enabled ?? this.enabled,
+      hitCount: hitCount ?? this.hitCount,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (pattern.present) {
+      map['pattern'] = Variable<String>(pattern.value);
+    }
+    if (isRegex.present) {
+      map['is_regex'] = Variable<bool>(isRegex.value);
+    }
+    if (matchField.present) {
+      map['match_field'] = Variable<String>(matchField.value);
+    }
+    if (action.present) {
+      map['action'] = Variable<String>(action.value);
+    }
+    if (feedId.present) {
+      map['feed_id'] = Variable<String>(feedId.value);
+    }
+    if (enabled.present) {
+      map['enabled'] = Variable<bool>(enabled.value);
+    }
+    if (hitCount.present) {
+      map['hit_count'] = Variable<int>(hitCount.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FilterRulesCompanion(')
+          ..write('id: $id, ')
+          ..write('pattern: $pattern, ')
+          ..write('isRegex: $isRegex, ')
+          ..write('matchField: $matchField, ')
+          ..write('action: $action, ')
+          ..write('feedId: $feedId, ')
+          ..write('enabled: $enabled, ')
+          ..write('hitCount: $hitCount, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   $LocalDatabaseManager get managers => $LocalDatabaseManager(this);
@@ -5315,6 +5929,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $CollectionsTable collections = $CollectionsTable(this);
   late final $CollectionEntriesTable collectionEntries =
       $CollectionEntriesTable(this);
+  late final $FilterRulesTable filterRules = $FilterRulesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5329,6 +5944,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     entryTags,
     collections,
     collectionEntries,
+    filterRules,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -5380,6 +5996,13 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('collection_entries', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'feeds',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('filter_rules', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -5441,6 +6064,24 @@ final class $$FeedsTableReferences
     ).filter((f) => f.feedId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_entriesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$FilterRulesTable, List<FilterRuleRow>>
+  _filterRulesRefsTable(_$LocalDatabase db) => MultiTypedResultKey.fromTable(
+    db.filterRules,
+    aliasName: 'feeds__id__filter_rules__feed_id',
+  );
+
+  $$FilterRulesTableProcessedTableManager get filterRulesRefs {
+    final manager = $$FilterRulesTableTableManager(
+      $_db,
+      $_db.filterRules,
+    ).filter((f) => f.feedId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_filterRulesRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -5552,6 +6193,31 @@ class $$FeedsTableFilterComposer
           }) => $$EntriesTableFilterComposer(
             $db: $db,
             $table: $db.entries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> filterRulesRefs(
+    Expression<bool> Function($$FilterRulesTableFilterComposer f) f,
+  ) {
+    final $$FilterRulesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.filterRules,
+      getReferencedColumn: (t) => t.feedId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FilterRulesTableFilterComposer(
+            $db: $db,
+            $table: $db.filterRules,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -5743,6 +6409,31 @@ class $$FeedsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> filterRulesRefs<T extends Object>(
+    Expression<T> Function($$FilterRulesTableAnnotationComposer a) f,
+  ) {
+    final $$FilterRulesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.filterRules,
+      getReferencedColumn: (t) => t.feedId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FilterRulesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.filterRules,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$FeedsTableTableManager
@@ -5758,7 +6449,7 @@ class $$FeedsTableTableManager
           $$FeedsTableUpdateCompanionBuilder,
           (FeedRow, $$FeedsTableReferences),
           FeedRow,
-          PrefetchHooks Function({bool entriesRefs})
+          PrefetchHooks Function({bool entriesRefs, bool filterRulesRefs})
         > {
   $$FeedsTableTableManager(_$LocalDatabase db, $FeedsTable table)
     : super(
@@ -5855,29 +6546,59 @@ class $$FeedsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({entriesRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (entriesRefs) db.entries],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (entriesRefs)
-                    await $_getPrefetchedData<FeedRow, $FeedsTable, EntryRow>(
-                      currentTable: table,
-                      referencedTable: $$FeedsTableReferences._entriesRefsTable(
-                        db,
-                      ),
-                      managerFromTypedResult: (p0) =>
-                          $$FeedsTableReferences(db, table, p0).entriesRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.feedId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({entriesRefs = false, filterRulesRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (entriesRefs) db.entries,
+                    if (filterRulesRefs) db.filterRules,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (entriesRefs)
+                        await $_getPrefetchedData<
+                          FeedRow,
+                          $FeedsTable,
+                          EntryRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$FeedsTableReferences
+                              ._entriesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$FeedsTableReferences(db, table, p0).entriesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.feedId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (filterRulesRefs)
+                        await $_getPrefetchedData<
+                          FeedRow,
+                          $FeedsTable,
+                          FilterRuleRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$FeedsTableReferences
+                              ._filterRulesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$FeedsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).filterRulesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.feedId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -5894,7 +6615,7 @@ typedef $$FeedsTableProcessedTableManager =
       $$FeedsTableUpdateCompanionBuilder,
       (FeedRow, $$FeedsTableReferences),
       FeedRow,
-      PrefetchHooks Function({bool entriesRefs})
+      PrefetchHooks Function({bool entriesRefs, bool filterRulesRefs})
     >;
 typedef $$EntriesTableCreateCompanionBuilder = EntriesCompanion Function({
   required String id,
@@ -9415,6 +10136,418 @@ typedef $$CollectionEntriesTableProcessedTableManager =
       CollectionEntryRow,
       PrefetchHooks Function({bool collectionId, bool entryId})
     >;
+typedef $$FilterRulesTableCreateCompanionBuilder =
+    FilterRulesCompanion Function({
+      required String id,
+      required String pattern,
+      Value<bool> isRegex,
+      Value<String> matchField,
+      Value<String> action,
+      Value<String?> feedId,
+      Value<bool> enabled,
+      Value<int> hitCount,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$FilterRulesTableUpdateCompanionBuilder =
+    FilterRulesCompanion Function({
+      Value<String> id,
+      Value<String> pattern,
+      Value<bool> isRegex,
+      Value<String> matchField,
+      Value<String> action,
+      Value<String?> feedId,
+      Value<bool> enabled,
+      Value<int> hitCount,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$FilterRulesTableReferences
+    extends BaseReferences<_$LocalDatabase, $FilterRulesTable, FilterRuleRow> {
+  $$FilterRulesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $FeedsTable _feedIdTable(_$LocalDatabase db) =>
+      db.feeds.createAlias('filter_rules__feed_id__feeds__id');
+
+  $$FeedsTableProcessedTableManager? get feedId {
+    final $_column = $_itemColumn<String>('feed_id');
+    if ($_column == null) return null;
+    final manager = $$FeedsTableTableManager(
+      $_db,
+      $_db.feeds,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_feedIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$FilterRulesTableFilterComposer
+    extends Composer<_$LocalDatabase, $FilterRulesTable> {
+  $$FilterRulesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pattern => $composableBuilder(
+    column: $table.pattern,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isRegex => $composableBuilder(
+    column: $table.isRegex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get matchField => $composableBuilder(
+    column: $table.matchField,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get action => $composableBuilder(
+    column: $table.action,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hitCount => $composableBuilder(
+    column: $table.hitCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$FeedsTableFilterComposer get feedId {
+    final $$FeedsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.feedId,
+      referencedTable: $db.feeds,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FeedsTableFilterComposer(
+            $db: $db,
+            $table: $db.feeds,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$FilterRulesTableOrderingComposer
+    extends Composer<_$LocalDatabase, $FilterRulesTable> {
+  $$FilterRulesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pattern => $composableBuilder(
+    column: $table.pattern,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isRegex => $composableBuilder(
+    column: $table.isRegex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get matchField => $composableBuilder(
+    column: $table.matchField,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get action => $composableBuilder(
+    column: $table.action,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hitCount => $composableBuilder(
+    column: $table.hitCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$FeedsTableOrderingComposer get feedId {
+    final $$FeedsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.feedId,
+      referencedTable: $db.feeds,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FeedsTableOrderingComposer(
+            $db: $db,
+            $table: $db.feeds,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$FilterRulesTableAnnotationComposer
+    extends Composer<_$LocalDatabase, $FilterRulesTable> {
+  $$FilterRulesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get pattern =>
+      $composableBuilder(column: $table.pattern, builder: (column) => column);
+
+  GeneratedColumn<bool> get isRegex =>
+      $composableBuilder(column: $table.isRegex, builder: (column) => column);
+
+  GeneratedColumn<String> get matchField => $composableBuilder(
+    column: $table.matchField,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get action =>
+      $composableBuilder(column: $table.action, builder: (column) => column);
+
+  GeneratedColumn<bool> get enabled =>
+      $composableBuilder(column: $table.enabled, builder: (column) => column);
+
+  GeneratedColumn<int> get hitCount =>
+      $composableBuilder(column: $table.hitCount, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$FeedsTableAnnotationComposer get feedId {
+    final $$FeedsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.feedId,
+      referencedTable: $db.feeds,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FeedsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.feeds,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$FilterRulesTableTableManager
+    extends
+        RootTableManager<
+          _$LocalDatabase,
+          $FilterRulesTable,
+          FilterRuleRow,
+          $$FilterRulesTableFilterComposer,
+          $$FilterRulesTableOrderingComposer,
+          $$FilterRulesTableAnnotationComposer,
+          $$FilterRulesTableCreateCompanionBuilder,
+          $$FilterRulesTableUpdateCompanionBuilder,
+          (FilterRuleRow, $$FilterRulesTableReferences),
+          FilterRuleRow,
+          PrefetchHooks Function({bool feedId})
+        > {
+  $$FilterRulesTableTableManager(_$LocalDatabase db, $FilterRulesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FilterRulesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FilterRulesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FilterRulesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> pattern = const Value.absent(),
+                Value<bool> isRegex = const Value.absent(),
+                Value<String> matchField = const Value.absent(),
+                Value<String> action = const Value.absent(),
+                Value<String?> feedId = const Value.absent(),
+                Value<bool> enabled = const Value.absent(),
+                Value<int> hitCount = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FilterRulesCompanion(
+                id: id,
+                pattern: pattern,
+                isRegex: isRegex,
+                matchField: matchField,
+                action: action,
+                feedId: feedId,
+                enabled: enabled,
+                hitCount: hitCount,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String pattern,
+                Value<bool> isRegex = const Value.absent(),
+                Value<String> matchField = const Value.absent(),
+                Value<String> action = const Value.absent(),
+                Value<String?> feedId = const Value.absent(),
+                Value<bool> enabled = const Value.absent(),
+                Value<int> hitCount = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => FilterRulesCompanion.insert(
+                id: id,
+                pattern: pattern,
+                isRegex: isRegex,
+                matchField: matchField,
+                action: action,
+                feedId: feedId,
+                enabled: enabled,
+                hitCount: hitCount,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FilterRulesTable, FilterRuleRow>(table),
+                  $$FilterRulesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({feedId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (feedId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.feedId,
+                        referencedTable: $$FilterRulesTableReferences
+                            ._feedIdTable(db),
+                        referencedColumn: $$FilterRulesTableReferences
+                            ._feedIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$FilterRulesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$LocalDatabase,
+      $FilterRulesTable,
+      FilterRuleRow,
+      $$FilterRulesTableFilterComposer,
+      $$FilterRulesTableOrderingComposer,
+      $$FilterRulesTableAnnotationComposer,
+      $$FilterRulesTableCreateCompanionBuilder,
+      $$FilterRulesTableUpdateCompanionBuilder,
+      (FilterRuleRow, $$FilterRulesTableReferences),
+      FilterRuleRow,
+      PrefetchHooks Function({bool feedId})
+    >;
 
 class $LocalDatabaseManager {
   final _$LocalDatabase _db;
@@ -9437,4 +10570,6 @@ class $LocalDatabaseManager {
       $$CollectionsTableTableManager(_db, _db.collections);
   $$CollectionEntriesTableTableManager get collectionEntries =>
       $$CollectionEntriesTableTableManager(_db, _db.collectionEntries);
+  $$FilterRulesTableTableManager get filterRules =>
+      $$FilterRulesTableTableManager(_db, _db.filterRules);
 }

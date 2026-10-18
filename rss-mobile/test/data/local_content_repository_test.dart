@@ -3,6 +3,7 @@ import 'package:aurora_mobile/data/repositories/local_content_repository.dart';
 import 'package:aurora_mobile/domain/entities/feed.dart';
 import 'package:aurora_mobile/domain/feed_parsing/parsed_feed.dart';
 import 'package:aurora_mobile/domain/value_objects/feed_view_type.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -48,7 +49,7 @@ void main() {
     final version = await database
         .customSelect('PRAGMA user_version')
         .getSingle();
-    expect(version.read<int>('user_version'), 6);
+    expect(version.read<int>('user_version'), 7);
   });
 
   test('refreshing a feed preserves its creation timestamp', () async {
@@ -346,6 +347,288 @@ void main() {
     expect(await database.select(database.collectionEntries).get(), isEmpty);
     expect(await database.select(database.userTags).get(), hasLength(1));
     expect(await database.select(database.collections).get(), hasLength(1));
+  });
+
+  group('tags', () {
+    Future<String> seedEntry(String guid) async {
+      await repository.insertParsedEntries('feed-1', [_entry(guid, guid)]);
+      final rows = await (database.select(database.entries)
+            ..where((row) => row.guid.equals(guid)))
+          .get();
+      return rows.single.id;
+    }
+
+    test('ensureTag creates once and reuses by trimmed, case-insensitive name',
+        () async {
+      final first = await repository.ensureTag('AI');
+      final again = await repository.ensureTag(' ai ');
+
+      expect(again.id, first.id);
+      expect(
+        await database.select(database.userTags).get(),
+        hasLength(1),
+      );
+      expect(first.color, kTagPalette.first);
+    });
+
+    test('ensureTag rotates palette colors across new tags', () async {
+      final a = await repository.ensureTag('one');
+      final b = await repository.ensureTag('two');
+
+      expect(a.color, isNot(b.color));
+    });
+
+    test('listTags counts entries and orders most-used first', () async {
+      final entryA = await seedEntry('tagged-a');
+      final entryB = await seedEntry('tagged-b');
+      final entryC = await seedEntry('tagged-c');
+      final popular = await repository.ensureTag('popular');
+      final quiet = await repository.ensureTag('quiet');
+
+      await repository.assignTag(entryId: entryA, tagId: popular.id);
+      await repository.assignTag(entryId: entryB, tagId: popular.id);
+      await repository.assignTag(entryId: entryC, tagId: quiet.id);
+
+      final tags = await repository.listTags();
+      expect(tags.map((tag) => tag.name), ['popular', 'quiet']);
+      expect(tags.first.entryCount, 2);
+      expect(tags.last.entryCount, 1);
+    });
+
+    test('setEntryTag toggles associations idempotently', () async {
+      final entryId = await seedEntry('toggle-me');
+      final tag = await repository.ensureTag('toggle');
+
+      await repository.setEntryTag(
+        entryId: entryId,
+        tagId: tag.id,
+        assigned: true,
+      );
+      await repository.setEntryTag(
+        entryId: entryId,
+        tagId: tag.id,
+        assigned: true,
+      );
+      expect(await repository.entryTagIds(entryId), {tag.id});
+
+      await repository.setEntryTag(
+        entryId: entryId,
+        tagId: tag.id,
+        assigned: false,
+      );
+      expect(await repository.entryTagIds(entryId), isEmpty);
+    });
+
+    test('entriesByTag returns newest first with translated titles', () async {
+      final older = await seedEntry('older-guid');
+      final newer = await seedEntry('newer-guid');
+      final tag = await repository.ensureTag('ordered');
+      await repository.assignTag(entryId: older, tagId: tag.id);
+      await repository.assignTag(entryId: newer, tagId: tag.id);
+
+      final entries = await repository.entriesByTag(tag.id);
+      expect(entries.map((entry) => entry.guid), ['newer-guid', 'older-guid']);
+    });
+
+    test('renameTag and updateTagColor persist changes', () async {
+      final tag = await repository.ensureTag('rename-me');
+
+      await repository.renameTag(tag.id, 'renamed');
+      await repository.updateTagColor(tag.id, '#EF4444');
+
+      final tags = await repository.listTags();
+      expect(tags.single.name, 'renamed');
+      expect(tags.single.color, '#EF4444');
+    });
+
+    test('deleteTag drops associations but keeps entries', () async {
+      final entryId = await seedEntry('keep-me');
+      final tag = await repository.ensureTag('doomed');
+      await repository.assignTag(entryId: entryId, tagId: tag.id);
+
+      await repository.deleteTag(tag.id);
+
+      expect(await repository.listTags(), isEmpty);
+      expect(await repository.entryTagIds(entryId), isEmpty);
+      expect(
+        await database.select(database.entries).get(),
+        hasLength(1),
+      );
+    });
+
+    test('insertParsedEntries auto-tags new entries with isManual=false',
+        () async {
+      await repository.insertParsedEntries(
+        'feed-1',
+        [_entry('auto-1', 'OpenAI 发布新一代大模型')],
+      );
+
+      final tags = await repository.listTags();
+      expect(tags.map((tag) => tag.name), contains('AI'));
+      final rows = await database.select(database.entries).get();
+      final details = await repository.entryTagDetails(rows.single.id);
+      expect(details.values, everyElement(isFalse));
+    });
+
+    test('manual tags keep isManual=true alongside auto tags', () async {
+      final entryId = await seedEntry('mixed-origins');
+      final auto = await repository.ensureTag('auto-tag');
+      final manual = await repository.ensureTag('manual-tag');
+
+      await repository.setEntryTag(
+        entryId: entryId,
+        tagId: auto.id,
+        assigned: true,
+        isManual: false,
+      );
+      await repository.setEntryTag(
+        entryId: entryId,
+        tagId: manual.id,
+        assigned: true,
+      );
+
+      final details = await repository.entryTagDetails(entryId);
+      expect(details[auto.id], isFalse);
+      expect(details[manual.id], isTrue);
+    });
+
+    test('backfillAutoTags re-tags entries that lost their auto tags',
+        () async {
+      await repository.insertParsedEntries(
+        'feed-1',
+        [_entry('backfill-1', 'GPT-5 与大模型的新突破')],
+      );
+      final rows = await database.select(database.entries).get();
+      // Simulate a pre-feature article: drop its auto associations.
+      await database.delete(database.entryTags).go();
+      expect(await repository.entryTagIds(rows.single.id), isEmpty);
+
+      final tagged = await repository.backfillAutoTags();
+
+      expect(tagged, 1);
+      final details = await repository.entryTagDetails(rows.single.id);
+      expect(details.values, everyElement(isFalse));
+      expect(details, isNotEmpty);
+    });
+
+    group('filter rules', () {
+      Future<void> saveRule(
+        String pattern, {
+        String action = 'hide',
+        String? feedId,
+        String matchField = 'title',
+        bool isRegex = false,
+      }) {
+        final now = DateTime.now().toUtc();
+        return repository.saveFilterRule(
+          FilterRulesCompanion.insert(
+            id: 'rule-$pattern-$action',
+            pattern: pattern,
+            isRegex: Value(isRegex),
+            matchField: Value(matchField),
+            action: Value(action),
+            feedId: Value(feedId),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      }
+
+      test('hide rules block insert entirely', () async {
+        await saveRule('好物推荐|优惠券');
+        final inserted = await repository.insertParsedEntries(
+          'feed-1',
+          [
+            _entry('ad-1', '双11好物推荐'),
+            _entry('keep-1', '正常的文章'),
+          ],
+        );
+
+        expect(inserted, 1);
+        final titles = await database.customSelect(
+          'SELECT title FROM entries',
+        ).get();
+        expect(titles.map((r) => r.read<String>('title')), ['正常的文章']);
+        // Hit counter recorded the block.
+        final rules = await repository.listFilterRules();
+        expect(rules.single.hitCount, 1);
+      });
+
+      test('markRead and star rules annotate new entries', () async {
+        await saveRule('融资', action: 'markRead');
+        await saveRule('融资', action: 'star');
+        await repository.insertParsedEntries(
+          'feed-1',
+          [_entry('biz-1', '某公司完成新一轮融资')],
+        );
+
+        final row = (await database.select(database.entries).get()).single;
+        expect(row.readAt, isNotNull);
+        expect(row.starred, isTrue);
+      });
+
+      test('feed-scoped rules ignore other feeds', () async {
+        await repository.saveFeed(
+          Feed(
+            id: 'feed-2',
+            title: 'Other Feed',
+            url: Uri.parse('https://example.com/other.xml'),
+            viewType: FeedViewType.articles,
+          ),
+        );
+        await saveRule('广告', feedId: 'feed-2');
+        await repository.insertParsedEntries(
+          'feed-1',
+          [_entry('other-1', '来自其它源的广告')],
+        );
+
+        expect(await database.select(database.entries).get(), hasLength(1));
+      });
+
+      test('applyFilterRulesToExisting processes stored entries', () async {
+        await repository.insertParsedEntries(
+          'feed-1',
+          [
+            _entry('old-ad', '老文章里的好物推荐'),
+            _entry('old-ok', '老的正常文章'),
+          ],
+        );
+        await saveRule('好物推荐');
+
+        final affected = await repository.applyFilterRulesToExisting();
+
+        expect(affected, 1);
+        final titles = await database.customSelect(
+          'SELECT title FROM entries',
+        ).get();
+        expect(
+          titles.map((r) => r.read<String>('title')),
+          ['老的正常文章'],
+        );
+      });
+
+      test('disabled rules are ignored on insert', () async {
+        await saveRule('好物推荐');
+        await repository.setFilterRuleEnabled('rule-好物推荐-hide', false);
+        final inserted = await repository.insertParsedEntries(
+          'feed-1',
+          [_entry('ad-2', '双11好物推荐')],
+        );
+
+        expect(inserted, 1);
+      });
+
+      test('deleting a rule stops future filtering', () async {
+        await saveRule('好物推荐');
+        await repository.deleteFilterRule('rule-好物推荐-hide');
+        final inserted = await repository.insertParsedEntries(
+          'feed-1',
+          [_entry('ad-3', '双11好物推荐')],
+        );
+
+        expect(inserted, 1);
+      });
+    });
   });
 }
 

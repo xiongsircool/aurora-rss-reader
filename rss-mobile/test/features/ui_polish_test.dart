@@ -82,7 +82,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byTooltip('阅读设置'));
+    await tester.tap(find.byTooltip('更多'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('阅读设置'));
     await tester.pumpAndSettle();
     expect(find.text('字号 · 16'), findsOneWidget);
     expect(tester.takeException(), isNull);

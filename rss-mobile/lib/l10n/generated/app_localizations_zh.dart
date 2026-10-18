@@ -1102,4 +1102,150 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get continueReading => '继续阅读';
+
+  @override
+  String get tags => '标签';
+
+  @override
+  String get tagPickerTitle => '添加标签';
+
+  @override
+  String get tagFilterHint => '筛选标签';
+
+  @override
+  String get tagNewNameHint => '输入新标签名';
+
+  @override
+  String get tagCreate => '创建并添加';
+
+  @override
+  String get tagPickerEmpty => '还没有标签，输入名称创建第一个';
+
+  @override
+  String tagCount(int count) {
+    return '$count 篇';
+  }
+
+  @override
+  String get tagEntriesEmpty => '该标签下暂无文章';
+
+  @override
+  String get tagManage => '标签管理';
+
+  @override
+  String get tagManageHint => '重命名、改色或删除标签';
+
+  @override
+  String get tagRename => '重命名标签';
+
+  @override
+  String get tagColor => '颜色';
+
+  @override
+  String get tagDelete => '删除标签';
+
+  @override
+  String get tagDeleteConfirmBody => '标签会从所有文章上移除，文章本身不受影响。';
+
+  @override
+  String get tagManageEmpty => '还没有标签。阅读文章时点 # 按钮即可添加。';
+
+  @override
+  String get tagAutoBackfill => '为历史文章自动打标签';
+
+  @override
+  String get tagAutoBackfillBusy => '刷新中无法补打标签，请稍后再试';
+
+  @override
+  String get tagAutoBackfillRunning => '正在为历史文章补打标签…';
+
+  @override
+  String tagAutoBackfillDone(int count) {
+    return '已为 $count 篇文章打上标签';
+  }
+
+  @override
+  String get filterRules => '过滤规则';
+
+  @override
+  String get filterRulesHint => '自动屏蔽、标已读或收藏匹配的文章';
+
+  @override
+  String get filterRulesEmpty => '还没有规则。新建一条，用关键词或正则自动处理订阅。';
+
+  @override
+  String get filterRuleNew => '新建规则';
+
+  @override
+  String get filterRuleEdit => '编辑规则';
+
+  @override
+  String get filterRulePattern => '匹配内容';
+
+  @override
+  String get filterRulePatternHint => '多个关键词用 | 分隔';
+
+  @override
+  String get filterRuleIsRegex => '作为正则表达式';
+
+  @override
+  String get filterRuleFieldLabel => '匹配范围';
+
+  @override
+  String get filterRuleFieldTitle => '标题';
+
+  @override
+  String get filterRuleFieldTitleSummary => '标题和摘要';
+
+  @override
+  String get filterRuleActionLabel => '执行动作';
+
+  @override
+  String get filterActionHide => '屏蔽';
+
+  @override
+  String get filterActionHideDesc => '匹配文章不进入收件箱';
+
+  @override
+  String get filterActionMarkRead => '标为已读';
+
+  @override
+  String get filterActionMarkReadDesc => '进入收件箱但不算未读';
+
+  @override
+  String get filterActionStar => '自动收藏';
+
+  @override
+  String get filterActionStarDesc => '匹配文章直接进收藏夹';
+
+  @override
+  String get filterRuleScopeLabel => '作用范围';
+
+  @override
+  String get filterRuleScopeAll => '全部订阅源';
+
+  @override
+  String get filterRuleScopeFeed => '指定订阅源';
+
+  @override
+  String get filterRulePickFeed => '选择订阅源';
+
+  @override
+  String get filterRuleDelete => '删除规则';
+
+  @override
+  String get filterRuleDeleteBody => '删除后新文章不再按此规则处理，已处理的文章不变。';
+
+  @override
+  String filterRuleApplied(int count) {
+    return '已应用：处理 $count 篇现有文章';
+  }
+
+  @override
+  String get filterRuleAppliedZero => '规则已保存，现有文章无匹配';
+
+  @override
+  String filterRuleHits(int count) {
+    return '$count 次命中';
+  }
 }
